@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "configFile",
+      "type": "pickString",
+      "description": "Which config file?",
+      "options": [
+        "C:\\Users\\lester\\.claude.json",
+        "C:\\Users\\lester\\.claude\\settings.json",
+        "C:\\Users\\lester\\.claude\\CLAUDE.md",
+        "C:\\Users\\lester\\AppData\\Roaming\\Code\\User\\settings.json",
+        "C:\\Users\\lester\\.claude-mem\\settings.json"
+      ]
+    },
+    {
+      "id": "configFolder",
+      "type": "pickString",
+      "description": "Which folder?",
+      "options": [
+        "C:\\Users\\lester\\.claude\\skills",
+        "C:\\Users\\lester\\.claude\\projects",
+        "C:\\Users\\lester\\.claude\\plans",
+        "C:\\Users\\lester\\.claude\\docs",
+        "C:\\Users\\lester\\.vscode\\extensions\\awl-claude-http-bridge",
+        "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\claude-code-sandbox\\tools\\awl_claude_tmux_bridge"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Claude: Open File",
+      "type": "shell",
+      "command": "code",
+      "args": ["${input:configFile}"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "never" }
+    },
+    {
+      "label": "Claude: Open Folder",
+      "type": "shell",
+      "command": "explorer",
+      "args": ["${input:configFolder}"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "never" }
+    }
+  ]
+}

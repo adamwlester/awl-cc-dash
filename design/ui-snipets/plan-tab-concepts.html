@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentation panel · Plan tab — concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- v9p6 tokens (kept 1:1 so this ports straight into the live mockup) ---- */
+    --background:#fef6e4; --secondary-background:#ffffff; --foreground:#001858;
+    --main:#f582ae; --main-dim:#f9b9d2; --border:#001858; --ring:#8bd3dd;
+    --secondary:#8bd3dd; --secondary-dim:#bfe6ec; --select:#a9dde7;
+    --surface-3:#f5ecd9; --surface-btn:#fbf5e8; --rule:#d8cfb8;
+    --muted:#5b5f86; --muted-2:#9a93b4; --ag-user:#7b7fa6;
+    --success:#2f9e6f; --warning:#d98a2b; --danger:#d23b6a;
+    --shadow:4px 4px 0 0 var(--border); --shadow-sm:2px 2px 0 0 var(--border);
+    --radius:5px;
+    /* plan-status ramp */
+    --st-draft:#9a93b4; --st-review:#d98a2b; --st-approved:#2f9e6f; --st-exec:#0e8aa0; --st-done:#5b5f86;
+    /* agent jewel identities used in the mocks */
+    --ag-kai:#0076ab; --ag-sandy:#008149; --ag-rowan:#9d5400; --ag-drew:#7152b5;
+  }
+  *{box-sizing:border-box; scrollbar-width:thin; scrollbar-color:#9a93b4 #f0e8d8;}
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-track{background:#f0e8d8;}
+  ::-webkit-scrollbar-thumb{background:#9a93b4; border-radius:4px; border:1px solid #f0e8d8;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--main);}
+  body{margin:0; background:var(--background); color:var(--foreground); font-family:'Archivo',system-ui,sans-serif; font-weight:500; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+
+  /* ---------------- page scaffold ---------------- */
+  .page{max-width:1240px; margin:0 auto; padding:36px 28px 110px;}
+  .topbar{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px;}
+  .topbar h1{font-size:22px; font-weight:900; letter-spacing:-0.02em; margin:0;}
+  .ver{font-size:10px; font-weight:800; color:#fff; background:var(--main); padding:3px 8px; border-radius:var(--radius); border:2px solid var(--border); box-shadow:var(--shadow-sm); font-family:'JetBrains Mono',monospace;}
+  .lede{font-size:13.5px; line-height:1.62; color:var(--muted); max-width:880px; margin:12px 0 0;}
+  .lede b{color:var(--foreground); font-weight:700;}
+  code{font-family:'JetBrains Mono',monospace; font-size:0.9em; background:var(--surface-3); padding:1px 5px; border-radius:3px; border:1px solid var(--rule); color:var(--foreground);}
+
+  /* recommendation / short version block */
+  .reco{margin:24px 0 14px; border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); overflow:hidden; box-shadow:var(--shadow);}
+  .reco-h{display:flex; align-items:center; gap:9px; background:var(--surface-3); border-bottom:2px solid var(--border); padding:10px 16px;}
+  .reco-h .dot{width:10px; height:10px; border-radius:50%; background:var(--main); border:2px solid var(--border);}
+  .reco-h span{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em;}
+  .reco-b{padding:14px 18px; font-size:13px; line-height:1.6; color:var(--muted);}
+  .reco-b ul{margin:10px 0 0; padding-left:0; list-style:none;}
+  .reco-b li{display:flex; gap:11px; padding:5px 0; align-items:baseline;}
+  .reco-b li .k{flex:0 0 auto; font-weight:800; color:var(--foreground); min-width:78px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em;}
+  .reco-b li b{color:var(--foreground);}
+
+  /* anatomy strip */
+  .anat{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:8px 0 6px;}
+  @media(max-width:820px){.anat{grid-template-columns:1fr 1fr;}}
+  .anat-card{border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:11px 12px;}
+  .anat-card h4{margin:0 0 5px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:7px;}
+  .anat-card h4 svg{width:14px; height:14px;}
+  .anat-card p{margin:0; font-size:11.5px; line-height:1.5; color:var(--muted);}
+
+  /* ---------------- idea block ---------------- */
+  .idea{margin-top:40px; border-top:2px solid rgba(0,24,88,0.14); padding-top:28px;}
+  .eyebrow{display:inline-flex; align-items:center; gap:9px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.09em; color:var(--main);}
+  .eyebrow .num{font-family:'JetBrains Mono',monospace; color:var(--foreground); background:var(--surface-3); border:2px solid var(--border); border-radius:var(--radius); padding:2px 8px; box-shadow:var(--shadow-sm);}
+  .idea h2{font-size:19px; font-weight:800; margin:12px 0 6px; letter-spacing:-0.015em;}
+  .thesis{font-size:13px; line-height:1.62; color:var(--muted); margin:0 0 14px; max-width:900px;}
+  .thesis b{color:var(--foreground);}
+  .tradeoffs{display:grid; grid-template-columns:1fr 1fr; gap:10px 26px; margin:6px 0 22px; max-width:900px;}
+  @media(max-width:560px){.tradeoffs{grid-template-columns:1fr;}}
+  .to-col h5{font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; margin:0 0 6px;}
+  .to-col.good h5{color:var(--success);} .to-col.bad h5{color:var(--danger);}
+  .to-col ul{margin:0; padding-left:0; list-style:none;}
+  .to-col li{font-size:12px; line-height:1.5; color:var(--muted); padding:2px 0 2px 15px; position:relative;}
+  .to-col li::before{content:''; position:absolute; left:1px; top:8px; width:6px; height:6px; border-radius:2px;}
+  .to-col.good li::before{background:var(--success);} .to-col.bad li::before{background:var(--danger);}
+  .mock-cap{font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted-2); margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .mock-cap::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 0 3px rgba(47,158,111,0.18);}
+
+  /* ---------------- the panel mock ---------------- */
+  .panel{border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); box-shadow:var(--shadow); overflow:hidden;}
+  .panel-head{display:flex; align-items:center; gap:10px; background:var(--surface-3); border-bottom:2px solid var(--border); padding:8px 12px;}
+  .panel-title{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; display:flex; align-items:center; gap:8px;}
+  .panel-title svg{width:15px; height:15px;}
+  .doc-tabs{display:flex; gap:5px; margin-left:6px;}
+  .doc-tab{font-size:11px; font-weight:700; padding:5px 11px; border:2px solid transparent; border-radius:var(--radius); color:var(--muted); background:transparent; cursor:pointer; transition:all .1s; display:flex; align-items:center; gap:6px;}
+  .doc-tab:hover{color:var(--foreground); background:rgba(0,24,88,0.05);}
+  .doc-tab.active{color:var(--foreground); background:var(--main); border-color:var(--border); box-shadow:var(--shadow-sm);}
+  .doc-tab .cnt{font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; background:var(--secondary-background); border:1.5px solid var(--border); border-radius:20px; padding:0 5px; line-height:14px;}
+  .panel-head .spacer{flex:1;}
+
+  /* buttons (v9p6 .btn family) */
+  .btn{display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; font-family:inherit; font-size:11px; font-weight:700; border:2px solid var(--border); border-radius:var(--radius); color:var(--foreground); background:var(--surface-btn); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s, background .12s; white-space:nowrap;}
+  .btn svg{width:13px; height:13px;}
+  .btn:hover{transform:translate(2px,2px); box-shadow:none;}
+  .btn-main{background:var(--main);}
+  .btn-secondary{background:var(--secondary);}
+  .btn-danger{background:var(--danger); color:#fff;}
+  .btn-ghost{border-color:transparent; box-shadow:none; background:transparent;}
+  .btn-ghost:hover{background:rgba(0,24,88,0.06); transform:none;}
+  .btn-sm{height:25px; padding:0 9px; font-size:10px;}
+  .btn:disabled{opacity:0.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none;}
+
+  /* segmented control */
+  .seg{display:inline-flex; border:2px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--surface-3);}
+  .seg button{font-family:inherit; font-size:10px; font-weight:700; padding:6px 11px; color:var(--muted); border:none; background:transparent; cursor:pointer; border-right:2px solid var(--border); transition:all .1s; display:inline-flex; align-items:center; gap:5px;}
+  .seg button:last-child{border-right:none;}
+  .seg button:hover:not(.active){color:var(--foreground); background:rgba(0,24,88,0.05);}
+  .seg button.active{background:var(--secondary); color:var(--foreground);}
+
+  /* status + origin chips */
+  .chip{display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:2px 7px; border-radius:20px; border:2px solid var(--border); white-space:nowrap; line-height:1.4;}
+  .chip svg{width:11px; height:11px;}
+  .st-draft{background:#efe9dd; color:#6c6883;}
+  .st-review{background:#fbe9cf; color:#9a6710;}
+  .st-approved{background:#dcf2e7; color:#1f6f4d;}
+  .st-exec{background:var(--secondary-dim); color:#0b6576;}
+  .st-done{background:#e7e4f0; color:#574f7a;}
+  .org-local{background:var(--surface-btn); color:var(--muted);}
+  .org-cloud{background:var(--main-dim); color:#9a3160;}
+
+  /* agent identity dot */
+  .agdot{width:16px; height:16px; border-radius:4px; border:2px solid var(--border); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .agdot svg{width:9px; height:9px; color:#fff;}
+
+  /* ---------------- Idea 1: master-detail library ---------------- */
+  .plan-grid{display:grid; grid-template-columns:248px 1fr; min-height:520px;}
+  @media(max-width:780px){.plan-grid{grid-template-columns:1fr;}}
+  .plan-list{border-right:2px solid var(--border); background:var(--background); display:flex; flex-direction:column; min-width:0;}
+  .pl-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 11px; border-bottom:2px solid var(--rule);}
+  .pl-head .lab{font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);}
+  .pl-scroll{overflow-y:auto; padding:9px; display:flex; flex-direction:column; gap:8px; max-height:560px;}
+  .plan-card{text-align:left; border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:9px 10px; cursor:pointer; transition:transform .07s, box-shadow .07s; display:flex; flex-direction:column; gap:7px;}
+  .plan-card:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 0 var(--border);}
+  .plan-card.sel{background:var(--select); box-shadow:var(--shadow); transform:none;}
+  .pc-top{display:flex; align-items:flex-start; gap:8px;}
+  .pc-title{font-size:12px; font-weight:800; line-height:1.25; flex:1; min-width:0;}
+  .pc-chips{display:flex; flex-wrap:wrap; gap:5px;}
+  .pc-meta{display:flex; align-items:center; gap:7px; font-size:9.5px; font-weight:600; color:var(--muted); font-family:'JetBrains Mono',monospace;}
+  .pc-meta .nm{font-family:'Archivo'; font-weight:700; color:var(--foreground);}
+
+  /* reader */
+  .plan-reader{display:flex; flex-direction:column; min-width:0; background:var(--secondary-background);}
+  .reader-bar{position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--surface-3); border-bottom:2px solid var(--border); flex-wrap:wrap;}
+  .reader-bar .rb-title{font-size:13px; font-weight:800; flex:1; min-width:120px;}
+  .reader-body{padding:16px 20px 22px; overflow-y:auto; max-height:560px;}
+  .md h3{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--main); margin:18px 0 7px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  .md h3:first-child{margin-top:0;}
+  .md p{font-size:12.5px; line-height:1.6; color:var(--muted); margin:0 0 9px;}
+  .md ul{margin:0 0 9px; padding-left:0; list-style:none;}
+  .md li{font-size:12.5px; line-height:1.55; color:var(--muted); padding:3px 0 3px 18px; position:relative;}
+  .md li::before{content:''; position:absolute; left:3px; top:10px; width:5px; height:5px; border-radius:50%; background:var(--main);}
+  .md li b, .md p b{color:var(--foreground); font-weight:700;}
+  .md .phase{border-left:3px solid var(--secondary); padding:2px 0 2px 12px; margin:0 0 9px;}
+  .md .phase .pn{font-size:11px; font-weight:800; color:var(--foreground); display:block; margin-bottom:2px;}
+  .md code{font-size:11px;}
+
+  /* ---------------- Idea 2: review surface ---------------- */
+  .rev-grid{display:grid; grid-template-columns:190px 1fr; min-height:480px;}
+  @media(max-width:780px){.rev-grid{grid-template-columns:1fr;}}
+  .outline{border-right:2px solid var(--border); background:var(--background); padding:12px 11px; display:flex; flex-direction:column; gap:3px;}
+  .outline .ol-cap{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted-2); margin-bottom:6px;}
+  .ol-item{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; font-weight:700; color:var(--muted); padding:6px 8px; border-radius:var(--radius); cursor:pointer; border:2px solid transparent;}
+  .ol-item:hover{background:rgba(0,24,88,0.05); color:var(--foreground);}
+  .ol-item.on{background:var(--select); border-color:var(--border); color:var(--foreground);}
+  .ol-item .cbadge{font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; background:var(--main); color:var(--foreground); border:1.5px solid var(--border); border-radius:20px; padding:0 5px; line-height:15px;}
+  .rev-body{padding:14px 16px 18px; overflow-y:auto; max-height:520px;}
+  .rev-sec{border:2px solid var(--rule); border-radius:var(--radius); margin-bottom:12px; background:var(--secondary-background); overflow:hidden;}
+  .rev-sec.active{border-color:var(--border); box-shadow:var(--shadow-sm);}
+  .rs-head{display:flex; align-items:center; gap:9px; padding:9px 11px; cursor:pointer;}
+  .rs-head h4{font-size:12px; font-weight:800; margin:0; flex:1;}
+  .rs-body{padding:0 11px 11px;}
+  .rs-body p{font-size:12px; line-height:1.55; color:var(--muted); margin:0 0 8px;}
+  .react-row{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;}
+  .react{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:2px 8px; border:2px solid var(--border); border-radius:20px; background:var(--surface-btn); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s;}
+  .react:hover{transform:translate(1px,1px); box-shadow:none;}
+  .react.on{background:var(--secondary-dim);}
+  .react .em{font-size:12px;}
+  .react .n{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted);}
+  .add-cmt{font-size:10px; font-weight:700; color:var(--main); background:none; border:none; cursor:pointer; padding:2px 4px;}
+  .add-cmt:hover{text-decoration:underline;}
+  .cmt{display:none; margin-top:9px; border-top:2px solid var(--rule); padding-top:9px;}
+  .cmt.open{display:block;}
+  .cmt-item{display:flex; gap:8px; margin-bottom:8px;}
+  .cmt-item .who{font-size:10px; font-weight:800; color:var(--foreground);}
+  .cmt-item p{font-size:11px; margin:2px 0 0; color:var(--muted); line-height:1.45;}
+  .cmt-input{display:flex; gap:7px; margin-top:6px;}
+  .cmt-input input{flex:1; font-family:inherit; font-size:11px; padding:6px 9px; border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); color:var(--foreground);}
+  .cmt-input input:focus{outline:none; box-shadow:var(--shadow-sm);}
+
+  /* ---------------- Idea 3: approve → execute ---------------- */
+  .exec-wrap{padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media(max-width:780px){.exec-wrap{grid-template-columns:1fr;}}
+  .exec-card{border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden;}
+  .ec-head{padding:9px 12px; background:var(--surface-3); border-bottom:2px solid var(--border); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:7px;}
+  .ec-head svg{width:14px; height:14px;}
+  .ec-body{padding:13px;}
+  .gate{display:flex; align-items:center; gap:9px; padding:9px 11px; border:2px solid var(--rule); border-radius:var(--radius); margin-bottom:10px; font-size:12px; font-weight:700;}
+  .gate .stamp{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:2px 7px; border-radius:20px; border:2px solid var(--border); margin-left:auto;}
+  .actions-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+  .target-row{display:flex; gap:8px; margin:12px 0 6px;}
+  .target{flex:1; text-align:left; border:2px solid var(--border); border-radius:var(--radius); background:var(--surface-btn); box-shadow:var(--shadow-sm); padding:10px; cursor:pointer; transition:transform .07s, box-shadow .07s;}
+  .target:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 0 var(--border);}
+  .target.on{background:var(--select); box-shadow:var(--shadow); transform:none;}
+  .target .tt{font-size:11px; font-weight:800; display:flex; align-items:center; gap:6px;}
+  .target .td{font-size:10px; color:var(--muted); margin-top:4px; line-height:1.4;}
+  .toggle-row{display:flex; align-items:center; gap:9px; padding:8px 0 2px; font-size:11px; font-weight:600; color:var(--muted);}
+  .sw{width:34px; height:19px; border:2px solid var(--border); border-radius:20px; background:var(--surface-btn); position:relative; cursor:pointer; flex:0 0 auto; transition:background .12s;}
+  .sw::after{content:''; position:absolute; top:1px; left:1px; width:13px; height:13px; border-radius:50%; background:var(--border); transition:left .14s;}
+  .sw.on{background:var(--secondary);}
+  .sw.on::after{left:16px;}
+  /* todo checklist */
+  .todo{display:flex; align-items:flex-start; gap:9px; padding:7px 4px; font-size:12px; border-bottom:1px solid var(--rule);}
+  .todo:last-child{border-bottom:none;}
+  .tbox{width:16px; height:16px; border:2px solid var(--border); border-radius:4px; flex:0 0 auto; cursor:pointer; display:flex; align-items:center; justify-content:center; margin-top:1px; background:var(--secondary-background);}
+  .tbox svg{width:10px; height:10px; color:#fff; opacity:0;}
+  .todo.done .tbox{background:var(--success);} .todo.done .tbox svg{opacity:1;}
+  .todo.done .tlab{color:var(--muted-2); text-decoration:line-through;}
+  .todo.active .tbox{border-color:var(--st-exec); box-shadow:0 0 0 3px var(--secondary-dim);}
+  .tlab{flex:1; line-height:1.4; color:var(--muted); font-weight:600;}
+  .todo.active .tlab{color:var(--foreground); font-weight:700;}
+  .tnow{font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--st-exec); border:2px solid var(--st-exec); border-radius:20px; padding:1px 6px; margin-top:1px;}
+
+  /* ---------------- Idea 4: ultraplan launcher ---------------- */
+  .up-wrap{padding:16px; display:grid; grid-template-columns:1fr 320px; gap:14px;}
+  @media(max-width:820px){.up-wrap{grid-template-columns:1fr;}}
+  .up-compose{border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:13px;}
+  .up-ta{width:100%; min-height:74px; resize:vertical; font-family:inherit; font-size:12.5px; line-height:1.5; padding:10px; border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background); color:var(--foreground);}
+  .up-ta:focus{outline:none; box-shadow:var(--shadow-sm);}
+  .field-lab{font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:12px 0 6px; display:block;}
+  .variant-row{display:flex; gap:8px;}
+  .variant{flex:1; text-align:left; border:2px solid var(--border); border-radius:var(--radius); background:var(--surface-btn); box-shadow:var(--shadow-sm); padding:9px; cursor:pointer; transition:transform .07s, box-shadow .07s;}
+  .variant:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 0 var(--border);}
+  .variant.on{background:var(--select); box-shadow:var(--shadow); transform:none;}
+  .variant .vt{font-size:11px; font-weight:800;}
+  .variant .vd{font-size:9.5px; color:var(--muted); margin-top:3px; line-height:1.35;}
+  .up-status{border:2px solid var(--border); border-radius:var(--radius); background:var(--surface-3); box-shadow:var(--shadow-sm); padding:13px; display:flex; flex-direction:column; gap:11px;}
+  .ups-row{display:flex; align-items:center; gap:9px;}
+  .spin{width:15px; height:15px; border:2.5px solid var(--rule); border-top-color:var(--st-exec); border-radius:50%; animation:sp 0.8s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .ups-prog{height:8px; border:2px solid var(--border); border-radius:20px; background:var(--secondary-background); overflow:hidden;}
+  .ups-prog > i{display:block; height:100%; background:var(--st-exec); width:28%; transition:width .4s;}
+  .ups-note{font-size:10.5px; line-height:1.45; color:var(--muted);}
+  .ups-note b{color:var(--foreground);}
+  .free-pill{display:inline-flex; align-items:center; gap:5px; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#1f6f4d; background:#dcf2e7; border:2px solid var(--border); border-radius:20px; padding:2px 7px;}
+
+  /* ---------------- Idea 5: versions / diff ---------------- */
+  .ver-wrap{padding:14px 16px;}
+  .ver-pills{display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
+  .vpill{font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:4px 11px; border:2px solid var(--border); border-radius:var(--radius); background:var(--surface-btn); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s; display:flex; align-items:center; gap:7px;}
+  .vpill:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 0 var(--border);}
+  .vpill.on{background:var(--main); box-shadow:var(--shadow);}
+  .vpill .vd{font-family:'Archivo'; font-size:9px; font-weight:600; color:var(--muted);}
+  .vpill.on .vd{color:#9a3160;}
+  .diff{border:2px solid var(--border); border-radius:var(--radius); overflow:hidden; font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  .dl{display:flex; gap:10px; padding:4px 11px; line-height:1.5;}
+  .dl .sign{width:12px; flex:0 0 auto; font-weight:700; text-align:center;}
+  .dl.add{background:#e7f5ee; color:#1f6f4d;} .dl.add .sign::before{content:'+';}
+  .dl.del{background:#fbe7ee; color:#9a2447;} .dl.del .sign::before{content:'\2212';}
+  .dl.ctx{color:var(--muted);} .dl.ctx .sign::before{content:'';}
+  .ver-meta{font-size:10.5px; color:var(--muted); margin-top:9px; display:flex; align-items:center; gap:8px;}
+
+  .footnote{margin-top:54px; padding-top:20px; border-top:2px solid rgba(0,24,88,0.14); font-size:12px; line-height:1.65; color:var(--muted); max-width:920px;}
+  .footnote b{color:var(--foreground);}
+  .footnote h4{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 8px;}
+</style>
+</head>
+<body>
+
+<!-- ---------------- icon defs ---------------- -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-doc" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3"/><path d="M6 8h4M6 10.5h4"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7l3 3V13.5H3z"/><path d="M5.5 7l1.4 1.4L10 5.5"/><path d="M5.5 11h5"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12a3 3 0 0 1-.4-5.97A4 4 0 0 1 12 6.2 2.8 2.8 0 0 1 11.5 12z"/></symbol>
+  <symbol id="i-term" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 6.5l2 1.5-2 1.5M8.5 10h2.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-6.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3z"/></symbol>
+  <symbol id="i-cmt" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10v7H7l-3 2.5V10H3z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2L4 9h3.5L7 14l5-7H8.5z"/></symbol>
+  <symbol id="i-tele" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v6"/><path d="M5 5l3-3 3 3"/><rect x="3" y="9" width="10" height="5" rx="1"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8"/><path d="M12 7.6a4 4 0 0 1-4 4H4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="9" height="7" rx="1.5"/><path d="M8 2.5v2.5M6 8.5h.01M10 8.5h.01"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+</svg>
+
+<div class="page">
+
+  <div class="topbar">
+    <h1>Documentation panel · Plan tab</h1>
+    <span class="ver">concepts</span>
+  </div>
+  <p class="lede">
+    A concept set for a <b>Plan</b> tab living inside a new <b>Documentation</b> panel — the surface that turns Claude Code's
+    <b>native planning</b> into something you read, review, approve and ship from the dashboard, never the raw CLI. It covers
+    both flavours of the real feature: <b>local Plan Mode</b> (read-only research that writes a markdown plan into the
+    <code>plansDirectory</code>) and <b>Ultraplan</b> (planning that runs in a cloud container while your terminal stays free,
+    returning a richer artifact with Simple / Visual / Deep variants). Every mock below is live — click it. Tokens are pulled
+    1:1 from <code>ui-concept-v9p6.html</code> so any direction drops straight in. Backlog ref: <b>C4 "Plans Tab"</b> + the
+    Documentation-panel loose note.
+  </p>
+
+  <!-- short version -->
+  <div class="reco">
+    <div class="reco-h"><span class="dot"></span><span>The short version</span></div>
+    <div class="reco-b">
+      The Documentation panel is the new third-from-left column (<b>Agent · Team Graph · Documentation · Feed · Prompts</b>),
+      and <b>Plan</b> is its first, most live tab — sitting beside Specs / Notes / Refs. Recommended build order:
+      <ul>
+        <li><span class="k">Spine</span><span><b>Concept 1 — Plan Library.</b> A master–detail list ↔ markdown reader over the real plan files. Everything else hangs off this; build it first.</span></li>
+        <li><span class="k">Review</span><span><b>Concept 2 — Section review.</b> Inline comments + emoji reactions + an outline rail — the dashboard's own copy of Ultraplan's browser review surface.</span></li>
+        <li><span class="k">Ship it</span><span><b>Concept 3 — Approve → Execute.</b> The gate that routes approval to <b>Requests</b> and fans out to <b>teleport-to-local</b> or <b>cloud → PR</b>, with the live todo checklist.</span></li>
+        <li><span class="k">Source</span><span><b>Concept 4 — Ultraplan launcher.</b> Compose a plan, pick a variant, watch the cloud run while the terminal stays free, escalate a local draft up.</span></li>
+        <li><span class="k">Trust</span><span><b>Concept 5 — Versions &amp; diff.</b> Plans iterate; keep every draft and diff them so an edit is never a black box.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- anatomy -->
+  <div class="anat">
+    <div class="anat-card">
+      <h4><svg><use href="#i-plan"/></svg>What a plan is</h4>
+      <p>A markdown file Claude writes in plan mode — Goal · Context · phased Approach · Files · Risks · Out-of-scope. The tab renders it; it is not a chat log.</p>
+    </div>
+    <div class="anat-card">
+      <h4><svg><use href="#i-doc"/></svg>Where it comes from</h4>
+      <p>Local <b>Plan Mode</b> (Shift+Tab, read-only) or <b>Ultraplan</b> in the cloud. Each plan card is tagged with its origin so you know how it was made.</p>
+    </div>
+    <div class="anat-card">
+      <h4><svg><use href="#i-check"/></svg>What you do to it</h4>
+      <p>Read → comment / react → edit → <b>approve</b> (or request changes). Approval is a first-class act that surfaces in the Requests inbox.</p>
+    </div>
+    <div class="anat-card">
+      <h4><svg><use href="#i-bolt"/></svg>Where it goes</h4>
+      <p>On accept: <b>teleport</b> to a local agent for execution, or run in the cloud and open a PR. A live todo list tracks the execution it spawns.</p>
+    </div>
+  </div>
+
+  <!-- ============================ CONCEPT 1 ============================ -->
+  <div class="idea" id="c1">
+    <span class="eyebrow"><span class="num">1</span> Plan Library — master &amp; detail</span>
+    <h2>A list of every plan, a reader for the one in focus</h2>
+    <p class="thesis">The spine of the tab and the closest mirror of how plans actually exist on disk (many markdown files in <code>plansDirectory</code>). The left rail lists every plan as an identity-tagged card — title, <b>status</b> along the draft → review → approved → executing → done ramp, <b>origin</b> (Plan-mode vs Ultraplan), and the owning agent. Click one and it renders, full markdown, in a reader with a sticky action bar. It scales to dozens of plans and reads at a glance, exactly like the Team Feed's other lists.</p>
+    <div class="tradeoffs">
+      <div class="to-col good"><h5>Buys you</h5><ul>
+        <li>Maps 1:1 to the real files — no invented model to maintain</li>
+        <li>Status + origin chips make a fleet of plans scannable</li>
+        <li>Reuses the node-card + list patterns already in the mockup</li>
+      </ul></div>
+      <div class="to-col bad"><h5>Costs you</h5><ul>
+        <li>Two-pane split needs width — wants the wide Documentation column</li>
+        <li>A very long single plan still needs an inner scroll</li>
+        <li>List + reader is more to wire than a single document view</li>
+      </ul></div>
+    </div>
+    <div class="mock-cap">live · click a plan in the list</div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><svg><use href="#i-doc"/></svg>Documentation</span>
+        <div class="doc-tabs">
+          <button class="doc-tab active"><svg style="width:13px;height:13px"><use href="#i-plan"/></svg>Plan <span class="cnt">4</span></button>
+          <button class="doc-tab">Specs</button>
+          <button class="doc-tab">Notes</button>
+          <button class="doc-tab">Refs</button>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn btn-sm"><svg><use href="#i-cloud"/></svg>New Ultraplan</button>
+      </div>
+      <div class="plan-grid">
+        <div class="plan-list">
+          <div class="pl-head"><span class="lab">Plans · plansDirectory</span><span class="chip st-review" style="font-size:9px">2 need you</span></div>
+          <div class="pl-scroll" id="c1-list"></div>
+        </div>
+        <div class="plan-reader">
+          <div class="reader-bar">
+            <span class="rb-title" id="c1-rtitle">—</span>
+            <button class="btn btn-sm"><svg><use href="#i-edit"/></svg>Edit</button>
+            <button class="btn btn-sm btn-secondary"><svg><use href="#i-cmt"/></svg>Request changes</button>
+            <button class="btn btn-sm btn-main"><svg><use href="#i-check"/></svg>Approve</button>
+          </div>
+          <div class="reader-body md" id="c1-reader"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ CONCEPT 2 ============================ -->
+  <div class="idea" id="c2">
+    <span class="eyebrow"><span class="num">2</span> Section review — comments &amp; reactions</span>
+    <h2>Mark up the plan section by section, like the cloud review surface</h2>
+    <p class="thesis">This is the dashboard's own version of <b>Ultraplan's browser review</b>: the plan splits into collapsible sections, each carrying its own <b>inline comment thread</b> and <b>emoji reactions</b> (a fast 👍 / ⚠️ / 🎯 to signal approval or concern without writing prose). An <b>outline rail</b> navigates long plans and shows which sections have open comments. The loop is leave a note → "ask Claude to address" → review the redraft → repeat, all without leaving the panel.</p>
+    <div class="tradeoffs">
+      <div class="to-col good"><h5>Buys you</h5><ul>
+        <li>Matches the native Ultraplan review UX users already meet on the web</li>
+        <li>Reactions make "I'm fine with this section" a one-click act</li>
+        <li>Outline + comment badges turn a wall of markdown into a worklist</li>
+      </ul></div>
+      <div class="to-col bad"><h5>Costs you</h5><ul>
+        <li>Section-level threading is real state to model and persist</li>
+        <li>Only worth it once plans are genuinely long / iterated on</li>
+        <li>Risks overlapping with the Feed if comments aren't kept in-panel</li>
+      </ul></div>
+    </div>
+    <div class="mock-cap">live · click a section, react, open a thread</div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><svg><use href="#i-doc"/></svg>Documentation</span>
+        <div class="doc-tabs">
+          <button class="doc-tab active"><svg style="width:13px;height:13px"><use href="#i-plan"/></svg>Plan</button>
+          <button class="doc-tab">Specs</button><button class="doc-tab">Notes</button><button class="doc-tab">Refs</button>
+        </div>
+        <span class="spacer"></span>
+        <span class="chip org-cloud"><svg><use href="#i-cloud"/></svg>Ultraplan · Deep</span>
+      </div>
+      <div class="rev-grid">
+        <div class="outline" id="c2-outline">
+          <div class="ol-cap">Outline</div>
+        </div>
+        <div class="rev-body" id="c2-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ CONCEPT 3 ============================ -->
+  <div class="idea" id="c3">
+    <span class="eyebrow"><span class="num">3</span> Approve → Execute</span>
+    <h2>The gate: approve the plan, then choose where it runs</h2>
+    <p class="thesis">Approval is the moment the plan stops being a document and becomes work. The left card is the <b>gate</b> — Request changes · Edit · <b>Approve</b> — and approving posts the plan to the team-wide <b>Requests</b> inbox (consistent with how every other human-control act routes). The right card is the <b>handoff</b>: pick a target — <b>teleport to a local agent</b> (full environment access) or <b>execute in the cloud → open a PR</b> — with the native <code>clear-context-on-accept</code> toggle. Once it's running, the same card becomes the live <b>todo checklist</b> Claude drives.</p>
+    <div class="tradeoffs">
+      <div class="to-col good"><h5>Buys you</h5><ul>
+        <li>Both real execution paths (local teleport, cloud PR) in one place</li>
+        <li>Approval reuses the Requests inbox — no parallel approval UI</li>
+        <li>The todo list gives execution a progress readout, not a black box</li>
+      </ul></div>
+      <div class="to-col bad"><h5>Costs you</h5><ul>
+        <li>Cloud execution needs a connected GitHub repo + web account</li>
+        <li>Clear-context-on-accept is destructive — needs a clear warning</li>
+        <li>Two states in one card (gate vs running) adds conditional logic</li>
+      </ul></div>
+    </div>
+    <div class="mock-cap">live · approve, pick a target, tick the todos</div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><svg><use href="#i-doc"/></svg>Documentation</span>
+        <div class="doc-tabs"><button class="doc-tab active"><svg style="width:13px;height:13px"><use href="#i-plan"/></svg>Plan</button><button class="doc-tab">Specs</button><button class="doc-tab">Notes</button><button class="doc-tab">Refs</button></div>
+        <span class="spacer"></span>
+        <span class="chip org-local" id="c3-status"><svg><use href="#i-term"/></svg>Plan mode · rate-limiting</span>
+      </div>
+      <div class="exec-wrap">
+        <div class="exec-card">
+          <div class="ec-head"><svg><use href="#i-check"/></svg>Approval gate</div>
+          <div class="ec-body">
+            <div class="gate">Add rate limiting to the API gateway<span class="stamp st-review" id="c3-gate-stamp">Awaiting you</span></div>
+            <div class="actions-row">
+              <button class="btn btn-sm"><svg><use href="#i-cmt"/></svg>Request changes</button>
+              <button class="btn btn-sm"><svg><use href="#i-edit"/></svg>Edit</button>
+              <button class="btn btn-sm btn-main" id="c3-approve"><svg><use href="#i-check"/></svg>Approve plan</button>
+            </div>
+            <p style="font-size:10.5px;color:var(--muted);line-height:1.5;margin:8px 0 0;">Approving posts a card to <b>Requests</b> and unlocks the execution target on the right. <span id="c3-approved-note" style="display:none;color:#1f6f4d;font-weight:700;">✓ Approved — choose where it runs.</span></p>
+          </div>
+        </div>
+        <div class="exec-card">
+          <div class="ec-head"><svg><use href="#i-bolt"/></svg>Execute</div>
+          <div class="ec-body" id="c3-exec">
+            <div class="target-row">
+              <button class="target on" data-t="local">
+                <span class="tt"><svg style="width:13px;height:13px"><use href="#i-tele"/></svg>Teleport to local</span>
+                <span class="td">Drop the plan into a local agent with full repo + env access.</span>
+              </button>
+              <button class="target" data-t="cloud">
+                <span class="tt"><svg style="width:13px;height:13px"><use href="#i-branch"/></svg>Cloud → PR</span>
+                <span class="td">Run in the cloud session; lands as a pull request.</span>
+              </button>
+            </div>
+            <div class="toggle-row"><span class="sw" id="c3-clear"></span><span>Clear context on accept <span style="color:var(--muted-2)">— start execution fresh from the plan</span></span></div>
+            <button class="btn btn-main" id="c3-run" style="width:100%;justify-content:center;margin-top:10px;" disabled><svg><use href="#i-bolt"/></svg>Approve a plan to run</button>
+            <div id="c3-todos" style="display:none;margin-top:12px;">
+              <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px;">Live todos · TodoWrite</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ CONCEPT 4 ============================ -->
+  <div class="idea" id="c4">
+    <span class="eyebrow"><span class="num">4</span> Ultraplan launcher</span>
+    <h2>Compose a plan, send it to the cloud, keep working</h2>
+    <p class="thesis">Where plans are <b>born</b>. Describe the task, pick a variant — <b>Simple</b> (baseline), <b>Visual</b> (Mermaid / ASCII diagrams), or <b>Deep</b> (subagents run risk &amp; architecture reviews) — and launch. Planning runs in a cloud container (Opus, up to ~30 min) <b>while your terminal stays free</b>, so the right card is a live status readout, not a frozen wait. A local Plan-Mode draft can also be <b>escalated</b> here for a heavier cloud pass. When it lands, the artifact flows into the Library (Concept 1).</p>
+    <div class="tradeoffs">
+      <div class="to-col good"><h5>Buys you</h5><ul>
+        <li>Surfaces the variant choice the CLI hides behind A/B assignment</li>
+        <li>"Terminal stays free" becomes visible — you see it running, not blocking</li>
+        <li>One escalate button bridges local drafts → cloud iteration</li>
+      </ul></div>
+      <div class="to-col bad"><h5>Costs you</h5><ul>
+        <li>Requires Claude Code web (Pro/Max/Team) + v2.1.91+</li>
+        <li>Plans off a point-in-time repo snapshot — needs a "may be stale" note</li>
+        <li>Cloud status needs real polling/streaming to feel honest</li>
+      </ul></div>
+    </div>
+    <div class="mock-cap">live · pick a variant, press Plan in cloud</div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><svg><use href="#i-doc"/></svg>Documentation</span>
+        <div class="doc-tabs"><button class="doc-tab active"><svg style="width:13px;height:13px"><use href="#i-plan"/></svg>Plan</button><button class="doc-tab">Specs</button><button class="doc-tab">Notes</button><button class="doc-tab">Refs</button></div>
+        <span class="spacer"></span>
+        <span class="free-pill"><svg style="width:11px;height:11px"><use href="#i-term"/></svg>terminal free</span>
+      </div>
+      <div class="up-wrap">
+        <div class="up-compose">
+          <span class="field-lab">What should Claude plan?</span>
+          <textarea class="up-ta" id="c4-ta">Migrate the auth service from server-side sessions to JWTs, keeping refresh-token rotation and a zero-downtime cutover.</textarea>
+          <span class="field-lab">Planning variant</span>
+          <div class="variant-row" id="c4-variants">
+            <button class="variant" data-v="simple"><span class="vt">Simple</span><span class="vd">Baseline structured plan.</span></button>
+            <button class="variant" data-v="visual"><span class="vt">Visual</span><span class="vd">Adds Mermaid / ASCII diagrams.</span></button>
+            <button class="variant on" data-v="deep"><span class="vt">Deep</span><span class="vd">Subagents review risk &amp; architecture.</span></button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-main" id="c4-launch"><svg><use href="#i-cloud"/></svg>Plan in cloud</button>
+            <button class="btn"><svg><use href="#i-tele"/></svg>Escalate local draft</button>
+          </div>
+        </div>
+        <div class="up-status" id="c4-status">
+          <div class="ups-row"><svg style="width:15px;height:15px;color:var(--muted-2)"><use href="#i-cloud"/></svg><span style="font-size:11px;font-weight:800;">Cloud planner</span><span class="chip st-draft" style="margin-left:auto" id="c4-state">idle</span></div>
+          <div class="ups-note" id="c4-note">Pick a variant and launch. Claude plans in a remote container off a point-in-time snapshot of the repo — your terminal stays free the whole time.</div>
+          <div class="ups-prog" id="c4-progwrap" style="display:none;"><i id="c4-prog"></i></div>
+          <div class="ups-row" id="c4-meta" style="display:none;font-size:10px;color:var(--muted);"><svg style="width:12px;height:12px"><use href="#i-clock"/></svg><span id="c4-time" class="mono">00:00 / ~30:00</span><span class="agdot" style="background:var(--ag-kai);margin-left:auto"><svg><use href="#i-bot"/></svg></span><span style="font-weight:700;color:var(--foreground)">kai</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ CONCEPT 5 ============================ -->
+  <div class="idea" id="c5">
+    <span class="eyebrow"><span class="num">5</span> Versions &amp; diff</span>
+    <h2>Every redraft kept, every edit diffable</h2>
+    <p class="thesis">Plans rarely land in one shot — you comment, Claude redrafts, you escalate to the cloud. This concept keeps each <b>version</b> as a pill and shows a <b>line diff</b> between any two, so "what changed when I asked for X" is a glance, not a re-read. It's the trust layer under Concepts 2–4: the natural home for an audit trail of who/what changed a plan and why.</p>
+    <div class="tradeoffs">
+      <div class="to-col good"><h5>Buys you</h5><ul>
+        <li>Makes Claude's redrafts legible — edits stop being a black box</li>
+        <li>Pairs naturally with the comment loop and cloud escalation</li>
+        <li>Cheap if plans are already files — it's git-for-plans, lightly</li>
+      </ul></div>
+      <div class="to-col bad"><h5>Costs you</h5><ul>
+        <li>Only earns its keep once plans actually iterate</li>
+        <li>A full diff view is more chrome than a small panel wants</li>
+        <li>Needs a snapshot per version kept somewhere</li>
+      </ul></div>
+    </div>
+    <div class="mock-cap">live · switch the version being compared</div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><svg><use href="#i-doc"/></svg>Documentation</span>
+        <div class="doc-tabs"><button class="doc-tab active"><svg style="width:13px;height:13px"><use href="#i-plan"/></svg>Plan</button><button class="doc-tab">Specs</button><button class="doc-tab">Notes</button><button class="doc-tab">Refs</button></div>
+        <span class="spacer"></span>
+        <span class="chip org-cloud"><svg><use href="#i-cloud"/></svg>Ultraplan</span>
+      </div>
+      <div class="ver-wrap">
+        <div class="ver-pills" id="c5-pills">
+          <span style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-right:2px;">Compare v2 →</span>
+        </div>
+        <div class="diff" id="c5-diff"></div>
+        <div class="ver-meta" id="c5-meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    <h4>How it ties into the rest of the dashboard</h4>
+    <b>Layout:</b> Documentation becomes the new third column in the reconfigured frame — <b>Agent · Team Graph · Documentation · Feed · Prompts</b> — and <b>Plan</b> is the live tab among quieter doc tabs (Specs / Notes / Refs).
+    <b>Identity:</b> every plan card and cloud run carries the owning agent's color + icon, same as everywhere else.
+    <b>Requests:</b> "approve plan" is an <i>Approval</i>-type request, so it shows up in the Team Feed's Requests inbox rather than inventing a second approval surface; <b>Reply</b> still routes to Prompts → Compose.
+    <b>Triggers / lifecycle:</b> teleport-to-local reuses the same <i>Now / Next / Queue</i> delivery vocabulary as links and sends.
+    <br><br>
+    <b>Pick a direction and the pieces compose:</b> 1 is the spine, 2 and 5 layer onto the reader, 3 is the exit, 4 is the entrance. Say which and I'll wire it into <code>ui-concept-v9p6.html</code> against the real Documentation column and the Requests handlers.
+  </p>
+
+</div>
+
+<script>
+/* ====================== shared sample data ====================== */
+const AG = {
+  kai:  {name:'kai',   c:'var(--ag-kai)'},
+  sandy:{name:'sandy', c:'var(--ag-sandy)'},
+  rowan:{name:'rowan', c:'var(--ag-rowan)'},
+  drew: {name:'drew',  c:'var(--ag-drew)'},
+};
+const ST = {
+  draft:   {cls:'st-draft',    lab:'Draft'},
+  review:  {cls:'st-review',   lab:'Awaiting you'},
+  approved:{cls:'st-approved', lab:'Approved'},
+  exec:    {cls:'st-exec',     lab:'Executing'},
+  done:    {cls:'st-done',     lab:'Done'},
+};
+function org(o,v){
+  return o==='cloud'
+    ? `<span class="chip org-cloud"><svg><use href="#i-cloud"/></svg>Ultraplan${v?' · '+v:''}</span>`
+    : `<span class="chip org-local"><svg><use href="#i-term"/></svg>Plan mode</span>`;
+}
+function dot(a){ return `<span class="agdot" style="background:${AG[a].c}"><svg><use href="#i-bot"/></svg></span>`; }
+
+const PLANS = [
+  { id:'jwt', title:'Migrate auth service → JWT', status:'review', o:'cloud', v:'Deep', ag:'kai', meta:'42 turns · 6m ago',
+    body:`
+      <h3>Goal</h3>
+      <p>Replace server-side session auth with stateless <b>JWTs</b>, preserving refresh-token rotation and shipping a <b>zero-downtime</b> cutover.</p>
+      <h3>Current state</h3>
+      <ul>
+        <li>Sessions held in Redis, looked up on every request in <code>src/auth/session.ts</code>.</li>
+        <li>Login issues an opaque cookie; logout deletes the Redis key.</li>
+        <li>No token signing infra exists yet.</li>
+      </ul>
+      <h3>Approach</h3>
+      <div class="phase"><span class="pn">Phase 1 · Issue JWTs alongside sessions</span>Add an asymmetric signing key, mint a short-lived access JWT + rotating refresh token at login, keep the Redis session live in parallel.</div>
+      <div class="phase"><span class="pn">Phase 2 · Verify-first middleware</span>New middleware checks the JWT, falls back to the session lookup on miss — so nothing breaks mid-rollout.</div>
+      <div class="phase"><span class="pn">Phase 3 · Drain &amp; remove sessions</span>Once JWT coverage is healthy in metrics, stop writing sessions and delete the Redis path.</div>
+      <h3>Files to change</h3>
+      <ul>
+        <li><code>src/auth/jwt.ts</code> — new signer / verifier</li>
+        <li><code>src/auth/middleware.ts</code> — verify-first, session fallback</li>
+        <li><code>src/auth/refresh.ts</code> — rotation + reuse detection</li>
+        <li><code>src/auth/session.ts</code> — gated behind a flag, removed in Phase 3</li>
+      </ul>
+      <h3>Risks</h3>
+      <ul>
+        <li><b>Refresh reuse</b> — a stolen refresh token must invalidate its family. Mitigation: rotation + reuse detection in Phase 1.</li>
+        <li><b>Clock skew</b> across nodes can reject valid tokens — allow a small leeway window.</li>
+      </ul>
+      <h3>Out of scope</h3>
+      <ul><li>OAuth / social login. SSO. Per-tenant key isolation.</li></ul>` },
+  { id:'rate', title:'Add rate limiting to API gateway', status:'approved', o:'local', v:'', ag:'sandy', meta:'18 turns · 22m ago',
+    body:`<h3>Goal</h3><p>Protect the gateway with a <b>token-bucket</b> limiter, per-key and per-route.</p>
+      <h3>Approach</h3>
+      <div class="phase"><span class="pn">Phase 1 · Middleware</span>Drop a Redis-backed token-bucket in front of routes; 429 + <code>Retry-After</code> on exhaustion.</div>
+      <div class="phase"><span class="pn">Phase 2 · Config</span>Per-route limits in <code>gateway.config.ts</code>, hot-reloaded.</div>
+      <h3>Risks</h3><ul><li>Redis outage must <b>fail open</b>, not lock everyone out.</li></ul>` },
+  { id:'scratch', title:'Refactor scratchpad persistence', status:'draft', o:'local', v:'', ag:'rowan', meta:'9 turns · 1h ago',
+    body:`<h3>Goal</h3><p>Move the shared scratchpad from in-memory to an append log so posts survive restarts.</p>
+      <h3>Open question</h3><ul><li>Flat JSONL vs SQLite — leaning JSONL for grep-ability. <b>Needs your call.</b></li></ul>` },
+  { id:'edges', title:'Dashboard: directed link edges', status:'done', o:'cloud', v:'Visual', ag:'drew', meta:'31 turns · yesterday',
+    body:`<h3>Goal</h3><p>Render agent links as <b>directed arrows</b> on the Team Graph.</p>
+      <h3>Result</h3><ul><li>Shipped — edges route to card anchors, A→B / B→A / A↔B supported.</li></ul>` },
+];
+
+/* ====================== Concept 1 — library ====================== */
+(function(){
+  const list=document.getElementById('c1-list'), reader=document.getElementById('c1-reader'), rtitle=document.getElementById('c1-rtitle');
+  list.innerHTML = PLANS.map((p,i)=>`
+    <button class="plan-card${i===0?' sel':''}" data-id="${p.id}">
+      <div class="pc-top"><span class="pc-title">${p.title}</span></div>
+      <div class="pc-chips"><span class="chip ${ST[p.status].cls}">${ST[p.status].lab}</span>${org(p.o,p.v)}</div>
+      <div class="pc-meta">${dot(p.ag)}<span class="nm">${AG[p.ag].name}</span><span>·</span><span>${p.meta}</span></div>
+    </button>`).join('');
+  function open(id){
+    const p=PLANS.find(x=>x.id===id);
+    rtitle.textContent=p.title; reader.innerHTML=p.body;
+    list.querySelectorAll('.plan-card').forEach(c=>c.classList.toggle('sel',c.dataset.id===id));
+  }
+  list.addEventListener('click',e=>{ const c=e.target.closest('.plan-card'); if(c) open(c.dataset.id); });
+  open('jwt');
+})();
+
+/* ====================== Concept 2 — review surface ====================== */
+(function(){
+  const SECS=[
+    {id:'goal',t:'Goal',c:0,body:`<p>Replace server-side session auth with stateless JWTs, preserving refresh rotation and a zero-downtime cutover.</p>`,
+      thread:[{who:'You',txt:'Confirm we keep the same cookie name for the access token?'}]},
+    {id:'appr',t:'Approach · 3 phases',c:2,body:`<p>Parallel-issue → verify-first middleware → drain &amp; remove. Each phase is independently revertable.</p>`,
+      thread:[{who:'You',txt:'Phase 2 fallback is the key safety net — good.'},{who:'kai',txt:'Added a metric gate before Phase 3 starts.'}]},
+    {id:'risk',t:'Risks',c:1,body:`<p>Refresh-token reuse and cross-node clock skew are the two live risks; both mitigated in-plan.</p>`,
+      thread:[{who:'You',txt:'What leeway window for skew?'}]},
+    {id:'scope',t:'Out of scope',c:0,body:`<p>OAuth, SSO, per-tenant key isolation — explicitly deferred.</p>`,thread:[]},
+  ];
+  const outline=document.getElementById('c2-outline'), body=document.getElementById('c2-body');
+  outline.innerHTML += SECS.map((s,i)=>`<div class="ol-item${i===1?' on':''}" data-id="${s.id}">${s.t.split('·')[0].trim()}${s.c?`<span class="cbadge">${s.c}</span>`:''}</div>`).join('');
+  body.innerHTML = SECS.map((s,i)=>`
+    <div class="rev-sec${i===1?' active':''}" data-id="${s.id}">
+      <div class="rs-head"><h4>${s.t}</h4><svg style="width:13px;height:13px;color:var(--muted-2)"><use href="#i-chev"/></svg></div>
+      <div class="rs-body">
+        ${s.body}
+        <div class="react-row">
+          <button class="react" data-em="👍"><span class="em">👍</span><span class="n">3</span></button>
+          <button class="react" data-em="⚠️"><span class="em">⚠️</span><span class="n">${s.id==='risk'?1:0}</span></button>
+          <button class="react" data-em="🎯"><span class="em">🎯</span><span class="n">${s.id==='goal'?2:0}</span></button>
+          <button class="add-cmt">${s.c?`${s.c} comments`:'+ comment'}</button>
+        </div>
+        <div class="cmt${i===1?' open':''}">
+          ${s.thread.map(c=>`<div class="cmt-item">${c.who==='You'?'<span class="agdot" style="background:var(--ag-user)"><svg><use href="#i-bot"/></svg></span>':dot('kai')}<div><span class="who">${c.who}</span><p>${c.txt}</p></div></div>`).join('')||'<p style="font-size:11px;color:var(--muted-2)">No comments yet.</p>'}
+          <div class="cmt-input"><input placeholder="Comment on this section…"><button class="btn btn-sm btn-main">Send</button></div>
+        </div>
+      </div>
+    </div>`).join('');
+  function activate(id){
+    body.querySelectorAll('.rev-sec').forEach(s=>s.classList.toggle('active',s.dataset.id===id));
+    outline.querySelectorAll('.ol-item').forEach(o=>o.classList.toggle('on',o.dataset.id===id));
+  }
+  outline.addEventListener('click',e=>{const o=e.target.closest('.ol-item'); if(o){activate(o.dataset.id); body.querySelector(`.rev-sec[data-id="${o.dataset.id}"]`).scrollIntoView({behavior:'smooth',block:'nearest'});}});
+  body.addEventListener('click',e=>{
+    const head=e.target.closest('.rs-head'); if(head){ activate(head.closest('.rev-sec').dataset.id); return; }
+    const r=e.target.closest('.react'); if(r){ const n=r.querySelector('.n'); const on=r.classList.toggle('on'); n.textContent=Math.max(0,(+n.textContent)+(on?1:-1)); return; }
+    const ac=e.target.closest('.add-cmt'); if(ac){ ac.closest('.rs-body').querySelector('.cmt').classList.toggle('open'); }
+  });
+})();
+
+/* ====================== Concept 3 — approve → execute ====================== */
+(function(){
+  const approve=document.getElementById('c3-approve'), run=document.getElementById('c3-run'),
+        note=document.getElementById('c3-approved-note'), gateStamp=document.getElementById('c3-gate-stamp'),
+        clearSw=document.getElementById('c3-clear'), exec=document.getElementById('c3-exec'),
+        todos=document.getElementById('c3-todos'), statusChip=document.getElementById('c3-status');
+  let approved=false, target='local';
+  exec.querySelectorAll('.target').forEach(t=>t.addEventListener('click',()=>{
+    exec.querySelectorAll('.target').forEach(x=>x.classList.toggle('on',x===t)); target=t.dataset.t;
+  }));
+  clearSw.addEventListener('click',()=>clearSw.classList.toggle('on'));
+  approve.addEventListener('click',()=>{
+    approved=true; note.style.display='inline'; gateStamp.className='stamp st-approved'; gateStamp.textContent='Approved';
+    run.disabled=false; run.innerHTML='<svg><use href="#i-bolt"/></svg>'+(target==='cloud'?'Run in cloud → open PR':'Teleport &amp; run locally');
+    approve.innerHTML='<svg><use href="#i-check"/></svg>Approved'; approve.disabled=true;
+  });
+  const T=[
+    {t:'Add JWT signer/verifier (jwt.ts)',s:'done'},
+    {t:'Wire verify-first middleware',s:'active'},
+    {t:'Refresh rotation + reuse detection',s:''},
+    {t:'Gate session path behind flag',s:''},
+    {t:'Drain sessions, remove Redis path',s:''},
+  ];
+  run.addEventListener('click',()=>{
+    if(run.disabled) return;
+    statusChip.className='chip st-exec'; statusChip.innerHTML='<svg><use href="#i-bolt"/></svg>Executing · '+(target==='cloud'?'cloud':'local');
+    todos.style.display='block';
+    todos.innerHTML='<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px;">Live todos · TodoWrite</div>'+
+      T.map((x,i)=>`<div class="todo ${x.s}" data-i="${i}"><span class="tbox"><svg><use href="#i-check"/></svg></span><span class="tlab">${x.t}</span>${x.s==='active'?'<span class="tnow">now</span>':''}</div>`).join('');
+    run.innerHTML='<svg><use href="#i-clock"/></svg>Running — tick a todo';
+    todos.querySelectorAll('.todo').forEach(td=>td.addEventListener('click',()=>{
+      td.classList.remove('active'); td.classList.toggle('done'); const n=td.querySelector('.tnow'); if(n)n.remove();
+    }));
+  });
+})();
+
+/* ====================== Concept 4 — ultraplan launcher ====================== */
+(function(){
+  const variants=document.getElementById('c4-variants'), launch=document.getElementById('c4-launch'),
+        state=document.getElementById('c4-state'), note=document.getElementById('c4-note'),
+        progwrap=document.getElementById('c4-progwrap'), prog=document.getElementById('c4-prog'),
+        meta=document.getElementById('c4-meta'), time=document.getElementById('c4-time'),
+        statusCard=document.getElementById('c4-status');
+  let v='deep', timer=null;
+  variants.addEventListener('click',e=>{const b=e.target.closest('.variant'); if(!b)return;
+    variants.querySelectorAll('.variant').forEach(x=>x.classList.toggle('on',x===b)); v=b.dataset.v;});
+  launch.addEventListener('click',()=>{
+    if(timer){clearInterval(timer); timer=null;}
+    state.className='chip st-exec'; state.textContent='planning';
+    statusCard.querySelector('.ups-row svg use').setAttribute('href','#i-cloud');
+    note.innerHTML=`Running a <b>${v[0].toUpperCase()+v.slice(1)}</b> plan in a cloud container off a repo snapshot. Leave it — your terminal stays free; the artifact will drop into the Plan Library when it's done.`;
+    progwrap.style.display='block'; meta.style.display='flex';
+    let sec=0; prog.style.width='4%';
+    timer=setInterval(()=>{
+      sec+=7; const pct=Math.min(100, Math.round(sec/1800*100*6)); // accelerated demo
+      prog.style.width=Math.max(4,pct)+'%';
+      const m=String(Math.floor(sec/60)).padStart(2,'0'), s=String(sec%60).padStart(2,'0');
+      time.textContent=`${m}:${s} / ~30:00`;
+      if(pct>=100){ clearInterval(timer); timer=null; state.className='chip st-approved'; state.textContent='ready';
+        note.innerHTML='<b>Plan ready.</b> A new <b>Deep</b> Ultraplan landed in the Library (Concept 1) — open it to review, comment, and approve.'; }
+    },140);
+  });
+})();
+
+/* ====================== Concept 5 — versions / diff ====================== */
+(function(){
+  const VERS=[
+    {v:'v1',d:'local draft',meta:'Plan-mode draft · sandy · 2d ago'},
+    {v:'v2',d:'+ rollback',meta:'You asked for revertable phases · kai · 1d ago',
+     diff:[['ctx','Phase 2 · Verify-first middleware'],['del','New middleware checks the JWT only.'],['add','New middleware checks the JWT, falls back to the session lookup on miss —'],['add','so nothing breaks mid-rollout.'],['ctx','Phase 3 · Drain & remove sessions']]},
+    {v:'v3',d:'cloud · Deep',meta:'Escalated to Ultraplan · kai · 6m ago',
+     diff:[['ctx','Risks'],['add','Refresh reuse — a stolen refresh token must invalidate its family.'],['add','Mitigation: rotation + reuse detection in Phase 1.'],['del','Token theft is a risk.'],['ctx','Clock skew across nodes can reject valid tokens.']]},
+  ];
+  const pills=document.getElementById('c5-pills'), diff=document.getElementById('c5-diff'), metaEl=document.getElementById('c5-meta');
+  pills.innerHTML += VERS.map((x,i)=>`<button class="vpill${i===2?' on':''}" data-i="${i}">${x.v}<span class="vd">${x.d}</span></button>`).join('');
+  function show(i){
+    const ver=VERS[i]; const d=ver.diff||[['ctx','— base version, nothing to compare against —']];
+    diff.innerHTML=d.map(r=>`<div class="dl ${r[0]}"><span class="sign"></span><span>${r[1]}</span></div>`).join('');
+    metaEl.innerHTML=`<svg style="width:12px;height:12px"><use href="#i-clock"/></svg><span>${ver.meta}</span>`;
+    pills.querySelectorAll('.vpill').forEach(p=>p.classList.toggle('on',+p.dataset.i===i));
+  }
+  pills.addEventListener('click',e=>{const p=e.target.closest('.vpill'); if(p) show(+p.dataset.i);});
+  show(2);
+})();
+</script>
+</body>
+</html>

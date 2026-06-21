@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Action strip — Revise · Formatting · Send</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page:#fef6e4; --header:#f7f0e0; --surface:#fff8ee; --card:#ffffff; --subtle:#f0e8d8;
+    --navy:#001858; --dim:#8a8eb8; --body:#172c66; --label:#4a5088; --muted:#3a4878;
+    --pink:#f582ae; --pink-dk:#e8709a; --amber:#d08530; --coral:#e06654;
+    --sage:#3d946a; --gold:#d4a050; --field:#fdf1e6; --term:#ebedf3; --rule:#c9c2b0;
+  }
+  *{box-sizing:border-box; scrollbar-width:thin; scrollbar-color:#8a8eb8 #f0e8d8;}
+  ::-webkit-scrollbar{width:7px;height:7px;}
+  ::-webkit-scrollbar-track{background:#f0e8d8;}
+  ::-webkit-scrollbar-thumb{background:#8a8eb8;border-radius:4px;border:1px solid #f0e8d8;}
+  ::-webkit-scrollbar-thumb:hover{background:#f582ae;}
+  body{margin:0; background:var(--page); color:var(--body); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;}
+
+  .wrap{max-width:660px; margin:0 auto; padding:40px 24px 70px;}
+  .pagehead h1{font-size:18px; font-weight:800; color:var(--navy); margin:0 0 4px; letter-spacing:-0.01em;}
+  .pagehead p{font-size:12.5px; line-height:1.55; color:var(--muted); margin:0; max-width:540px;}
+  .pagehead code{font-family:'JetBrains Mono',monospace; font-size:0.92em; background:var(--subtle); padding:1px 5px; border-radius:3px; color:var(--navy);}
+
+  .rail-cap{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); margin:24px 0 7px;}
+
+  /* mock compose pane so the upward menus have room */
+  .compose{border:2px solid var(--navy); border-radius:6px; background:var(--card); overflow:hidden;}
+  .compose-head{height:36px; display:flex; align-items:center; padding:0 12px; background:var(--header); border-bottom:2px solid var(--navy); font-size:11px; font-weight:800; color:var(--navy); text-transform:uppercase; letter-spacing:0.05em;}
+  .compose-field{min-height:120px; padding:12px; font-size:12px; color:var(--muted); line-height:1.5; background:var(--field);}
+  .compose-field .ph{color:var(--dim);}
+
+  /* ===================== action strip ===================== */
+  .strip{border-top:2px solid var(--navy); padding:10px 12px; display:flex; align-items:center; gap:10px;}
+  .spacer{flex:1 1 auto;}
+
+  /* split control — DROPDOWN leads, ICON action follows */
+  .split{position:relative; display:inline-flex; align-items:stretch; height:28px;}
+  .split-drop{display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 10px; font-size:11px; font-weight:700; border:2px solid; border-right:none; border-radius:4px 0 0 4px; cursor:pointer; transition:all .12s; white-space:nowrap;}
+  .split-drop svg{width:11px; height:11px;}
+  .split-div{width:2px; align-self:stretch; flex:0 0 auto; background:var(--navy);}
+  .split-act{display:inline-flex; align-items:center; justify-content:center; width:36px; flex:0 0 auto; border:2px solid; border-left:none; border-radius:0 4px 4px 0; cursor:pointer; transition:all .12s;}
+  .split-act svg{width:15px; height:15px;}
+  /* primary (Send) */
+  .split--primary .split-act{background:var(--pink); color:var(--navy); border-color:var(--navy);}
+  .split--primary .split-drop{background:#ec6fa0; color:var(--navy); border-color:var(--navy);}
+  .split--primary .split-act:hover{background:var(--pink-dk);}
+  .split--primary .split-drop:hover{background:#df5f93;}
+  /* outline (Revise) */
+  .split--outline .split-act{background:transparent; color:var(--navy); border-color:var(--navy);}
+  .split--outline .split-drop{background:var(--subtle); color:var(--navy); border-color:var(--navy);}
+  .split--outline .split-act:hover{background:rgba(0,24,88,0.06);}
+  .split--outline .split-drop:hover{background:#e7ddc8;}
+
+  /* split dropdown menu (single-select, opens upward) */
+  .split-menu{position:absolute; bottom:100%; left:0; margin-bottom:6px; z-index:50; min-width:190px; background:var(--card); border:2px solid var(--navy); border-radius:4px; padding:5px; display:none; box-shadow:0 -6px 22px rgba(0,24,88,0.18);}
+  .split-menu--right{left:auto; right:0;}
+  .split-menu.open{display:block;}
+  .split-menu-h{font-size:8.5px; color:var(--dim); padding:5px 9px 4px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800;}
+  .split-mi{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; padding:8px 10px; border-radius:4px; cursor:pointer; color:var(--navy); border:none; background:transparent; width:100%; text-align:left;}
+  .split-mi:hover{background:var(--subtle);}
+  .split-mi .lead{display:flex; flex-direction:column; gap:1px;}
+  .split-mi .lead b{font-weight:800; font-size:11px;}
+  .split-mi .sub{font-size:9px; color:var(--dim); font-weight:600;}
+  .split-mi .ck{opacity:0; font-size:11px; color:var(--sage); font-weight:900;}
+  .split-mi.sel .ck{opacity:1;}
+
+  /* ===================== Formatting — multi-select dropdown ===================== */
+  .fmt{position:relative; display:inline-flex;}
+  .fmt-btn{height:28px; display:inline-flex; align-items:center; gap:7px; padding:0 10px; border:2px solid var(--navy); border-radius:4px; background:var(--card); color:var(--navy); cursor:pointer; transition:all .12s;}
+  .fmt-btn:hover{background:rgba(0,24,88,0.05);}
+  .fmt-btn.active{background:rgba(245,130,174,0.12);}
+  .fmt-btn .ic{width:15px; height:15px;}
+  .fmt-btn .cv{width:11px; height:11px; color:var(--dim);}
+  .fmt-badge{display:none; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--pink); color:var(--navy); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace;}
+  .fmt-btn.active .fmt-badge{display:inline-flex;}
+
+  .fmt-menu{position:absolute; bottom:100%; left:0; margin-bottom:6px; z-index:60; width:270px; background:var(--card); border:2px solid var(--navy); border-radius:5px; padding:9px; display:none; box-shadow:0 -8px 24px rgba(0,24,88,0.20);}
+  .fmt-menu.open{display:block;}
+  .fmt-group{padding:5px 1px;}
+  .fmt-group + .fmt-group{border-top:1px solid rgba(0,24,88,0.08); margin-top:3px;}
+  .fmt-gh{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; padding:0 1px;}
+  .fmt-gh .nm{font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label);}
+  .fmt-gh .mode{font-size:7.5px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:0.03em;}
+  .fmt-pills{display:flex; flex-wrap:wrap; gap:6px;}
+  .fmt-pill{font-size:10.5px; font-weight:700; padding:5px 11px; border:1.5px solid var(--rule); border-radius:999px; background:var(--card); color:var(--label); cursor:pointer; transition:all .1s; user-select:none;}
+  .fmt-pill:hover:not(.on){border-color:var(--dim); color:var(--navy);}
+  .fmt-pill.on{border-color:var(--pink); background:rgba(245,130,174,0.16); color:var(--navy);}
+  .fmt-foot{display:flex; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:2px solid rgba(0,24,88,0.1);}
+  .fmt-count{font-size:9px; font-weight:700; color:var(--dim);}
+  .fmt-clear{font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0;}
+  .fmt-clear:hover{color:#b06d20;}
+
+  /* applied readout under the strip — just to make the POC state visible */
+  .applied{margin-top:9px; font-size:10.5px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-height:20px;}
+  .applied .lab{font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--dim);}
+  .applied .tag{font-size:10px; font-weight:700; color:var(--navy); background:var(--subtle); border:1px solid rgba(0,24,88,0.12); border-radius:999px; padding:2px 9px;}
+  .applied .none{font-size:10px; color:var(--dim); font-style:italic;}
+
+  .foot{margin-top:30px; padding-top:18px; border-top:2px solid rgba(0,24,88,0.12); font-size:11.5px; line-height:1.6; color:var(--muted); max-width:540px;}
+  .foot b{color:var(--navy);}
+  .foot code{font-family:'JetBrains Mono',monospace; font-size:0.92em; background:var(--subtle); padding:1px 5px; border-radius:3px; color:var(--navy);}
+</style>
+</head>
+<body>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon-chevron-down" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="icon-pencil" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3z"/><path d="M9 4l3 3"/></symbol>
+  <symbol id="icon-send" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L7 9"/><path d="M14 2l-4.4 12-2.6-5L2 6.4z"/></symbol>
+  <symbol id="icon-format" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="3" cy="4" r="0.85" fill="currentColor" stroke="none"/><circle cx="3" cy="8" r="0.85" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="0.85" fill="currentColor" stroke="none"/><path d="M6 4h7M6 8h7M6 12h5"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="pagehead">
+    <h1>Action strip — reworked</h1>
+    <p>Splits flipped so the <b>dropdown leads</b> and an <b>icon button follows</b>; a new <b>Formatting</b> multi-select dropdown sits right after Revise. Everything is live, open the menus (they pop upward). Placeholder options live in the <code>FMT</code> array.</p>
+  </div>
+
+  <div class="rail-cap">live · click the chevrons and the format button</div>
+
+  <div class="compose">
+    <div class="compose-head">Compose</div>
+    <div class="compose-field"><span class="ph">Analyze JWT middleware for security vulns&hellip;</span></div>
+
+    <div class="strip" id="strip">
+
+      <!-- Revise — dropdown (strength) then pencil action -->
+      <div class="split split--outline" data-kind="revise">
+        <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)" aria-label="Revision strength"><span class="split-lbl">Medium</span><svg><use href="#icon-chevron-down"/></svg></button>
+        <span class="split-div"></span>
+        <button class="split-act" title="Revise — run an AI revision pass"><svg><use href="#icon-pencil"/></svg></button>
+        <div class="split-menu">
+          <div class="split-menu-h">Strength</div>
+          <button class="split-mi" onclick="pickSplit(this)"><span class="lead"><b>Minimal</b><span class="sub">Light touch-up</span></span><span class="ck">&#10003;</span></button>
+          <button class="split-mi sel" onclick="pickSplit(this)"><span class="lead"><b>Medium</b><span class="sub">Balanced rewrite</span></span><span class="ck">&#10003;</span></button>
+          <button class="split-mi" onclick="pickSplit(this)"><span class="lead"><b>Maximum</b><span class="sub">Aggressive rewrite</span></span><span class="ck">&#10003;</span></button>
+        </div>
+      </div>
+
+      <!-- Formatting — multi-select dropdown (icon trigger, no heading) -->
+      <div class="fmt" id="fmt">
+        <button class="fmt-btn" id="fmt-btn" onclick="event.stopPropagation();toggleFmt()" title="Response formatting" aria-label="Response formatting">
+          <svg class="ic"><use href="#icon-format"/></svg>
+          <span class="fmt-badge" id="fmt-badge">0</span>
+          <svg class="cv"><use href="#icon-chevron-down"/></svg>
+        </button>
+        <div class="fmt-menu" id="fmt-menu"></div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <!-- Send — dropdown (delivery) then send action -->
+      <div class="split split--primary" data-kind="send">
+        <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)" aria-label="Delivery timing"><span class="split-lbl">Now</span><svg><use href="#icon-chevron-down"/></svg></button>
+        <span class="split-div"></span>
+        <button class="split-act" title="Send"><svg><use href="#icon-send"/></svg></button>
+        <div class="split-menu split-menu--right">
+          <div class="split-menu-h">Deliver</div>
+          <button class="split-mi sel" onclick="pickSplit(this)"><span class="lead"><b>Now</b><span class="sub">Send immediately</span></span><span class="ck">&#10003;</span></button>
+          <button class="split-mi" onclick="pickSplit(this)"><span class="lead"><b>Next</b><span class="sub">At the next turn boundary</span></span><span class="ck">&#10003;</span></button>
+          <button class="split-mi" onclick="pickSplit(this)"><span class="lead"><b>Queue</b><span class="sub">Hold in the queue</span></span><span class="ck">&#10003;</span></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="applied" id="applied"></div>
+
+  <p class="foot">
+    <b>The flip:</b> each split is now <code>[ dropdown ▾ | icon ]</code> — the chip you set lives on the left, the commit icon (pencil for Revise, send for Send) on the right. Colors keep their roles, so Send stays the pink primary.<br><br>
+    <b>Formatting:</b> no label is possible in the action row, so the trigger is an icon plus a count badge; meaning lives inside the menu. Options are highlighted pills, not checkboxes. Spectrum groups (Length, Altitude, Register) are pick-one; Structure and Emphasis are pick-any. Edit <code>FMT</code> to add or rename anything.
+  </p>
+</div>
+
+<script>
+/* ---------- existing split behavior (single-select) ---------- */
+function toggleSplitMenu(btn){
+  const m = btn.parentElement.querySelector('.split-menu');
+  const open = m.classList.contains('open');
+  closeAllMenus();
+  if(!open) m.classList.add('open');
+}
+function pickSplit(mi){
+  const menu = mi.closest('.split-menu');
+  menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel', x===mi));
+  const lbl = menu.closest('.split').querySelector('.split-lbl');
+  if(lbl) lbl.textContent = mi.querySelector('b').textContent;
+  menu.classList.remove('open');
+}
+
+/* ---------- Formatting (multi-select, grouped) ---------- */
+const FMT = [
+  {key:'length',   label:'Length',   mode:'single', opts:['Concise','Elaborate']},
+  {key:'altitude', label:'Altitude', mode:'single', opts:['High-level','Low-level']},
+  {key:'register', label:'Register', mode:'single', opts:['Technical','Plain']},
+  {key:'structure',label:'Structure',mode:'multi',  opts:['Numbered list','Bullets','Tables','Prose']},
+  {key:'emphasis', label:'Emphasis', mode:'multi',  opts:['Lead with the answer','Cite sources','Skip hedging']},
+];
+/* default selections (placeholder POC state) */
+const state = { length:['Concise'], altitude:[], register:[], structure:['Tables'], emphasis:['Lead with the answer'] };
+
+const fmtMenu = document.getElementById('fmt-menu');
+const fmtBtn  = document.getElementById('fmt-btn');
+const fmtBadge= document.getElementById('fmt-badge');
+
+function renderFmtMenu(){
+  fmtMenu.innerHTML = FMT.map(g=>{
+    const pills = g.opts.map(o=>{
+      const on = state[g.key].includes(o) ? ' on' : '';
+      return `<button class="fmt-pill${on}" data-g="${g.key}" data-o="${o}">${o}</button>`;
+    }).join('');
+    return `<div class="fmt-group">
+      <div class="fmt-gh"><span class="nm">${g.label}</span><span class="mode">${g.mode==='single'?'pick one':'pick any'}</span></div>
+      <div class="fmt-pills">${pills}</div>
+    </div>`;
+  }).join('') + `<div class="fmt-foot"><span class="fmt-count" id="fmt-count"></span><button class="fmt-clear" onclick="clearFmt()">Clear all</button></div>`;
+  updateCount();
+}
+function totalActive(){ return Object.values(state).reduce((n,a)=>n+a.length,0); }
+function updateCount(){
+  const n = totalActive();
+  fmtBadge.textContent = n;
+  fmtBtn.classList.toggle('active', n>0);
+  const c = document.getElementById('fmt-count'); if(c) c.textContent = n ? `${n} active` : 'none active';
+  renderApplied();
+}
+function togglePill(g, o){
+  const grp = FMT.find(x=>x.key===g);
+  const arr = state[g];
+  const has = arr.includes(o);
+  if(grp.mode==='single'){
+    state[g] = has ? [] : [o];          // pick-one, click again clears
+  } else {
+    state[g] = has ? arr.filter(x=>x!==o) : [...arr, o];
+  }
+  renderFmtMenu();
+}
+function clearFmt(){ Object.keys(state).forEach(k=>state[k]=[]); renderFmtMenu(); }
+function toggleFmt(){
+  const open = fmtMenu.classList.contains('open');
+  closeAllMenus();
+  if(!open) fmtMenu.classList.add('open');
+}
+fmtMenu.addEventListener('click', e=>{
+  e.stopPropagation();
+  const p = e.target.closest('.fmt-pill'); if(!p) return;
+  togglePill(p.dataset.g, p.dataset.o);
+});
+
+/* applied readout (POC visibility) */
+function renderApplied(){
+  const tags = [];
+  FMT.forEach(g=>state[g.key].forEach(o=>tags.push(o)));
+  const el = document.getElementById('applied');
+  el.innerHTML = `<span class="lab">Applies</span>` + (tags.length
+    ? tags.map(t=>`<span class="tag">${t}</span>`).join('')
+    : `<span class="none">default formatting</span>`);
+}
+
+/* ---------- shared dismissal ---------- */
+function closeAllMenus(){
+  document.querySelectorAll('.split-menu.open').forEach(x=>x.classList.remove('open'));
+  fmtMenu.classList.remove('open');
+}
+document.addEventListener('click', e=>{ if(!e.target.closest('.split') && !e.target.closest('.fmt')) closeAllMenus(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllMenus(); });
+
+renderFmtMenu();
+</script>
+</body>
+</html>

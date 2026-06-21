@@ -1,0 +1,816 @@
+﻿{
+  "path": "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\claude-code-sandbox\\agent-dashboard\\design\\ui-concept-v7p1.html",
+  "content": "<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"UTF-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+  <title>AWL Multi-Agent Dashboard</title>
+  <script src=\"https://cdn.tailwindcss.com\"></script>
+  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap\" rel=\"stylesheet\">
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+        colors: {
+          base:  { 950:'#fef6e4', 900:'#f7f0e0', 850:'#fff8ee', 800:'#ffffff', 750:'#f0e8d8', 700:'#001858', 600:'#001858', 500:'#8a8eb8' },
+          warm:  { 50:'#001858', 100:'#172c66', 200:'#2a3d78', 300:'#3a4878', 400:'#4a5088', 500:'#8a8eb8' },
+          pink:'#f582ae', amber:'#d08530', coral:'#e06654', danger:'#c74060', sage:'#3d946a', gold:'#d4a050', blush:'#f3d2c1',
+          field:'#fdf1e6', term:'#ebedf3',
+          agent: { rose:'#b84568', teal:'#228070', indigo:'#4855b5', copper:'#c07828', forest:'#2d7848', plum:'#7e4ea0', vermil:'#c04838', cobalt:'#2d6ea8', bronze:'#8a7820', olive:'#5e7828', mauve:'#954e80', steel:'#506480' }
+        }
+      }}
+    }
+  </script>
+  <style>
+    :root{
+      --page:#fef6e4; --header:#f7f0e0; --surface:#fff8ee; --card:#ffffff; --subtle:#f0e8d8;
+      --navy:#001858; --dim:#8a8eb8; --body:#172c66; --label:#4a5088; --muted:#3a4878;
+      --pink:#f582ae; --pink-dk:#e8709a; --amber:#d08530; --coral:#e06654; --danger:#c74060;
+      --sage:#3d946a; --gold:#d4a050; --field:#fdf1e6; --term:#ebedf3; --rule:#c9c2b0;
+      --c-sys:#c07828; --c-tools:#2d6ea8; --c-mcp:#2d7848; --c-agents:#d4a050;
+      --c-mem:#7e4ea0; --c-msg:#e06654; --c-free:#bcb6a4;
+      --r:10px; --r-in:6px;
+    }
+    * { scrollbar-width: thin; scrollbar-color: #8a8eb8 #f0e8d8; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #f0e8d8; }
+    ::-webkit-scrollbar-thumb { background: #8a8eb8; border-radius: 4px; border: 1px solid #f0e8d8; }
+    ::-webkit-scrollbar-thumb:hover { background: #f582ae; }
+    ::-webkit-scrollbar-corner { background: #f0e8d8; }
+    .ref-section { scrollbar-color: #4a5088 #0e1840; }
+    .ref-section::-webkit-scrollbar-track { background: #0e1840; }
+    .ref-section::-webkit-scrollbar-thumb { background: #4a5088; border-color: #0e1840; }
+    .ref-section::-webkit-scrollbar-thumb:hover { background: #f582ae; }
+
+
+    /* ===== §A — rounded card framing. Each inner panel is a card on the cream page. ===== */
+    .pcard { border:2px solid var(--navy); border-radius:var(--r); display:flex; flex-direction:column; min-height:0; background:var(--card); }
+    .pcard.clip { overflow:hidden; }
+    .pcard.surf { background:var(--surface); }
+
+
+    /* Segmented control */
+    .seg-ctrl { display:flex; border-radius:var(--r-in); overflow:hidden; border:2px solid #001858; background:#f0e8d8; }
+    .seg-ctrl button { flex:1; font-size:10px; padding:6px 2px; color:#8a8eb8; font-weight:600; border:none; background:transparent; cursor:pointer; transition:all 0.12s; border-right:1px solid rgba(0,24,88,0.1); white-space:nowrap; }
+    .seg-ctrl button:last-child { border-right:none; }
+    .seg-ctrl button.active { background:#f582ae; color:#001858; font-weight:700; }
+    .seg-ctrl button:hover:not(.active) { color:#4a5088; background:rgba(0,24,88,0.04); }
+    .seg-ctrl button.seg-danger { color:#c74060; font-weight:700; }
+    .seg-ctrl button.seg-danger:hover:not(.active) { color:#c74060; background:rgba(199,64,96,0.08); }
+    .seg-ctrl button.seg-danger.active { background:#c74060; color:#fff; }
+
+
+    .heading-strip { background:#f7f0e0; padding:0 12px; height:38px; min-height:38px; max-height:38px; border-bottom:2px solid #001858; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; border-radius:8px 8px 0 0; gap:8px; }
+    .heading-strip h3 { font-size:11px; font-weight:800; color:#001858; text-transform:uppercase; letter-spacing:0.06em; white-space:nowrap; }
+    .cli-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+
+    .tab-btn { font-size:11px; padding:0 8px; font-weight:600; border-bottom:2px solid transparent; color:#8a8eb8; cursor:pointer; height:100%; display:flex; align-items:center; transition:all 0.1s; }
+    .tab-btn:hover { color:#4a5088; }
+    .tab-btn.active { border-bottom-color:#f582ae; color:#f582ae; }
+
+
+    .card { background:#ffffff; border:2px solid #001858; border-radius:var(--r-in); overflow:hidden; }
+
+
+    .v-splitter { height:8px; cursor:row-resize; background:transparent; position:relative; flex-shrink:0; z-index:5; }
+    .v-splitter::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:34px; height:4px; background:#c9c2b0; border-radius:2px; transition:background 0.15s; }
+    .v-splitter:hover::after { background:#f582ae; }
+
+
+    /* ===== Team Graph nodes — square, spaced, edge-linked ===== */
+    .graph-stage { position:relative; }
+    .edge-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; overflow:visible; }
+    .agent-node { transition: all 0.12s ease; position:relative; z-index:2; aspect-ratio:1 / 1; display:flex; flex-direction:column; }
+    .agent-node:hover { transform: translateY(-1px); }
+    .agent-node.selected { outline:3px solid #f582ae; outline-offset:2px; }
+    .node-meta { font-size:8px; color:#4a5088; font-family:'JetBrains Mono',monospace; line-height:1.25; margin-top:auto; }
+
+
+    .subagent-mini { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.1s; border:1px solid #001858; background:#ffffff; }
+    .subagent-mini:hover { transform:scale(1.1); }
+
+
+    /* ===== MODEL — single-select version-dropdown group (ported) ===== */
+    .ro-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .ro-label{font-size:9px; color:var(--label); text-transform:uppercase; letter-spacing:0.05em; font-weight:800;}
+    .link-amber{font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0;}
+    .link-amber:hover{color:#b06d20;}
+    .model-tabs{display:flex; border:2px solid var(--navy); border-radius:var(--r-in) var(--r-in) 0 0; overflow:hidden; background:var(--subtle);}
+    .model-tabs.flat{border-radius:var(--r-in);}
+    .model-tab{flex:1 1 0; min-width:0; font-size:9.5px; font-weight:700; padding:7px 3px; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .model-tab:last-child{border-right:none;}
+    .model-tab:hover:not(.active):not(.open){color:var(--navy); background:rgba(0,24,88,0.04);}
+    .model-tab.open{background:rgba(0,24,88,0.06); color:var(--navy);}
+    .model-tab.active{flex:1.5 1 0; background:var(--card); color:var(--navy); font-weight:800; box-shadow:inset 0 -2px 0 var(--pink);}
+    .ver-panel{display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 var(--r-in) var(--r-in); background:var(--card); padding:6px;}
+    .ver-panel.open{display:block;}
+    .ver-h{font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label); padding:4px 7px 6px;}
+    .ver-row{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; font-weight:600; color:var(--navy); padding:7px 9px; border-radius:4px; cursor:pointer; border:1.5px solid transparent; transition:all .1s;}
+    .ver-row + .ver-row{margin-top:2px;}
+    .ver-row:hover{background:var(--subtle);}
+    .ver-row.sel{border-color:var(--pink); background:rgba(245,130,174,0.10); font-weight:800;}
+    .ver-name{font-family:'JetBrains Mono',monospace;}
+    .ver-check{color:var(--pink); font-weight:900; font-size:12px; opacity:0;}
+    .ver-row.sel .ver-check{opacity:1;}
+
+
+    /* ===== CONTEXT — panel-3 look, panel-1 mechanic (ported) ===== */
+    .ctx-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .ctx-ratio{margin-left:auto; font-size:10px; font-weight:600; color:#8a8eb8; font-family:'JetBrains Mono',monospace; white-space:nowrap;}
+    .ctx-trigger{width:100%; text-align:left; background:var(--card); border:2px solid var(--rule); border-radius:var(--r-in); padding:9px 10px; cursor:pointer; transition:all .12s;}
+    .ctx-trigger:hover{border-color:var(--dim);}
+    .ctx-trigger.open{border-color:var(--navy); border-bottom:none; border-radius:var(--r-in) var(--r-in) 0 0;}
+    .summary-row{display:flex; align-items:center; gap:9px;}
+    .ctxbar{display:flex; height:7px; border-radius:3px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); flex:1 1 auto;}
+    .ctxbar > i{display:block; height:100%;}
+    .pct{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace; flex:0 0 auto;}
+    .chev{width:13px; height:13px; color:var(--dim); transition:transform .18s; flex:0 0 auto;}
+    .chev.up{transform:rotate(180deg);}
+    .panel{display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 var(--r-in) var(--r-in); background:var(--card); overflow:hidden;}
+    .panel.open{display:block;}
+    .bd{padding:11px;}
+    .bd-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px;}
+    .bd-model{font-size:11px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace;}
+    .bd-tot{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace;}
+    .bd-bar{display:flex; height:9px; border-radius:4px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); margin-bottom:11px;}
+    .bd-bar > i{display:block; height:100%;}
+    .cat{display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px;}
+    .cat + .cat{border-top:1px solid rgba(0,24,88,0.07);}
+    .cat .sw{width:9px; height:9px; border-radius:2px; flex:0 0 auto;}
+    .cat .nm{flex:1 1 auto; color:var(--muted); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .cat .tk{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); font-size:10.5px;}
+    .cat .pc{font-family:'JetBrains Mono',monospace; color:var(--dim); font-size:10px; width:38px; text-align:right; flex:0 0 auto;}
+    .bd-sub{margin-top:11px; padding-top:9px; border-top:2px solid rgba(0,24,88,0.12);}
+    .bd-sub h5{font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; color:var(--label); margin:0 0 6px; display:flex; align-items:center; gap:6px;}
+    .bd-sub h5 .slash{color:var(--pink); font-family:'JetBrains Mono',monospace;}
+    .ml{display:flex; align-items:flex-start; gap:8px; padding:3px 0; font-size:10px;}
+    .ml .p{flex:1 1 auto; color:var(--muted); font-family:'JetBrains Mono',monospace; word-break:break-all; line-height:1.35;}
+    .ml .t{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); flex:0 0 auto;}
+
+
+    /* ===== HISTORY — rewind / handoff (ported) ===== */
+    .tri-tabs{display:flex; border:2px solid var(--navy); border-radius:var(--r-in) var(--r-in) 0 0; overflow:hidden; background:var(--subtle);}
+    .tri-tabs.flat{border-radius:var(--r-in);}
+    .tri-tab{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:700; padding:6px 0; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s;}
+    .tri-tab:last-child{border-right:none;}
+    .tri-tab svg{width:12px; height:12px;}
+    .tri-tab:hover:not(.active){color:var(--navy); background:rgba(0,24,88,0.04);}
+    .tri-tab.active{background:var(--card); color:var(--navy); box-shadow:inset 0 -2px 0 var(--pink);}
+    .tl-phead{padding:7px 11px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--subtle); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);}
+    .tl-confirm{display:none; align-items:center; gap:7px; margin:8px 10px 0; padding:7px 9px; border-radius:4px; background:rgba(61,148,106,0.10); border:1px solid rgba(61,148,106,0.45); color:#2d7848; font-size:10px; font-weight:700;}
+    .tl{padding:8px 10px; display:flex; flex-direction:column; gap:6px; max-height:236px; overflow-y:auto;}
+    .tl-row{display:flex; align-items:center; gap:9px; border:1px solid var(--rule); border-radius:4px; padding:7px 8px 7px 10px; transition:all .12s;}
+    .tl-row:hover{border-color:var(--dim);}
+    .tl-row.current{border-color:rgba(245,130,174,0.55); background:rgba(245,130,174,0.06);}
+    .tl-main{flex:1 1 auto; min-width:0;}
+    .tl-top{display:flex; align-items:center; flex-wrap:wrap; line-height:1.2; margin-bottom:3px;}
+    .tl-turn{font-size:10px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace;}
+    .tl-now{font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--pink); border:1px solid var(--pink); border-radius:3px; padding:0 4px; margin-left:6px; line-height:1.5;}
+    .tl-time{font-size:9.5px; color:var(--label); font-family:'JetBrains Mono',monospace;}
+    .tl-time::before{content:'·'; color:var(--dim); margin:0 6px;}
+    .tl-ctx{font-size:9.5px; font-weight:700; font-family:'JetBrains Mono',monospace;}
+    .tl-ctx::before{content:'·'; color:var(--dim); margin:0 6px; font-weight:400;}
+    .tl-desc{font-size:11px; color:var(--muted); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .tl-ic{flex:0 0 auto; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid var(--rule); border-radius:4px; background:var(--card); color:var(--label); cursor:pointer; transition:all .12s;}
+    .tl-ic svg{width:14px; height:14px;}
+    .tl-ic:hover{border-color:var(--pink); background:rgba(245,130,174,0.12); color:var(--navy);}
+    .tl-row.current .tl-ic{border-color:rgba(245,130,174,0.6);}
+
+
+    /* ===== End-After limit toggles ===== */
+    .lim-tog { width:100%; font-size:10px; font-weight:700; padding:5px 0; border:2px solid #c9c2b0; border-radius:var(--r-in); background:#ffffff; color:#8a8eb8; cursor:pointer; transition:all 0.12s; }
+    .lim-tog:hover:not(.on) { border-color:#8a8eb8; color:#4a5088; }
+    .lim-tog.on { border-color:#f582ae; background:#f582ae14; color:#001858; }
+    .lim-in { width:100%; margin-top:4px; background:#ffffff; border:2px solid #c9c2b0; border-radius:var(--r-in); padding:4px 6px; font-size:10px; font-weight:700; color:#001858; text-align:center; }
+    .lim-in:focus { outline:none; border-color:#f582ae; }
+    .lim-in:disabled { opacity:0.45; background:#f0e8d8; cursor:not-allowed; }
+    .lim-in::placeholder { color:#8a8eb8; font-weight:600; }
+
+
+    /* ===== Buttons ===== */
+    .btn-primary { height:28px; background:#f582ae; color:#001858; font-size:11px; font-weight:700; border:2px solid #f582ae; border-radius:var(--r-in); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-primary:hover { background:#e8709a; border-color:#e8709a; }
+    .btn-outline { height:28px; background:transparent; color:#001858; font-size:11px; font-weight:600; border:2px solid #001858; border-radius:var(--r-in); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-outline:hover { border-color:#3a4878; background:rgba(0,24,88,0.05); }
+    .btn-danger { height:28px; background:transparent; color:#c74060; font-size:11px; font-weight:600; border:2px solid #c7406044; border-radius:var(--r-in); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-danger:hover { border-color:#c7406088; background:rgba(199,64,96,0.06); }
+
+
+    /* ===== Split button — DROPDOWN leads, ICON action follows (ported, flipped) ===== */
+    .split{position:relative; display:inline-flex; align-items:stretch; height:28px;}
+    .split-drop{display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 10px; font-size:11px; font-weight:700; border:2px solid; border-right:none; border-radius:var(--r-in) 0 0 var(--r-in); cursor:pointer; transition:all .12s; white-space:nowrap;}
+    .split-drop svg{width:11px; height:11px;}
+    .split-div{width:2px; align-self:stretch; flex:0 0 auto; background:var(--navy);}
+    .split-act{display:inline-flex; align-items:center; justify-content:center; width:36px; flex:0 0 auto; border:2px solid; border-left:none; border-radius:0 var(--r-in) var(--r-in) 0; cursor:pointer; transition:all .12s;}
+    .split-act svg{width:15px; height:15px;}
+    .split--primary .split-act{background:var(--pink); color:var(--navy); border-color:var(--navy);}
+    .split--primary .split-drop{background:#ec6fa0; color:var(--navy); border-color:var(--navy);}
+    .split--primary .split-act:hover{background:var(--pink-dk);}
+    .split--primary .split-drop:hover{background:#df5f93;}
+    .split--outline .split-act{background:transparent; color:var(--navy); border-color:var(--navy);}
+    .split--outline .split-drop{background:var(--subtle); color:var(--navy); border-color:var(--navy);}
+    .split--outline .split-act:hover{background:rgba(0,24,88,0.06);}
+    .split--outline .split-drop:hover{background:#e7ddc8;}
+    .split-menu{position:absolute; bottom:100%; left:0; margin-bottom:6px; z-index:50; min-width:200px; background:var(--card); border:2px solid var(--navy); border-radius:var(--r-in); padding:5px; display:none; box-shadow:0 -6px 22px rgba(0,24,88,0.18);}
+    .split-menu--right{left:auto; right:0;}
+    .split-menu.open{display:block;}
+    .split-menu-h{font-size:8.5px; color:var(--dim); padding:5px 9px 4px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800;}
+    .split-mi{display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11px; padding:8px 10px; border-radius:4px; cursor:pointer; color:var(--navy); border:none; background:transparent; width:100%; text-align:left;}
+    .split-mi:hover{background:var(--subtle);}
+    .split-mi .lead{display:flex; flex-direction:column; gap:1px;}
+    .split-mi .lead b{font-weight:800; font-size:11px; white-space:nowrap;}
+    .split-mi .sub{font-size:9px; color:var(--dim); font-weight:600; white-space:nowrap;}
+    .split-mi .ck{opacity:0; font-size:11px; color:var(--sage); font-weight:900; flex:0 0 auto;}
+    .split-mi.sel .ck{opacity:1;}
+
+
+    /* ===== Response / feed-format — labelled multi-select dropdown (ported) ===== */
+    .fmt{position:relative; display:inline-flex;}
+    .fmt-btn{height:28px; display:inline-flex; align-items:center; gap:7px; padding:0 11px; border:2px solid var(--navy); border-radius:var(--r-in); background:var(--card); color:var(--navy); cursor:pointer; transition:all .12s;}
+    .fmt-btn:hover{background:rgba(0,24,88,0.05);}
+    .fmt-btn.active{background:rgba(245,130,174,0.12);}
+    .fmt-btn .ic{width:14px; height:14px;}
+    .fmt-btn .fmt-lbl{font-size:11px; font-weight:700;}
+    .fmt-btn .cv{width:11px; height:11px; color:var(--dim);}
+    .fmt-badge{display:none; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--pink); color:var(--navy); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace;}
+    .fmt-btn.active .fmt-badge{display:inline-flex;}
+    .fmt-menu{position:absolute; bottom:100%; left:0; margin-bottom:6px; z-index:60; width:270px; background:var(--card); border:2px solid var(--navy); border-radius:var(--r-in); padding:9px; display:none; box-shadow:0 -8px 24px rgba(0,24,88,0.20);}
+    .fmt-menu--down{bottom:auto; top:100%; margin-bottom:0; margin-top:6px; box-shadow:0 8px 24px rgba(0,24,88,0.20);}
+    .fmt-menu--right{left:auto; right:0;}
+    .fmt-menu.open{display:block;}
+    .fmt-group{padding:5px 1px;}
+    .fmt-group + .fmt-group{border-top:1px solid rgba(0,24,88,0.08); margin-top:3px;}
+    .fmt-gh{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; padding:0 1px;}
+    .fmt-gh .nm{font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label);}
+    .fmt-gh .mode{font-size:7.5px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:0.03em;}
+    .fmt-pills{display:flex; flex-wrap:wrap; gap:6px;}
+    .fmt-pill{font-size:10.5px; font-weight:700; padding:5px 11px; border:1.5px solid var(--rule); border-radius:999px; background:var(--card); color:var(--label); cursor:pointer; transition:all .1s; user-select:none;}
+    .fmt-pill:hover:not(.on){border-color:var(--dim); color:var(--navy);}
+    .fmt-pill.on{border-color:var(--pink); background:rgba(245,130,174,0.16); color:var(--navy);}
+    .fmt-foot{display:flex; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:2px solid rgba(0,24,88,0.1);}
+    .fmt-count{font-size:9px; font-weight:700; color:var(--dim);}
+    .fmt-clear{font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0;}
+    .fmt-clear:hover{color:#b06d20;}
+
+
+    /* ===== Ghost utility icons (app-wide convention: faint at rest, emphasised on hover) ===== */
+    .ghost-ic { width:22px; height:20px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; color:#8a8eb8; cursor:pointer; border-radius:4px; transition:all 0.12s; padding:0; }
+    .ghost-ic:hover { color:#001858; background:rgba(0,24,88,0.06); }
+    .ghost-ic--danger:hover { color:#c74060; background:rgba(199,64,96,0.08); }
+
+
+    .ta-wrap { position:relative; }
+    .ta-tools { position:absolute; top:6px; right:12px; display:flex; gap:2px; z-index:2; background:rgba(253,241,230,0.92); border-radius:4px; padding:1px; }
+
+
+    .in-wrap { position:relative; display:block; }
+    .in-wrap > input { padding-right:24px; }
+    .in-x { position:absolute; top:50%; right:6px; transform:translateY(-50%); width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; color:#8a8eb8; cursor:pointer; border:none; background:transparent; padding:0; border-radius:3px; }
+    .in-x:hover { color:#001858; background:rgba(0,24,88,0.07); }
+    .in-x svg { width:11px; height:11px; }
+
+
+    /* ===== Library — contiguous stacked file list, inline colored placeholders, fill field ===== */
+    .sec-h { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4a5088; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+    .sec-h .sub { font-weight:600; color:#8a8eb8; text-transform:none; letter-spacing:normal; font-size:9px; }
+    .lib-list { border:2px solid #001858; border-radius:var(--r-in); overflow-y:auto; background:#ffffff; }
+    .lib-row { font-size:11px; font-weight:600; padding:7px 10px; color:#3a4878; cursor:pointer; transition:all 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid rgba(0,24,88,0.10); }
+    .lib-row:last-child { border-bottom:none; }
+    .lib-row:hover:not(.on) { background:rgba(0,24,88,0.04); color:#001858; }
+    .lib-row.on { background:#f582ae18; color:#001858; font-weight:800; box-shadow:inset 3px 0 0 #f582ae; }
+    .tpl-view { background:#fdf1e6; border:2px solid #001858; border-radius:var(--r-in); padding:9px 11px; font-size:11.5px; line-height:1.85; color:#3a4878; overflow-y:auto; }
+    /* inline colored placeholder text (replaces floating pills) */
+    .tpl-ph { font-weight:800; cursor:pointer; border-radius:3px; padding:0 1px; transition:background 0.1s; }
+    .tpl-ph:hover { background:rgba(0,24,88,0.06); }
+    .tpl-ph.filled { font-style:italic; }
+    .tpl-ph.sel { background:rgba(0,24,88,0.10); box-shadow:0 1px 0 currentColor; }
+    .tpl-fill { position:relative; }
+    .tpl-fill textarea { width:100%; background:#ffffff; border:2px solid #c9c2b0; border-radius:var(--r-in); padding:6px 52px 6px 32px; font-size:11px; font-weight:700; line-height:1.35; resize:none; outline:none; transition:border-color 0.12s; }
+    .tpl-fill textarea::placeholder { font-weight:700; opacity:0.65; color:var(--ph,#8a8eb8); }
+    .tpl-fill .fill-reset { position:absolute; top:0; left:6px; height:100%; display:flex; align-items:center; }
+    .tpl-fill .fill-tools { position:absolute; top:0; right:6px; height:100%; display:flex; align-items:center; gap:2px; }
+    .fill-ic { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; color:#8a8eb8; background:transparent; border:none; cursor:pointer; border-radius:4px; transition:all 0.12s; padding:0; }
+    .fill-ic:hover { color:#001858; background:rgba(0,24,88,0.07); }
+    .fill-ic--go:hover { color:#3d946a; background:rgba(61,148,106,0.10); }
+
+
+    @keyframes slideIn { from { transform:translateX(40px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+
+
+    /* ===== Vertical agent toggle strips (§F) — stacked, uniform width, no corner tag ===== */
+    .strip-wrap { display:flex; flex-direction:column; min-height:0; border-right:2px solid rgba(0,24,88,0.14); background:var(--subtle); }
+    .strip-head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 8px 4px; }
+    .strip-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4a5088; }
+    .strip-col { display:flex; flex-direction:column; gap:5px; overflow-y:auto; padding:2px 8px 8px; min-height:0; }
+    .vchip { display:flex; align-items:center; gap:7px; width:100%; padding:5px 8px; border:2px solid #c9c2b0; border-radius:var(--r-in); background:#ffffff; cursor:pointer; transition:all 0.12s; text-align:left; }
+    .vchip:hover:not(.on) { border-color:#8a8eb8; }
+    .vchip.on { border-color:#f582ae; background:#f582ae14; }
+    .vchip-ic { width:20px; height:20px; flex-shrink:0; }
+    .vchip-lab { display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+    .vchip-role { font-size:8px; text-transform:uppercase; letter-spacing:0.03em; color:#8a8eb8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vchip-nm { font-size:10px; font-weight:800; color:#001858; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .selectall { font-size:9px; font-weight:800; color:#d08530; cursor:pointer; background:none; border:none; white-space:nowrap; text-transform:uppercase; letter-spacing:0.04em; }
+    .selectall:hover { color:#b06d20; }
+
+
+    /* ===== Readout cards (cross-cutting): feed/scratch/log items as stacked cards w/ copy ===== */
+    .ro-card { position:relative; background:#ffffff; border:2px solid rgba(0,24,88,0.16); border-radius:var(--r-in); padding:8px 10px; }
+    .ro-card .ro-copy { position:absolute; top:5px; right:6px; }
+    .ro-card .ro-name { font-size:11px; font-weight:800; margin-bottom:2px; padding-right:22px; }
+    .ro-card .ro-text { font-size:11px; color:#3a4878; line-height:1.45; }
+    .ro-card .ro-time { font-size:9px; color:#8a8eb8; font-family:'JetBrains Mono',monospace; }
+    .ro-state { font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:999px; border:1px solid; }
+
+
+    /* ===== Requests ===== */
+    .req-head { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .req-badge { margin-left:auto; min-width:22px; height:20px; padding:0 7px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; line-height:1; flex-shrink:0; background:#001858; color:#fff8ee; }
+    .req-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#3a4878; }
+
+
+    /* ===== Vertical decision option sub-cards ===== */
+    .opt { display:block; width:100%; text-align:left; border:2px solid #c9c2b0; border-radius:var(--r-in); background:#ffffff; padding:7px 10px; cursor:pointer; transition:all 0.12s; }
+    .opt:hover:not(.on) { border-color:#8a8eb8; }
+    .opt.on { border-color:#f582ae; background:#f582ae14; }
+    .opt-nm { display:block; font-size:11px; font-weight:800; color:#001858; }
+    .opt-desc { display:block; font-size:9.5px; color:#4a5088; line-height:1.3; margin-top:1px; }
+
+
+    /* ===== Per-field editing (Details) ===== */
+    .edit-ic { background:none; border:none; cursor:pointer; color:#8a8eb8; display:inline-flex; align-items:center; padding:0; line-height:0; }
+    .edit-ic:hover { color:#d08530; }
+    .field.editing .edit-ic { color:#3d946a; }
+    .field .ic-save { display:none; }
+    .field.editing .ic-pencil { display:none; }
+    .field.editing .ic-save { display:inline-block; }
+    textarea.autosize { min-height:30px; resize:none; overflow:hidden; }
+    .field:not(.editing) .lockable { opacity:0.45; pointer-events:none; filter:saturate(0.55); }
+    .grp-div { border-top:2px solid rgba(0,24,88,0.14); height:0; }
+
+
+    .swatch { width:20px; height:20px; flex:0 0 auto; border-radius:var(--r-in); cursor:pointer; border:2px solid transparent; transition:all 0.12s; }
+    .swatch.on { outline:2px solid #001858; outline-offset:2px; }
+    .icobtn { width:28px; height:28px; flex:0 0 auto; border-radius:var(--r-in); background:#ffffff; border:2px solid #c9c2b0; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .icobtn:hover { border-color:#8a8eb8; }
+    .icobtn.on { border-color:#001858; }
+    .hscroll { display:flex; flex-wrap:nowrap; gap:7px; overflow-x:auto; overflow-y:hidden; padding:3px 1px 5px; align-items:center; }
+
+
+    /* ===== Window-footer session controls ===== */
+    .foot-btn { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 9px; font-size:10px; font-weight:700; border-radius:5px; border:1px solid rgba(0,24,88,0.22); background:#ffffff; color:#001858; cursor:pointer; transition:all 0.12s; }
+    .foot-btn:hover { border-color:#f582ae; }
+    .foot-btn svg { width:12px; height:12px; }
+
+
+    /* ===== Color Palette Reference ===== */
+    .ref-section { background:#0e1840; color:#e8e6f4; border-top:3px solid #001858; padding:20px 28px 24px; overflow-y:auto; max-height:340px; }
+    .ref-heading { display:flex; align-items:center; justify-content:center; gap:12px; font-size:11px; font-weight:800; letter-spacing:0.18em; text-transform:uppercase; color:#9aa0d0; margin-bottom:16px; }
+    .ref-heading .rule { width:48px; height:1px; background:#3a4488; display:inline-block; }
+    .ref-grid { max-width:1400px; margin:0 auto; }
+    .ref-group { display:grid; grid-template-columns:118px 1fr; gap:16px; align-items:start; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .ref-group:last-child { border-bottom:none; }
+    .ref-group-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#b7bce0; padding-top:4px; }
+    .ref-chips { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:9px 14px; }
+    .ref-chip { display:flex; align-items:center; gap:9px; }
+    .ref-sw { width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,0.18); flex-shrink:0; }
+    .ref-meta { display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+    .ref-hex { font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#dfe2f4; font-weight:500; }
+    .ref-name { font-size:9.5px; color:#8b91c0; font-weight:600; }
+  </style>
+  <script>
+    function switchTab(g,t){document.querySelectorAll(`[data-group=\"${g}\"]`).forEach(p=>p.classList.add('hidden'));document.getElementById(`${g}-${t}`).classList.remove('hidden');document.querySelectorAll(`[data-tab-group=\"${g}\"]`).forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+      const foots=document.querySelectorAll(`[data-group=\"${g}-foot\"]`);if(foots.length){foots.forEach(f=>f.classList.add('hidden'));const fm=document.getElementById(`${g}-foot-${t}`);if(fm)fm.classList.remove('hidden');}
+      if(g==='prompt'){const ar=document.getElementById('prompt-actions');if(ar)ar.classList.toggle('hidden',t==='history');const rv=document.getElementById('revise-split');if(rv)rv.classList.toggle('hidden',t!=='compose');const rsp=document.getElementById('response-fmt');if(rsp)rsp.classList.toggle('hidden',t!=='compose');}
+      const s=JSON.parse(localStorage.getItem('awl-tabs')||'{}');s[g]=t;localStorage.setItem('awl-tabs',JSON.stringify(s));}
+    function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden')}
+    function toggleChip(el){el.classList.toggle('on');}
+    function pickChip(el){const row=el.closest('[data-single]');row.querySelectorAll('.vchip,.atog').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+    function segPick(btn){const g=btn.closest('.seg-ctrl');g.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+    function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
+    function openReply(){const f=document.getElementById('reply-field');if(f){f.focus();f.scrollIntoView({block:'nearest'});}}
+    function clearField(id){const el=document.getElementById(id);if(el){el.value='';if(el.classList.contains('autosize'))autosize(el);el.focus();}}
+    function clearInput(btn){const i=btn.parentElement.querySelector('input,textarea');if(i){i.value='';i.focus();}}
+    function cycleDir(b){const order=['ab','ba','both'];const glyph={ab:'\\u2192',ba:'\\u2190',both:'\\u2194'};const tip={ab:'A \\u2192 B',ba:'B \\u2192 A',both:'A \\u2194 B (both)'};let i=(order.indexOf(b.dataset.dir)+1)%3;b.dataset.dir=order[i];b.textContent=glyph[order[i]];b.title=tip[order[i]];}
+    function toggleLimit(b){b.classList.toggle('on');const inp=b.parentElement.querySelector('.lim-in');if(inp)inp.disabled=!b.classList.contains('on');}
+    function pickSwatch(el){const w=el.parentElement;w.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+    function pickIcon(el){const w=el.closest('[data-icogroup]');w.querySelectorAll('.icobtn').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+    function toggleEdit(btn){btn.closest('.field').classList.toggle('editing');}
+    function selectAll(btn){const wrap=btn.closest('[data-toggle-wrap]');const chips=[...wrap.querySelectorAll('.vchip,.atog')];const allOn=chips.length>0&&chips.every(c=>c.classList.contains('on'));const turnOn=!allOn;chips.forEach(c=>c.classList.toggle('on',turnOn));btn.textContent=turnOn?'Clear all':'Select all';}
+    function initSelectAll(){document.querySelectorAll('[data-toggle-wrap]').forEach(w=>{const btn=w.querySelector('.selectall');if(!btn)return;const chips=[...w.querySelectorAll('.vchip,.atog')];btn.textContent=(chips.length>0&&chips.every(c=>c.classList.contains('on')))?'Clear all':'Select all';});}
+    function autosize(el){el.style.height='auto';const cs=getComputedStyle(el);const border=(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);el.style.height=(el.scrollHeight+border)+'px';}
+    function autosizeAll(){document.querySelectorAll('textarea.autosize').forEach(t=>autosize(t));}
+
+
+    /* ---------- split + fmt menu behaviour (shared, multi-instance) ---------- */
+    function closeAllMenus(){document.querySelectorAll('.split-menu.open,.fmt-menu.open').forEach(x=>x.classList.remove('open'));}
+    function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllMenus();if(!open)m.classList.add('open');}
+    function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const lbl=menu.closest('.split').querySelector('.split-lbl');if(lbl)lbl.textContent=mi.dataset.short||mi.querySelector('b').textContent;menu.classList.remove('open');}
+
+
+    window.addEventListener('DOMContentLoaded',()=>{
+      const s=JSON.parse(localStorage.getItem('awl-tabs')||'{}');Object.entries(s).forEach(([g,t])=>{if(document.getElementById(`${g}-${t}`))switchTab(g,t);});
+      const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();initSelectAll();
+      if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));}
+      initModel(); initContext(); initHistory(); initLibrary(); drawEdges();
+      makeFmt('response-fmt', RESPONSE_FMT, {length:['Concise'],altitude:[],register:[],structure:['Tables'],emphasis:['Lead with the answer']});
+      makeFmt('feed-fmt', FEED_FMT, {format:['Formatted'],include:['Thinking blocks']});
+    });
+    window.addEventListener('load',autosizeAll);
+    if(document.fonts&&document.fonts.ready){document.fonts.ready.then(autosizeAll);}
+    window.addEventListener('resize',()=>{clearTimeout(window.__edgeT);window.__edgeT=setTimeout(drawEdges,80);});
+    document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt'))closeAllMenus();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllMenus();if(typeof closeHist==='function')closeHist();}});
+    setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString()},1000);
+    (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m}catch(e){}},300)})();
+    document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.v-splitter').forEach(s=>{let sy,pe,ne,ph,nh;s.addEventListener('mousedown',e=>{e.preventDefault();sy=e.clientY;pe=s.previousElementSibling;ne=s.nextElementSibling;if(!pe||!ne)return;ph=pe.offsetHeight;nh=ne.offsetHeight;const mv=e2=>{const d=e2.clientY-sy;pe.style.height=Math.max(80,ph+d)+'px';pe.style.flex='none';ne.style.height=Math.max(80,nh-d)+'px';ne.style.flex='none';drawEdges()};const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)})})});
+  </script>
+</head>
+<body class=\"bg-base-950 text-warm-100 font-sans h-screen overflow-hidden flex flex-col\">
+
+
+  <!-- SVG Defs -->
+  <svg xmlns=\"http://www.w3.org/2000/svg\" style=\"display:none\">
+    <!-- utility icons -->
+    <symbol id=\"icon-pencil\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 2l3 3-9 9H2v-3z\"/><path d=\"M9 4l3 3\"/></symbol>
+    <symbol id=\"icon-save\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 2.5h7.5L13.5 5.5V13.5H2.5z\"/><path d=\"M5 2.5V6h5V2.5\"/><path d=\"M5 9.5h6V13.5H5z\"/></symbol>
+    <symbol id=\"icon-user\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5\"/></symbol>
+    <symbol id=\"icon-shuffle\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 4h2.6l6.4 8H14\"/><path d=\"M2 12h2.6l6.4-8H14\"/><path d=\"M11.6 2L14 4l-2.4 2\"/><path d=\"M11.6 10L14 12l-2.4 2\"/></symbol>
+    <symbol id=\"icon-copy\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5.5\" y=\"5.5\" width=\"8\" height=\"8\" rx=\"1.2\"/><path d=\"M10.5 5.5V3.2A1.2 1.2 0 0 0 9.3 2H3.2A1.2 1.2 0 0 0 2 3.2v6.1A1.2 1.2 0 0 0 3.2 10.5h2.3\"/></symbol>
+    <symbol id=\"icon-trash\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 4.5h10\"/><path d=\"M6.5 4.5V3h3v1.5\"/><path d=\"M4.6 4.5l.55 8.1a1 1 0 0 0 1 .9h3.7a1 1 0 0 0 1-.9l.55-8.1\"/><path d=\"M6.8 7v4M9.2 7v4\"/></symbol>
+    <symbol id=\"icon-retry\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13 8a5 5 0 1 1-1.46-3.54\"/><path d=\"M13 2.5V5h-2.5\"/></symbol>
+    <symbol id=\"icon-reset\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 8a5 5 0 1 0 1.46-3.54\"/><path d=\"M3 2.5V5h2.5\"/></symbol>
+    <symbol id=\"icon-send\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 2L7 9\"/><path d=\"M14 2l-4.4 12-2.6-5L2 6.4z\"/></symbol>
+    <symbol id=\"icon-format\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"3\" cy=\"4\" r=\"0.85\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"3\" cy=\"8\" r=\"0.85\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"3\" cy=\"12\" r=\"0.85\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M6 4h7M6 8h7M6 12h5\"/></symbol>
+    <symbol id=\"icon-wand\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 13L9 7\"/><path d=\"M11.3 2.1 L12.2 3.8 L13.9 4.7 L12.2 5.6 L11.3 7.3 L10.4 5.6 L8.7 4.7 L10.4 3.8 Z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M4.9 2.3 L5.4 3.2 L6.3 3.7 L5.4 4.2 L4.9 5.1 L4.4 4.2 L3.5 3.7 L4.4 3.2 Z\" fill=\"currentColor\" stroke=\"none\"/></symbol>
+    <symbol id=\"icon-note\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 3h8l5 5v13H6z\"/><path d=\"M14 3v5h5\"/><path d=\"M9 12.5h6M9 15.5h6M9 18.5h3.5\"/></symbol>
+    <symbol id=\"icon-chevron-down\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6l4 4 4-4\"/></symbol>
+    <symbol id=\"icon-x\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4.5 4.5l7 7M11.5 4.5l-7 7\"/></symbol>
+    <symbol id=\"icon-insert\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 10.5V3\"/><path d=\"M5 6l3-3 3 3\"/><path d=\"M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5\"/></symbol>
+    <symbol id=\"icon-folder\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z\"/></symbol>
+    <!-- history icons -->
+    <symbol id=\"i-rewind\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 4.5L3 7.5l3 3\"/><path d=\"M3 7.5h5.5a4 4 0 1 1 0 8H4.5\"/></symbol>
+    <symbol id=\"i-fork\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"5\" cy=\"3.5\" r=\"1.6\"/><circle cx=\"5\" cy=\"12.5\" r=\"1.6\"/><circle cx=\"11\" cy=\"6\" r=\"1.6\"/><path d=\"M5 5.1v5.8\"/><path d=\"M11 7.6a3.5 3.5 0 0 1-3.5 3.5H5\"/></symbol>
+    <symbol id=\"i-chev\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6l4 4 4-4\"/></symbol>
+
+
+    <!-- ===== AGENT FACES — outline-only line-drawing avatars (§E5). 18 unique, uniform 24x24. ===== -->
+    <symbol id=\"ag-owl\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"13\" r=\"9\"/><circle cx=\"9\" cy=\"12\" r=\"2.5\"/><circle cx=\"15\" cy=\"12\" r=\"2.5\"/><circle cx=\"9\" cy=\"11.7\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15\" cy=\"11.7\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M11 16l1 1.4 1-1.4\"/><path d=\"M5 6l3 4M19 6l-3 4\"/></symbol>
+    <symbol id=\"ag-fox\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 21c-5 0-8-4-8-8 0-3 1-5 3-7l2-3v4l3-1 3 1V3l2 3c2 2 3 4 3 7 0 4-3 8-8 8z\"/><circle cx=\"9.5\" cy=\"13\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"13\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10 17c0.8 0.7 3.2 0.7 4 0\"/></symbol>
+    <symbol id=\"ag-cat\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 11V5l4 4h8l4-4v6a8 8 0 0 1-16 0z\"/><circle cx=\"9\" cy=\"12\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15\" cy=\"12\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M12 14v1.5M10.5 15.5l-3 1M13.5 15.5l3 1\"/></symbol>
+    <symbol id=\"ag-frog\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 16c0-4 3-7 7-7s7 3 7 7\"/><circle cx=\"9\" cy=\"9\" r=\"1.8\"/><circle cx=\"15\" cy=\"9\" r=\"1.8\"/><path d=\"M5 16h14M8 16c1.2 1.2 6.8 1.2 8 0\"/></symbol>
+    <symbol id=\"ag-bear\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"13\" r=\"6.5\"/><circle cx=\"6.5\" cy=\"7.5\" r=\"2.2\"/><circle cx=\"17.5\" cy=\"7.5\" r=\"2.2\"/><circle cx=\"10\" cy=\"12\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14\" cy=\"12\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M12 14.5v1M10.5 16c1 0.7 2 0.7 3 0\"/></symbol>
+    <symbol id=\"ag-rabbit\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.5 4c-1 2-1 5 0.3 7M14.5 4c1 2 1 5-0.3 7\"/><circle cx=\"12\" cy=\"15\" r=\"5.5\"/><circle cx=\"10\" cy=\"14\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14\" cy=\"14\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M11 17h2\"/></symbol>
+    <symbol id=\"ag-robot\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" width=\"14\" height=\"11\" rx=\"2.5\"/><circle cx=\"12\" cy=\"4.5\" r=\"1\"/><path d=\"M12 5.5V8\"/><circle cx=\"9.5\" cy=\"13\" r=\"1.2\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"13\" r=\"1.2\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M9.5 16.5h5M3 12v3M21 12v3\"/></symbol>
+    <symbol id=\"ag-ghost\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 20V11a7 7 0 0 1 14 0v9l-2.3-1.6L14.3 20 12 18.4 9.7 20 7.3 18.4 5 20z\"/><circle cx=\"9.5\" cy=\"11\" r=\"1.1\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"11\" r=\"1.1\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 14.5c1 0.8 2 0.8 3 0\"/></symbol>
+    <symbol id=\"ag-alien\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3c4.5 0 7 2.8 7 7 0 5-3.5 8.5-7 11C8.5 18.5 5 15 5 10c0-4.2 2.5-7 7-7z\"/><path d=\"M8.5 10c0.8 1.6 1.6 2.4 2.5 2.6M15.5 10c-0.8 1.6-1.6 2.4-2.5 2.6\" stroke-width=\"2.4\"/></symbol>
+    <symbol id=\"ag-cyclops\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"11.5\" r=\"3\"/><circle cx=\"12\" cy=\"11.5\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M9 17c1.6 1 4.4 1 6 0\"/></symbol>
+    <symbol id=\"ag-devil\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"13.5\" r=\"7\"/><path d=\"M6.5 8C5 6.5 5 4.5 5 4.5S7 5 8 7M17.5 8C19 6.5 19 4.5 19 4.5S17 5 16 7\"/><circle cx=\"9.5\" cy=\"13\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"13\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M9.5 16.5c1.5 1.2 3.5 1.2 5 0\"/></symbol>
+    <symbol id=\"ag-skull\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 11a6 6 0 0 1 12 0v3.5c0 1-.8 1.8-1.8 1.8H16v2.2H8v-2.2h-.2C6.8 16.3 6 15.5 6 14.5z\"/><circle cx=\"9.3\" cy=\"11.3\" r=\"1.6\"/><circle cx=\"14.7\" cy=\"11.3\" r=\"1.6\"/><path d=\"M11 14.5h2M10.5 18.5v-2M13.5 18.5v-2\"/></symbol>
+    <symbol id=\"ag-blob\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4.5 15c-.5-5 3-9.5 7.5-9.5S20 9.5 19.5 15c-.3 3-2 4.5-3.5 4.5-1 0-1.3-.6-2-.6s-1 .6-2 .6-1.3-.6-2-.6-1 .6-2 .6c-1.2 0-1.8-1.3-2-2.5z\"/><path d=\"M9 12c.6.8 1.4.8 2 0M13 12c.6.8 1.4.8 2 0\" stroke-width=\"2\"/><path d=\"M11 15c.6.5 1.4.5 2 0\"/></symbol>
+    <symbol id=\"ag-moth\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 8v9\"/><path d=\"M12 8c-1-2-3-3.5-5.5-3.5C4 4.5 3 7 3.5 9.5 4 12 6 13 8 13c2 0 3.2-1.2 4-2.4\"/><path d=\"M12 8c1-2 3-3.5 5.5-3.5C20 4.5 21 7 20.5 9.5 20 12 18 13 16 13c-2 0-3.2-1.2-4-2.4\"/><path d=\"M10.5 5.5L12 8l1.5-2.5\"/><circle cx=\"12\" cy=\"9\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/></symbol>
+    <symbol id=\"ag-mushroom\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12a8 8 0 0 1 16 0z\"/><path d=\"M9 12v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6\"/><circle cx=\"10\" cy=\"15.5\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14\" cy=\"15.5\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M11 17.5c.6.4 1.4.4 2 0\"/></symbol>
+    <symbol id=\"ag-star\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z\"/><circle cx=\"10.2\" cy=\"11\" r=\"0.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"13.8\" cy=\"11\" r=\"0.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 13c.7.6 2.3.6 3 0\"/></symbol>
+    <symbol id=\"ag-moon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M16 3a9 9 0 1 0 5 7 6.5 6.5 0 0 1-5-7z\"/><circle cx=\"11\" cy=\"11.5\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15\" cy=\"12.5\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M11 15c1 .7 2.6.4 3.4-.6\"/></symbol>
+    <symbol id=\"ag-octo\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 12a5 5 0 0 1 10 0v2H7z\"/><circle cx=\"10\" cy=\"11\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14\" cy=\"11\" r=\"0.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M11 13c.6.5 1.4.5 2 0\"/><path d=\"M7 14c-1 .5-2 1.5-2 3M9.5 14.5c-.4 1-.4 2.2 0 3.5M14.5 14.5c.4 1 .4 2.2 0 3.5M17 14c1 .5 2 1.5 2 3M12 14.5v3.5\"/></symbol>
+  </svg>
+
+
+  <!-- TITLE BAR -->
+  <header class=\"bg-base-900 border-b-2 border-base-600 px-4 h-[36px] min-h-[36px] flex items-center justify-between flex-shrink-0\">
+    <div class=\"flex items-center gap-3\">
+      <span class=\"text-sm font-extrabold text-warm-50 tracking-tight\">AWL Multi-Agent Dashboard</span>
+      <span class=\"text-[9px] px-1.5 py-0.5 rounded bg-pink/20 text-pink font-mono font-bold\">v7.1</span>
+      <span class=\"text-xs text-warm-500 font-semibold\">9 agents</span>
+    </div>
+    <div class=\"flex items-center gap-2 text-[10px] text-warm-400 font-semibold\">
+      <span id=\"clock\" class=\"px-2 py-0.5 rounded-md bg-base-800 font-mono border border-base-700/20\"></span>
+      <span class=\"px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20\">WSL2</span>
+      <span class=\"px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20\">tmux</span>
+      <span class=\"px-2 py-0.5 rounded-full bg-sage/20 text-sage font-bold\">Connected</span>
+    </div>
+  </header>
+
+
+  <!-- MAIN 3-PANE — rounded cards on the cream page -->
+  <div class=\"flex flex-1 overflow-hidden gap-2 p-2\">
+
+
+    <!-- LEFT PANE -->
+    <div class=\"flex-[4] flex flex-col gap-2 overflow-hidden min-w-0\">
+
+
+      <!-- TEAM GRAPH -->
+      <div class=\"pcard clip relative\" style=\"height:300px\">
+        <div class=\"heading-strip\"><h3>Team Graph</h3><button onclick=\"toggleDrawer()\" class=\"text-[11px] text-amber hover:text-amber/80 font-bold\">Link Agents</button></div>
+        <div class=\"flex-1 overflow-auto bg-base-950 p-4 relative\">
+          <div class=\"graph-stage\" id=\"graph-stage\" style=\"max-width:520px;margin:0 auto;\">
+            <svg class=\"edge-layer\" id=\"edge-layer\"><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0 L10 5 L0 10 z\" fill=\"#8a8eb8\"/></marker></defs></svg>
+            <div class=\"relative z-[2] grid grid-cols-3 gap-5\">
+
+
+              <!-- 01 researcher — PENDING (3) — selected -->
+              <div class=\"agent-node selected cursor-pointer bg-base-800 border-2 border-agent-teal rounded-2xl p-2.5 hover:border-agent-teal\" data-node=\"0\">
+                <div class=\"absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-pink border-2 border-base-950 text-[7px] font-extrabold text-warm-50 tracking-wider whitespace-nowrap\" title=\"Shown in the Agent panel and CLI\">VIEWING</div>
+                <div class=\"absolute -top-2 -left-2 min-w-[22px] h-[22px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center z-10\" title=\"pending — 3 requests awaiting\"><span class=\"text-[12px] font-extrabold text-base-800 leading-none\">3</span></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-teal shrink-0\"><use href=\"#ag-owl\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">researcher</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 sandy</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-teal rounded\" style=\"width:62%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">62%</span></div>
+                <div class=\"flex gap-1 mt-1.5\"><div class=\"subagent-mini\" title=\"sub-1 (working)\"><span class=\"text-[8px] font-bold text-agent-teal\">1</span></div><div class=\"subagent-mini\" title=\"sub-2 (idle)\"><span class=\"text-[8px] font-bold text-agent-teal/50\">2</span></div></div>
+                <div class=\"node-meta\">opus 4.8 · auto · high</div>
+              </div>
+
+
+              <!-- 02 synthesizer — idle -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-indigo rounded-2xl p-2.5 hover:border-agent-indigo\" data-node=\"1\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#9498bb\" title=\"idle\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-indigo shrink-0\"><use href=\"#ag-fox\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">synthesizer</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 kai</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-indigo rounded\" style=\"width:34%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">34%</span></div>
+                <div class=\"node-meta\">sonnet 4.6 · edit · med</div>
+              </div>
+
+
+              <!-- 03 auditor — PENDING (1) -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-forest rounded-2xl p-2.5 hover:border-agent-forest\" data-node=\"2\">
+                <div class=\"absolute -top-2 -left-2 min-w-[22px] h-[22px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center z-10\" title=\"pending — 1 request awaiting\"><span class=\"text-[12px] font-extrabold text-base-800 leading-none\">1</span></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-forest shrink-0\"><use href=\"#ag-cat\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">auditor</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 drew</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-forest rounded\" style=\"width:12%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">12%</span></div>
+                <div class=\"node-meta\">haiku 4.5 · plan · low</div>
+              </div>
+
+
+              <!-- 04 coder — active -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-copper rounded-2xl p-2.5 hover:border-agent-copper\" data-node=\"3\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#3d946a\" title=\"active\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-copper shrink-0\"><use href=\"#ag-robot\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">coder</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 max</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-copper rounded\" style=\"width:48%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">48%</span></div>
+                <div class=\"flex gap-1 mt-1.5\"><div class=\"subagent-mini\" title=\"sub-1 (working)\"><span class=\"text-[8px] font-bold text-agent-copper\">1</span></div></div>
+                <div class=\"node-meta\">sonnet 4.6 · auto · high</div>
+              </div>
+
+
+              <!-- 05 researcher-02 — active -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-rose rounded-2xl p-2.5 hover:border-agent-rose\" data-node=\"4\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#3d946a\" title=\"active\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-rose shrink-0\"><use href=\"#ag-ghost\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">researcher</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">02 rowan</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-rose rounded\" style=\"width:71%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">71%</span></div>
+                <div class=\"node-meta\">opus 4.8 · auto · max</div>
+              </div>
+
+
+              <!-- 06 tester — idle -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-plum rounded-2xl p-2.5 hover:border-agent-plum\" data-node=\"5\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#9498bb\" title=\"idle\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-plum shrink-0\"><use href=\"#ag-frog\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">tester</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 nova</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-plum rounded\" style=\"width:5%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">5%</span></div>
+                <div class=\"node-meta\">haiku 4.5 · ask · low</div>
+              </div>
+
+
+              <!-- 07 reviewer — PENDING (2) -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-cobalt rounded-2xl p-2.5 hover:border-agent-cobalt\" data-node=\"6\">
+                <div class=\"absolute -top-2 -left-2 min-w-[22px] h-[22px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center z-10\" title=\"pending — 2 requests awaiting\"><span class=\"text-[12px] font-extrabold text-base-800 leading-none\">2</span></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-cobalt shrink-0\"><use href=\"#ag-alien\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">reviewer</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 vega</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-cobalt rounded\" style=\"width:88%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">88%</span></div>
+                <div class=\"node-meta\">sonnet 4.6 · edit · high</div>
+              </div>
+
+
+              <!-- 08 planner — idle -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-vermil rounded-2xl p-2.5 hover:border-agent-vermil\" data-node=\"7\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#9498bb\" title=\"idle\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-vermil shrink-0\"><use href=\"#ag-moth\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">planner</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 quinn</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-vermil rounded\" style=\"width:22%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">22%</span></div>
+                <div class=\"node-meta\">opus 4.8 · plan · extra</div>
+              </div>
+
+
+              <!-- 09 docs — active -->
+              <div class=\"agent-node cursor-pointer bg-base-800 border-2 border-agent-olive rounded-2xl p-2.5 hover:border-agent-olive\" data-node=\"8\">
+                <div class=\"absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950 z-10\" style=\"background:#3d946a\" title=\"active\"></div>
+                <div class=\"flex items-center gap-1.5 mb-1\"><svg class=\"w-5 h-5 text-agent-olive shrink-0\"><use href=\"#ag-mushroom\"/></svg><div class=\"leading-tight min-w-0\"><div class=\"text-[8.5px] text-warm-400 font-semibold\">docs</div><div class=\"text-[10.5px] font-extrabold text-warm-50 truncate\">01 wren</div></div></div>
+                <div class=\"flex items-center gap-1.5\"><div class=\"flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20\"><div class=\"h-full bg-agent-olive rounded\" style=\"width:56%\"></div></div><span class=\"text-[8.5px] text-warm-400 font-mono font-bold\">56%</span></div>
+                <div class=\"node-meta\">haiku 4.5 · auto · med</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Link Drawer -->
+        <div id=\"link-drawer\" class=\"hidden absolute top-0 right-0 w-[260px] h-full bg-base-850 border-l-2 border-base-600 z-30 overflow-y-auto shadow-[-8px_0_20px_rgba(0,24,88,0.18)]\" style=\"animation:slideIn 0.15s ease forwards\">
+          <div class=\"heading-strip\" style=\"border-radius:0\"><h3>Link Config</h3><button onclick=\"toggleDrawer()\" class=\"ghost-ic\" title=\"Close\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-x\"/></svg></button></div>
+          <div class=\"p-3 space-y-3\">
+            <div class=\"flex items-center justify-between gap-2\">
+              <div class=\"flex items-center gap-1.5 min-w-0\"><svg class=\"w-4 h-4 text-agent-teal shrink-0\"><use href=\"#ag-owl\"/></svg><span class=\"leading-tight min-w-0\"><span class=\"block text-[8px] text-warm-400 font-bold uppercase tracking-wide\">researcher</span><span class=\"block text-[11px] font-extrabold text-warm-50 truncate\">01 sandy</span></span></div>
+              <button id=\"link-dir\" data-dir=\"ab\" onclick=\"cycleDir(this)\" class=\"w-7 h-7 shrink-0 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center text-[15px] font-extrabold text-amber hover:border-amber/60 transition-colors\" title=\"A → B\">&rarr;</button>
+              <div class=\"flex items-center gap-1.5 min-w-0 justify-end\"><svg class=\"w-4 h-4 text-agent-indigo shrink-0\"><use href=\"#ag-fox\"/></svg><span class=\"leading-tight min-w-0\"><span class=\"block text-[8px] text-warm-400 font-bold uppercase tracking-wide\">synthesizer</span><span class=\"block text-[11px] font-extrabold text-warm-50 truncate\">01 kai</span></span></div>
+            </div>
+            <div><label class=\"text-[10px] text-warm-400 font-bold block mb-1.5\">Trigger</label><div class=\"seg-ctrl\"><button onclick=\"segPick(this)\">Now</button><button onclick=\"segPick(this)\">Next</button><button class=\"active\" onclick=\"segPick(this)\">Queue</button><button onclick=\"segPick(this)\">Hold</button></div></div>
+            <div><label class=\"text-[10px] text-warm-400 font-bold block mb-1.5\">Payload</label><div class=\"seg-ctrl\"><button class=\"active\" onclick=\"segPick(this)\">Message</button><button onclick=\"segPick(this)\">Transcript</button><button onclick=\"segPick(this)\">Manual</button></div></div>
+            <div>
+              <label class=\"text-[10px] text-warm-400 font-bold block mb-1.5\">End After <span class=\"text-warm-500 font-semibold normal-case\">— no limit unless set; ends at the first reached</span></label>
+              <div class=\"grid grid-cols-3 gap-2\">
+                <div><button class=\"lim-tog\" onclick=\"toggleLimit(this)\">Turns</button><input type=\"text\" class=\"lim-in\" placeholder=\"50\" disabled></div>
+                <div><button class=\"lim-tog\" onclick=\"toggleLimit(this)\">Time</button><input type=\"text\" class=\"lim-in\" placeholder=\"30m\" disabled></div>
+                <div><button class=\"lim-tog\" onclick=\"toggleLimit(this)\">Tokens</button><input type=\"text\" class=\"lim-in\" placeholder=\"100k\" disabled></div>
+              </div>
+            </div>
+            <div class=\"flex gap-2 pt-1\"><button class=\"flex-1 px-2 btn-primary\">Save</button><button class=\"flex-1 px-2 btn-danger\">Delete</button></div>
+          </div>
+        </div>
+      </div>
+
+
+      <div class=\"v-splitter\"></div>
+
+
+      <!-- TEAM FEED -->
+      <div class=\"pcard flex-1 min-h-[140px]\">
+        <div class=\"heading-strip\">
+          <h3>Team Feed</h3>
+          <div class=\"flex items-center gap-2 h-full\">
+            <div class=\"flex items-center gap-1 h-full\">
+              <button data-tab-group=\"feed\" data-tab=\"out\" onclick=\"switchTab('feed','out')\" class=\"tab-btn active\">Outgoing</button>
+              <button data-tab-group=\"feed\" data-tab=\"in\" onclick=\"switchTab('feed','in')\" class=\"tab-btn\">Incoming</button>
+              <button data-tab-group=\"feed\" data-tab=\"scratch\" onclick=\"switchTab('feed','scratch')\" class=\"tab-btn\">Scratch</button>
+              <button data-tab-group=\"feed\" data-tab=\"log\" onclick=\"switchTab('feed','log')\" class=\"tab-btn\">Log</button>
+            </div>
+            <!-- feed-formatting control (reuses Response component, opens downward) -->
+            <div class=\"fmt\" id=\"feed-fmt\">
+              <button class=\"fmt-btn\" onclick=\"event.stopPropagation();toggleFmt(this)\" title=\"Feed formatting\"><svg class=\"ic\"><use href=\"#icon-format\"/></svg><span class=\"fmt-lbl\">Format</span><span class=\"fmt-badge\">0</span><svg class=\"cv\"><use href=\"#icon-chevron-down\"/></svg></button>
+              <div class=\"fmt-menu fmt-menu--down fmt-menu--right\"></div>
+            </div>
+          </div>
+        </div>
+        <div class=\"flex-1 flex min-h-0\" style=\"overflow:hidden; border-radius:0 0 8px 8px\">
+          <!-- vertical agent filter strip (left of content) -->
+          <div class=\"strip-wrap\" style=\"width:118px\" data-toggle-wrap>
+            <div class=\"strip-head\"><span class=\"strip-label\">Filter</span><button class=\"selectall\" onclick=\"selectAll(this)\">Clear all</button></div>
+            <div class=\"strip-col\">
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-warm-50\"><use href=\"#icon-user\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">human</span><span class=\"vchip-nm\">User</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-teal\"><use href=\"#ag-owl\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">researcher</span><span class=\"vchip-nm\">01 sandy</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-indigo\"><use href=\"#ag-fox\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">synthesizer</span><span class=\"vchip-nm\">01 kai</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-forest\"><use href=\"#ag-cat\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">auditor</span><span class=\"vchip-nm\">01 drew</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-copper\"><use href=\"#ag-robot\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">coder</span><span class=\"vchip-nm\">01 max</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-rose\"><use href=\"#ag-ghost\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">researcher</span><span class=\"vchip-nm\">02 rowan</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-plum\"><use href=\"#ag-frog\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">tester</span><span class=\"vchip-nm\">01 nova</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-cobalt\"><use href=\"#ag-alien\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">reviewer</span><span class=\"vchip-nm\">01 vega</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-vermil\"><use href=\"#ag-moth\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">planner</span><span class=\"vchip-nm\">01 quinn</span></span></button>
+              <button class=\"vchip on\" onclick=\"toggleChip(this)\"><svg class=\"vchip-ic text-agent-olive\"><use href=\"#ag-mushroom\"/></svg><span class=\"vchip-lab\"><span class=\"vchip-role\">docs</span><span class=\"vchip-nm\">01 wren</span></span></button>
+            </div>
+          </div>
+          <!-- feed content (stacked readout cards) -->
+          <div class=\"flex-1 min-w-0 relative\">
+            <div id=\"feed-out\" data-group=\"feed\" class=\"absolute inset-0 overflow-y-auto bg-term px-3 py-2.5 space-y-2.5\">
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"ro-name text-agent-teal\">researcher-01-sandy</div><div class=\"ro-text\">Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token...</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"ro-name text-agent-forest\">auditor-01-drew</div><div class=\"ro-text\">Confirmed 2 of 3 vulns. Expiry bypass is critical -- tokens refresh indefinitely...</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"ro-name text-agent-cobalt\">reviewer-01-vega</div><div class=\"ro-text\">Reviewed the patch diff. Two style nits + one missing test for the rotation path...</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"ro-name text-agent-indigo\">synthesizer-01-kai</div><div class=\"ro-text\">Synthesizing findings. Remediation plan written to scratchpad...</div></div>
+            </div>
+            <div id=\"feed-in\" data-group=\"feed\" class=\"hidden absolute inset-0 overflow-y-auto bg-term px-3 py-2.5 space-y-2.5\">
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center gap-2 mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-warm-50\">User</span><span class=\"ro-state\" style=\"color:#506480;border-color:#50648055\">direct</span></div><div class=\"ro-text\">Analyze JWT middleware in src/auth/ for security vulns.</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center gap-2 mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-agent-teal\">researcher-01-sandy</span><span class=\"ro-state\" style=\"color:#d08530;border-color:#d0853055\">queued</span></div><div class=\"ro-text\">Found 3 auth vulns. Please audit and confirm.</div></div>
+            </div>
+            <div id=\"feed-scratch\" data-group=\"feed\" class=\"hidden absolute inset-0 overflow-y-auto bg-term px-3 py-2.5 space-y-2.5\">
+              <div class=\"text-[9px] text-warm-500 font-mono px-1\">~/.claude/shared/scratchpad.md — shared posts</div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center justify-between mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-agent-teal\">researcher-01-sandy</span><span class=\"ro-time\">14:33:07</span></div><div class=\"ro-text\">Posted finding: <b class=\"text-warm-100\">Token Expiry Bypass (CRITICAL)</b> — validateToken() accepts expired tokens; refresh issues new tokens indefinitely.</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center justify-between mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-agent-teal\">researcher-01-sandy</span><span class=\"ro-time\">14:33:51</span></div><div class=\"ro-text\">Posted finding: <b class=\"text-warm-100\">Weak Secret Leak (HIGH)</b> — default dev secret hardcoded in config.defaults.ts.</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center justify-between mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-agent-forest\">auditor-01-drew</span><span class=\"ro-time\">14:37:18</span></div><div class=\"ro-text\">Confirmed CRITICAL + HIGH. Demoted \"no rate limiting\" to MEDIUM — endpoint is behind the gateway throttle.</div></div>
+              <div class=\"ro-card\"><button class=\"ghost-ic ro-copy\" title=\"Copy\"><svg class=\"w-3.5 h-3.5\"><use href=\"#icon-copy\"/></svg></button><div class=\"flex items-center justify-between mb-0.5 pr-6\"><span class=\"text-[11px] font-extrabold text-agent-indigo\">synthesizer-01-kai</span><span class=\"ro-time\">14:40:36</span></div><div class=\"ro-text\">Wrote <b class=\"text-warm-100\"># Auth Remediation Plan</b> — Critical → High → Medium, with owners + checklist. Ready for approval.</div></div>
+            </div>
+            <div id=\"feed-log\" data-group=\"feed\" class=\"hidden absolute inset-0 overflow-y-auto bg-term px-3 py-2.5 font-mono text-[10px] space-y-1\">
+              <div class=\"text-warm-50\"><span class=\"text-warm-500\">14:31:58</span> user > dispatched researcher-01-sandy</div>
+              <div class=\"text-agent-teal\"><span class=\"text-warm-500\">14:32:04</span> researcher-01-sandy > started</div>
+              <div class=\"text-agent-teal\"><span class=\"text-warm-500\">14:33:07</span> researcher-01-sandy : posted scratch (CRITICAL)</div>
+              <div class=\"text-agent-indigo\"><span class=\"text-warm-500\">14:33:11</span> synthesizer-01-kai > started</div>
+              <div class=\"text-agent-forest\"><span class=\"text-warm-500\">14:34:22</span> auditor-01-drew > started</div>
+              <div class=\"text-agent-teal\"><span class=\"text-warm-500\">14:35:09</span> researcher-01 -> synthesizer-01 link</div>
+              <div class=\"text-agent-copper\"><span class=\"text-warm-500\">14:35:40</span> coder-01-max > started</div>
+              <div class=\"text-agent-indigo\"><span class=\"text-warm-500\">14:35:53</span> synthesizer-01-kai : committed 3f2a1b</div>
+              <div class=\"text-agent-forest\"><span class=\"text-warm-500\">14:37:18</span> auditor-01-drew ! flagged 2</div>
+              <div class=\"text-agent-copper\"><span class=\"text-warm-500\">14:37:46</span> coder-01-max : patched validateToken()</div>
+              <div class=\"text-gold\"><span class=\"text-warm-500\">14:38:30</span> auditor-01-drew * permission request</div>
+              <div class=\"text-agent-cobalt\"><span class=\"text-warm-500\">14:39:02</span> reviewer-01-vega : review note added</div>
+              <div class=\"text-agent-indigo\"><span class=\"text-warm-500\">14:40:36</span> synthesizer-01-kai : wrote remediation plan</div>
+              <div class=\"text-gold\"><span class=\"text-warm-500\">14:41:12</span> researcher-01-sandy * approval request</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MIDDLE PANE -->
+    <div class=\"flex-[2.2] flex flex-col gap-2 overflow-hidden min-w-0\">
+      <div class=\"pcard clip flex-1\">
+        <div class=\"heading-strip\"><h3>Agent</h3><div class=\"flex items-center gap-1 h-full\"><button data-tab-group=\"mid\" data-tab=\"details\" onclick=\"switchTab('mid','details')\" class=\"tab-btn active\">Details</button><button data-tab-group=\"mid\" data-tab=\"create\" onclick=\"switchTab('mid','create')\" class=\"tab-btn\">Create</button><button data-tab-group=\"mid\" data-tab=\"requests\" onclick=\"switchTab('mid','requests')\" class=\"tab-btn relative\">Requests<span class=\"absolute -top-1 -right-2.5 min-w-[18px] h-[18px] px-1 bg-gold border-2 border-base-600 rounded-full text-[10px] text-base-800 font-extrabold flex items-center justify-center leading-none\">3</span></button></div></div>
+
+
+        <!-- Details -->
+        <div id=\"mid-details\" data-group=\"mid\" class=\"flex-1 overflow-y-auto p-3 space-y-3\">
+          <div class=\"flex items-center gap-2\"><svg class=\"w-6 h-6 text-agent-teal shrink-0\"><use href=\"#ag-owl\"/></svg><div class=\"flex-1\"><div class=\"text-[9px] text-warm-400 uppercase font-bold\">researcher</div><div class=\"text-sm font-extrabold text-warm-50\">01 sandy</div></div><span class=\"text-[9px] px-2 py-0.5 rounded-full bg-gold/20 text-amber font-bold border border-gold/40 shrink-0\">Pending</span></div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Session</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <textarea rows=\"1\" class=\"lockable autosize w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold leading-snug focus:border-pink focus:outline-none\">jwt-auth-vuln-audit &amp; remediation sprint — 2026-q2</textarea>
+          </div>
+
+
+          <div class=\"flex gap-2\">
+            <div class=\"field flex-1 min-w-0\" data-field>
+              <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Role</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+              <select class=\"lockable w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none\"><option>researcher</option><option>synthesizer</option><option>auditor</option></select>
+            </div>
+            <div class=\"field\" data-field style=\"width:104px\">
+              <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">No.</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+              <input type=\"text\" value=\"01\" class=\"lockable w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 text-center font-bold\" readonly>
+            </div>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Name</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <span class=\"in-wrap lockable\"><input type=\"text\" value=\"sandy\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none\"><button class=\"in-x\" onclick=\"clearInput(this)\" title=\"Clear\"><svg><use href=\"#icon-x\"/></svg></button></span>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Description</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <textarea rows=\"2\" class=\"lockable autosize w-full bg-field border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-200 font-medium focus:border-pink focus:outline-none\">Security researcher focused on auth vulnerabilities.</textarea>
+          </div>
+
+
+          <!-- Model — ported single-select version-dropdown group -->
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Model</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <div class=\"lockable\"><div class=\"model-tabs flat\" id=\"model-tabs\"></div><div class=\"ver-panel\" id=\"ver-panel\"></div></div>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Skills</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <div class=\"lockable\"><div class=\"flex flex-wrap gap-1 mb-1\"><span class=\"text-[9px] px-2 py-0.5 rounded-full bg-transparent text-agent-teal border border-agent-teal/40 font-bold\">security-review x</span></div><span class=\"in-wrap\"><input type=\"text\" placeholder=\"Type to add...\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 placeholder-warm-500 focus:border-pink focus:outline-none\"><button class=\"in-x\" onclick=\"clearInput(this)\" title=\"Clear\"><svg><use href=\"#icon-x\"/></svg></button></span></div>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-0.5\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Tools</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <select class=\"lockable w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none\"><option>All tools</option><option>Read-only</option><option>Code tools</option><option>Web tools</option></select>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-1\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Color</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <div class=\"lockable hscroll\"><button class=\"swatch bg-agent-rose\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-teal on\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-indigo\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-copper\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-forest\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-plum\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-vermil\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-cobalt\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-bronze\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-olive\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-mauve\" onclick=\"pickSwatch(this)\"></button><button class=\"swatch bg-agent-steel\" onclick=\"pickSwatch(this)\"></button></div>
+          </div>
+
+
+          <div class=\"field\" data-field>
+            <div class=\"flex items-center justify-between mb-1\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold\">Icon</label><button class=\"edit-ic\" onclick=\"toggleEdit(this)\" title=\"Edit / Save\"><svg class=\"ic-pencil w-3.5 h-3.5\"><use href=\"#icon-pencil\"/></svg><svg class=\"ic-save w-3.5 h-3.5\"><use href=\"#icon-save\"/></svg></button></div>
+            <div class=\"lockable hscroll\" data-icogroup><button class=\"icobtn on\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-owl\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-fox\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-cat\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-frog\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-bear\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-rabbit\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-robot\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-ghost\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-alien\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-cyclops\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-devil\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-skull\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-blob\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-moth\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-mushroom\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-star\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-moon\"/></svg></button><button class=\"icobtn\" onclick=\"pickIcon(this)\"><svg class=\"w-4 h-4 text-warm-50\"><use href=\"#ag-octo\"/></svg></button></div>
+          </div>
+
+
+          <div class=\"grp-div\"></div>
+
+
+          <div><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1\">Mode</label><div class=\"seg-ctrl\"><button onclick=\"segPick(this)\">Plan</button><button onclick=\"segPick(this)\">Ask</button><button onclick=\"segPick(this)\">Edit</button><button class=\"active\" onclick=\"segPick(this)\">Auto</button><button class=\"seg-danger\" onclick=\"segPick(this)\" title=\"Bypass permissions\">Fuckit</button></div></div>
+
+
+          <div><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1\">Effort</label><div class=\"seg-ctrl\"><button onclick=\"segPick(this)\">Low</button><button onclick=\"segPick(this)\">Med</button><button class=\"active\" onclick=\"segPick(this)\">High</button><button onclick=\"segPick(this)\">Extra</button><button onclick=\"segPick(this)\">Max</button><button onclick=\"segPick(this)\">Ultra</button></div></div>
+
+
+          <div><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5\">Lifecycle <span class=\"text-warm-500 normal-case font-semibold tracking-normal\">— auto-stop conditions</span></label><div class=\"flex gap-2\"><div class=\"flex-1\"><label class=\"text-[8px] text-warm-500 uppercase tracking-wide font-bold block mb-0.5\">Max turns</label><input type=\"number\" value=\"50\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-bold focus:border-pink focus:outline-none\"></div><div class=\"flex-1\"><label class=\"text-[8px] text-warm-500 uppercase tracking-wide font-bold block mb-0.5\">Context %</label><input type=\"number\" value=\"80\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-bold focus:border-pink focus:outline-none\"></div></div></div>
+
+
+          <div class=\"grp-div\"></div>
+
+
+          <!-- Context — ported breakdown -->
+          <div>
+            <div class=\"ctx-head\"><span class=\"ro-label\">Context</span><button class=\"link-amber\">Compact</button><span class=\"ctx-ratio\" id=\"ctx-ratio\">89.3k / 1.0M</span></div>
+            <button class=\"ctx-trigger\" id=\"ctx-btn\"><div class=\"summary-row\"><div class=\"ctxbar\" id=\"ctx-bar\"></div><span class=\"pct\" id=\"ctx-pct\">9%</span><svg class=\"chev\"><use href=\"#i-chev\"/></svg></div></button>
+            <div class=\"panel\" id=\"ctx-panel\"></div>
+          </div>
+
+
+          <!-- History — ported rewind / handoff -->
+          <div>
+            <div class=\"ro-head\"><span class=\"ro-label\">History</span></div>
+            <div class=\"tri-tabs flat\" id=\"hist-tabs\">
+              <button class=\"tri-tab\" data-mode=\"rewind\"><svg><use href=\"#i-rewind\"/></svg>Rewind</button>
+              <button class=\"tri-tab\" data-mode=\"handoff\"><svg><use href=\"#i-fork\"/></svg>Handoff</button>
+            </div>
+            <div class=\"panel\" id=\"hist-panel\"></div>
+          </div>
+        </div>
+
+
+        <!-- Create -->
+        <div id=\"mid-create\" data-group=\"mid\" class=\"hidden flex-1 overflow-y-auto p-3 space-y-3\">
+          <div><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5\">Session</label><textarea rows=\"1\" class=\"autosize w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold leading-snug focus:border-pink focus:outline-none\">jwt-auth-vuln-audit &amp; remediation sprint — 2026-q2</textarea></div>
+          <div class=\"flex gap-2\"><div class=\"flex-1\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5\">Role</label><select class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none\"><option>researcher</option><option>synthesizer</option><option>auditor</option><option>custom...</option></select></div><div class=\"w-14\"><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5\">No.</label><input type=\"text\" value=\"02\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2 py-1 text-[11px] text-warm-100 text-center font-bold\" readonly></div></div>
+          <div><label class=\"text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5\">Name</label><div class=\"flex gap-1.5\"><span class=\"in-wrap flex-1\"><input type=\"text\" placeholder=\"auto-generated\" class=\"w-full bg-base-800 border-2 border-base-600 rounded-md px-2"
+}

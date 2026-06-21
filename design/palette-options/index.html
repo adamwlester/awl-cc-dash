@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Dashboard — Palette Options</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:#1a1a22; color:#ccc; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    .tab-bar { display:flex; gap:4px; padding:10px 14px; background:#111116; border-bottom:1px solid #2a2a33; flex-wrap:wrap; align-items:center; }
+    .tab-bar .label { font-size:11px; color:#666; margin-right:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; }
+    .tab-btn { font-family:'Inter',sans-serif; font-size:11px; font-weight:600; padding:7px 14px; border:2px solid transparent; border-radius:999px; cursor:pointer; transition:all 0.15s; background:#1e1e28; color:#888; }
+    .tab-btn:hover { background:#2a2a36; color:#bbb; }
+    .tab-btn.active { color:#fff; border-color:currentColor; }
+
+    .theme-panel { display:none; flex:1; overflow-y:auto; padding:24px; }
+    .theme-panel.visible { display:block; }
+
+    .theme-header { margin-bottom:20px; }
+    .theme-name { font-size:22px; font-weight:800; margin-bottom:4px; letter-spacing:-0.02em; }
+    .theme-desc { font-size:13px; line-height:1.5; max-width:600px; }
+
+    /* Demo components — rounded, bold, illustrated feel */
+    .demo { border-radius:16px; overflow:hidden; max-width:680px; border-width:2px; border-style:solid; }
+    .demo-header { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; border-bottom-width:2px; border-bottom-style:solid; }
+    .demo-tabs { display:flex; gap:0; padding:0 18px; font-size:12px; font-weight:600; border-bottom-width:2px; border-bottom-style:solid; }
+    .demo-tabs span { padding:8px 14px; border-bottom:3px solid transparent; cursor:default; }
+    .demo-body { padding:18px; }
+
+    .seg { display:inline-flex; border-radius:999px; overflow:hidden; font-size:11px; font-weight:700; border-width:2px; border-style:solid; }
+    .seg span { padding:6px 14px; cursor:default; transition:all 0.1s; }
+
+    .btn-row { display:flex; gap:8px; margin-top:14px; }
+    .btn { font-family:'Inter',sans-serif; font-size:12px; font-weight:700; padding:9px 22px; border:2px solid transparent; border-radius:999px; cursor:default; letter-spacing:-0.01em; }
+
+    .pills { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .pill { display:inline-flex; align-items:center; gap:7px; padding:6px 14px 6px 8px; border-radius:999px; font-size:12px; font-weight:600; border-width:2px; border-style:solid; }
+
+    .input-demo { width:100%; padding:10px 14px; border-radius:12px; font-size:13px; font-family:'Inter',sans-serif; outline:none; border-width:2px; border-style:solid; font-weight:500; }
+
+    .feed { margin-top:14px; font-size:12px; line-height:1.7; }
+    .feed-item { padding:10px 0; }
+    .feed-name { font-weight:700; font-size:12px; }
+
+    .progress-track { height:8px; border-radius:4px; overflow:hidden; margin-top:6px; width:200px; }
+    .progress-fill { height:100%; border-radius:4px; }
+
+    .icon-circle { width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; border-width:2px; border-style:solid; }
+
+    .divider { height:2px; margin:16px 0; border-radius:1px; }
+
+    .swatches { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+    .swatch-box { width:52px; height:36px; border-radius:8px; margin-bottom:4px; border:2px solid rgba(0,0,0,0.1); }
+    .swatch-label { font-size:9px; font-family:'JetBrains Mono',monospace; text-align:center; }
+
+    .demo-row { display:flex; gap:16px; margin-top:16px; flex-wrap:wrap; }
+    .demo-row > div { flex:1; min-width:300px; }
+
+    .badge { font-size:10px; font-weight:700; padding:4px 10px; border-radius:999px; display:inline-block; }
+  </style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <span class="label">Palette:</span>
+</div>
+
+<script>
+const themes = [
+  {
+    name: "Happy Hues 17 (Reference)",
+    desc: "The warm cream palette you picked — navy text, pink buttons, soft teal. Flat illustrated feel. This is the reference point.",
+    tabColor: "#f582ae", tabText: "#001858",
+    bg: "#fef6e4", surface: "#fff8ee", surfaceAlt: "#f3d2c1", border: "#001858",
+    text: "#001858", textDim: "#172c66", textFaint: "#8a8eb8",
+    accent: "#f582ae", accentText: "#001858",
+    red: "#f582ae", blue: "#8bd3dd", green: "#6cc4a1", yellow: "#f3d2c1",
+    cardBg: "#fff8ee", headerBg: "#fef6e4",
+    isLight: true
+  },
+  {
+    name: "Eggplant & Dusty Gold",
+    desc: "Deep aubergine with warm gold accents and dusty rose. Rich and cozy, like velvet curtains in a dimly lit parlor.",
+    tabColor: "#d4a853", tabText: "#1e1128",
+    bg: "#1e1128", surface: "#2a1a38", surfaceAlt: "#3d2952", border: "#4e3968",
+    text: "#f0e6d3", textDim: "#b8a08a", textFaint: "#7a6478",
+    accent: "#d4a853", accentText: "#1e1128",
+    red: "#d4728c", blue: "#8ba4c8", green: "#7eb88a", yellow: "#d4a853",
+    cardBg: "#2a1a38", headerBg: "#221430",
+    isLight: false
+  },
+  {
+    name: "Midnight Peach",
+    desc: "Deep navy-charcoal with warm peachy pinks and soft corals. Dark but never cold. The Happy Hues 17 colors, inverted.",
+    tabColor: "#f3d2c1", tabText: "#0e1528",
+    bg: "#0e1528", surface: "#162035", surfaceAlt: "#243048", border: "#354562",
+    text: "#f3e8df", textDim: "#b0a8a0", textFaint: "#6b7088",
+    accent: "#f582ae", accentText: "#0e1528",
+    red: "#f582ae", blue: "#8bd3dd", green: "#7ec8a0", yellow: "#f3d2c1",
+    cardBg: "#162035", headerBg: "#0c1220",
+    isLight: false
+  },
+  {
+    name: "Warm Cocoa",
+    desc: "Chocolate-brown base with terracotta, dusty rose, and cream. Feels like a ceramic mug on a wool blanket.",
+    tabColor: "#d4876c", tabText: "#1c1410",
+    bg: "#1c1410", surface: "#28201a", surfaceAlt: "#3a302a", border: "#504038",
+    text: "#f0e4d8", textDim: "#b8a090", textFaint: "#7a6858",
+    accent: "#d4876c", accentText: "#1c1410",
+    red: "#d4726a", blue: "#88b4c0", green: "#8ab878", yellow: "#ddb870",
+    cardBg: "#28201a", headerBg: "#201814",
+    isLight: false
+  },
+  {
+    name: "Forest & Honey",
+    desc: "Dark emerald-green with amber-gold and warm cream. Botanical and grounded. The green from your Colorffy pick.",
+    tabColor: "#f0c050", tabText: "#0c1f18",
+    bg: "#0c1f18", surface: "#142a22", surfaceAlt: "#1e3d30", border: "#2e5242",
+    text: "#eee8d8", textDim: "#a0b098", textFaint: "#607860",
+    accent: "#f0c050", accentText: "#0c1f18",
+    red: "#d87070", blue: "#70b8c8", green: "#5eb88a", yellow: "#f0c050",
+    cardBg: "#142a22", headerBg: "#0e221a",
+    isLight: false
+  },
+  {
+    name: "Rose Garden",
+    desc: "Deep warm mauve with pink, coral, and soft sage. The pink from your Colorffy pick, but softer and warmer.",
+    tabColor: "#e87ca0", tabText: "#1a1018",
+    bg: "#1a1018", surface: "#261a24", surfaceAlt: "#3a2a36", border: "#503e4a",
+    text: "#f4e4ec", textDim: "#b898a8", textFaint: "#806878",
+    accent: "#e87ca0", accentText: "#1a1018",
+    red: "#e87ca0", blue: "#88b8cc", green: "#80c4a0", yellow: "#e0b878",
+    cardBg: "#261a24", headerBg: "#1e1420",
+    isLight: false
+  },
+  {
+    name: "Dusty Lavender",
+    desc: "Muted purple-gray with soft lilac accents and warm cream text. Gentle, dreamy, like dried flowers.",
+    tabColor: "#a088c0", tabText: "#14121e",
+    bg: "#14121e", surface: "#1e1a2c", surfaceAlt: "#2c2640", border: "#3e3658",
+    text: "#e8e0f0", textDim: "#a898b8", textFaint: "#6e6488",
+    accent: "#a088c0", accentText: "#14121e",
+    red: "#d0788e", blue: "#80a8d0", green: "#78b890", yellow: "#d8b870",
+    cardBg: "#1e1a2c", headerBg: "#181524",
+    isLight: false
+  },
+  {
+    name: "Vintage Teal",
+    desc: "Deep ocean-teal with warm gold and dusty pink. Art deco meets grandma's living room. Very 'cozy institution.'",
+    tabColor: "#e8b058", tabText: "#0c1820",
+    bg: "#0c1820", surface: "#14222e", surfaceAlt: "#203444", border: "#30485a",
+    text: "#e8e0d4", textDim: "#a0a8a4", textFaint: "#607078",
+    accent: "#e8b058", accentText: "#0c1820",
+    red: "#d0787a", blue: "#68b8c8", green: "#68b890", yellow: "#e8b058",
+    cardBg: "#14222e", headerBg: "#101c26",
+    isLight: false
+  },
+  {
+    name: "Berry & Cream",
+    desc: "Wine-dark base with creamy blush pink and soft blue. Like a berry tart on a linen tablecloth.",
+    tabColor: "#e8a0b0", tabText: "#1a0e18",
+    bg: "#1a0e18", surface: "#261824", surfaceAlt: "#3a2836", border: "#50384a",
+    text: "#f8ece8", textDim: "#c0a0a8", textFaint: "#886878",
+    accent: "#e8a0b0", accentText: "#1a0e18",
+    red: "#d87888", blue: "#90b8d0", green: "#80c098", yellow: "#e0c088",
+    cardBg: "#261824", headerBg: "#1e1220",
+    isLight: false
+  },
+  {
+    name: "Cream & Navy (Light)",
+    desc: "Flipped: light cream background, deep navy surfaces. Bold and clean. The Happy Hues spirit on a light canvas.",
+    tabColor: "#6050d0", tabText: "#fef6e4",
+    bg: "#faf5ec", surface: "#fff8ee", surfaceAlt: "#f0e8d8", border: "#d8cfc0",
+    text: "#1a1848", textDim: "#484068", textFaint: "#908898",
+    accent: "#6050d0", accentText: "#fef6e4",
+    red: "#d05878", blue: "#4898c0", green: "#40a878", yellow: "#d8a840",
+    cardBg: "#fff8ee", headerBg: "#f4ede0",
+    isLight: true
+  },
+];
+
+const tabBar = document.querySelector('.tab-bar');
+const container = document.createElement('div');
+container.style.cssText = 'flex:1;overflow:hidden;position:relative;';
+document.body.appendChild(container);
+
+themes.forEach((t, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+  btn.textContent = t.name.replace(/ \(.*\)/, '');
+  if (i === 0) { btn.style.background = t.tabColor; btn.style.color = t.tabText; btn.style.borderColor = t.tabColor; }
+  btn.onclick = () => {
+    document.querySelectorAll('.tab-btn').forEach(b => { b.className = 'tab-btn'; b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
+    btn.className = 'tab-btn active';
+    btn.style.background = t.tabColor; btn.style.color = t.tabText; btn.style.borderColor = t.tabColor;
+    document.querySelectorAll('.theme-panel').forEach(p => p.classList.remove('visible'));
+    document.getElementById('theme-' + i).classList.add('visible');
+  };
+  tabBar.appendChild(btn);
+
+  const panel = document.createElement('div');
+  panel.id = 'theme-' + i;
+  panel.className = 'theme-panel' + (i === 0 ? ' visible' : '');
+  panel.style.background = t.bg;
+  panel.style.color = t.text;
+
+  const borderCol = t.isLight ? t.border : t.border;
+  const dimBorder = t.isLight ? t.border + '88' : t.border;
+
+  panel.innerHTML = `
+    <div class="theme-header">
+      <div class="theme-name" style="color:${t.text}">${t.name}</div>
+      <div class="theme-desc" style="color:${t.textDim}">${t.desc}</div>
+    </div>
+
+    <!-- Swatches -->
+    <div class="swatches">
+      ${[['bg',t.bg],['surface',t.surface],['alt',t.surfaceAlt],['border',t.border],['text',t.text],['dim',t.textDim],['accent',t.accent],['red',t.red],['blue',t.blue],['green',t.green],['yellow',t.yellow]]
+        .map(([l,c]) => `<div><div class="swatch-box" style="background:${c}"></div><div class="swatch-label" style="color:${t.textFaint}">${l}<br>${c}</div></div>`).join('')}
+    </div>
+
+    <div class="demo-row">
+      <!-- Left: Agent Detail -->
+      <div>
+        <div class="demo" style="background:${t.cardBg};border-color:${borderCol};margin-top:16px;">
+          <div class="demo-header" style="background:${t.headerBg};border-bottom-color:${borderCol};color:${t.text}">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="icon-circle" style="background:${t.red}28;color:${t.red};border-color:${t.red}44;font-size:16px">🦉</span>
+              <div>
+                <div style="font-weight:800">researcher-01-sandy</div>
+                <div style="font-size:10px;color:${t.textFaint};font-weight:500;font-family:'JetBrains Mono',monospace">opus · auto</div>
+              </div>
+            </div>
+            <span class="badge" style="background:${t.green}28;color:${t.green};border:2px solid ${t.green}44">Working</span>
+          </div>
+          <div class="demo-tabs" style="background:${t.headerBg};border-bottom-color:${dimBorder};color:${t.textDim}">
+            <span style="color:${t.accent};border-bottom:3px solid ${t.accent}">Details</span>
+            <span>Create New</span>
+            <span>History</span>
+          </div>
+          <div class="demo-body">
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Mode</div>
+              <div class="seg" style="background:${t.surface};border-color:${borderCol}">
+                <span style="color:${t.textFaint}">Default</span>
+                <span style="background:${t.accent}28;color:${t.accent}">Auto</span>
+                <span style="color:${t.textFaint}">Edit</span>
+                <span style="color:${t.textFaint}">Plan</span>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Effort</div>
+              <div class="seg" style="background:${t.surface};border-color:${borderCol}">
+                <span style="color:${t.textFaint}">Low</span>
+                <span style="color:${t.textFaint}">Med</span>
+                <span style="background:${t.accent}28;color:${t.accent}">High</span>
+                <span style="color:${t.textFaint}">Max</span>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Context</div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="progress-track" style="background:${t.surface};border:2px solid ${borderCol}"><div class="progress-fill" style="width:62%;background:${t.red}"></div></div>
+                <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:${t.textDim};font-weight:600">62%</span>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Name</div>
+              <input class="input-demo" value="researcher-01-sandy" style="background:${t.surface};border-color:${borderCol};color:${t.text}" readonly>
+            </div>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Color</div>
+              <div style="display:flex;gap:6px;">
+                ${[t.red,t.blue,t.green,t.yellow,'#c080d0','#60c8cc','#e09050','#e8e0d8'].map((c,j) =>
+                  `<div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${j===0?c+'cc':'transparent'};${j===0?'box-shadow:0 0 0 3px '+t.bg+',0 0 0 5px '+c+'88':''}""></div>`
+                ).join('')}
+              </div>
+            </div>
+            <div class="divider" style="background:${borderCol}44"></div>
+            <div>
+              <div style="font-size:10px;color:${t.textDim};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Target</div>
+              <div class="pills">
+                <div class="pill" style="background:${t.accent}18;border-color:${t.accent}55;color:${t.text}">
+                  <span class="icon-circle" style="width:22px;height:22px;font-size:11px;background:${t.red}28;color:${t.red};border-color:${t.red}44">🦉</span>
+                  researcher-01-sandy
+                </div>
+                <div class="pill" style="background:${t.surface};border-color:${borderCol};color:${t.textDim}">
+                  <span class="icon-circle" style="width:22px;height:22px;font-size:11px;background:${t.blue}28;color:${t.blue};border-color:${t.blue}44">🦊</span>
+                  synthesizer-01-kai
+                </div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <div class="btn" style="background:${t.accent};color:${t.accentText};border-color:${t.accent}">Send</div>
+              <div class="btn" style="background:transparent;color:${t.textDim};border-color:${borderCol}">Clear</div>
+              <div class="btn" style="background:transparent;color:${t.textDim};border-color:${borderCol}">Queue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Feed + Log + Terminal -->
+      <div>
+        <!-- Feed -->
+        <div class="demo" style="background:${t.cardBg};border-color:${borderCol};margin-top:16px;">
+          <div class="demo-header" style="background:${t.headerBg};border-bottom-color:${borderCol};color:${t.text}">
+            <span style="font-weight:800">Team Feed</span>
+            <div style="display:flex;gap:6px;">
+              <div class="pill" style="background:${t.accent}18;border-color:${t.accent}44;color:${t.text};padding:3px 10px;font-size:10px">🦉 res</div>
+              <div class="pill" style="background:${t.surface};border-color:${borderCol};color:${t.textDim};padding:3px 10px;font-size:10px">🦊 syn</div>
+            </div>
+          </div>
+          <div class="demo-tabs" style="background:${t.headerBg};border-bottom-color:${dimBorder};color:${t.textDim}">
+            <span style="color:${t.accent};border-bottom:3px solid ${t.accent}">Outgoing</span>
+            <span>Incoming</span>
+            <span>Scratch</span>
+            <span style="position:relative">Pending <span style="position:absolute;top:-4px;right:-12px;width:16px;height:16px;border-radius:50%;background:${t.yellow};color:${t.isLight?t.text:t.bg};font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center">1</span></span>
+          </div>
+          <div class="demo-body feed">
+            <div class="feed-item" style="border-bottom:2px solid ${borderCol}22;padding-bottom:12px">
+              <div class="feed-name" style="color:${t.red}">researcher-01-sandy</div>
+              <div style="color:${t.textDim}">Found 3 auth vulnerabilities in the JWT middleware. The token refresh logic doesn't validate expiry...</div>
+            </div>
+            <div class="feed-item" style="padding-top:12px">
+              <div class="feed-name" style="color:${t.green}">auditor-01-drew</div>
+              <div style="color:${t.textDim}">Confirmed 2 of 3 reported vulns. The expiry bypass is critical — tokens can be refreshed indefinitely.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Log -->
+        <div class="demo" style="background:${t.cardBg};border-color:${borderCol};margin-top:12px;">
+          <div class="demo-header" style="background:${t.headerBg};border-bottom-color:${borderCol};color:${t.text};font-weight:800">Activity Log</div>
+          <div class="demo-body" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:2;">
+            <div style="color:${t.red}"><span style="color:${t.textFaint}">14:32</span> researcher-01-sandy ▸ started</div>
+            <div style="color:${t.blue}"><span style="color:${t.textFaint}">14:33</span> synthesizer-01-kai ▸ started</div>
+            <div style="color:${t.green}"><span style="color:${t.textFaint}">14:34</span> auditor-01-drew ▸ started</div>
+            <div style="color:${t.red}"><span style="color:${t.textFaint}">14:35</span> researcher-01 → synthesizer-01 link</div>
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="demo" style="background:${t.headerBg};border-color:${borderCol};margin-top:12px;">
+          <div class="demo-header" style="background:${t.headerBg};border-bottom-color:${borderCol};color:${t.text}">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:14px">🦉</span>
+              <span style="font-weight:800">researcher-01-sandy</span>
+              <span style="font-size:9px;color:${t.textFaint};font-family:'JetBrains Mono',monospace">tmux:claude-res-01</span>
+            </div>
+            <span class="badge" style="background:${t.green}28;color:${t.green}">● Working</span>
+          </div>
+          <div class="demo-body" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.9;background:${t.bg};border-radius:0 0 14px 14px;">
+            <div style="color:${t.textFaint}">$ claude --agent researcher.md</div>
+            <div style="color:${t.text}"><span style="color:${t.accent};font-weight:700">Claude</span> <span style="color:${t.textFaint}">></span> Analyzing the auth module...</div>
+            <div style="color:${t.textFaint};font-size:10px"><span style="color:${t.green}">◆</span> Read src/auth/jwt.ts</div>
+            <div style="color:${t.text}"><span style="color:${t.accent};font-weight:700">Claude</span> <span style="color:${t.textFaint}">></span> Found 3 issues in JWT middleware:</div>
+            <div style="color:${t.textDim};margin-left:12px">1. No expiry validation on refresh</div>
+            <div style="color:${t.textDim};margin-left:12px">2. Weak secret leaks to prod</div>
+          </div>
+        </div>
+
+        <!-- Approve/Deny -->
+        <div class="demo" style="background:${t.cardBg};border-color:${borderCol};margin-top:12px;">
+          <div class="demo-header" style="background:${t.headerBg};border-bottom-color:${borderCol};color:${t.text};font-weight:800">Pending Approval</div>
+          <div class="demo-body">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span class="icon-circle" style="width:22px;height:22px;font-size:11px;background:${t.green}28;color:${t.green};border-color:${t.green}44">🐱</span>
+              <span style="font-weight:600;color:${t.text}">auditor-01-drew</span>
+              <span style="color:${t.textFaint}">→</span>
+              <span class="icon-circle" style="width:22px;height:22px;font-size:11px;background:${t.red}28;color:${t.red};border-color:${t.red}44">🦉</span>
+              <span style="font-weight:600;color:${t.text}">researcher-01-sandy</span>
+            </div>
+            <div style="font-size:12px;color:${t.textDim};line-height:1.6;margin-bottom:14px">Confirmed expiry bypass. Investigate OAuth2 flow at src/auth/oauth.ts.</div>
+            <div class="btn-row">
+              <div class="btn" style="background:${t.green}28;color:${t.green};border-color:${t.green}55">Approve</div>
+              <div class="btn" style="background:transparent;color:${t.red}aa;border-color:${borderCol}">Deny</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(panel);
+});
+</script>
+</body>
+</html>

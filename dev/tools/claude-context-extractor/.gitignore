@@ -1,0 +1,5 @@
+# Never commit the auth cookie or pulled conversations
+session_key.txt
+out/
+__pycache__/
+*.pyc

@@ -1,0 +1,38 @@
+{
+  "Claude: New Chat Prompt": {
+    "prefix": "claude:snip-1",
+    "body": [
+      "## Task",
+      "$1",
+      "",
+      "## Context",
+      "$2",
+      "",
+      "## Output",
+      "Save results to ./doc/$3.md"
+    ],
+    "description": "Generic Claude prompt template"
+  },
+  "Claude: Research Topic": {
+    "prefix": "claude:snip-2",
+    "body": [
+      "Research the following topic: $1",
+      "",
+      "Focus on: $2",
+      "",
+      "Format the output as structured markdown and save to ./doc/$3.md"
+    ],
+    "description": "Generic research prompt"
+  },
+  "Claude: Review File": {
+    "prefix": "claude:snip-3",
+    "body": [
+      "Review the file at $1",
+      "",
+      "Look for: $2",
+      "",
+      "Summarize findings and save to ./doc/review-$3.md"
+    ],
+    "description": "Generic file review prompt"
+  }
+}

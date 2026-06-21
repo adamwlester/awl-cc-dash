@@ -1,0 +1,60 @@
+# Secrets and credentials
+.env
+*.key
+credentials*.json
+
+# Obsidian config (editor-specific, not project content)
+.obsidian/
+
+# Python virtual environment
+claude-code-sandbox-env/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Node
+node_modules/
+
+# Scratch — transient agent artifacts (screenshots, scratch HTML, debug dumps).
+# Keep the folder discoverable, ignore its contents.
+.scratch/*
+!.scratch/.gitkeep
+
+# Test run logs (timestamped, regenerated each run — keep the dir, not the logs)
+**/tests/log/*
+!**/tests/log/.gitkeep
+# Pytest cache
+.pytest_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Image files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.bmp
+*.ico
+*.tiff
+*.tif
+
+# Misc
+.playwright-mcp/
+
+# Agent memory — local/private agent memory should not be tracked
+.claude/agent-memory-local/
+
+# Claude/Codex session exports (personal transcripts + .source.jsonl sidecars) —
+# written by the claude-history-viewer extension. Keep the dir, ignore its contents.
+.claude/cc-exports/*
+!.claude/cc-exports/.gitkeep
+
+# Archive bucket for things kept on disk but intentionally NOT tracked in git
+# (e.g. old personal session transcripts). The _ignored/ name signals "untracked".
+archive/_ignored/

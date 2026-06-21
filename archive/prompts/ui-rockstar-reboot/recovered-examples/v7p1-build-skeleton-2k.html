@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Multi-Agent Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+        colors: {
+          // Happy Hues 17 — warm cream illustrated palette
+          base:  { 950:'#fef6e4', 900:'#f7f0e0', 850:'#fff8ee', 800:'#ffffff', 750:'#f0e8d8', 700:'#001858', 600:'#001858', 500:'#8a8eb8' },
+          warm:  { 50:'#001858', 100:'#172c66', 200:'#2a3d78', 300:'#3a4878', 400:'#4a5088', 500:'#8a8eb8' },
+          // UI accent colors
+          pink:    '#f582ae',
+          amber:   '#d08530',
+          coral:   '#e06654',
+          danger:  '#c74060',
+          sage:    '#3d946a',
+          gold:    '#d4a050',
+          blush:   '#f3d2c1',
+          // Surface tints
+          field:   '#fdf1e6',
+          term:    '#ebedf3',
+          // Agent identity palette — 16 distinct complementary colors (12 original + 4 added in v7)
+          agent: {
+            rose:    '#b84568',
+            teal:    '#228070',
+            indigo:  '#4855b5',
+            copper:  '#c07828',
+            forest:  '#2d7848',
+            plum:    '#7e4ea0',
+            vermil:  '#c04838',
+            cobalt:  '#2d6ea8',
+            bronze:  '#8a7820',
+            olive:   '#5e7828',
+            mauve:   '#954e80',
+            steel:   '#506480',
+            cyan:    '#1f97a8',
+            moss:    '#4f9b3e',
+            violet:  '#6a52c8',
+            magenta: '#a8439a',
+          }
+        }
+      }}
+    }
+  </script>
+  <style>/*__CSS__*/</style>
+  <script>/*__HEADJS__*/</script>
+</head>
+<body class="bg-base-950 text-warm-100 font-sans h-screen overflow-hidden flex flex-col">
+  <!--__SVGDEFS__-->
+  <!--__TITLEBAR__-->
+  <!-- MAIN 3-PANE — inset workspace: cream gutters between rounded panel cards (v7 §A) -->
+  <div class="flex flex-1 overflow-hidden gap-2 p-2 min-h-0">
+    <!--__LEFTPANE__-->
+    <!--__MIDPANE__-->
+    <!--__RIGHTPANE__-->
+  </div>
+  <!--__WINFOOTER__-->
+  <!--__PALETTEREF__-->
+  <script src="design-tools.js"></script>
+</body>
+</html>

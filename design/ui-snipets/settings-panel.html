@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings panel — step-into view (neobrutalism)</title>
+  <!--
+    STANDALONE SNIPPET for review — not merged into the live ui-concept yet (other agents own that file).
+    Adds a top-level "Settings" panel per prompts/add-settings-panel/add-settings-panel.md.
+    Design language mirrors agent-dashboard/design/ui-concept-v8p9.html (neobrutalism.dev tokens, Archivo + JetBrains Mono).
+
+    What this demonstrates
+      • A gear control in the title bar, to the right of the WSL2 / tmux / Connected chips.
+      • A STEP-INTO full-window view (not a 4th column, not a floating popup). The gear toggles it
+        in/out; on exit the 3-pane view returns. (A dimmed 3-pane stand-in sits behind to show this.)
+      • Subject tabs: Usage · MCP · Plugins · Config · Setups. Scope (user/project/local · global/project)
+        is a SECONDARY segment INSIDE a subject — never a tab, never one subject split across tabs.
+      • Read-only status/health/usage is visually separated from editable config (inert "STATUS" bands
+        vs raised "EDITABLE" bands). Edits to global ~/.claude config are gated behind an explicit confirm.
+      • Footer keeps the glanceable quick-access (Save/Load + a usage summary); the panel holds full detail.
+
+    Content is grounded in THIS machine: real plugins + enabled state (installed_plugins.json /
+    settings.json), the real MCP allow/deny set (incl. the two parked claude.ai servers), the three
+    configured models, the active GSD hooks, effort=max, voice on, etc. Usage figures are representative.
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans:['Archivo','sans-serif'], mono:['JetBrains Mono','monospace'] },
+      fontWeight: { base:'500', heading:'800' },
+      colors: {
+        background:'var(--background)', 'secondary-background':'var(--secondary-background)',
+        foreground:'var(--foreground)', main:'var(--main)', 'main-foreground':'var(--main-foreground)',
+        border:'var(--border)', ring:'var(--ring)', surface3:'var(--surface-3)',
+        muted:'var(--muted)', 'muted-2':'var(--muted-2)', secondary:'var(--secondary)', select:'var(--select)',
+        success:'var(--success)', warning:'var(--warning)', danger:'var(--danger)'
+      },
+      borderRadius: { base:'var(--radius-base)' },
+      boxShadow: { shadow:'var(--shadow)', shadowsm:'var(--shadow-sm)' }
+    }}}
+  </script>
+  <style>
+    /* ============================ neobrutalism tokens (mirror ui-concept-v8p9) ============================ */
+    :root{
+      --background:#fef6e4; --secondary-background:#ffffff; --foreground:#001858; --main-foreground:#001858;
+      --main:#f582ae; --border:#001858; --ring:#f582ae;
+      --secondary:#8bd3dd; --secondary-foreground:#001858; --select:#f9cbdf;
+      --main-dim:#ef7aa6; --secondary-dim:#bfe6ec;
+      --shadow:4px 4px 0 0 var(--border); --shadow-sm:2px 2px 0 0 var(--border);
+      --radius-base:5px; --font-weight-base:500; --font-weight-heading:800;
+      --surface-3:#f5ecd9; --muted:#5b5f86; --muted-2:#9a93b4; --rule:#d8cfb8;
+      --success:#2f9e6f; --warning:#d98a2b; --danger:#d23b6a;
+    }
+    *{ box-sizing:border-box; scrollbar-width:thin; scrollbar-color:var(--muted) var(--surface-3); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+    ::-webkit-scrollbar-track{ background:var(--surface-3); border-left:2px solid var(--border); }
+    ::-webkit-scrollbar-thumb{ background:var(--muted); border:2px solid var(--border); }
+    ::-webkit-scrollbar-thumb:hover{ background:var(--main); }
+    body{ margin:0; font-weight:var(--font-weight-base); font-family:'Archivo',sans-serif; color:var(--foreground); }
+    h1,h2,h3,h4,h5{ font-weight:var(--font-weight-heading); margin:0; }
+    svg.lucide{ display:inline-block; vertical-align:middle; flex:0 0 auto; }
+    .mono{ font-family:'JetBrains Mono',monospace; }
+
+    .app{ height:100vh; display:flex; flex-direction:column; overflow:hidden; background:var(--background); }
+
+    /* ============================ title bar / footer ============================ */
+    .topbar{ flex-shrink:0; height:36px; display:flex; align-items:center; justify-content:space-between; padding:0 12px; background:var(--main); border-bottom:2px solid var(--border); }
+    .chip{ display:inline-flex; align-items:center; gap:5px; padding:1px 8px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); font-size:9.5px; font-weight:700; color:var(--foreground); }
+    .footbar{ flex-shrink:0; height:34px; display:flex; align-items:center; justify-content:space-between; padding:0 12px; background:var(--surface-3); border-top:2px solid var(--border); }
+
+    /* gear control (title bar, right of the chips) */
+    .gear{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:24px; padding:0 8px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; font-size:9.5px; font-weight:800; }
+    .gear:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .gear.active{ background:var(--foreground); color:#fff; }
+    .gear.active svg{ animation:spin-in .4s ease; }
+    @keyframes spin-in{ from{ transform:rotate(-90deg); } to{ transform:rotate(0); } }
+
+    /* ============================ stage: 3-pane stand-in vs settings ============================ */
+    .stage{ flex:1 1 auto; min-height:0; position:relative; overflow:hidden; }
+
+    /* dimmed 3-pane stand-in (only to show the step-into / return behavior) */
+    .ghost3{ position:absolute; inset:0; display:flex; padding:14px; gap:12px; filter:grayscale(0.4) opacity(0.5); }
+    .ghost-col{ border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:10px; }
+    .ghost-col h5{ font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:8px; }
+    .ghost-line{ height:9px; border-radius:3px; background:var(--surface-3); border:2px solid var(--rule); margin-bottom:7px; }
+    .ghost-hint{ position:absolute; left:50%; bottom:18px; transform:translateX(-50%); font-size:11px; font-weight:800; color:var(--muted); background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); padding:6px 12px; box-shadow:var(--shadow-sm); }
+
+    /* the full-window Settings surface (step-into; replaces the 3-pane, edge to edge) */
+    .settings{ position:absolute; inset:0; display:flex; flex-direction:column; background:var(--background); }
+    .settings.hidden{ display:none; }
+
+    .set-head{ flex-shrink:0; background:var(--surface-3); border-bottom:2px solid var(--border); padding:10px 16px 0; }
+    .set-titlerow{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:9px; }
+    .set-title{ font-size:16px; font-weight:900; letter-spacing:-0.01em; display:flex; align-items:center; gap:9px; }
+    .set-title .lucide{ width:18px; height:18px; }
+    .set-sub{ font-size:11px; color:var(--muted); font-weight:600; margin-top:2px; max-width:680px; line-height:1.5; }
+    .set-x{ display:inline-flex; align-items:center; justify-content:center; gap:6px; height:28px; padding:0 11px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); font-size:11px; font-weight:800; transition:transform .07s, box-shadow .07s; flex:0 0 auto; }
+    .set-x:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .set-x svg{ width:14px; height:14px; }
+
+    /* subject tabs */
+    .subjtabs{ display:flex; gap:4px; }
+    .subjtab{ display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 13px; font-size:11px; font-weight:800; color:var(--muted); background:transparent; border:2px solid transparent; border-bottom:none; border-radius:var(--radius-base) var(--radius-base) 0 0; cursor:pointer; transition:all .1s; position:relative; top:2px; }
+    .subjtab svg{ width:13px; height:13px; }
+    .subjtab:hover{ color:var(--foreground); }
+    .subjtab.active{ color:var(--foreground); background:var(--background); border-color:var(--border); }
+    .subjtab .badge{ font-size:8.5px; min-width:15px; height:15px; padding:0 4px; display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--border); border-radius:8px; background:var(--secondary-background); font-weight:800; }
+    .subjtab.active .badge{ background:var(--main); }
+
+    .set-body{ flex:1 1 auto; min-height:0; overflow-y:auto; padding:18px 16px 28px; }
+    .set-inner{ max-width:880px; margin:0 auto; }
+    .tabpane{ display:none; } .tabpane.active{ display:block; }
+
+    /* scope segment (secondary, inside a subject) */
+    .scoperow{ display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+    .scope-lbl{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+    .scopeseg{ display:inline-flex; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); box-shadow:var(--shadow-sm); }
+    .scopeseg button{ padding:5px 13px; font-size:10px; font-weight:800; color:var(--muted); background:transparent; border:none; border-right:2px solid var(--border); cursor:pointer; transition:all .1s; }
+    .scopeseg button:last-child{ border-right:none; }
+    .scopeseg button:hover:not(.active){ color:var(--foreground); background:rgba(0,24,88,.05); }
+    .scopeseg button.active{ background:var(--main); color:var(--main-foreground); }
+    .scope-note{ font-size:10px; color:var(--muted-2); font-weight:600; }
+
+    /* bands: read-only (inert) vs editable (raised) */
+    .band{ border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); margin-bottom:16px; overflow:hidden; }
+    .band--edit{ box-shadow:var(--shadow-sm); }
+    .band-h{ display:flex; align-items:center; gap:9px; padding:8px 12px; border-bottom:2px solid var(--border); }
+    .band--ro .band-h{ background:#f1ebdc; }
+    .band--edit .band-h{ background:var(--surface-3); }
+    .band-h .cap{ font-size:10.5px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .band-h .desc{ font-size:9.5px; color:var(--muted); font-weight:600; margin-left:auto; }
+    .kind{ display:inline-flex; align-items:center; gap:4px; font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; padding:2px 6px; border:2px solid var(--border); border-radius:3px; }
+    .kind svg{ width:10px; height:10px; }
+    .kind--ro{ background:var(--secondary-background); color:var(--muted); }
+    .kind--edit{ background:var(--select); color:var(--foreground); }
+    .band-b{ padding:6px 12px 10px; }
+
+    /* generic key/val info rows (read-only) */
+    .inforow{ display:flex; align-items:center; gap:10px; padding:8px 2px; font-size:11.5px; }
+    .inforow + .inforow{ border-top:1px solid var(--rule); }
+    .inforow .k{ color:var(--muted); font-weight:700; width:160px; flex:0 0 auto; }
+    .inforow .v{ flex:1 1 auto; min-width:0; font-weight:700; color:var(--foreground); }
+    .inforow .v.mono{ font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+    /* registry rows (servers / plugins / config) */
+    .reg{ display:flex; align-items:center; gap:11px; padding:9px 2px; }
+    .reg + .reg{ border-top:1px solid var(--rule); }
+    .reg-ico{ width:30px; height:30px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); }
+    .reg-ico svg{ width:15px; height:15px; }
+    .reg-mid{ flex:1 1 auto; min-width:0; }
+    .reg-name{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12px; color:var(--foreground); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    .reg-sub{ font-size:9.5px; color:var(--muted); font-weight:600; margin-top:2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .reg-sub .dot{ color:var(--muted-2); }
+    .reg-right{ display:flex; align-items:center; gap:9px; flex:0 0 auto; }
+    .reg.off .reg-name, .reg.off .reg-ico{ opacity:.55; }
+
+    /* skill chips (plugins) */
+    .schip{ font-size:8.5px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); background:var(--surface-3); border:1.5px solid var(--rule); border-radius:999px; padding:1px 7px; }
+
+    /* status pills */
+    .pill{ display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:2px solid var(--border); border-radius:999px; font-size:9.5px; font-weight:800; white-space:nowrap; }
+    .pill .pdot{ width:7px; height:7px; border-radius:50%; border:1.5px solid var(--border); }
+    .pill--ok{ background:#dcf2e6; color:#1f6f4d; }
+    .pill--oauth{ background:#dff0f4; color:#0d5e6e; }
+    .pill--parked{ background:var(--surface-3); color:var(--muted); }
+    .pill--err{ background:#fbe1ea; color:var(--danger); }
+
+    /* lifecycle badge (live vs new session) */
+    .lc{ font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:.03em; padding:1px 6px; border:2px solid var(--border); border-radius:3px; white-space:nowrap; }
+    .lc--live{ background:#dcf2e6; color:#1f6f4d; }
+    .lc--session{ background:#fbeed3; color:#9a6710; }
+
+    /* toggle switch */
+    .tog{ width:40px; height:23px; border:2px solid var(--border); border-radius:12px; background:var(--surface-3); position:relative; cursor:pointer; transition:background .14s; flex:0 0 auto; box-shadow:var(--shadow-sm); }
+    .tog::after{ content:''; position:absolute; top:1px; left:1px; width:17px; height:17px; border:2px solid var(--border); border-radius:50%; background:var(--secondary-background); transition:transform .14s; }
+    .tog.on{ background:var(--main); }
+    .tog.on::after{ transform:translateX(17px); }
+
+    /* small ghost icon button */
+    .ic-btn{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--muted); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, color .1s; }
+    .ic-btn:hover{ transform:translate(2px,2px); box-shadow:none; color:var(--foreground); }
+    .ic-btn--danger:hover{ color:var(--danger); }
+    .ic-btn svg{ width:14px; height:14px; }
+
+    /* buttons */
+    .btn,.btn-main,.btn-secondary,.btn-danger{ display:inline-flex; align-items:center; justify-content:center; gap:6px; height:30px; padding:0 13px; font-size:11px; font-weight:800; cursor:pointer; border:2px solid var(--border); border-radius:var(--radius-base); color:var(--foreground); background:var(--secondary-background); box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; white-space:nowrap; }
+    .btn:hover,.btn-main:hover,.btn-secondary:hover,.btn-danger:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .btn-main{ background:var(--main); color:var(--main-foreground); }
+    .btn-secondary{ background:var(--secondary); color:var(--secondary-foreground); }
+    .btn-danger{ color:var(--danger); } .btn-danger:hover{ background:#fbe7ee; }
+    .btn-sm{ height:26px; padding:0 10px; font-size:10px; }
+    .btn svg,.btn-main svg,.btn-secondary svg,.btn-danger svg{ width:13px; height:13px; }
+
+    /* usage bars */
+    .ubar{ height:11px; border:2px solid var(--border); border-radius:3px; background:var(--surface-3); overflow:hidden; }
+    .ubar > i{ display:block; height:100%; }
+    .urow{ padding:9px 2px; } .urow + .urow{ border-top:1px solid var(--rule); }
+    .utop{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:5px; }
+    .ulbl{ font-size:11.5px; font-weight:800; color:var(--foreground); }
+    .upct{ font-size:11.5px; font-weight:800; font-family:'JetBrains Mono',monospace; }
+    .ufoot{ font-size:9px; color:var(--muted-2); font-weight:600; margin-top:4px; }
+
+    /* contributing insight cards */
+    .ins{ border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:9px 11px; margin-bottom:9px; }
+    .ins b{ color:var(--foreground); } .ins p{ margin:3px 0 0; font-size:10px; color:var(--muted); font-weight:600; line-height:1.5; }
+    .ins-top{ font-size:11px; font-weight:800; color:var(--foreground); display:flex; align-items:center; gap:7px; }
+    .ins-top .mono{ color:var(--danger); }
+
+    /* mini segmented (Day/Week) */
+    .mini-seg{ display:inline-flex; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }
+    .mini-seg button{ padding:3px 11px; font-size:9.5px; font-weight:800; color:var(--muted); background:transparent; border:none; border-right:2px solid var(--border); cursor:pointer; }
+    .mini-seg button:last-child{ border-right:none; }
+    .mini-seg button.active{ background:var(--main); color:var(--main-foreground); }
+
+    /* the global-edit confirm gate */
+    .gate{ display:none; align-items:center; gap:10px; margin:0 0 16px; padding:9px 12px; border:2px solid var(--warning); border-radius:var(--radius-base); background:#fbf1dc; box-shadow:var(--shadow-sm); }
+    .gate.show{ display:flex; }
+    .gate .gt-ic{ color:#9a6710; flex:0 0 auto; } .gate .gt-ic svg{ width:16px; height:16px; }
+    .gate .gt-txt{ flex:1 1 auto; font-size:10.5px; font-weight:700; color:#7a5410; line-height:1.45; }
+    .gate .gt-txt b{ font-family:'JetBrains Mono',monospace; }
+
+    /* empty state */
+    .empty{ text-align:center; padding:26px 16px; color:var(--muted); font-size:11px; font-weight:600; border:2px dashed var(--rule); border-radius:var(--radius-base); background:var(--secondary-background); }
+    .empty .lucide{ width:20px; height:20px; margin-bottom:8px; color:var(--muted-2); }
+    .empty code{ font-family:'JetBrains Mono',monospace; background:var(--surface-3); padding:1px 5px; border-radius:3px; color:var(--foreground); }
+
+    /* small note line */
+    .xref{ display:flex; gap:8px; align-items:flex-start; font-size:10px; color:var(--muted); font-weight:600; line-height:1.5; margin-top:4px; padding:8px 10px; border:2px solid var(--rule); border-radius:var(--radius-base); background:var(--surface-3); }
+    .xref svg{ width:13px; height:13px; color:var(--muted-2); flex:0 0 auto; margin-top:1px; }
+
+    .tok-pill{ font-size:10px; font-weight:800; font-family:'JetBrains Mono',monospace; padding:2px 9px; border:2px solid var(--border); border-radius:999px; background:var(--secondary-background); color:var(--foreground); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== TITLE BAR (gear sits to the right of the chips) ===================== -->
+  <header class="topbar">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-[13px] text-main-foreground tracking-tight" style="font-weight:900">AWL Multi-Agent Dashboard</span>
+      <span class="chip mono">v8.5</span>
+      <span class="text-[11px] font-bold text-main-foreground" style="opacity:.8">13 agents</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="chip mono" id="clock"></span>
+      <span class="chip">WSL2</span>
+      <span class="chip">tmux</span>
+      <span class="chip" style="gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);border:2px solid var(--border)"></span>Connected</span>
+      <button class="gear active" id="gearBtn" title="Settings"><i data-lucide="settings"></i>Settings</button>
+    </div>
+  </header>
+
+  <!-- ===================== STAGE ===================== -->
+  <div class="stage">
+
+    <!-- dimmed 3-pane stand-in: only here to show the step-into / step-out behavior -->
+    <div class="ghost3" id="ghost3" aria-hidden="true">
+      <div class="ghost-col" style="width:210px">
+        <h5>Agent</h5>
+        <div class="ghost-line" style="width:90%"></div><div class="ghost-line" style="width:70%"></div>
+        <div class="ghost-line" style="width:80%"></div><div class="ghost-line" style="width:55%"></div>
+        <div class="ghost-line" style="width:75%"></div>
+      </div>
+      <div class="ghost-col" style="flex:1.4">
+        <h5>Team Graph · Prompts</h5>
+        <div class="ghost-line" style="width:60%"></div><div class="ghost-line" style="width:85%"></div>
+        <div class="ghost-line" style="width:50%"></div><div class="ghost-line" style="width:78%"></div>
+      </div>
+      <div class="ghost-col" style="flex:1.2">
+        <h5>Team Feed</h5>
+        <div class="ghost-line" style="width:70%"></div><div class="ghost-line" style="width:88%"></div>
+        <div class="ghost-line" style="width:62%"></div><div class="ghost-line" style="width:80%"></div>
+      </div>
+      <div class="ghost-hint">Settings closed — the 3-pane view is back. Click the gear to step in.</div>
+    </div>
+
+    <!-- the step-into Settings surface (full window, edge to edge) -->
+    <section class="settings" id="settings">
+      <div class="set-head">
+        <div class="set-titlerow">
+          <div>
+            <h2 class="set-title"><i data-lucide="settings"></i>Settings</h2>
+            <p class="set-sub">The global control surface — your plan &amp; usage, the MCP registry, installed plugins, base Claude Code config, and saved setups. This panel owns the <b>global</b> registry &amp; enablement; per-agent scoping stays in the Agent panel.</p>
+          </div>
+          <button class="set-x" id="closeBtn"><i data-lucide="x"></i>Close</button>
+        </div>
+        <nav class="subjtabs" id="subjtabs">
+          <button class="subjtab active" data-pane="usage"><i data-lucide="gauge"></i>Usage</button>
+          <button class="subjtab" data-pane="mcp"><i data-lucide="plug"></i>MCP<span class="badge">16</span></button>
+          <button class="subjtab" data-pane="plugins"><i data-lucide="blocks"></i>Plugins<span class="badge">5</span></button>
+          <button class="subjtab" data-pane="config"><i data-lucide="sliders-horizontal"></i>Config</button>
+          <button class="subjtab" data-pane="setups"><i data-lucide="save"></i>Setups</button>
+        </nav>
+      </div>
+
+      <div class="set-body">
+        <div class="set-inner">
+
+          <!-- ============================================================ USAGE ============================================================ -->
+          <div class="tabpane active" data-pane="usage">
+
+            <div class="band band--ro">
+              <div class="band-h"><span class="cap">Account</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span><span class="desc">/status</span></div>
+              <div class="band-b">
+                <div class="inforow"><span class="k">Plan</span><span class="v">Claude Max</span></div>
+                <div class="inforow"><span class="k">Auth method</span><span class="v">Claude AI</span></div>
+                <div class="inforow"><span class="k">Email</span><span class="v mono">adamwardlester@gmail.com</span></div>
+                <div class="inforow"><span class="k">Organization</span><span class="v">adamwardlester@gmail.com's Organization</span></div>
+              </div>
+            </div>
+
+            <div class="band band--ro">
+              <div class="band-h"><span class="cap">Limits</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span><span class="desc">/stats · usage only</span></div>
+              <div class="band-b">
+                <div class="urow">
+                  <div class="utop"><span class="ulbl">Session (5 hr)</span><span class="upct" style="color:var(--danger)">95%</span></div>
+                  <div class="ubar"><i style="width:95%;background:var(--danger)"></i></div>
+                  <div class="ufoot">Resets in 4m</div>
+                </div>
+                <div class="urow">
+                  <div class="utop"><span class="ulbl">Weekly (7 day)</span><span class="upct" style="color:var(--success)">13%</span></div>
+                  <div class="ubar"><i style="width:13%;background:var(--secondary)"></i></div>
+                  <div class="ufoot">Resets in 5d</div>
+                </div>
+                <div class="urow">
+                  <div class="utop"><span class="ulbl">Weekly — Sonnet</span><span class="upct" style="color:var(--muted-2)">0%</span></div>
+                  <div class="ubar"><i style="width:1%;background:var(--muted-2)"></i></div>
+                  <div class="ufoot">Resets in 5d</div>
+                </div>
+                <div class="xref"><i data-lucide="info"></i><span>Approximate, based on local sessions on this machine — does not include other devices or claude.ai. <b style="color:var(--foreground)">Usage only</b> — per-agent cost / spend is deliberately out of scope.</span></div>
+              </div>
+            </div>
+
+            <div class="band band--ro">
+              <div class="band-h">
+                <span class="cap">What's driving your limits</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span>
+                <span class="desc" style="margin-left:auto;display:flex;align-items:center;gap:8px">Last 24h
+                  <span class="mini-seg" id="dayweek"><button class="active">Day</button><button>Week</button></span>
+                </span>
+              </div>
+              <div class="band-b">
+                <div class="ins">
+                  <div class="ins-top"><span class="mono">82%</span> of your usage was at <span class="mono" style="color:var(--foreground)">&gt;150k context</span></div>
+                  <p>Longer sessions cost more even when cached. <b>/compact</b> mid-task, <b>/clear</b> when switching to new tasks.</p>
+                </div>
+                <div class="ins">
+                  <div class="ins-top"><span class="mono">38%</span> of your usage came from MCP server <span class="mono" style="color:var(--foreground)">"playwright"</span></div>
+                  <p>MCP tool results stay in context for the rest of the session. <b>/compact</b> to flush them, or disable servers you don't need (MCP tab).</p>
+                </div>
+                <div style="margin-top:6px">
+                  <div class="inforow" style="border-top:none;padding-bottom:5px"><span class="k" style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2)">MCP servers</span><span class="v" style="text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2)">% of usage</span></div>
+                  <div class="inforow"><span class="k mono" style="color:var(--foreground);font-weight:700">playwright</span><span class="v mono" style="text-align:right">38%</span></div>
+                  <div class="inforow"><span class="k mono" style="color:var(--foreground);font-weight:700">firecrawl</span><span class="v mono" style="text-align:right">3%</span></div>
+                  <div class="inforow"><span class="k mono" style="color:var(--foreground);font-weight:700">google-workspace</span><span class="v mono" style="text-align:right">2%</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================ MCP ============================================================ -->
+          <div class="tabpane" data-pane="mcp">
+            <div class="scoperow">
+              <span class="scope-lbl">Scope</span>
+              <span class="scopeseg" data-seg="mcp"><button class="active" data-scope="user">User</button><button data-scope="project">Project</button></span>
+              <span class="scope-note" id="mcp-note">~/.claude.json · available in every project</span>
+            </div>
+
+            <!-- USER scope -->
+            <div data-mscope="user">
+              <div class="band band--ro">
+                <div class="band-h"><span class="cap">Connection health</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span><span class="desc">16 enabled · 1 issue · 2 parked</span></div>
+                <div class="band-b" style="display:flex;gap:8px;flex-wrap:wrap;padding-top:10px">
+                  <span class="pill pill--ok"><span class="pdot" style="background:var(--success)"></span>15 connected</span>
+                  <span class="pill pill--oauth"><span class="pdot" style="background:#0d7e92"></span>1 OAuth</span>
+                  <span class="pill pill--err"><span class="pdot" style="background:var(--danger)"></span>1 disconnected</span>
+                  <span class="pill pill--parked"><span class="pdot" style="background:var(--muted-2)"></span>2 parked</span>
+                </div>
+              </div>
+
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Server registry</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">enable / disable · reconnect</span></div>
+                <div class="band-b" id="mcp-user"></div>
+              </div>
+
+              <div class="band band--ro" style="margin-bottom:8px">
+                <div class="band-h" style="background:#f1ebdc"><span class="cap" style="color:var(--muted)">Parked — disabled</span><span class="kind kind--ro"><i data-lucide="parking-circle"></i>Off</span><span class="desc">defined but turned off; kept for one-click re-enable</span></div>
+                <div class="band-b" id="mcp-parked"></div>
+              </div>
+
+              <div class="xref"><i data-lucide="info"></i><span>Enabling a server here makes it available <b style="color:var(--foreground)">globally</b>. Which agent may <i>use</i> it is set per-agent in the <b style="color:var(--foreground)">Agent panel</b> — this is not "let agent Y use server X."</span></div>
+            </div>
+
+            <!-- PROJECT scope -->
+            <div data-mscope="project" style="display:none">
+              <div class="empty"><i data-lucide="folder-open"></i><br>No project-scoped MCP servers.<br><span style="font-size:10px">Add one to <code>.mcp.json</code> at the repo root to share it with this project only.</span></div>
+            </div>
+          </div>
+
+          <!-- ============================================================ PLUGINS ============================================================ -->
+          <div class="tabpane" data-pane="plugins">
+            <div class="scoperow">
+              <span class="scope-lbl">Scope</span>
+              <span class="scopeseg" data-seg="plug"><button class="active" data-scope="user">User</button><button data-scope="project">Project</button><button data-scope="local">Local</button></span>
+              <span class="scope-note" id="plug-note">~/.claude · 5 installed · 3 enabled</span>
+            </div>
+
+            <div data-pscope="user">
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Installed</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">toggle enabled · uninstall</span></div>
+                <div class="band-b" id="plug-user"></div>
+              </div>
+              <div class="xref"><i data-lucide="info"></i><span>Disabling a plugin keeps it installed but unloads its skills, agents &amp; hooks on the next session. Marketplaces are managed in the CLI (<b style="color:var(--foreground)">/plugin</b>).</span></div>
+            </div>
+            <div data-pscope="project" style="display:none">
+              <div class="empty"><i data-lucide="folder-open"></i><br>No project-scoped plugins.<br><span style="font-size:10px">Project plugins install into <code>.claude/plugins</code> and are shared with the repo.</span></div>
+            </div>
+            <div data-pscope="local" style="display:none">
+              <div class="empty"><i data-lucide="folder-open"></i><br>No local plugins.<br><span style="font-size:10px">Local plugins live in <code>.claude/settings.local.json</code> (gitignored) — yours only.</span></div>
+            </div>
+          </div>
+
+          <!-- ============================================================ CONFIG ============================================================ -->
+          <div class="tabpane" data-pane="config">
+            <div class="scoperow">
+              <span class="scope-lbl">Scope</span>
+              <span class="scopeseg" data-seg="cfg"><button class="active" data-scope="global">Global</button><button data-scope="project">Project</button></span>
+              <span class="scope-note" id="cfg-note">~/.claude/settings.json — affects every project</span>
+            </div>
+
+            <!-- the global-edit confirm gate -->
+            <div class="gate" id="cfg-gate">
+              <span class="gt-ic"><i data-lucide="shield-alert"></i></span>
+              <span class="gt-txt">You're about to change <b>~/.claude</b> global config (<span id="gate-what">a setting</span>). This affects <b>every</b> project on this machine.</span>
+              <button class="btn-sm btn-danger" id="gate-confirm">Confirm edit</button>
+              <button class="btn-sm" id="gate-cancel">Cancel</button>
+            </div>
+
+            <div data-cscope="global">
+              <div class="band band--ro">
+                <div class="band-h"><span class="cap">Status</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span><span class="desc">resolved this session</span></div>
+                <div class="band-b">
+                  <div class="inforow"><span class="k">Update channel</span><span class="v mono">latest</span></div>
+                  <div class="inforow"><span class="k">Theme</span><span class="v mono">light-ansi</span></div>
+                  <div class="inforow"><span class="k">Extra directories</span><span class="v mono">2 added</span></div>
+                  <div class="inforow"><span class="k">Status line</span><span class="v mono">gsd-statusline.js</span></div>
+                </div>
+              </div>
+
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Models &amp; thinking</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">change = new session unless marked Live</span></div>
+                <div class="band-b">
+                  <div class="reg"><div class="reg-ico"><i data-lucide="cpu"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Default model</div><div class="reg-sub">opus[1m] · Opus 4.8 · 1M context <span class="dot">·</span> Sonnet 4.6 · Haiku 4.5 available</div></div>
+                    <div class="reg-right"><span class="lc lc--session">New session</span><button class="ic-btn cfg-edit" data-what="the default model"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="gauge"></i></div>
+                    <div class="reg-mid"><div class="reg-name">effortLevel</div><div class="reg-sub mono">max <span class="dot">·</span> /effort writes back to ~settings</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn cfg-edit" data-what="effort level"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="brain"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Extended thinking</div><div class="reg-sub">alwaysThinkingEnabled · main session</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><span class="tog on cfg-tog" data-what="extended thinking"></span></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="zap"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Opus Fast mode</div><div class="reg-sub">/fast · per-session opt-in</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><span class="tog cfg-tog" data-what="fast mode"></span></div></div>
+                </div>
+              </div>
+
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Permissions &amp; sandbox</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span></div>
+                <div class="band-b">
+                  <div class="reg"><div class="reg-ico"><i data-lucide="shield"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Permission mode</div><div class="reg-sub">default <span class="dot">·</span> ⇧⇥ cycles at runtime · Plan / Ask / Edit / Auto / FREE!</div></div>
+                    <div class="reg-right"><span class="lc lc--session">New session</span><button class="ic-btn cfg-edit" data-what="the default permission mode"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="list-checks"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Allow / Ask / Deny rules</div><div class="reg-sub">21 allow <span class="dot">·</span> 2 deny · evaluated per tool call</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn cfg-edit" data-what="permission rules"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="box"></i></div>
+                    <div class="reg-mid"><div class="reg-name">OS sandbox</div><div class="reg-sub">disabled · wraps the Bash tool</div></div>
+                    <div class="reg-right"><span class="lc lc--session">New session</span><span class="tog cfg-tog" data-what="the OS sandbox"></span></div></div>
+                </div>
+              </div>
+
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Hooks · env · memory · plans</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span></div>
+                <div class="band-b">
+                  <div class="reg"><div class="reg-ico"><i data-lucide="webhook"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Hooks</div><div class="reg-sub">SessionStart · PostToolUse · PreToolUse <span class="dot">·</span> + statusLine</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn cfg-edit" data-what="hooks"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="variable"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Environment</div><div class="reg-sub mono">3 vars · default opus/sonnet/haiku model IDs</div></div>
+                    <div class="reg-right"><span class="lc lc--session">New session</span><button class="ic-btn cfg-edit" data-what="environment variables"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="file-text"></i></div>
+                    <div class="reg-mid"><div class="reg-name">CLAUDE.md</div><div class="reg-sub">user + project loaded · re-read on change</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn cfg-edit" data-what="CLAUDE.md"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="map"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Plans directory</div><div class="reg-sub mono">default · ~/.claude/plans</div></div>
+                    <div class="reg-right"><span class="lc lc--session">New session</span><button class="ic-btn cfg-edit" data-what="the plans directory"><i data-lucide="square-pen"></i></button></div></div>
+                </div>
+              </div>
+            </div>
+
+            <div data-cscope="project" style="display:none">
+              <div class="band band--ro">
+                <div class="band-h"><span class="cap">Status</span><span class="kind kind--ro"><i data-lucide="lock"></i>Read-only</span><span class="desc">.claude/settings.json</span></div>
+                <div class="band-b">
+                  <div class="inforow"><span class="k">Source</span><span class="v mono">.claude/settings.json</span></div>
+                  <div class="inforow"><span class="k">Agreement</span><span class="v">All agents use only <span class="mono">.claude/settings.json</span> — no settings.local.json</span></div>
+                </div>
+              </div>
+              <div class="band band--edit">
+                <div class="band-h"><span class="cap">Project config</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">committed · no global confirm</span></div>
+                <div class="band-b">
+                  <div class="reg"><div class="reg-ico"><i data-lucide="list-checks"></i></div>
+                    <div class="reg-mid"><div class="reg-name">Project allow rules</div><div class="reg-sub">layered over user rules · per tool call</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn"><i data-lucide="square-pen"></i></button></div></div>
+                  <div class="reg"><div class="reg-ico"><i data-lucide="folder-git-2"></i></div>
+                    <div class="reg-mid"><div class="reg-name">additionalDirectories</div><div class="reg-sub mono">.claude · .claude/docs</div></div>
+                    <div class="reg-right"><span class="lc lc--live">Live</span><button class="ic-btn"><i data-lucide="square-pen"></i></button></div></div>
+                </div>
+              </div>
+              <div class="xref"><i data-lucide="shield-check"></i><span>Project edits land in the repo's <b style="color:var(--foreground)">.claude/settings.json</b> — no global confirm needed (only <b style="color:var(--foreground)">~/.claude</b> global edits are gated).</span></div>
+            </div>
+          </div>
+
+          <!-- ============================================================ SETUPS ============================================================ -->
+          <div class="tabpane" data-pane="setups">
+            <div class="band band--edit">
+              <div class="band-h"><span class="cap">Save current setup</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">agents · links · selection</span></div>
+              <div class="band-b">
+                <div style="display:flex;gap:9px;align-items:center;padding:6px 0 2px">
+                  <input id="setup-name" placeholder="Name this setup…" style="flex:1;height:32px;background:var(--secondary-background);border:2px solid var(--border);border-radius:var(--radius-base);padding:0 11px;font-size:11.5px;font-weight:600;color:var(--foreground);outline:none">
+                  <button class="btn-main" id="setup-save"><i data-lucide="download"></i>Save setup</button>
+                </div>
+                <div class="reg-sub" style="padding:6px 2px 0">Captures the 13 live agents, 6 links, and the current selection so you can restore this whole working session later.</div>
+              </div>
+            </div>
+
+            <div class="band band--edit">
+              <div class="band-h"><span class="cap">Saved setups</span><span class="kind kind--edit"><i data-lucide="square-pen"></i>Editable</span><span class="desc">load · delete</span></div>
+              <div class="band-b" id="setups-list"></div>
+            </div>
+
+            <div class="xref"><i data-lucide="info"></i><span>The footer keeps a glanceable <b style="color:var(--foreground)">Save / Load</b> for quick access — this tab is the full detail (naming, browsing, deleting saved setups).</span></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== FOOTER (glanceable quick-access stays here) ===================== -->
+  <footer class="footbar">
+    <div class="flex items-center gap-2" style="font-size:10px;font-weight:600;color:var(--muted)">
+      <span><b style="color:var(--foreground)">13</b> agents</span><span style="opacity:.4">·</span>
+      <span><b style="color:var(--foreground)">4</b> subagents</span><span style="opacity:.4">·</span>
+      <span><b style="color:var(--foreground)">6</b> links</span><span style="opacity:.4">·</span>
+      <span class="flex items-center gap-1"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);border:2px solid var(--border)"></span>5 active</span>
+      <span class="flex items-center gap-1"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);border:2px solid var(--border)"></span>4 pending</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="btn btn-sm" title="Save this session's agents & links"><i data-lucide="download"></i>Save setup</button>
+      <button class="btn btn-sm" title="Load a saved session"><i data-lucide="inbox"></i>Load</button>
+      <span class="tok-pill" title="Session usage — full detail in Settings → Usage">Σ 1.42M · 95% / 5hr</span>
+      <span class="mono" style="font-size:10px;font-weight:600;color:var(--muted)">02:14:08</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* ===================== data grounded in this machine ===================== */
+// MCP — user scope. Connection health reflects the real allow/deny set in ~/.claude/settings.json.
+const MCP_USER = [
+  { n:'playwright',       t:'stdio · local',  s:'ok',    note:'no auth' },
+  { n:'github',           t:'stdio',          s:'ok',    note:'PAT' },
+  { n:'google-workspace', t:'stdio',          s:'ok',    note:'OAuth client' },
+  { n:'firecrawl',        t:'stdio',          s:'ok',    note:'API key' },
+  { n:'apify',            t:'stdio',          s:'ok',    note:'token' },
+  { n:'n8n',              t:'stdio',          s:'ok',    note:'API key' },
+  { n:'supabase',         t:'stdio',          s:'oauth', note:'browser OAuth' },
+  { n:'neon',             t:'stdio',          s:'ok',    note:'API key' },
+  { n:'brave-search',     t:'stdio',          s:'ok',    note:'API key' },
+  { n:'exa',              t:'stdio',          s:'ok',    note:'API key' },
+  { n:'notion',           t:'stdio',          s:'ok',    note:'integration token' },
+  { n:'docker',           t:'stdio · local',  s:'ok',    note:'Docker Desktop' },
+  { n:'attom-api',        t:'stdio',          s:'ok',    note:'API key' },
+  { n:'rentcast',         t:'stdio',          s:'ok',    note:'API key' },
+  { n:'excalidraw',       t:'stdio · local',  s:'ok',    note:'no auth' },
+  { n:'slack',            t:'stdio',          s:'err',   note:'disconnected — bot token' },
+];
+// Parked = defined but disabled (these two are in permissions.deny on this machine).
+const MCP_PARKED = [
+  { n:'claude.ai Gmail',        t:'remote · claude.ai' },
+  { n:'claude.ai Google Drive', t:'remote · claude.ai' },
+];
+
+// Plugins — real installed set + enabled state (installed_plugins.json / settings.json).
+const PLUGINS = [
+  { n:'superpowers',          mp:'superpowers-marketplace',     v:'5.0.7',  on:true,  skills:['brainstorming','test-driven-development','systematic-debugging'] },
+  { n:'ui-ux-pro-max',        mp:'ui-ux-pro-max-skill',         v:'2.5.0',  on:true,  skills:['design-system','ui-styling','slides'] },
+  { n:'pyright-lsp',          mp:'claude-plugins-official',     v:'1.0.0',  on:true,  skills:[] },
+  { n:'everything-claude-code',mp:'everything-claude-code',     v:'1.9.0',  on:false, skills:['api-design','security-review','deep-research'] },
+  { n:'claude-mem',           mp:'thedotmack',                  v:'10.6.3', on:false, skills:['mem-search','smart-explore','make-plan'] },
+];
+
+const SETUPS = [
+  { n:'dashboard-frontend', meta:'9 agents · 4 links', when:'2026-06-19 16:40' },
+  { n:'property-research',  meta:'5 agents · 2 links', when:'2026-06-17 11:02' },
+  { n:'bridge-tests',       meta:'3 agents · 0 links', when:'2026-06-14 09:21' },
+];
+
+/* ===================== renderers ===================== */
+const pill = (s) => {
+  if(s==='ok')    return '<span class="pill pill--ok"><span class="pdot" style="background:var(--success)"></span>Connected</span>';
+  if(s==='oauth') return '<span class="pill pill--oauth"><span class="pdot" style="background:#0d7e92"></span>OAuth</span>';
+  if(s==='err')   return '<span class="pill pill--err"><span class="pdot" style="background:var(--danger)"></span>Disconnected</span>';
+  return '<span class="pill pill--parked"><span class="pdot" style="background:var(--muted-2)"></span>Parked</span>';
+};
+
+document.getElementById('mcp-user').innerHTML = MCP_USER.map((m,i)=>`
+  <div class="reg">
+    <div class="reg-ico"><i data-lucide="plug"></i></div>
+    <div class="reg-mid">
+      <div class="reg-name">${m.n}</div>
+      <div class="reg-sub">${m.t} <span class="dot">·</span> ${m.note}</div>
+    </div>
+    <div class="reg-right">
+      ${m.s==='err' ? '<button class="ic-btn" title="Reconnect"><i data-lucide="refresh-cw"></i></button>' : ''}
+      ${pill(m.s)}
+      <span class="tog on mcp-tog"></span>
+    </div>
+  </div>`).join('');
+
+document.getElementById('mcp-parked').innerHTML = MCP_PARKED.map(m=>`
+  <div class="reg off">
+    <div class="reg-ico"><i data-lucide="plug"></i></div>
+    <div class="reg-mid">
+      <div class="reg-name">${m.n}</div>
+      <div class="reg-sub">${m.t} <span class="dot">·</span> in permissions.deny</div>
+    </div>
+    <div class="reg-right">${pill('parked')}<span class="tog mcp-tog"></span></div>
+  </div>`).join('');
+
+document.getElementById('plug-user').innerHTML = PLUGINS.map(p=>`
+  <div class="reg ${p.on?'':'off'}">
+    <div class="reg-ico"><i data-lucide="blocks"></i></div>
+    <div class="reg-mid">
+      <div class="reg-name">${p.n} <span style="font-size:9px;color:var(--muted-2);font-family:'JetBrains Mono',monospace">@${p.mp}</span></div>
+      <div class="reg-sub"><span class="mono">v${p.v}</span> ${p.skills.map(s=>`<span class="schip">${s}</span>`).join(' ')}</div>
+    </div>
+    <div class="reg-right">
+      <button class="ic-btn ic-btn--danger" title="Uninstall"><i data-lucide="trash-2"></i></button>
+      <span class="tog ${p.on?'on':''} plug-tog"></span>
+    </div>
+  </div>`).join('');
+
+document.getElementById('setups-list').innerHTML = SETUPS.map(s=>`
+  <div class="reg">
+    <div class="reg-ico"><i data-lucide="save"></i></div>
+    <div class="reg-mid">
+      <div class="reg-name" style="font-family:'Archivo',sans-serif">${s.n}</div>
+      <div class="reg-sub">${s.meta} <span class="dot">·</span> <span class="mono">${s.when}</span></div>
+    </div>
+    <div class="reg-right">
+      <button class="btn btn-sm"><i data-lucide="upload"></i>Load</button>
+      <button class="ic-btn ic-btn--danger" title="Delete"><i data-lucide="trash-2"></i></button>
+    </div>
+  </div>`).join('');
+
+/* ===================== interactions ===================== */
+// gear / close: step in & out (the 3-pane stand-in returns on exit)
+const settings = document.getElementById('settings');
+const ghost3   = document.getElementById('ghost3');
+const gearBtn  = document.getElementById('gearBtn');
+function setOpen(open){
+  settings.classList.toggle('hidden', !open);
+  gearBtn.classList.toggle('active', open);
+  ghost3.style.display = open ? 'none' : 'flex';
+}
+gearBtn.addEventListener('click', ()=> setOpen(settings.classList.contains('hidden')));
+document.getElementById('closeBtn').addEventListener('click', ()=> setOpen(false));
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !settings.classList.contains('hidden')) setOpen(false); });
+
+// subject tabs
+document.getElementById('subjtabs').addEventListener('click', e=>{
+  const b = e.target.closest('.subjtab'); if(!b) return;
+  document.querySelectorAll('.subjtab').forEach(x=>x.classList.toggle('active', x===b));
+  const pane = b.dataset.pane;
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('active', p.dataset.pane===pane));
+});
+
+// scope segments (swap which scope block shows; never split a subject across tabs)
+const scopeNotes = {
+  mcp:{ user:'~/.claude.json · available in every project', project:'.mcp.json · this repo only' },
+  plug:{ user:'~/.claude · 5 installed · 3 enabled', project:'.claude/plugins · committed', local:'.claude/settings.local.json · yours only' },
+  cfg:{ global:'~/.claude/settings.json — affects every project', project:'.claude/settings.json — committed to the repo' }
+};
+const scopeAttr = { mcp:'mscope', plug:'pscope', cfg:'cscope' };
+document.querySelectorAll('.scopeseg').forEach(seg=>{
+  seg.addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    const key = seg.dataset.seg, scope = b.dataset.scope, attr = scopeAttr[key];
+    seg.querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
+    const pane = document.querySelector(`.tabpane[data-pane="${key==='plug'?'plugins':key==='cfg'?'config':'mcp'}"]`);
+    pane.querySelectorAll(`[data-${attr}]`).forEach(blk=>blk.style.display = blk.dataset[attr]===scope ? '' : 'none');
+    const note = document.getElementById(key+'-note'); if(note) note.textContent = scopeNotes[key][scope];
+    if(key==='cfg') hideGate();
+  });
+});
+
+// generic toggles (MCP enable/disable + plugin enable/disable)
+document.addEventListener('click', e=>{
+  const t = e.target.closest('.mcp-tog, .plug-tog'); if(!t) return;
+  t.classList.toggle('on');
+});
+
+// Day/Week
+document.getElementById('dayweek').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  b.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
+});
+
+// ---- global-edit confirm gate (Config → Global only) ----
+const gate = document.getElementById('cfg-gate');
+let pendingTog = null;
+function showGate(what, tog){
+  document.getElementById('gate-what').textContent = what;
+  pendingTog = tog || null;
+  gate.classList.add('show');
+  gate.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function hideGate(){ gate.classList.remove('show'); pendingTog=null; }
+document.addEventListener('click', e=>{
+  const editBtn = e.target.closest('.cfg-edit');
+  if(editBtn){ showGate(editBtn.dataset.what, null); return; }
+  const tog = e.target.closest('.cfg-tog');
+  if(tog){ showGate(tog.dataset.what, tog); return; }   // gate BEFORE applying
+});
+document.getElementById('gate-confirm').addEventListener('click', ()=>{
+  if(pendingTog) pendingTog.classList.toggle('on');
+  hideGate();
+});
+document.getElementById('gate-cancel').addEventListener('click', hideGate);
+
+// setups save (demo)
+document.getElementById('setup-save').addEventListener('click', ()=>{
+  const inp = document.getElementById('setup-name');
+  const name = inp.value.trim() || 'untitled-setup';
+  const now = new Date().toISOString().slice(0,16).replace('T',' ');
+  const row = document.createElement('div'); row.className='reg';
+  row.innerHTML = `<div class="reg-ico"><i data-lucide="save"></i></div>
+    <div class="reg-mid"><div class="reg-name" style="font-family:'Archivo',sans-serif">${name}</div>
+    <div class="reg-sub">13 agents · 6 links <span class="dot">·</span> <span class="mono">${now}</span></div></div>
+    <div class="reg-right"><button class="btn btn-sm"><i data-lucide="upload"></i>Load</button>
+    <button class="ic-btn ic-btn--danger" title="Delete"><i data-lucide="trash-2"></i></button></div>`;
+  document.getElementById('setups-list').prepend(row);
+  inp.value=''; lucide.createIcons();
+});
+
+// clock
+(function(){ const c=document.getElementById('clock'); const t=()=>{const d=new Date();c.textContent=d.toLocaleTimeString('en-GB');}; t(); setInterval(t,1000); })();
+
+lucide.createIcons();
+</script>
+</body>
+</html>

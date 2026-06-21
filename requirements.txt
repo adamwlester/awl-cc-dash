@@ -1,0 +1,8 @@
+# Claude Agent SDK project dependencies
+# Add packages here, one per line. Comments and blank lines are fine.
+
+claude-agent-sdk
+python-dotenv
+
+# Testing
+pytest

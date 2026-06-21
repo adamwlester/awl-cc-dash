@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Multi-Agent Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+        colors: {
+          // Happy Hues 17 — warm cream illustrated palette
+          base:  { 950:'#fef6e4', 900:'#f7f0e0', 850:'#fff8ee', 800:'#ffffff', 750:'#f0e8d8', 700:'#001858', 600:'#001858', 500:'#8a8eb8' },
+          warm:  { 50:'#001858', 100:'#172c66', 200:'#2a3d78', 300:'#3a4878', 400:'#4a5088', 500:'#8a8eb8' },
+          // UI accent colors
+          pink:    '#f582ae',
+          amber:   '#d08530',
+          coral:   '#e06654',
+          danger:  '#c74060',
+          sage:    '#3d946a',
+          gold:    '#d4a050',
+          blush:   '#f3d2c1',
+          // Surface tints
+          field:   '#fdf1e6',   // editable multiline (textareas)
+          term:    '#ebedf3',   // terminal / stream surfaces (CLI, feed, log)
+          // Agent identity palette — 12 distinct complementary colors
+          agent: {
+            rose:   '#b84568',
+            teal:   '#228070',
+            indigo: '#4855b5',
+            copper: '#c07828',
+            forest: '#2d7848',
+            plum:   '#7e4ea0',
+            vermil: '#c04838',
+            cobalt: '#2d6ea8',
+            bronze: '#8a7820',
+            olive:  '#5e7828',
+            mauve:  '#954e80',
+            steel:  '#506480',
+          }
+        }
+      }}
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #f7f0e0; }
+    ::-webkit-scrollbar-thumb { background: #c0b8aa; border-radius: 3px; }
+
+    /* Segmented control — v4 radius (4px) */
+    .seg-ctrl { display:flex; border-radius:4px; overflow:hidden; border:2px solid #001858; background:#f0e8d8; }
+    .seg-ctrl button { flex:1; font-size:10px; padding:6px 0; color:#8a8eb8; font-weight:600; border:none; background:transparent; cursor:pointer; transition:all 0.12s; border-right:1px solid rgba(0,24,88,0.1); }
+    .seg-ctrl button:last-child { border-right:none; }
+    .seg-ctrl button.active { background:#f582ae; color:#001858; font-weight:700; }
+    .seg-ctrl button:hover:not(.active) { color:#4a5088; background:rgba(0,24,88,0.04); }
+
+    .heading-strip { background:#f7f0e0; padding:0 12px; height:38px; min-height:38px; max-height:38px; border-bottom:2px solid #001858; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .heading-strip h3 { font-size:11px; font-weight:800; color:#001858; text-transform:uppercase; letter-spacing:0.06em; }
+
+    .tab-btn { font-size:11px; padding:0 8px; font-weight:600; border-bottom:2px solid transparent; color:#8a8eb8; cursor:pointer; height:100%; display:flex; align-items:center; transition:all 0.1s; }
+    .tab-btn:hover { color:#4a5088; }
+    .tab-btn.active { border-bottom-color:#f582ae; color:#f582ae; }
+
+    /* Card — v4 radius (4px) */
+    .card { background:#ffffff; border:2px solid #001858; border-radius:4px; overflow:hidden; }
+
+    .v-splitter { height:5px; cursor:row-resize; background:transparent; position:relative; flex-shrink:0; z-index:5; }
+    .v-splitter::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:30px; height:3px; background:#001858; border-radius:2px; transition:background 0.15s; }
+    .v-splitter:hover::after { background:#f582ae; }
+
+    .agent-node { transition: all 0.12s ease; }
+    .agent-node:hover { transform: translateY(-1px); }
+
+    /* Flat status dots — subtle ring for legibility on light bg */
+    .status-working { width:10px; height:10px; border-radius:50%; background:#3d946a; box-shadow:0 0 0 1px rgba(0,24,88,0.12); }
+    .status-idle { width:10px; height:10px; border-radius:50%; background:#9498bb; box-shadow:0 0 0 1px rgba(0,24,88,0.18); }
+    .status-permission { width:10px; height:10px; border-radius:50%; background:#d4a050; animation: pulse-amber 2s infinite; }
+    @keyframes pulse-amber { 0%,100%{ box-shadow: 0 0 0 0 #d4a05044; } 50%{ box-shadow: 0 0 0 4px #d4a05000; } }
+
+    .subagent-mini { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.1s; border:1px solid #001858; background:#ffffff; }
+    .subagent-mini:hover { transform:scale(1.1); }
+
+    .accordion-body { max-height:0; overflow:hidden; transition:max-height 0.2s ease; }
+    .accordion-body.open { max-height:300px; }
+
+    /* Buttons — v4 radius (4px) */
+    .btn-primary { height:28px; background:#f582ae; color:#001858; font-size:11px; font-weight:700; border:2px solid #f582ae; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-primary:hover { background:#e8709a; border-color:#e8709a; }
+    .btn-outline { height:28px; background:transparent; color:#001858; font-size:11px; font-weight:600; border:2px solid #001858; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-outline:hover { border-color:#3a4878; }
+    .btn-danger { height:28px; background:transparent; color:#c74060; font-size:11px; font-weight:600; border:2px solid #c7406044; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .btn-danger:hover { border-color:#c7406088; }
+
+    @keyframes slideIn { from { transform:translateX(100%); } to { transform:translateX(0); } }
+
+    /* ===== Agent toggles — icon + two-line label, clearly interactive ===== */
+    /* Multi-select: spaced chips, each with a checkbox affordance */
+    .atog-row { display:flex; flex-wrap:wrap; gap:8px; }
+    .atog { position:relative; display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 9px; border:2px solid #c9c2b0; border-radius:4px; background:#ffffff; cursor:pointer; transition:all 0.12s; }
+    .atog:hover { border-color:#8a8eb8; }
+    .atog.on { border-color:#f582ae; background:#f582ae14; }
+    .atog-ic { width:22px; height:22px; flex-shrink:0; }
+    .atog-lab { display:flex; flex-direction:column; line-height:1.15; text-align:left; }
+    .atog-role { font-size:8.5px; text-transform:uppercase; letter-spacing:0.04em; color:#8a8eb8; font-weight:700; }
+    .atog-nm { font-size:10.5px; font-weight:800; color:#001858; }
+    .atog .chk { position:absolute; top:-6px; right:-6px; width:15px; height:15px; border-radius:50%; border:2px solid #c9c2b0; background:#fff; display:flex; align-items:center; justify-content:center; font-size:8px; line-height:1; font-weight:900; color:transparent; }
+    .atog.on .chk { border-color:#f582ae; background:#f582ae; color:#fff; }
+
+    /* Single-select: grouped/segmented row, pick one */
+    .atog-grouped { display:inline-flex; flex-wrap:wrap; border:2px solid #c9c2b0; border-radius:4px; overflow:hidden; }
+    .atog-seg { position:relative; display:inline-flex; align-items:center; gap:7px; padding:5px 12px; background:#ffffff; border:none; border-right:2px solid #e3ddcc; cursor:pointer; transition:all 0.12s; }
+    .atog-seg:last-child { border-right:none; }
+    .atog-seg:hover:not(.on) { background:rgba(0,24,88,0.04); }
+    .atog-seg.on { background:#f582ae1f; }
+    .atog-seg.on::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; background:#f582ae; }
+
+    /* Request section header */
+    .req-head { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .req-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .req-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#3a4878; }
+    .req-count { font-size:9px; font-weight:700; color:#8a8eb8; }
+
+    /* ===== Color Palette Reference — dark panel, deliberately distinct from the UI ===== */
+    .ref-section { background:#0e1840; color:#e8e6f4; border-top:3px solid #001858; padding:20px 28px 24px; overflow-y:auto; max-height:340px; }
+    .ref-heading { display:flex; align-items:center; justify-content:center; gap:12px; font-size:11px; font-weight:800; letter-spacing:0.18em; text-transform:uppercase; color:#9aa0d0; margin-bottom:16px; }
+    .ref-heading .rule { width:48px; height:1px; background:#3a4488; display:inline-block; }
+    .ref-grid { max-width:1400px; margin:0 auto; }
+    .ref-group { display:grid; grid-template-columns:118px 1fr; gap:16px; align-items:start; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .ref-group:last-child { border-bottom:none; }
+    .ref-group-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#b7bce0; padding-top:4px; }
+    .ref-chips { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:9px 14px; }
+    .ref-chip { display:flex; align-items:center; gap:9px; }
+    .ref-sw { width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,0.18); flex-shrink:0; }
+    .ref-meta { display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+    .ref-hex { font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#dfe2f4; font-weight:500; }
+    .ref-name { font-size:9.5px; color:#8b91c0; font-weight:600; }
+  </style>
+  <script>
+    function switchTab(g,t){document.querySelectorAll(`[data-group="${g}"]`).forEach(p=>p.classList.add('hidden'));document.getElementById(`${g}-${t}`).classList.remove('hidden');document.querySelectorAll(`[data-tab-group="${g}"]`).forEach(b=>b.classList.toggle('active',b.dataset.tab===t));const s=JSON.parse(localStorage.getItem('awl-tabs')||'{}');s[g]=t;localStorage.setItem('awl-tabs',JSON.stringify(s));}
+    function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden')}
+    function toggleAccordion(id){const el=document.getElementById(id);el.classList.toggle('open');const c=el.previousElementSibling?.querySelector('.chev');if(c)c.textContent=el.classList.contains('open')?'▾':'▸';}
+    // Multi-select chip: toggle independently
+    function toggleChip(el){el.classList.toggle('on');}
+    // Single-select group: exactly one active
+    function pickSeg(el){const p=el.parentElement;p.querySelectorAll('.atog-seg').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+    window.addEventListener('DOMContentLoaded',()=>{const s=JSON.parse(localStorage.getItem('awl-tabs')||'{}');Object.entries(s).forEach(([g,t])=>switchTab(g,t));});
+    setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString()},1000);
+    (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m}catch(e){}},300)})();
+    document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.v-splitter').forEach(s=>{let sy,pe,ne,ph,nh;s.addEventListener('mousedown',e=>{e.preventDefault();sy=e.clientY;pe=s.previousElementSibling;ne=s.nextElementSibling;if(!pe||!ne)return;ph=pe.offsetHeight;nh=ne.offsetHeight;const mv=e2=>{const d=e2.clientY-sy;pe.style.height=Math.max(80,ph+d)+'px';pe.style.flex='none';ne.style.height=Math.max(80,nh-d)+'px';ne.style.flex='none'};const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)})})});
+  </script>
+</head>
+<body class="bg-base-950 text-warm-100 font-sans h-screen overflow-hidden flex flex-col">
+
+  <!-- SVG Defs -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-owl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="9"/><circle cx="9" cy="12" r="2.5"/><circle cx="15" cy="12" r="2.5"/><circle cx="9" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="11.5" r="1" fill="currentColor" stroke="none"/><path d="M11 16l1 1.5 1-1.5"/><path d="M5 6l3 4"/><path d="M19 6l-3 4"/></symbol>
+    <symbol id="icon-fox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-5 0-8-4-8-8 0-3 1-5 3-7l2-5v5l3-1.5L12 4l0 1.5L15 7v-5l2 5c2 2 3 4 3 7 0 4-3 8-8 8z"/><circle cx="9.5" cy="13" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="13" r="1" fill="currentColor" stroke="none"/><path d="M10 17c0.8 0.8 3.2 0.8 4 0"/></symbol>
+    <symbol id="icon-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V5l4 4h8l4-4v6a8 8 0 01-16 0z"/><circle cx="9" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1" fill="currentColor" stroke="none"/><path d="M12 14v1.5"/><path d="M10.5 15.5l-3 1"/><path d="M13.5 15.5l3 1"/><path d="M10.5 15.5h3"/></symbol>
+    <symbol id="icon-daemon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="14" r="7"/><path d="M7 9l2 3h1.5L8 7z"/><path d="M17 9l-2 3h-1.5L16 7z"/><circle cx="10" cy="13.5" r="1.2" fill="#fef6e4"/><circle cx="14" cy="13.5" r="1.2" fill="#fef6e4"/><path d="M10 17.5c0.7 0.5 3.3 0.5 4 0" stroke="#fef6e4" stroke-width="1" fill="none"/></symbol>
+    <symbol id="icon-pencil" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3z"/><path d="M9 4l3 3"/></symbol>
+    <symbol id="icon-dice" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="0.8" fill="currentColor"/><circle cx="10.5" cy="5.5" r="0.8" fill="currentColor"/><circle cx="8" cy="8" r="0.8" fill="currentColor"/><circle cx="5.5" cy="10.5" r="0.8" fill="currentColor"/><circle cx="10.5" cy="10.5" r="0.8" fill="currentColor"/></symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></symbol>
+  </svg>
+
+  <!-- TITLE BAR -->
+  <header class="bg-base-900 border-b-2 border-base-600 px-4 h-[36px] min-h-[36px] flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-coral"></div><div class="w-2.5 h-2.5 rounded-full bg-gold"></div><div class="w-2.5 h-2.5 rounded-full bg-sage"></div></div>
+      <span class="text-sm font-extrabold text-warm-50 tracking-tight">AWL Multi-Agent Dashboard</span>
+      <span class="text-[9px] px-1.5 py-0.5 rounded bg-pink/20 text-pink font-mono font-bold">v0.8</span>
+      <span class="text-xs text-warm-500 font-semibold">3 agents</span>
+    </div>
+    <div class="flex items-center gap-2 text-[10px] text-warm-400 font-semibold">
+      <span id="clock" class="px-2 py-0.5 rounded-md bg-base-800 font-mono border border-base-700/20"></span>
+      <span class="px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20">WSL2</span>
+      <span class="px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20">tmux</span>
+      <span class="px-2 py-0.5 rounded-full bg-sage/20 text-sage font-bold">Connected</span>
+    </div>
+  </header>
+
+  <!-- MAIN 3-PANE — full bleed, no outer margins -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- LEFT PANE -->
+    <div class="flex-[4] border-r-2 border-base-600 flex flex-col overflow-hidden min-w-0">
+
+      <!-- TEAM GRAPH -->
+      <div class="relative flex flex-col" style="height:290px">
+        <div class="heading-strip"><h3>Team Graph</h3><button onclick="toggleDrawer()" class="text-[11px] text-amber hover:text-amber/80 font-bold">Link Agents</button></div>
+        <div class="flex-1 overflow-auto bg-base-950 p-4 relative">
+          <div class="relative z-[2] grid grid-cols-3 gap-4" style="max-width:520px;margin:0 auto;">
+
+            <!-- res-01 — has 3 requests awaiting -->
+            <div class="agent-node cursor-pointer bg-base-800 border-2 border-agent-teal rounded-2xl p-3 relative hover:border-agent-teal">
+              <div class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-gold border-2 border-base-950 flex items-center justify-center" title="3 requests awaiting"><span class="text-[10px] font-extrabold text-warm-50 leading-none">3</span></div>
+              <div class="absolute top-2.5 left-2.5"><div class="status-working"></div></div>
+              <div class="flex items-center gap-2 mb-1.5 ml-5"><svg class="w-5 h-5 text-agent-teal shrink-0"><use href="#icon-owl"/></svg><div class="leading-tight"><div class="text-[9px] text-warm-400 font-semibold">researcher</div><div class="text-[11px] font-extrabold text-warm-50">01 sandy</div></div></div>
+              <div class="text-[9px] text-warm-500 font-mono mb-2">opus -- auto</div>
+              <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-teal rounded" style="width:62%"></div></div><span class="text-[9px] text-warm-400 font-mono font-bold">62%</span></div>
+              <div class="mt-2.5 pt-2 border-t-2 border-base-700/20 flex gap-1.5">
+                <div class="subagent-mini" title="sub-1 (working)"><span class="text-[9px] font-bold text-agent-teal">1</span></div>
+                <div class="subagent-mini" title="sub-2 (idle)"><span class="text-[9px] font-bold text-agent-teal/50">2</span></div>
+              </div>
+            </div>
+
+            <!-- syn-01 — no requests -->
+            <div class="agent-node cursor-pointer bg-base-800 border-2 border-agent-indigo rounded-2xl p-3 relative hover:border-agent-indigo">
+              <div class="absolute top-2.5 left-2.5"><div class="status-idle"></div></div>
+              <div class="flex items-center gap-2 mb-1.5 ml-5"><svg class="w-5 h-5 text-agent-indigo shrink-0"><use href="#icon-fox"/></svg><div class="leading-tight"><div class="text-[9px] text-warm-400 font-semibold">synthesizer</div><div class="text-[11px] font-extrabold text-warm-50">01 kai</div></div></div>
+              <div class="text-[9px] text-warm-500 font-mono mb-2">sonnet -- edit</div>
+              <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-indigo rounded" style="width:34%"></div></div><span class="text-[9px] text-warm-400 font-mono font-bold">34%</span></div>
+            </div>
+
+            <!-- aud-01 — 1 request (blocked on permission) -->
+            <div class="agent-node cursor-pointer bg-base-800 border-2 border-agent-forest rounded-2xl p-3 relative hover:border-agent-forest">
+              <div class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-gold border-2 border-base-950 flex items-center justify-center" title="1 request awaiting"><span class="text-[10px] font-extrabold text-warm-50 leading-none">1</span></div>
+              <div class="absolute top-2.5 left-2.5"><div class="status-permission"></div></div>
+              <div class="flex items-center gap-2 mb-1.5 ml-5"><svg class="w-5 h-5 text-agent-forest shrink-0"><use href="#icon-cat"/></svg><div class="leading-tight"><div class="text-[9px] text-warm-400 font-semibold">auditor</div><div class="text-[11px] font-extrabold text-warm-50">01 drew</div></div></div>
+              <div class="text-[9px] text-warm-500 font-mono mb-2">haiku -- plan</div>
+              <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-forest rounded" style="width:12%"></div></div><span class="text-[9px] text-warm-400 font-mono font-bold">12%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Link Drawer — overlays into the middle column -->
+        <div id="link-drawer" class="hidden absolute top-0 w-[260px] h-full bg-base-850 border-l-2 border-base-600 z-20 overflow-y-auto" style="right:-262px; animation:slideIn 0.15s ease forwards">
+          <div class="heading-strip"><h3>Link Config</h3><button onclick="toggleDrawer()" class="text-xs text-warm-500 hover:text-warm-100 font-bold">X</button></div>
+          <div class="p-3 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold"><svg class="w-4 h-4 text-agent-teal"><use href="#icon-owl"/></svg><span class="text-warm-50">researcher-01</span><span class="text-warm-500">-></span><svg class="w-4 h-4 text-agent-indigo"><use href="#icon-fox"/></svg><span class="text-warm-50">synthesizer-01</span></div>
+            <div><label class="text-[10px] text-warm-400 font-bold block mb-1.5">Trigger</label><div class="seg-ctrl"><button>Imm</button><button>Next</button><button class="active">Queue</button><button>Held</button></div></div>
+            <div><label class="text-[10px] text-warm-400 font-bold block mb-1.5">Payload</label><div class="seg-ctrl"><button class="active">Free</button><button>Context</button><button>Manual</button></div></div>
+            <div><label class="text-[10px] text-warm-400 font-bold block mb-1.5">End After</label><div class="seg-ctrl"><button class="active">None</button><button>Turns</button><button>Time</button><button>Tokens</button></div></div>
+            <div class="flex gap-2 pt-1">
+              <button class="flex-1 px-2 btn-primary">Save</button>
+              <button class="flex-1 px-2 btn-outline">1-Shot</button>
+              <button class="flex-1 px-2 btn-danger">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v-splitter"></div>
+
+      <!-- TEAM FEED -->
+      <div class="flex-1 flex flex-col overflow-hidden min-h-[120px]">
+        <div class="heading-strip">
+          <h3>Team Feed</h3>
+          <div class="flex items-center gap-1 h-full">
+            <button data-tab-group="feed" data-tab="out" onclick="switchTab('feed','out')" class="tab-btn active">Outgoing</button>
+            <button data-tab-group="feed" data-tab="in" onclick="switchTab('feed','in')" class="tab-btn">Incoming</button>
+            <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
+          </div>
+        </div>
+        <div id="feed-out" data-group="feed" class="flex-1 overflow-y-auto bg-term px-3 py-2.5 space-y-3">
+          <div class="border-b-2 border-base-700/15 pb-3"><div class="text-[11px] font-bold text-agent-teal mb-0.5">researcher-01-sandy</div><div class="text-[11px] text-warm-300 leading-relaxed">Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token...</div></div>
+          <div class="border-b-2 border-base-700/15 pb-3"><div class="text-[11px] font-bold text-agent-forest mb-0.5">auditor-01-drew</div><div class="text-[11px] text-warm-300 leading-relaxed">Confirmed 2 of 3 vulns. Expiry bypass is critical -- tokens refresh indefinitely...</div></div>
+          <div><div class="text-[11px] font-bold text-agent-indigo mb-0.5">synthesizer-01-kai</div><div class="text-[11px] text-warm-300 leading-relaxed">Synthesizing findings. Remediation plan written to scratchpad...</div></div>
+        </div>
+        <div id="feed-in" data-group="feed" class="hidden flex-1 overflow-y-auto bg-term px-3 py-2.5 space-y-3">
+          <div class="border-b-2 border-base-700/15 pb-3"><div class="flex items-center gap-2 mb-0.5"><span class="text-[11px] font-bold text-warm-50">User</span><span class="text-[8px] px-1.5 py-0.5 rounded-full bg-base-800 text-warm-500 font-bold border border-base-700/20">direct</span></div><div class="text-[11px] text-warm-300">Analyze JWT middleware in src/auth/ for security vulns.</div></div>
+          <div><div class="flex items-center gap-2 mb-0.5"><span class="text-[11px] font-bold text-agent-teal">researcher-01-sandy</span><span class="text-[8px] px-1.5 py-0.5 rounded-full bg-base-800 text-warm-500 font-bold border border-base-700/20">queued</span></div><div class="text-[11px] text-warm-300">Found 3 auth vulns. Please audit and confirm.</div></div>
+        </div>
+        <div id="feed-scratch" data-group="feed" class="hidden flex-1 overflow-y-auto bg-term px-3 py-2.5">
+          <div class="font-mono text-[10px] text-warm-300 leading-relaxed space-y-1"><div class="text-warm-500">~/.claude/shared/scratchpad.md</div><div class="text-warm-50 font-extrabold mt-2"># Auth Remediation Plan</div><div class="text-coral font-bold">## Critical</div><div>1. Token Expiry Bypass (CRITICAL)</div><div class="text-warm-400 ml-2">- validateToken() accepts expired tokens</div><div class="mt-1">2. Weak Secret Leak (HIGH)</div><div class="text-warm-400 ml-2">- Default dev secret in config.defaults.ts</div></div>
+        </div>
+      </div>
+
+      <div class="v-splitter"></div>
+
+      <!-- ACTIVITY LOG -->
+      <div class="flex flex-col min-h-[120px]" style="height:210px">
+        <div class="heading-strip"><h3>Activity Log</h3></div>
+        <!-- Agent filter toggles — multi-select, above the log on the normal background -->
+        <div class="atog-row px-3 pt-2.5 pb-2 flex-shrink-0">
+          <button class="atog on" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-teal"><use href="#icon-owl"/></svg><span class="atog-lab"><span class="atog-role">researcher</span><span class="atog-nm">01 sandy</span></span></button>
+          <button class="atog" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-indigo"><use href="#icon-fox"/></svg><span class="atog-lab"><span class="atog-role">synthesizer</span><span class="atog-nm">01 kai</span></span></button>
+          <button class="atog on" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-forest"><use href="#icon-cat"/></svg><span class="atog-lab"><span class="atog-role">auditor</span><span class="atog-nm">01 drew</span></span></button>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-term px-3 py-2.5 font-mono text-[10px] space-y-1">
+          <div class="text-agent-teal"><span class="text-warm-500">14:32</span> researcher-01-sandy > started</div>
+          <div class="text-agent-indigo"><span class="text-warm-500">14:33</span> synthesizer-01-kai > started</div>
+          <div class="text-agent-forest"><span class="text-warm-500">14:34</span> auditor-01-drew > started</div>
+          <div class="text-agent-teal"><span class="text-warm-500">14:35</span> researcher-01 -> synthesizer-01 link</div>
+          <div class="text-agent-indigo"><span class="text-warm-500">14:35</span> synthesizer-01-kai : committed 3f2a1b</div>
+          <div class="text-agent-forest"><span class="text-warm-500">14:37</span> auditor-01-drew ! flagged 2</div>
+          <div class="text-gold"><span class="text-warm-500">14:38</span> auditor-01-drew * permission request</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIDDLE PANE -->
+    <div class="flex-[2.2] border-r-2 border-base-600 flex flex-col overflow-hidden min-w-0">
+      <div class="heading-strip"><h3>Agent</h3><div class="flex items-center gap-1 h-full"><button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="tab-btn active">Details</button><button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="tab-btn">Create</button><button data-tab-group="mid" data-tab="requests" onclick="switchTab('mid','requests')" class="tab-btn relative">Requests<span class="absolute -top-0.5 -right-1 w-3.5 h-3.5 bg-gold rounded-full text-[8px] text-warm-50 font-extrabold flex items-center justify-center">3</span></button></div></div>
+
+      <!-- Details -->
+      <div id="mid-details" data-group="mid" class="flex-1 overflow-y-auto p-3 space-y-3">
+        <div class="flex items-center gap-2"><svg class="w-6 h-6 text-agent-teal shrink-0"><use href="#icon-owl"/></svg><div class="flex-1"><div class="text-[9px] text-warm-400 uppercase font-bold">researcher</div><div class="flex items-center gap-1.5"><span class="text-sm font-extrabold text-warm-50">01 sandy</span><button class="text-warm-500 hover:text-amber"><svg class="w-3.5 h-3.5"><use href="#icon-pencil"/></svg></button></div></div><span class="text-[9px] px-2 py-0.5 rounded-full bg-sage/20 text-sage font-bold border border-sage/30 shrink-0">Working</span></div>
+
+        <div class="flex gap-2"><div class="flex-1"><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Role</label><select class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"><option>researcher</option><option>synthesizer</option><option>auditor</option></select></div><div class="w-14"><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">No.</label><input type="text" value="01" class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 text-center font-bold" readonly></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Name</label><div class="flex gap-1.5"><input type="text" value="sandy" class="flex-1 bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"><button class="w-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center text-warm-500 hover:text-amber hover:border-amber/50" style="height:28px"><svg class="w-3.5 h-3.5"><use href="#icon-dice"/></svg></button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Description</label><textarea rows="2" class="w-full bg-field border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-200 font-medium resize-none focus:border-pink focus:outline-none">Security researcher focused on auth vulnerabilities.</textarea></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Model (locked)</label><select class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-500 opacity-60" disabled><option>opus</option></select></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Mode</label><div class="seg-ctrl"><button>Default</button><button class="active">Auto</button><button>Edit</button><button>Plan</button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Effort</label><div class="seg-ctrl"><button>Low</button><button>Med</button><button class="active">High</button><button>Max</button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Lifecycle (max turns)</label><input type="number" value="50" class="w-20 bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-bold focus:border-pink focus:outline-none"></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Skills</label><div class="flex flex-wrap gap-1 mb-1"><span class="text-[9px] px-2 py-0.5 rounded-full bg-transparent text-agent-teal border border-agent-teal/40 font-bold">security-review x</span></div><input type="text" placeholder="Type to add..." class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 placeholder-warm-500 focus:border-pink focus:outline-none"></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Tools</label><select class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"><option>All tools</option><option>Read-only</option><option>Code tools</option><option>Web tools</option></select></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Memory</label><div class="seg-ctrl" style="max-width:180px"><button class="active">Project</button><button>User</button><button>Both</button></div></div>
+
+        <div><div class="flex items-center gap-2 mb-0.5"><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold">Context</label><button class="text-[9px] text-amber hover:text-amber/80 font-bold">Compact</button></div><div class="flex items-center gap-2"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-teal rounded" style="width:62%"></div></div><span class="text-[10px] text-warm-400 font-mono font-bold">62%</span></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Color</label><div class="flex gap-1.5 flex-wrap"><button class="w-5 h-5 rounded bg-agent-rose"></button><button class="w-5 h-5 rounded bg-agent-teal ring-2 ring-agent-teal/60 ring-offset-1 ring-offset-base-950"></button><button class="w-5 h-5 rounded bg-agent-indigo"></button><button class="w-5 h-5 rounded bg-agent-copper"></button><button class="w-5 h-5 rounded bg-agent-forest"></button><button class="w-5 h-5 rounded bg-agent-plum"></button><button class="w-5 h-5 rounded bg-agent-vermil"></button><button class="w-5 h-5 rounded bg-agent-cobalt"></button><button class="w-5 h-5 rounded bg-agent-bronze"></button><button class="w-5 h-5 rounded bg-agent-olive"></button><button class="w-5 h-5 rounded bg-agent-mauve"></button><button class="w-5 h-5 rounded bg-agent-steel"></button></div></div>
+
+        <div><button onclick="toggleAccordion('icon-acc')" class="flex items-center gap-1 text-[9px] text-warm-400 uppercase tracking-wider font-bold mb-1"><span class="chev text-[10px]">&#9656;</span> Icon</button><div class="flex gap-1.5 mb-1"><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-agent-teal flex items-center justify-center"><svg class="w-4 h-4 text-agent-teal"><use href="#icon-owl"/></svg></button><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-indigo"><use href="#icon-fox"/></svg></button><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-forest"><use href="#icon-cat"/></svg></button></div><div id="icon-acc" class="accordion-body"><div class="flex gap-1.5 flex-wrap py-1"><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-plum"><use href="#icon-daemon"/></svg></button></div></div></div>
+      </div>
+
+      <!-- Create -->
+      <div id="mid-create" data-group="mid" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
+        <div class="flex gap-2"><div class="flex-1"><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Role</label><select class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"><option>researcher</option><option>synthesizer</option><option>auditor</option><option>custom...</option></select></div><div class="w-14"><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">No.</label><input type="text" value="02" class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 text-center font-bold" readonly></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Name</label><div class="flex gap-1.5"><input type="text" placeholder="auto-generated" class="flex-1 bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold placeholder-warm-500 focus:border-pink focus:outline-none"><button class="w-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center text-warm-500 hover:text-amber hover:border-amber/50" style="height:28px"><svg class="w-3.5 h-3.5"><use href="#icon-dice"/></svg></button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Description</label><textarea rows="2" placeholder="What this agent does..." class="w-full bg-field border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-200 font-medium resize-none placeholder-warm-500 focus:border-pink focus:outline-none"></textarea></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Model</label><select class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"><option>inherit</option><option>sonnet</option><option>opus</option><option>haiku</option></select></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Mode</label><div class="seg-ctrl"><button class="active">Default</button><button>Auto</button><button>Edit</button><button>Plan</button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Effort</label><div class="seg-ctrl"><button>Low</button><button class="active">Med</button><button>High</button><button>Max</button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Color</label><div class="flex gap-1.5 flex-wrap"><button class="w-5 h-5 rounded bg-agent-rose"></button><button class="w-5 h-5 rounded bg-agent-teal"></button><button class="w-5 h-5 rounded bg-agent-indigo"></button><button class="w-5 h-5 rounded bg-agent-copper ring-2 ring-agent-copper/60 ring-offset-1 ring-offset-base-950"></button><button class="w-5 h-5 rounded bg-agent-forest"></button><button class="w-5 h-5 rounded bg-agent-plum"></button><button class="w-5 h-5 rounded bg-agent-vermil"></button><button class="w-5 h-5 rounded bg-agent-cobalt"></button><button class="w-5 h-5 rounded bg-agent-bronze"></button><button class="w-5 h-5 rounded bg-agent-olive"></button><button class="w-5 h-5 rounded bg-agent-mauve"></button><button class="w-5 h-5 rounded bg-agent-steel"></button></div></div>
+
+        <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-0.5">Icon</label><div class="flex gap-1.5"><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-copper"><use href="#icon-owl"/></svg></button><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-agent-copper flex items-center justify-center"><svg class="w-4 h-4 text-agent-copper"><use href="#icon-fox"/></svg></button><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-copper"><use href="#icon-cat"/></svg></button><button class="w-7 h-7 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center"><svg class="w-4 h-4 text-agent-copper"><use href="#icon-daemon"/></svg></button></div></div>
+
+        <div class="flex gap-2 pt-1">
+          <button class="flex-1 px-2 btn-primary">Create</button>
+          <button class="px-4 btn-outline">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Requests — per-agent approval inbox for the selected agent -->
+      <div id="mid-requests" data-group="mid" class="hidden flex-1 overflow-y-auto p-3 space-y-3">
+        <div class="flex items-center gap-2"><svg class="w-6 h-6 text-agent-teal shrink-0"><use href="#icon-owl"/></svg><div class="flex-1"><div class="text-[9px] text-warm-400 uppercase font-bold">researcher</div><div class="text-sm font-extrabold text-warm-50">01 sandy</div></div><span class="text-[9px] px-2 py-0.5 rounded-full bg-gold/20 text-amber font-bold border border-gold/40 shrink-0">3 awaiting</span></div>
+
+        <!-- Permissions -->
+        <div>
+          <div class="req-head"><span class="req-dot" style="background:#d4a050"></span><span class="req-label">Permissions</span><span class="req-count">1</span></div>
+          <div class="card p-2.5 space-y-2" style="border-left:5px solid #d4a050">
+            <div class="text-[9px] text-warm-400 uppercase tracking-wider font-bold">wants to run</div>
+            <div class="font-mono text-[10px] text-warm-100 bg-term rounded px-2 py-1.5 border border-base-700/15">$ npm install -D vitest @vitest/coverage-v8</div>
+            <div class="text-[10px] text-warm-300 leading-relaxed">To add regression coverage for the token-expiry fix.</div>
+            <div class="flex gap-1.5"><button class="flex-1 px-2 btn-primary">Allow</button><button class="px-2.5 btn-outline">Always</button><button class="px-2.5 btn-danger">Deny</button></div>
+          </div>
+        </div>
+
+        <!-- Approvals -->
+        <div>
+          <div class="req-head"><span class="req-dot" style="background:#f582ae"></span><span class="req-label">Approvals</span><span class="req-count">1</span></div>
+          <div class="card p-2.5 space-y-2" style="border-left:5px solid #f582ae">
+            <div class="flex items-center justify-between"><span class="text-[11px] font-extrabold text-warm-50">Execution plan</span><span class="text-[9px] text-warm-500 font-mono">5 steps</span></div>
+            <div class="text-[10px] text-warm-300 leading-relaxed">Patch validateToken() to enforce expiry, add refresh-token rotation, write vitest coverage, then hand off to auditor-01 for review&hellip; <button class="text-amber font-bold hover:text-amber/80">Expand</button></div>
+            <div class="flex gap-1.5"><button class="flex-1 px-2 btn-primary">Approve</button><button class="px-2.5 btn-outline">Edit</button><button class="px-2.5 btn-danger">Reject</button></div>
+          </div>
+        </div>
+
+        <!-- Decisions -->
+        <div>
+          <div class="req-head"><span class="req-dot" style="background:#2d6ea8"></span><span class="req-label">Decisions</span><span class="req-count">1</span></div>
+          <div class="card p-2.5 space-y-2" style="border-left:5px solid #2d6ea8">
+            <div class="text-[10px] text-warm-200 font-medium leading-relaxed">Two ways to close the expiry bypass — which should I take?</div>
+            <div class="atog-grouped">
+              <button class="atog-seg on" onclick="pickSeg(this)"><span class="atog-lab"><span class="atog-nm">Hard reject</span><span class="atog-role">deny expired</span></span></button>
+              <button class="atog-seg" onclick="pickSeg(this)"><span class="atog-lab"><span class="atog-nm">Rotate</span><span class="atog-role">refresh + grace</span></span></button>
+            </div>
+            <div class="flex gap-1.5"><button class="flex-1 px-2 btn-primary">Submit</button><button class="px-2.5 btn-outline">Reply</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex-shrink-0 border-t-2 border-base-600 p-2 flex gap-2">
+        <button class="flex-1 px-2 btn-outline">Rollback</button>
+        <button class="flex-1 px-2 btn-outline">Clone</button>
+        <button class="flex-1 px-2 btn-danger">Retire</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANE -->
+    <div class="flex-[3.8] flex flex-col overflow-hidden min-w-0">
+
+      <!-- CLI -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="heading-strip"><h3>CLI</h3><div class="flex items-center gap-2"><svg class="w-4 h-4 text-agent-teal"><use href="#icon-owl"/></svg><span class="text-[11px] font-bold text-warm-50">researcher-01-sandy</span><span class="text-[9px] text-warm-500 font-mono">tmux:claude-res-01</span><span class="text-[9px] px-1.5 py-0.5 rounded-full bg-sage/15 text-sage font-bold">Working</span></div></div>
+        <div class="flex-1 overflow-y-auto bg-term p-3 font-mono text-[11px] leading-relaxed">
+          <div class="text-warm-500 mb-2">$ claude --agent researcher.md --model opus</div>
+          <div class="text-warm-100 mb-2"><span class="text-pink font-bold">Claude</span> <span class="text-warm-500">></span> I'll analyze the auth module for security vulnerabilities.</div>
+          <div class="text-warm-500 mb-0.5 text-[10px]"><span class="text-sage">*</span> Read src/auth/jwt.ts</div>
+          <div class="text-warm-100 mb-2"><span class="text-pink font-bold">Claude</span> <span class="text-warm-500">></span> Found several issues:</div>
+          <div class="text-warm-300 ml-2 mb-0.5">1. Token refresh doesn't validate expiry</div>
+          <div class="text-warm-300 ml-2 mb-0.5">2. Weak default secret leaks to prod</div>
+          <div class="text-warm-300 ml-2 mb-2">3. No rate limiting on refresh endpoint</div>
+          <div class="text-warm-500 mb-0.5 text-[10px]"><span class="text-sage">*</span> Read src/auth/refresh.ts</div>
+          <div class="text-warm-100 mb-1"><span class="text-pink font-bold">Claude</span> <span class="text-warm-500">></span> The <code class="text-danger font-bold bg-blush/40 px-1 rounded">validateToken()</code> function accepts expired tokens...</div>
+          <div class="inline-block w-1.5 h-3.5 bg-agent-teal animate-pulse"></div>
+        </div>
+      </div>
+
+      <div class="v-splitter"></div>
+
+      <!-- PROMPTS -->
+      <div class="flex flex-col min-h-[200px]" style="height:300px">
+        <div class="heading-strip"><h3>Prompts</h3><div class="flex items-center gap-1 h-full"><button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button><button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Library</button><button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button></div></div>
+
+        <!-- Compose -->
+        <div id="prompt-compose" data-group="prompt" class="flex-1 p-3 space-y-2.5 overflow-y-auto">
+          <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Source</label>
+            <div class="atog-grouped">
+              <button class="atog-seg on" onclick="pickSeg(this)"><svg class="atog-ic text-warm-50"><use href="#icon-user"/></svg><span class="atog-lab"><span class="atog-role">human</span><span class="atog-nm">User</span></span></button>
+              <button class="atog-seg" onclick="pickSeg(this)"><svg class="atog-ic text-agent-teal"><use href="#icon-owl"/></svg><span class="atog-lab"><span class="atog-role">researcher</span><span class="atog-nm">01 sandy</span></span></button>
+              <button class="atog-seg" onclick="pickSeg(this)"><svg class="atog-ic text-agent-indigo"><use href="#icon-fox"/></svg><span class="atog-lab"><span class="atog-role">synthesizer</span><span class="atog-nm">01 kai</span></span></button>
+            </div>
+          </div>
+          <textarea rows="3" placeholder="Compose..." class="w-full bg-field border-2 border-base-600 rounded px-2 py-1.5 text-[11px] text-warm-100 placeholder-warm-500 focus:border-pink focus:outline-none resize-none font-mono">Write findings to scratchpad. Flag critical vulns.</textarea>
+          <div><label class="text-[9px] text-warm-400 uppercase tracking-wider font-bold block mb-1">Target</label>
+            <div class="atog-row">
+              <button class="atog on" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-teal"><use href="#icon-owl"/></svg><span class="atog-lab"><span class="atog-role">researcher</span><span class="atog-nm">01 sandy</span></span></button>
+              <button class="atog" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-indigo"><use href="#icon-fox"/></svg><span class="atog-lab"><span class="atog-role">synthesizer</span><span class="atog-nm">01 kai</span></span></button>
+              <button class="atog on" onclick="toggleChip(this)"><span class="chk">&#10003;</span><svg class="atog-ic text-agent-forest"><use href="#icon-cat"/></svg><span class="atog-lab"><span class="atog-role">auditor</span><span class="atog-nm">01 drew</span></span></button>
+            </div>
+          </div>
+          <div class="flex gap-2"><button class="flex-1 px-2 btn-primary">Send</button><button class="px-4 btn-outline">Clear</button><button class="px-4 btn-outline">Queue</button></div>
+        </div>
+
+        <!-- Library -->
+        <div id="prompt-library" data-group="prompt" class="hidden flex-1 p-3 overflow-y-auto">
+          <div class="flex gap-2 h-full"><div class="w-[38%] space-y-1"><div class="bg-pink/10 border-2 border-pink/30 rounded px-2 py-1 text-[11px] text-pink font-bold cursor-pointer">analyze-codebase.md</div><div class="bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-300 font-semibold cursor-pointer hover:border-warm-500">review-pr.md</div><div class="bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-300 font-semibold cursor-pointer hover:border-warm-500">security-audit.md</div></div><div class="flex-1 space-y-1.5"><div class="card p-2 text-[10px] text-warm-300 font-mono h-[60px] overflow-y-auto">Analyze for <span class="text-amber font-bold">{{focus_area}}</span> and report.</div><div><label class="text-[9px] text-warm-400 font-bold block mb-0.5">focus_area</label><input type="text" value="auth module" class="w-full bg-base-800 border-2 border-base-600 rounded px-2 py-1 text-[11px] text-warm-100 font-semibold focus:border-pink focus:outline-none"></div><div class="flex gap-1.5"><button class="flex-1 px-2 btn-primary">Send</button><button class="px-4 btn-outline">Queue</button></div></div></div>
+        </div>
+
+        <!-- History -->
+        <div id="prompt-history" data-group="prompt" class="hidden flex-1 p-3 overflow-y-auto space-y-2">
+          <div class="atog-grouped mb-1">
+            <button class="atog-seg on" onclick="pickSeg(this)"><svg class="atog-ic text-agent-teal"><use href="#icon-owl"/></svg><span class="atog-lab"><span class="atog-role">researcher</span><span class="atog-nm">01 sandy</span></span></button>
+            <button class="atog-seg" onclick="pickSeg(this)"><svg class="atog-ic text-agent-indigo"><use href="#icon-fox"/></svg><span class="atog-lab"><span class="atog-role">synthesizer</span><span class="atog-nm">01 kai</span></span></button>
+            <button class="atog-seg" onclick="pickSeg(this)"><svg class="atog-ic text-agent-forest"><use href="#icon-cat"/></svg><span class="atog-lab"><span class="atog-role">auditor</span><span class="atog-nm">01 drew</span></span></button>
+          </div>
+          <div class="card p-2.5"><div class="flex items-center justify-between mb-0.5"><span class="text-[11px] font-bold text-warm-50">User</span><div class="flex gap-2 items-center"><span class="text-[9px] text-warm-500 font-mono">14:32</span><button class="text-[9px] text-amber font-bold hover:text-amber/80">Reuse</button></div></div><div class="text-[10px] text-warm-300">Analyze JWT middleware for security vulns.</div></div>
+          <div class="card p-2.5"><div class="flex items-center justify-between mb-0.5"><div class="flex items-center gap-1"><svg class="w-3 h-3 text-agent-forest"><use href="#icon-cat"/></svg><span class="text-[11px] font-bold text-agent-forest">auditor-01</span></div><div class="flex gap-2 items-center"><span class="text-[8px] px-1.5 py-0.5 rounded-full bg-base-800 text-warm-500 font-bold border border-base-700/20">queued</span><span class="text-[9px] text-warm-500 font-mono">14:38</span><button class="text-[9px] text-amber font-bold hover:text-amber/80">Reuse</button></div></div><div class="text-[10px] text-warm-300">Investigate OAuth2 at src/auth/oauth.ts.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-base-900 border-t-2 border-base-600 h-[36px] min-h-[36px] flex items-center px-4 flex-shrink-0">
+    <div class="flex items-center gap-4 text-[10px] text-warm-400 font-semibold"><span>3 agents / 2 links / <button class="text-amber font-bold hover:text-amber/80" title="Jump to next agent awaiting">4 pending &rarr;</button></span><span>Session: 47m</span></div>
+  </footer>
+
+  <!-- COLOR PALETTE REFERENCE — dark panel, deliberately distinct from the live UI -->
+  <div class="ref-section">
+    <div class="ref-heading"><span class="rule"></span> Color Palette Reference <span class="rule"></span></div>
+    <div class="ref-grid">
+
+      <!-- Base Colors -->
+      <div class="ref-group">
+        <div class="ref-group-label">Base</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#fef6e4"></span><span class="ref-meta"><span class="ref-hex">#fef6e4</span><span class="ref-name">950 · page</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#f7f0e0"></span><span class="ref-meta"><span class="ref-hex">#f7f0e0</span><span class="ref-name">900 · header</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#fff8ee"></span><span class="ref-meta"><span class="ref-hex">#fff8ee</span><span class="ref-name">850 · surface</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#ffffff"></span><span class="ref-meta"><span class="ref-hex">#ffffff</span><span class="ref-name">800 · card / input</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#f0e8d8"></span><span class="ref-meta"><span class="ref-hex">#f0e8d8</span><span class="ref-name">750 · subtle</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#001858"></span><span class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">700/600 · border</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#8a8eb8"></span><span class="ref-meta"><span class="ref-hex">#8a8eb8</span><span class="ref-name">500 · dim</span></span></div>
+        </div>
+      </div>
+
+      <!-- Surface Tints -->
+      <div class="ref-group">
+        <div class="ref-group-label">Surface Tints</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#fdf1e6"></span><span class="ref-meta"><span class="ref-hex">#fdf1e6</span><span class="ref-name">field · textareas</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#ebedf3"></span><span class="ref-meta"><span class="ref-hex">#ebedf3</span><span class="ref-name">term · CLI / feed / log</span></span></div>
+        </div>
+      </div>
+
+      <!-- UI Accents -->
+      <div class="ref-group">
+        <div class="ref-group-label">UI Accents</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#f582ae"></span><span class="ref-meta"><span class="ref-hex">#f582ae</span><span class="ref-name">pink · primary</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#d08530"></span><span class="ref-meta"><span class="ref-hex">#d08530</span><span class="ref-name">amber · attention</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#e06654"></span><span class="ref-meta"><span class="ref-hex">#e06654</span><span class="ref-name">coral · warning</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#c74060"></span><span class="ref-meta"><span class="ref-hex">#c74060</span><span class="ref-name">danger</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#3d946a"></span><span class="ref-meta"><span class="ref-hex">#3d946a</span><span class="ref-name">sage · success</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#d4a050"></span><span class="ref-meta"><span class="ref-hex">#d4a050</span><span class="ref-name">gold · permission / pending</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#f3d2c1"></span><span class="ref-meta"><span class="ref-hex">#f3d2c1</span><span class="ref-name">blush · utility</span></span></div>
+        </div>
+      </div>
+
+      <!-- Agent Identity -->
+      <div class="ref-group">
+        <div class="ref-group-label">Agent Identity</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#b84568"></span><span class="ref-meta"><span class="ref-hex">#b84568</span><span class="ref-name">rose</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#228070"></span><span class="ref-meta"><span class="ref-hex">#228070</span><span class="ref-name">teal</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#4855b5"></span><span class="ref-meta"><span class="ref-hex">#4855b5</span><span class="ref-name">indigo</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#c07828"></span><span class="ref-meta"><span class="ref-hex">#c07828</span><span class="ref-name">copper</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#2d7848"></span><span class="ref-meta"><span class="ref-hex">#2d7848</span><span class="ref-name">forest</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#7e4ea0"></span><span class="ref-meta"><span class="ref-hex">#7e4ea0</span><span class="ref-name">plum</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#c04838"></span><span class="ref-meta"><span class="ref-hex">#c04838</span><span class="ref-name">vermil</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#2d6ea8"></span><span class="ref-meta"><span class="ref-hex">#2d6ea8</span><span class="ref-name">cobalt</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#8a7820"></span><span class="ref-meta"><span class="ref-hex">#8a7820</span><span class="ref-name">bronze</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#5e7828"></span><span class="ref-meta"><span class="ref-hex">#5e7828</span><span class="ref-name">olive</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#954e80"></span><span class="ref-meta"><span class="ref-hex">#954e80</span><span class="ref-name">mauve</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#506480"></span><span class="ref-meta"><span class="ref-hex">#506480</span><span class="ref-name">steel</span></span></div>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="ref-group">
+        <div class="ref-group-label">Status</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#3d946a"></span><span class="ref-meta"><span class="ref-hex">#3d946a</span><span class="ref-name">working</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#9498bb"></span><span class="ref-meta"><span class="ref-hex">#9498bb</span><span class="ref-name">idle</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#d4a050"></span><span class="ref-meta"><span class="ref-hex">#d4a050</span><span class="ref-name">permission</span></span></div>
+        </div>
+      </div>
+
+      <!-- Text -->
+      <div class="ref-group">
+        <div class="ref-group-label">Text</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><span class="ref-sw" style="background:#001858"></span><span class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">warm-50 · heading</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#172c66"></span><span class="ref-meta"><span class="ref-hex">#172c66</span><span class="ref-name">warm-100 · body</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#2a3d78"></span><span class="ref-meta"><span class="ref-hex">#2a3d78</span><span class="ref-name">warm-200 · secondary</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#3a4878"></span><span class="ref-meta"><span class="ref-hex">#3a4878</span><span class="ref-name">warm-300 · muted</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#4a5088"></span><span class="ref-meta"><span class="ref-hex">#4a5088</span><span class="ref-name">warm-400 · label</span></span></div>
+          <div class="ref-chip"><span class="ref-sw" style="background:#8a8eb8"></span><span class="ref-meta"><span class="ref-hex">#8a8eb8</span><span class="ref-name">warm-500 · dim</span></span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="design-tools.js"></script>
+</body>
+</html>

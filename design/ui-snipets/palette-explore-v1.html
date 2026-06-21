@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWL Dashboard — Palette Exploration v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{ --shell:#15151c; --shell-2:#1d1d27; --shell-3:#262633; --shell-line:#33333f; --shell-text:#c9c9d6; --shell-dim:#7c7c8c; }
+  body{ font-family:'Archivo',sans-serif; background:var(--shell); color:var(--shell-text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ---- top chrome ---- */
+  .top{ display:flex; align-items:center; gap:14px; padding:11px 18px; background:var(--shell-2); border-bottom:1px solid var(--shell-line); flex-shrink:0; }
+  .top h1{ font-size:14px; font-weight:800; letter-spacing:-0.01em; color:#fff; }
+  .top .sub{ font-size:11px; color:var(--shell-dim); font-weight:500; }
+  .tabs{ display:flex; gap:6px; margin-left:auto; }
+  .tabs button{ font-family:'Archivo',sans-serif; font-size:11.5px; font-weight:700; padding:7px 15px; border:2px solid transparent; border-radius:999px; cursor:pointer; background:var(--shell-3); color:var(--shell-dim); transition:all .14s; }
+  .tabs button:hover{ color:#fff; }
+  .tabs button.active{ color:#15151c; }
+
+  .stage{ flex:1; overflow:hidden; position:relative; }
+  .opt{ display:none; position:absolute; inset:0; overflow-y:auto; }
+  .opt.show{ display:block; }
+
+  /* ===================== a single option panel ===================== */
+  .wrap{ padding:22px 26px 60px; max-width:1320px; margin:0 auto; }
+  .ohead{ margin-bottom:18px; }
+  .otitle{ font-size:24px; font-weight:900; letter-spacing:-0.02em; }
+  .odesc{ font-size:13px; line-height:1.55; max-width:760px; margin-top:5px; }
+  .ochips{ display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
+  .ochip{ font-size:10.5px; font-weight:700; padding:4px 11px; border-radius:999px; border:1.5px solid; }
+
+  /* token legend */
+  .legend{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:16px 22px; margin:20px 0 26px; }
+  .lgroup h4{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:9px; opacity:.65; }
+  .swrow{ display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+  .sw{ width:30px; height:30px; border-radius:6px; flex:0 0 auto; border:2px solid; }
+  .swmeta{ line-height:1.25; min-width:0; }
+  .swmeta b{ font-size:11px; font-weight:800; display:block; }
+  .swmeta span{ font-size:9.5px; font-family:'JetBrains Mono',monospace; opacity:.7; }
+
+  /* the two showcase columns */
+  .showcase{ display:grid; grid-template-columns:minmax(420px,1.15fr) minmax(360px,1fr); gap:22px; align-items:start; }
+  @media (max-width:980px){ .showcase{ grid-template-columns:1fr; } }
+  .blkcap{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; opacity:.55; margin:0 0 9px 2px; }
+
+  /* ---- neobrutalist primitives (driven by per-option vars) ---- */
+  .panel{ border:2px solid var(--border); border-radius:6px; overflow:hidden; box-shadow:4px 4px 0 0 var(--border); background:var(--surface); }
+  .phead{ display:flex; align-items:center; gap:10px; height:40px; padding:0 12px; background:var(--header); border-bottom:2px solid var(--border); }
+  .phead h3{ font-size:13px; font-weight:900; color:var(--ink); letter-spacing:-0.01em; }
+  .ptabs{ display:flex; gap:4px; margin-left:auto; }
+  .ptab{ font-family:'Archivo',sans-serif; font-size:10.5px; font-weight:700; padding:5px 10px; border:2px solid transparent; border-radius:5px; background:transparent; color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .ptab.active{ background:var(--primary); color:var(--ink); border-color:var(--border); box-shadow:2px 2px 0 0 var(--border); }
+  .reqbadge{ min-width:16px; height:16px; padding:0 4px; border-radius:9px; background:var(--alert); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; border:1.5px solid var(--border); }
+
+  /* messages body — the seam fix lives here */
+  .pbody{ display:flex; gap:9px; padding:9px; background:var(--surface); }
+  .filter{ width:150px; flex:0 0 auto; display:flex; flex-direction:column; }
+  .sec-h{ display:flex; align-items:center; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); padding:0 2px 6px; }
+  .mini-link{ margin-left:auto; font-size:9px; font-weight:800; color:var(--primary-ink); background:none; border:none; cursor:pointer; text-transform:uppercase; }
+  .aglist{ border:2px solid var(--border); border-radius:5px; overflow:hidden; background:var(--raised); }
+  .agrow{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; padding:5px 7px; background:transparent; border:none; border-top:2px solid var(--rule); cursor:pointer; }
+  .agrow:first-child{ border-top:none; }
+  .agrow:hover:not(.on){ background:var(--hover); }
+  .agrow.on{ background:var(--select); }
+  .agtile{ width:21px; height:21px; flex:0 0 auto; border:2px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; }
+  .agtile svg, .agtile i{ width:12px; height:12px; color:#fff; stroke-width:2.4; }
+  .ag-lab{ display:flex; flex-direction:column; line-height:1.15; min-width:0; flex:1; }
+  .ag-role{ font-size:7px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700; color:var(--muted); }
+  .agrow.on .ag-role{ color:var(--ink); opacity:.65; }
+  .ag-name{ font-size:10px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ag-ck{ width:12px; height:12px; color:var(--ink); opacity:0; flex:0 0 auto; }
+  .agrow.on .ag-ck{ opacity:1; }
+
+  .feedcol{ flex:1; min-width:0; display:flex; flex-direction:column; border:2px solid var(--border); border-radius:5px; overflow:hidden; background:var(--canvas); }
+  .minibar{ display:flex; align-items:center; gap:5px; padding:6px 8px; background:var(--surface); border-bottom:2px solid var(--border); flex-wrap:wrap; }
+  .mini-cap{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+  .mini-div{ width:2px; align-self:stretch; background:var(--rule); margin:1px 2px; }
+  .minitog{ font-family:'Archivo',sans-serif; display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:700; padding:3px 8px; border:2px solid var(--border); border-radius:4px; background:var(--raised); color:var(--muted); cursor:pointer; }
+  .minitog i{ width:10px; height:10px; }
+  .minitog.on{ background:var(--primary); color:var(--ink); }
+  .feedwell{ flex:1; overflow-y:auto; padding:9px; display:flex; flex-direction:column; gap:8px; }
+
+  .rcard{ position:relative; border:2px solid var(--border); border-radius:5px; background:var(--raised); padding:7px 9px; box-shadow:2px 2px 0 0 var(--border); }
+  .rc-head{ display:flex; align-items:center; gap:7px; }
+  .rc-name{ font-size:11px; font-weight:800; }
+  .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 5px; border-radius:3px; border:1.5px solid var(--rule); color:var(--muted); background:var(--surface); }
+  .rc-time{ margin-left:auto; font-size:9px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+  .rc-body{ font-size:11px; line-height:1.5; color:var(--ink-2); margin-top:3px; }
+  .rc-copy{ position:absolute; top:6px; right:7px; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; color:var(--muted-2); cursor:pointer; border-radius:4px; }
+  .rc-copy i{ width:11px; height:11px; }
+
+  /* ---- control gallery ---- */
+  .gal{ border:2px solid var(--border); border-radius:6px; background:var(--surface); box-shadow:4px 4px 0 0 var(--border); padding:14px; display:flex; flex-direction:column; gap:16px; }
+  .galsec{ }
+  .galsec > .cap{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:8px; }
+  .row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+  .btn{ font-family:'Archivo',sans-serif; display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:7px 13px; border:2px solid var(--border); border-radius:5px; background:var(--raised); color:var(--ink); cursor:pointer; box-shadow:2px 2px 0 0 var(--border); }
+  .btn i{ width:13px; height:13px; }
+  .btn-primary{ background:var(--primary); color:var(--ink); }
+  .btn-secondary{ background:var(--secondary); color:var(--ink); }
+  .btn-danger{ background:var(--bad); color:#fff; }
+  .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; color:var(--muted); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+  .split{ display:inline-flex; }
+  .split .act{ border-radius:5px 0 0 5px; border-right-width:1px; }
+  .split .drop{ border-radius:0 5px 5px 0; border-left-width:1px; padding:7px 9px; }
+  .split.primary .act{ background:var(--primary); color:var(--ink); }
+  .split.primary .drop{ background:var(--primary-dim); color:var(--ink); }
+  .split.secondary .act{ background:var(--secondary); color:var(--ink); }
+  .split.secondary .drop{ background:var(--secondary-dim); color:var(--ink); }
+
+  .seg{ display:inline-flex; border:2px solid var(--border); border-radius:5px; overflow:hidden; background:var(--header); }
+  .seg button{ font-family:'Archivo',sans-serif; font-size:10px; font-weight:700; padding:6px 12px; border:none; border-right:2px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; }
+  .seg button:last-child{ border-right:none; }
+  .seg button.active{ background:var(--primary); color:var(--ink); font-weight:800; }
+
+  .in{ width:100%; display:flex; align-items:center; gap:6px; background:var(--raised); border:2px solid var(--border); border-radius:5px; padding:7px 10px; }
+  .in input{ flex:1; border:none; outline:none; background:transparent; font-family:'Archivo',sans-serif; font-size:12px; font-weight:600; color:var(--ink); }
+  .in .clr{ width:15px; height:15px; color:var(--muted-2); cursor:pointer; }
+
+  .lbl{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:5px; display:block; }
+
+  .dot{ width:9px; height:9px; border-radius:50%; border:2px solid var(--border); display:inline-block; }
+  .statline{ display:inline-flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; color:var(--ink-2); }
+
+  .sbadge{ display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; padding:3px 9px; border-radius:999px; border:2px solid var(--border); }
+  .sbadge i{ width:11px; height:11px; }
+
+  .pbar-wrap{ display:flex; align-items:center; gap:9px; }
+  .pbar{ flex:1; height:9px; border:2px solid var(--border); border-radius:4px; overflow:hidden; background:var(--header); }
+  .pbar > i{ display:block; height:100%; }
+  .pbar-pc{ font-size:10px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--ink-2); }
+
+  .countbadge{ min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--primary); color:var(--ink); font-size:10px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--border); font-family:'JetBrains Mono',monospace; }
+
+  /* request cards w/ ramp stripe */
+  .req{ position:relative; border:2px solid var(--border); border-radius:5px; background:var(--raised); padding:8px 10px 8px 12px; box-shadow:2px 2px 0 0 var(--border); overflow:hidden; }
+  .req::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:6px; background:var(--stripe); }
+  .req-top{ display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+  .req-id{ line-height:1.1; }
+  .req-id .r{ font-size:7.5px; font-weight:700; text-transform:uppercase; color:var(--muted); }
+  .req-id .n{ font-size:11px; font-weight:900; color:var(--ink); }
+  .req-type{ margin-left:auto; display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px; border:1.5px solid var(--border); }
+  .req-type i{ width:10px; height:10px; }
+  .req-title{ font-size:11px; font-weight:800; color:var(--ink); }
+  .req-sub{ font-size:10.5px; color:var(--ink-2); margin-top:1px; line-height:1.45; }
+  .req-acts{ display:flex; align-items:center; gap:6px; margin-top:9px; }
+  .btn-sm{ font-size:10px; padding:5px 10px; box-shadow:2px 2px 0 0 var(--border); }
+  .req-sep{ margin-left:auto; width:2px; align-self:stretch; background:var(--border); }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>AWL Palette Exploration</h1>
+  <span class="sub">v2 · informed by Happy Hues 17 · 3 directions, one shared token taxonomy + good→bad status ramp</span>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div class="stage" id="stage"></div>
+
+<script>
+/* ============================================================
+   Shared semantics across all three options.
+   Only SURFACES + SELECTION + ACCENT strategy change per option.
+   ============================================================ */
+const SHARED = {
+  border:'#001858', ink:'#001858', ink2:'#172c66', muted:'#5b6086', muted2:'#9a93b4',
+  primary:'#f582ae', secondary:'#8bd3dd',
+  // good -> bad status ramp
+  ok:'#1f9268', info:'#2f8fb0', warn:'#d98a2b', alert:'#d9622f', bad:'#d23b4a', idle:'#9a93b4',
+};
+// agent identity (unchanged 16-color set)
+const AG = {
+  rose:'#b84568', teal:'#228070', indigo:'#4855b5', copper:'#c07828', forest:'#2d7848',
+  plum:'#7e4ea0', vermil:'#c04838', cobalt:'#2d6ea8', cyan:'#1f96a6', magenta:'#b13d86'
+};
+
+const OPTIONS = [
+  {
+    key:'A', name:'Warm · peach-select',
+    desc:'The cosiest read. Surfaces step up in warmth (cream wells → warm-white panels → pure-white cards) so white actually pops. Selection borrows Happy Hues 17’s unused peach, which lets pink retire to action-only. Header-cream is reserved strictly for the panel header band.',
+    chips:[['pink = action only','primary'],['selection = HH17 peach','accent'],['warmest surfaces','warm']],
+    header:'#f0e3c7', canvas:'#f7eeda', surface:'#fff9ef', raised:'#ffffff', rule:'#e7dcc4',
+    hover:'#f6efe0', select:'#f6ddc6', accent:'#f3d2c1',
+    primaryDim:'#f7a6c5', secondaryDim:'#a9e0e7', primaryInk:'#b8336b'
+  },
+  {
+    key:'B', name:'Balanced · refined-pink-select',
+    desc:'Closest to today, but disciplined. Pink still tints selection — only lighter, and pink is removed from badges/title-chrome so it reads as ONE family (action + selected). Surfaces get just enough separation to tell cream wells from white cards. The safe evolution.',
+    chips:[['pink = action + selection','primary'],['surfaces nudged apart','warm'],['requests on status ramp','status']],
+    header:'#f3e7cf', canvas:'#f9f2e2', surface:'#fffdf9', raised:'#ffffff', rule:'#e8dfca',
+    hover:'#f7f0e2', select:'#f9d2e0', accent:'#f3d2c1',
+    primaryDim:'#f7a6c5', secondaryDim:'#a9e0e7', primaryInk:'#b8336b'
+  },
+  {
+    key:'C', name:'Crisp · cool-select',
+    desc:'The most legible for dense work. Working surfaces go near-white/cool so warm status colours and pink read crisply; warmth is rationed to the header band + accents only. Selection is a cool navy-tint — maximally distinct from every warm/status colour, so a selected row never reads as a state.',
+    chips:[['pink = action only','primary'],['selection = navy-tint (cool)','accent'],['crispest, most neutral','warm']],
+    header:'#ece4d3', canvas:'#f5f1e8', surface:'#ffffff', raised:'#ffffff', rule:'#e6e1d5',
+    hover:'#f1f0ea', select:'#e3e9f7', accent:'#dfe6f7',
+    primaryDim:'#f7a6c5', secondaryDim:'#a9e0e7', primaryInk:'#3a4ba8'
+  },
+];
+
+/* ---- helpers ---- */
+const tint = (c,p)=>`color-mix(in srgb, ${c} ${p}%, #ffffff)`;
+const agTile = (color,glyph)=>`<span class="agtile" style="background:${color}"><i data-lucide="${glyph}"></i></span>`;
+
+function legend(o){
+  const surf = [['--header','header','panel headers / footers ONLY',o.header],['--canvas','canvas','app bg + feed scroll-wells',o.canvas],['--surface','surface','panel bodies',o.surface],['--raised','raised','cards · inputs · rows',o.raised],['--rule','rule','hairline row dividers',o.rule]];
+  const ink  = [['--border','border / ink','navy stroke + headings','#001858'],['--ink-2','ink-2','body copy (HH17 paragraph)','#172c66'],['--muted','muted','labels / meta','#5b6086'],['--muted-2','muted-2','faint / disabled','#9a93b4']];
+  const act  = [['--primary','primary','primary action + active',o.primaryUsesPink===false?o.primary:'#f582ae'],['--secondary','secondary','secondary action (Revise)','#8bd3dd'],['--select','select','selected row fill',o.select],['--accent','accent','soft highlight / info tint',o.accent]];
+  const stat = [['--ok','ok','active / success','#1f9268'],['--info','info','info / decision','#2f8fb0'],['--warn','warn','pending / approval','#d98a2b'],['--alert','alert','high urgency / permission','#d9622f'],['--bad','bad','danger / deny / error','#d23b4a'],['--idle','idle','idle / neutral','#9a93b4']];
+  const agents = Object.entries(AG).slice(0,6).map(([n,c])=>['','',n,c]);
+
+  const grp = (title, rows)=>`<div class="lgroup"><h4>${title}</h4>${rows.map(([tok,nm,use,c])=>`
+     <div class="swrow"><span class="sw" style="background:${c};border-color:${o.border}33"></span>
+     <span class="swmeta"><b>${nm||tok}</b><span>${use} · ${c}</span></span></div>`).join('')}</div>`;
+
+  return `<div class="legend">
+    ${grp('Surfaces', surf)}
+    ${grp('Ink &amp; Lines', ink)}
+    ${grp('Brand / Action', act)}
+    ${grp('Status — good → bad', stat)}
+    ${grp('Agent identity (16)', agents)}
+  </div>`;
+}
+
+function messages(o){
+  const rows = [
+    [AG.user,'human','User','user',true],
+    [AG.teal,'researcher','01 sandy','wand-2'],
+    [AG.indigo,'synthesizer','01 kai','box'],
+    [AG.forest,'auditor','01 drew','shield'],
+    [AG.copper,'coder','01 max','bot',false,true],
+    [AG.cobalt,'reviewer','01 vega','eye'],
+  ];
+  const aglist = rows.map(([c,role,name,glyph,user,off])=>`
+    <button class="agrow ${off?'':'on'}">
+      <span class="agtile" style="background:${user?SHARED.muted:c}"><i data-lucide="${glyph}"></i></span>
+      <span class="ag-lab"><span class="ag-role">${role}</span><span class="ag-name">${name}</span></span>
+      <i data-lucide="check" class="ag-ck"></i>
+    </button>`).join('');
+
+  const msgs = [
+    [AG.teal,'researcher-01-sandy','recv','14:41','Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn’t validate expiry before issuing a new token, so a session can be kept alive indefinitely.'],
+    ['ink','User','sent','14:42','Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.'],
+    [AG.forest,'auditor-01-drew','recv','14:43','Confirmed 2 of 3. Expiry bypass is critical — tokens refresh indefinitely. Demoted “no rate limiting” to medium; it’s behind the gateway throttle.'],
+    [AG.cobalt,'reviewer-01-vega','recv','14:44','Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.'],
+    [AG.copper,'coder-01-max','recv','14:47','Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I’m isolating.'],
+  ].map(([c,nm,dir,t,body])=>`
+    <div class="rcard">
+      <button class="rc-copy"><i data-lucide="copy"></i></button>
+      <div class="rc-head">
+        <span class="rc-name" style="color:${c==='ink'?o.ink:c}">${nm}</span>
+        <span class="dir-tag">${dir}</span>
+        <span class="rc-time">${t}</span>
+      </div>
+      <div class="rc-body">${body}</div>
+    </div>`).join('');
+
+  return `<div class="panel">
+    <div class="phead">
+      <h3>Team Feed</h3>
+      <div class="ptabs">
+        <button class="ptab active">Messages</button>
+        <button class="ptab">Requests <span class="reqbadge">4</span></button>
+        <button class="ptab">Scratch</button>
+        <button class="ptab">Log</button>
+      </div>
+    </div>
+    <div class="pbody">
+      <div class="filter">
+        <div class="sec-h">Filter <button class="mini-link">All</button></div>
+        <div class="aglist">${aglist}</div>
+      </div>
+      <div class="feedcol">
+        <div class="minibar">
+          <span class="mini-cap">Show</span>
+          <button class="minitog on"><i data-lucide="arrow-up-right"></i>Sent</button>
+          <button class="minitog on"><i data-lucide="arrow-down-left"></i>Received</button>
+          <span class="mini-div"></span>
+          <span class="mini-cap">Include</span>
+          <button class="minitog on">Thinking</button>
+          <button class="minitog">Read</button>
+          <button class="minitog">Write</button>
+          <button class="minitog">Bash</button>
+        </div>
+        <div class="feedwell">${msgs}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function gallery(o){
+  const req = (stripe, tone, typeIcon, type, role, name, glyph, agcolor, title, sub, acts)=>`
+    <div class="req" style="--stripe:${tone}">
+      <div class="req-top">
+        ${agTile(agcolor,glyph)}
+        <span class="req-id"><span class="r">${role}</span><br><span class="n">${name}</span></span>
+        <span class="req-type" style="background:${tint(tone,16)};color:${tone}"><i data-lucide="${typeIcon}"></i>${type}</span>
+        <span class="rc-time">14:4${acts}</span>
+      </div>
+      <div class="req-title">${title}</div>
+      <div class="req-sub">${sub}</div>`;
+
+  return `<div class="gal">
+    <div class="galsec"><div class="cap">Buttons</div>
+      <div class="row">
+        <button class="btn btn-primary"><i data-lucide="send-horizontal"></i>Send</button>
+        <button class="btn btn-secondary"><i data-lucide="wand-sparkles"></i>Revise</button>
+        <button class="btn">Default</button>
+        <button class="btn btn-danger"><i data-lucide="power"></i>Retire</button>
+        <button class="btn btn-ghost"><i data-lucide="copy"></i></button>
+        <button class="btn" disabled>Disabled</button>
+      </div>
+    </div>
+
+    <div class="galsec"><div class="cap">Split buttons</div>
+      <div class="row">
+        <span class="split primary"><button class="btn act">Send</button><button class="btn drop"><i data-lucide="chevron-down"></i></button></span>
+        <span class="split secondary"><button class="btn act">Revise</button><button class="btn drop"><i data-lucide="chevron-down"></i></button></span>
+      </div>
+    </div>
+
+    <div class="galsec"><div class="cap">Segmented · tabs · count</div>
+      <div class="row">
+        <span class="seg"><button>Default</button><button class="active">Auto</button><button>Edit</button><button>Plan</button></span>
+        <span class="countbadge">7</span>
+      </div>
+    </div>
+
+    <div class="galsec"><div class="cap">Agent identity rows</div>
+      <div class="aglist" style="max-width:230px">
+        <button class="agrow on">${agTile(AG.teal,'wand-2')}<span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
+        <button class="agrow">${agTile(AG.indigo,'box')}<span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
+      </div>
+    </div>
+
+    <div class="galsec"><div class="cap">Input</div>
+      <label class="lbl">Name</label>
+      <div class="in"><input value="researcher-01-sandy"><i data-lucide="x" class="clr"></i></div>
+    </div>
+
+    <div class="galsec"><div class="cap">Status — good → bad</div>
+      <div class="row" style="gap:14px;margin-bottom:9px">
+        <span class="statline"><span class="dot" style="background:${SHARED.ok}"></span>active</span>
+        <span class="statline"><span class="dot" style="background:${SHARED.idle}"></span>idle</span>
+        <span class="statline"><span class="dot" style="background:${SHARED.warn}"></span>pending</span>
+      </div>
+      <div class="row">
+        <span class="sbadge" style="background:${tint(SHARED.ok,16)};color:${SHARED.ok}"><i data-lucide="check"></i>Success</span>
+        <span class="sbadge" style="background:${tint(SHARED.info,16)};color:${SHARED.info}"><i data-lucide="info"></i>Info</span>
+        <span class="sbadge" style="background:${tint(SHARED.warn,18)};color:${SHARED.warn}"><i data-lucide="clock"></i>Pending</span>
+        <span class="sbadge" style="background:${tint(SHARED.alert,16)};color:${SHARED.alert}"><i data-lucide="alert-triangle"></i>Alert</span>
+        <span class="sbadge" style="background:${tint(SHARED.bad,16)};color:${SHARED.bad}"><i data-lucide="x"></i>Error</span>
+      </div>
+    </div>
+
+    <div class="galsec"><div class="cap">Context usage</div>
+      <div class="pbar-wrap"><div class="pbar"><i style="width:62%;background:${SHARED.ok}"></i></div><span class="pbar-pc">62%</span></div>
+      <div class="pbar-wrap" style="margin-top:7px"><div class="pbar"><i style="width:88%;background:${SHARED.alert}"></i></div><span class="pbar-pc">88%</span></div>
+    </div>
+
+    <div class="galsec"><div class="cap">Requests — folded onto the status ramp</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${req('',SHARED.info,'git-branch','Decision','reviewer','01 vega','eye',AG.cobalt,'Choose token rotation strategy','Sliding window vs one-time rotation — pick before merge.','4')}
+          <div class="req-acts"><button class="btn btn-primary btn-sm" disabled>Approve</button><span class="req-sep"></span><button class="btn btn-sm"><i data-lucide="send-horizontal"></i>Reply</button></div></div>
+        ${req('',SHARED.warn,'circle-check','Approval','researcher','01 sandy','wand-2',AG.teal,'Merge remediation plan to main','3 files · +84 −19 · rotation path covered by new test.','1')}
+          <div class="req-acts"><button class="btn btn-primary btn-sm">Approve</button><button class="btn btn-sm">Reject</button><span class="req-sep"></span><button class="btn btn-sm"><i data-lucide="send-horizontal"></i>Reply</button></div></div>
+        ${req('',SHARED.alert,'circle-alert','Permission','auditor','01 drew','shield',AG.forest,'Run bash command','<span style="font-family:JetBrains Mono,monospace">rm -rf node_modules &amp;&amp; pnpm install</span>','8')}
+          <div class="req-acts"><button class="btn btn-primary btn-sm">Approve</button><button class="btn btn-sm">Deny</button><button class="btn btn-sm">Always</button><span class="req-sep"></span><button class="btn btn-sm"><i data-lucide="send-horizontal"></i>Reply</button></div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildOption(o, idx){
+  const vars = {
+    '--border':o.border,'--ink':o.ink,'--ink-2':o.ink2,'--muted':o.muted,'--muted-2':o.muted2,
+    '--primary':o.primary||SHARED.primary,'--primary-dim':o.primaryDim,'--primary-ink':o.primaryInk,
+    '--secondary':SHARED.secondary,'--secondary-dim':o.secondaryDim,
+    '--ok':SHARED.ok,'--info':SHARED.info,'--warn':SHARED.warn,'--alert':SHARED.alert,'--bad':SHARED.bad,'--idle':SHARED.idle,
+    '--header':o.header,'--canvas':o.canvas,'--surface':o.surface,'--raised':o.raised,'--rule':o.rule,
+    '--hover':o.hover,'--select':o.select,'--accent':o.accent,
+  };
+  const styleStr = Object.entries(vars).map(([k,v])=>`${k}:${v}`).join(';');
+  const panel = document.createElement('div');
+  panel.className = 'opt'+(idx===0?' show':'');
+  panel.id = 'opt-'+o.key;
+  panel.style.cssText = styleStr+';background:'+o.canvas+';color:'+o.ink;
+  panel.innerHTML = `
+    <div class="wrap">
+      <div class="ohead">
+        <div class="otitle" style="color:${o.ink}">Option ${o.key} — ${o.name}</div>
+        <div class="odesc" style="color:${o.ink2}">${o.desc}</div>
+        <div class="ochips">${o.chips.map(([t,k])=>`<span class="ochip" style="border-color:${o.border}33;background:${tint(o.accent,40)};color:${o.ink}">${t}</span>`).join('')}</div>
+      </div>
+      ${legend(o)}
+      <div class="showcase">
+        <div><div class="blkcap">Team Feed › Messages — the full panel</div>${messages(o)}</div>
+        <div><div class="blkcap">Control gallery — the major UI controls</div>${gallery(o)}</div>
+      </div>
+    </div>`;
+  return panel;
+}
+
+AG.user = SHARED.muted; // user tile tone
+const stage = document.getElementById('stage');
+const tabs  = document.getElementById('tabs');
+OPTIONS.forEach((o,i)=>{
+  const b=document.createElement('button');
+  b.textContent='Option '+o.key;
+  b.className=(i===0?'active':'');
+  b.style.background = i===0 ? o.primary||SHARED.primary : '';
+  b.onclick=()=>{
+    document.querySelectorAll('.tabs button').forEach((x,j)=>{x.className='';x.style.background='';});
+    b.className='active'; b.style.background=o.primary||SHARED.primary;
+    document.querySelectorAll('.opt').forEach(p=>p.classList.remove('show'));
+    document.getElementById('opt-'+o.key).classList.add('show');
+  };
+  tabs.appendChild(b);
+  stage.appendChild(buildOption(o,i));
+});
+lucide.createIcons();
+</script>
+</body>
+</html>

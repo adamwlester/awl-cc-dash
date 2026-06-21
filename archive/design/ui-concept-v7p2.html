@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Multi-Agent Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+        colors: {
+          base:  { 950:'#fef6e4', 900:'#f7f0e0', 850:'#fff8ee', 800:'#ffffff', 750:'#f0e8d8', 700:'#001858', 600:'#001858', 500:'#8a8eb8' },
+          warm:  { 50:'#001858', 100:'#172c66', 200:'#2a3d78', 300:'#3a4878', 400:'#4a5088', 500:'#8a8eb8' },
+          pink:'#f582ae', amber:'#d08530', coral:'#e06654', danger:'#c74060', sage:'#3d946a', gold:'#d4a050', blush:'#f3d2c1',
+          field:'#fdf1e6', term:'#ebedf3',
+          agent: {
+            rose:'#b84568', teal:'#228070', indigo:'#4855b5', copper:'#c07828', forest:'#2d7848', plum:'#7e4ea0',
+            vermil:'#c04838', cobalt:'#2d6ea8', bronze:'#8a7820', olive:'#5e7828', mauve:'#954e80', steel:'#506480',
+            cyan:'#1f96a6', lime:'#7ba428', violet:'#6b5dd3', magenta:'#b13d86'
+          }
+        }
+      }}
+    }
+  </script>
+  <style>
+    :root{
+      --page:#fef6e4; --header:#f7f0e0; --surface:#fff8ee; --card:#ffffff; --subtle:#f0e8d8;
+      --navy:#001858; --dim:#8a8eb8; --body:#172c66; --label:#4a5088; --muted:#3a4878;
+      --pink:#f582ae; --pink-dk:#e8709a; --amber:#d08530; --coral:#e06654; --danger:#c74060;
+      --sage:#3d946a; --gold:#d4a050; --blush:#f3d2c1; --field:#fdf1e6; --term:#ebedf3; --rule:#c9c2b0;
+      --c-sys:#c07828; --c-tools:#2d6ea8; --c-mcp:#2d7848; --c-agents:#d4a050; --c-mem:#7e4ea0; --c-msg:#e06654; --c-free:#bcb6a4;
+      /* §A radius scale — calibrated for a dense 3-pane app (cards clearly rounded, controls softened, not toy-pill) */
+      --r-card:12px; --r-ctrl:7px; --r-chip:7px; --r-pill:999px; --r-node:14px; --r-in:8px;
+    }
+
+    /* Palette-matched scrollbars (app-wide) */
+    * { scrollbar-width: thin; scrollbar-color: #8a8eb8 #f0e8d8; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #f0e8d8; }
+    ::-webkit-scrollbar-thumb { background: #8a8eb8; border-radius: 4px; border: 1px solid #f0e8d8; }
+    ::-webkit-scrollbar-thumb:hover { background: #f582ae; }
+    ::-webkit-scrollbar-corner { background: #f0e8d8; }
+    .ref-section { scrollbar-color: #4a5088 #0e1840; }
+    .ref-section::-webkit-scrollbar-track { background: #0e1840; }
+    .ref-section::-webkit-scrollbar-thumb { background: #4a5088; border-color: #0e1840; }
+    .ref-section::-webkit-scrollbar-thumb:hover { background: #f582ae; }
+
+    /* ===================== §A — Panel card framing (header / body / footer on cream) ===================== */
+    .app { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+    .three { flex:1 1 auto; display:flex; gap:10px; padding:10px; background:var(--page); overflow:hidden; min-height:0; }
+    .col { display:flex; flex-direction:column; min-width:0; min-height:0; }
+    .pcard { display:flex; flex-direction:column; min-height:0; background:var(--surface); border:2px solid var(--navy); border-radius:var(--r-card); overflow:hidden; }
+    .pcard--flow { overflow:visible; }            /* cards whose menus open beyond the body (Prompts) */
+    .pcard--flow > .pcard-head { border-radius:calc(var(--r-card) - 2px) calc(var(--r-card) - 2px) 0 0; }
+    .pcard--flow > .pcard-foot { border-radius:0 0 calc(var(--r-card) - 2px) calc(var(--r-card) - 2px); }
+
+    .heading-strip, .pcard-head { background:var(--header); padding:0 12px; height:38px; min-height:38px; max-height:38px; border-bottom:2px solid var(--navy); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .pcard-head h3, .heading-strip h3 { font-size:11px; font-weight:800; color:var(--navy); text-transform:uppercase; letter-spacing:0.06em; }
+    .cli-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pcard-body { flex:1 1 auto; min-height:0; }
+    .pcard-foot { flex-shrink:0; background:var(--surface); border-top:2px solid var(--navy); }
+
+    .tab-btn { font-size:11px; padding:0 8px; font-weight:600; border-bottom:2px solid transparent; color:#8a8eb8; cursor:pointer; height:100%; display:flex; align-items:center; transition:all 0.1s; }
+    .tab-btn:hover { color:#4a5088; }
+    .tab-btn.active { border-bottom-color:#f582ae; color:#f582ae; }
+
+    .card { background:#ffffff; border:2px solid #001858; border-radius:var(--r-ctrl); overflow:hidden; }
+
+    .v-splitter { height:10px; cursor:row-resize; background:transparent; position:relative; flex-shrink:0; z-index:5; }
+    .v-splitter::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:34px; height:3px; background:#001858; border-radius:2px; transition:background 0.15s; opacity:0.55; }
+    .v-splitter:hover::after { background:#f582ae; opacity:1; }
+
+    /* Segmented control */
+    .seg-ctrl { display:flex; border-radius:var(--r-ctrl); overflow:hidden; border:2px solid #001858; background:#f0e8d8; }
+    .seg-ctrl button { flex:1; min-width:0; font-size:9.5px; padding:6px 2px; color:#8a8eb8; font-weight:600; border:none; background:transparent; cursor:pointer; transition:all 0.12s; border-right:1px solid rgba(0,24,88,0.1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .seg-ctrl button:last-child { border-right:none; }
+    .seg-ctrl button.active { background:#f582ae; color:#001858; font-weight:700; }
+    .seg-ctrl button:hover:not(.active) { color:#4a5088; background:rgba(0,24,88,0.04); }
+    .seg-ctrl button.seg-danger { color:#c74060; font-weight:700; }
+    .seg-ctrl button.seg-danger:hover:not(.active) { color:#c74060; background:rgba(199,64,96,0.08); }
+    .seg-ctrl button.seg-danger.active { background:#c74060; color:#fff; }
+
+    /* Buttons — fuller round per §A inspiration */
+    .btn-primary { height:28px; background:#f582ae; color:#001858; font-size:11px; font-weight:700; border:2px solid #f582ae; border-radius:var(--r-ctrl); display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; transition:all 0.12s; }
+    .btn-primary:hover { background:#e8709a; border-color:#e8709a; }
+    .btn-outline { height:28px; background:transparent; color:#001858; font-size:11px; font-weight:600; border:2px solid #001858; border-radius:var(--r-ctrl); display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; transition:all 0.12s; }
+    .btn-outline:hover { border-color:#3a4878; background:rgba(0,24,88,0.04); }
+    .btn-danger { height:28px; background:transparent; color:#c74060; font-size:11px; font-weight:600; border:2px solid #c7406044; border-radius:var(--r-ctrl); display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; transition:all 0.12s; }
+    .btn-danger:hover { border-color:#c7406088; background:rgba(199,64,96,0.06); }
+    .btn-sm { height:24px; font-size:10px; padding:0 10px; }
+
+    /* Ghost utility icons — faintly visible at rest, emphasized on hover (app-wide convention) */
+    .ghost-ic { width:22px; height:20px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; color:#9296c0; cursor:pointer; border-radius:5px; transition:all 0.12s; padding:0; }
+    .ghost-ic:hover { color:#001858; background:rgba(0,24,88,0.07); }
+    .ghost-ic--danger:hover { color:#c74060; background:rgba(199,64,96,0.08); }
+    .ghost-ic svg { width:14px; height:14px; }
+
+    /* Numeric stepper — ghost +/- flanking a centered value (Lifecycle) */
+    .stepper { display:flex; align-items:stretch; border:2px solid var(--rule); border-radius:var(--r-ctrl); overflow:hidden; background:#fff; }
+    .stepper:focus-within { border-color:#f582ae; }
+    .stepper button { width:24px; flex:0 0 auto; border:none; background:transparent; color:#8a8eb8; cursor:pointer; font-size:13px; font-weight:800; line-height:1; transition:all 0.12s; display:flex; align-items:center; justify-content:center; }
+    .stepper button:hover { color:#001858; background:rgba(0,24,88,0.06); }
+    .stepper input { flex:1 1 auto; min-width:0; border:none; background:transparent; text-align:center; font-size:11px; font-weight:700; color:#001858; outline:none; -moz-appearance:textfield; }
+    .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+
+    /* Inline clear "X" inside single-line inputs */
+    .in-wrap { position:relative; display:block; }
+    .in-wrap > input { padding-right:24px; }
+    .in-x { position:absolute; top:50%; right:6px; transform:translateY(-50%); width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; color:#8a8eb8; cursor:pointer; border:none; background:transparent; padding:0; border-radius:3px; }
+    .in-x:hover { color:#001858; background:rgba(0,24,88,0.07); }
+    .in-x svg { width:11px; height:11px; }
+
+    /* In-field tool cluster (kept for Reply) */
+    .ta-wrap { position:relative; }
+    .ta-tools { position:absolute; top:6px; right:12px; display:flex; gap:2px; z-index:2; background:rgba(253,241,230,0.92); border-radius:5px; padding:1px; }
+    /* §C.6 — copy/clear lifted OUT of the textarea into a tidy right-aligned ghost cluster above it (reference treatment) */
+    .field-tools { display:flex; align-items:center; justify-content:flex-end; gap:2px; margin-bottom:5px; }
+    .field-tools .lbl { margin-right:auto; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#8a8eb8; }
+
+    /* ===================== Agent node (graph) — square, spaced, with edges ===================== */
+    .graph-wrap { position:relative; }
+    .graph-grid { position:relative; z-index:2; display:grid; grid-template-columns:repeat(3, 168px); justify-content:space-between; gap:28px; }
+    .edge-layer { position:absolute; inset:0; z-index:4; pointer-events:none; width:100%; height:100%; overflow:visible; }
+    .agent-node { transition: all 0.12s ease; aspect-ratio:1 / 1; display:flex; flex-direction:column; border-radius:var(--r-node); }
+    .agent-node:hover { transform: translateY(-2px); }
+    .agent-node.selected { outline:3px solid #f582ae; outline-offset:2px; }
+    .subagent-mini { width:19px; height:19px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.1s; border:1px solid #001858; background:#ffffff; }
+    .subagent-mini:hover { transform:scale(1.12); }
+    .node-meta { font-size:8px; color:#4a5088; font-family:'JetBrains Mono',monospace; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ================= MODEL — single-select version-dropdown group (adopted) ================= */
+    .ro-head { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+    .ro-label { font-size:9px; color:var(--label); text-transform:uppercase; letter-spacing:0.05em; font-weight:800; }
+    .link-amber { font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0; }
+    .link-amber:hover { color:#b06d20; }
+    .model-tabs { display:flex; border:2px solid var(--navy); border-radius:var(--r-ctrl) var(--r-ctrl) 0 0; overflow:hidden; background:var(--subtle); }
+    .model-tabs.flat { border-radius:var(--r-ctrl); }
+    .model-tab { flex:1 1 0; min-width:0; font-size:9.5px; font-weight:700; padding:7px 3px; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .model-tab:last-child { border-right:none; }
+    .model-tab:hover:not(.active):not(.open) { color:var(--navy); background:rgba(0,24,88,0.04); }
+    .model-tab.open { background:rgba(0,24,88,0.06); color:var(--navy); }
+    .model-tab.active { flex:1.5 1 0; background:var(--card); color:var(--navy); font-weight:800; box-shadow:inset 0 -2px 0 var(--pink); }
+    .ver-panel { display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 var(--r-ctrl) var(--r-ctrl); background:var(--card); padding:6px; }
+    .ver-panel.open { display:block; }
+    .ver-h { font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label); padding:4px 7px 6px; }
+    .ver-row { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; font-weight:600; color:var(--navy); padding:7px 9px; border-radius:5px; cursor:pointer; border:1.5px solid transparent; transition:all .1s; }
+    .ver-row + .ver-row { margin-top:2px; }
+    .ver-row:hover { background:var(--subtle); }
+    .ver-row.sel { border-color:var(--pink); background:rgba(245,130,174,0.10); font-weight:800; }
+    .ver-name { font-family:'JetBrains Mono',monospace; }
+    .ver-check { color:var(--pink); font-weight:900; font-size:12px; opacity:0; }
+    .ver-row.sel .ver-check { opacity:1; }
+
+    /* ================= CONTEXT — trigger + inline breakdown (adopted) ================= */
+    .ctx-head { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+    .ctx-ratio { margin-left:auto; font-size:10px; font-weight:600; color:#8a8eb8; font-family:'JetBrains Mono',monospace; white-space:nowrap; }
+    .ctx-trigger { width:100%; text-align:left; background:var(--card); border:2px solid var(--rule); border-radius:var(--r-ctrl); padding:9px 10px; cursor:pointer; transition:all .12s; }
+    .ctx-trigger:hover { border-color:var(--dim); }
+    .ctx-trigger.open { border-color:var(--navy); border-bottom:none; border-radius:var(--r-ctrl) var(--r-ctrl) 0 0; }
+    .summary-row { display:flex; align-items:center; gap:9px; }
+    .ctxbar { display:flex; height:7px; border-radius:3px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); flex:1 1 auto; }
+    .ctxbar > i { display:block; height:100%; }
+    .pct { font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace; flex:0 0 auto; }
+    .chev { width:13px; height:13px; color:var(--dim); transition:transform .18s; flex:0 0 auto; }
+    .chev.up { transform:rotate(180deg); }
+    .acc { display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 var(--r-ctrl) var(--r-ctrl); background:var(--card); overflow:hidden; }
+    .acc.open { display:block; }
+    .bd { padding:11px; }
+    .bd-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px; }
+    .bd-model { font-size:11px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace; }
+    .bd-tot { font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace; }
+    .bd-bar { display:flex; height:9px; border-radius:4px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); margin-bottom:11px; }
+    .bd-bar > i { display:block; height:100%; }
+    .cat { display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px; }
+    .cat + .cat { border-top:1px solid rgba(0,24,88,0.07); }
+    .cat .sw { width:9px; height:9px; border-radius:2px; flex:0 0 auto; }
+    .cat .nm { flex:1 1 auto; color:var(--muted); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cat .tk { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); font-size:10.5px; }
+    .cat .pc { font-family:'JetBrains Mono',monospace; color:var(--dim); font-size:10px; width:38px; text-align:right; flex:0 0 auto; }
+    .bd-sub { margin-top:11px; padding-top:9px; border-top:2px solid rgba(0,24,88,0.12); }
+    .bd-sub h5 { font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; color:var(--label); margin:0 0 6px; display:flex; align-items:center; gap:6px; }
+    .bd-sub h5 .slash { color:var(--pink); font-family:'JetBrains Mono',monospace; }
+    .ml { display:flex; align-items:flex-start; gap:8px; padding:3px 0; font-size:10px; }
+    .ml .p { flex:1 1 auto; color:var(--muted); font-family:'JetBrains Mono',monospace; word-break:break-all; line-height:1.35; }
+    .ml .t { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); flex:0 0 auto; }
+
+    /* ================= HISTORY timeline — rewind / handoff (adopted) ================= */
+    .tri-tabs { display:flex; border:2px solid var(--navy); border-radius:var(--r-ctrl) var(--r-ctrl) 0 0; overflow:hidden; background:var(--subtle); }
+    .tri-tabs.flat { border-radius:var(--r-ctrl); }
+    .tri-tab { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:700; padding:6px 0; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s; }
+    .tri-tab:last-child { border-right:none; }
+    .tri-tab svg { width:12px; height:12px; }
+    .tri-tab:hover:not(.active) { color:var(--navy); background:rgba(0,24,88,0.04); }
+    .tri-tab.active { background:var(--card); color:var(--navy); box-shadow:inset 0 -2px 0 var(--pink); }
+    .tl-phead { padding:7px 11px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--subtle); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    .tl-confirm { display:none; align-items:center; gap:7px; margin:8px 10px 0; padding:7px 9px; border-radius:5px; background:rgba(61,148,106,0.10); border:1px solid rgba(61,148,106,0.45); color:#2d7848; font-size:10px; font-weight:700; }
+    .tl { padding:8px 10px; display:flex; flex-direction:column; gap:6px; max-height:236px; overflow-y:auto; }
+    .tl-row { display:flex; align-items:center; gap:9px; border:1px solid var(--rule); border-radius:6px; padding:7px 8px 7px 10px; transition:all .12s; }
+    .tl-row:hover { border-color:var(--dim); }
+    .tl-row.current { border-color:rgba(245,130,174,0.55); background:rgba(245,130,174,0.06); }
+    .tl-main { flex:1 1 auto; min-width:0; }
+    .tl-top { display:flex; align-items:center; flex-wrap:wrap; line-height:1.2; margin-bottom:3px; }
+    .tl-turn { font-size:10px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace; }
+    .tl-now { font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--pink); border:1px solid var(--pink); border-radius:3px; padding:0 4px; margin-left:6px; line-height:1.5; }
+    .tl-time { font-size:9.5px; color:var(--label); font-family:'JetBrains Mono',monospace; }
+    .tl-time::before { content:'·'; color:var(--dim); margin:0 6px; }
+    .tl-ctx { font-size:9.5px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+    .tl-ctx::before { content:'·'; color:var(--dim); margin:0 6px; font-weight:400; }
+    .tl-desc { font-size:11px; color:var(--muted); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-ic { flex:0 0 auto; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid var(--rule); border-radius:5px; background:var(--card); color:var(--label); cursor:pointer; transition:all .12s; }
+    .tl-ic svg { width:14px; height:14px; }
+    .tl-ic:hover { border-color:var(--pink); background:rgba(245,130,174,0.12); color:var(--navy); }
+    .tl-row.current .tl-ic { border-color:rgba(245,130,174,0.6); }
+
+    /* ===================== Split button — DROPDOWN leads, ICON action follows (adopted) ===================== */
+    .split { position:relative; display:inline-flex; align-items:stretch; height:28px; }
+    .split-drop { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 10px; font-size:11px; font-weight:700; border:2px solid; border-right:none; border-radius:var(--r-ctrl) 0 0 var(--r-ctrl); cursor:pointer; transition:all .12s; white-space:nowrap; }
+    .split-drop svg { width:11px; height:11px; }
+    .split-div { width:2px; align-self:stretch; flex:0 0 auto; background:var(--navy); }
+    .split-act { display:inline-flex; align-items:center; justify-content:center; width:36px; flex:0 0 auto; border:2px solid; border-left:none; border-radius:0 var(--r-ctrl) var(--r-ctrl) 0; cursor:pointer; transition:all .12s; }
+    .split-act svg { width:15px; height:15px; }
+    .split--primary .split-act { background:var(--pink); color:var(--navy); border-color:var(--navy); }
+    .split--primary .split-drop { background:#ec6fa0; color:var(--navy); border-color:var(--navy); }
+    .split--primary .split-act:hover { background:var(--pink-dk); }
+    .split--primary .split-drop:hover { background:#df5f93; }
+    .split--outline .split-act { background:transparent; color:var(--navy); border-color:var(--navy); }
+    .split--outline .split-drop { background:var(--subtle); color:var(--navy); border-color:var(--navy); }
+    .split--outline .split-act:hover { background:rgba(0,24,88,0.06); }
+    .split--outline .split-drop:hover { background:#e7ddc8; }
+    .split-menu { position:absolute; bottom:100%; left:0; margin-bottom:6px; z-index:50; min-width:200px; background:var(--card); border:2px solid var(--navy); border-radius:var(--r-ctrl); padding:5px; display:none; box-shadow:0 -6px 22px rgba(0,24,88,0.18); }
+    .split-menu--right { left:auto; right:0; }
+    .split-menu.open { display:block; }
+    .split-menu-h { font-size:8.5px; color:var(--dim); padding:5px 9px 4px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; }
+    .split-mi { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11px; padding:8px 10px; border-radius:5px; cursor:pointer; color:var(--navy); border:none; background:transparent; width:100%; text-align:left; }
+    .split-mi:hover { background:var(--subtle); }
+    .split-mi .lead { display:flex; flex-direction:column; gap:1px; }
+    .split-mi .lead b { font-weight:800; font-size:11px; white-space:nowrap; }
+    .split-mi .sub { font-size:9px; color:var(--dim); font-weight:600; white-space:nowrap; }
+    .split-mi .ck { opacity:0; font-size:11px; color:var(--sage); font-weight:900; flex:0 0 auto; }
+    .split-mi.sel .ck { opacity:1; }
+
+    /* ===================== Response / Format — grouped multi-select dropdown (adopted; reused by Team Feed) ===================== */
+    .fmt { position:relative; display:inline-flex; }
+    .fmt-btn { height:28px; display:inline-flex; align-items:center; gap:7px; padding:0 11px; border:2px solid var(--navy); border-radius:var(--r-ctrl); background:var(--card); color:var(--navy); cursor:pointer; transition:all .12s; }
+    .fmt-btn:hover { background:rgba(0,24,88,0.05); }
+    .fmt-btn.active { background:rgba(245,130,174,0.12); }
+    .fmt-btn .ic { width:14px; height:14px; }
+    .fmt-btn .fmt-lbl { font-size:11px; font-weight:700; }
+    .fmt-btn .cv { width:11px; height:11px; color:var(--dim); }
+    .fmt-badge { display:none; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--pink); color:var(--navy); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; }
+    .fmt-btn.active .fmt-badge { display:inline-flex; }
+    .fmt-menu { position:absolute; z-index:60; width:272px; background:var(--card); border:2px solid var(--navy); border-radius:var(--r-ctrl); padding:9px; display:none; box-shadow:0 8px 24px rgba(0,24,88,0.20); }
+    .fmt-menu.up { bottom:100%; margin-bottom:6px; box-shadow:0 -8px 24px rgba(0,24,88,0.20); }
+    .fmt-menu.down { top:100%; margin-top:6px; }
+    .fmt-menu.left { left:0; } .fmt-menu.right { right:0; }
+    .fmt-menu.open { display:block; }
+    .fmt-group { padding:5px 1px; }
+    .fmt-group + .fmt-group { border-top:1px solid rgba(0,24,88,0.08); margin-top:3px; }
+    .fmt-gh { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; padding:0 1px; }
+    .fmt-gh .nm { font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label); }
+    .fmt-gh .mode { font-size:7.5px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:0.03em; }
+    .fmt-pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .fmt-pill { font-size:10.5px; font-weight:700; padding:5px 11px; border:1.5px solid var(--rule); border-radius:var(--r-pill); background:var(--card); color:var(--label); cursor:pointer; transition:all .1s; user-select:none; }
+    .fmt-pill:hover:not(.on) { border-color:var(--dim); color:var(--navy); }
+    .fmt-pill.on { border-color:var(--pink); background:rgba(245,130,174,0.16); color:var(--navy); }
+    .fmt-foot { display:flex; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:2px solid rgba(0,24,88,0.1); }
+    .fmt-count { font-size:9px; font-weight:700; color:var(--dim); }
+    .fmt-clear { font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0; }
+    .fmt-clear:hover { color:#b06d20; }
+
+    /* ===================== Library — contiguous stacked list + inline placeholder text ===================== */
+    .sec-h { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#4a5088; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+    .lib-list { border:2px solid var(--navy); border-radius:var(--r-ctrl); overflow:hidden; background:#fff; }
+    .lib-row { font-size:11px; font-weight:600; padding:7px 10px; color:#3a4878; cursor:pointer; transition:all .1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-top:1px solid rgba(0,24,88,0.08); display:flex; align-items:center; gap:7px; }
+    .lib-row:first-child { border-top:none; }
+    .lib-row:hover:not(.on) { background:var(--subtle); color:#001858; }
+    .lib-row.on { background:rgba(245,130,174,0.14); color:#001858; font-weight:800; box-shadow:inset 3px 0 0 var(--pink); }
+    .lib-row .doticon { width:13px; height:13px; flex:0 0 auto; color:#8a8eb8; }
+    .tpl-view { background:#fdf1e6; border:2px solid #001858; border-radius:var(--r-ctrl); padding:10px 12px; font-size:12px; line-height:1.9; color:#3a4878; overflow-y:auto; }
+    /* §B.2 — placeholders are TRUE inline text (no floating pills): bold=unfilled, bold+italic=filled */
+    .ph-text { font-weight:800; cursor:pointer; border-bottom:1.5px dashed currentColor; padding-bottom:1px; transition:background .1s; }
+    .ph-text:hover { background:rgba(0,24,88,0.05); }
+    .ph-text.filled { font-style:italic; border-bottom-style:solid; }
+    .ph-text.sel { background:rgba(245,130,174,0.18); outline:1.5px solid currentColor; outline-offset:1px; border-radius:2px; }
+    .tpl-fill { position:relative; }
+    .tpl-fill textarea { width:100%; background:#ffffff; border:2px solid var(--rule); border-radius:var(--r-in); padding:6px 52px 6px 30px; font-size:11px; font-weight:700; line-height:1.3; resize:none; outline:none; transition:border-color .12s; }
+    .tpl-fill textarea::placeholder { font-weight:700; opacity:0.6; color:var(--ph,#8a8eb8); }
+    .tpl-fill .lead-ic { position:absolute; top:0; left:8px; height:100%; display:flex; align-items:center; color:var(--ph,#8a8eb8); pointer-events:none; }
+    .tpl-fill .lead-ic svg { width:15px; height:15px; }
+    .tpl-fill .fill-tools { position:absolute; top:0; right:6px; height:100%; display:flex; align-items:center; gap:2px; }
+    .fill-ic { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; color:#8a8eb8; background:transparent; border:none; cursor:pointer; border-radius:3px; transition:all 0.12s; padding:0; }
+    .fill-ic:hover { color:#001858; background:rgba(0,24,88,0.07); }
+    .fill-ic--go:hover { color:#3d946a; background:rgba(61,148,106,0.10); }
+
+    /* ===================== §F — Vertical agent-toggle strips (own surface, persist across tabs) ===================== */
+    .vstrip { width:100px; flex:0 0 auto; display:flex; flex-direction:column; min-height:0; background:var(--subtle); border:2px solid var(--navy); border-radius:var(--r-ctrl); overflow:hidden; }
+    .vstrip-head { padding:6px 8px 7px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--header); flex-shrink:0; }
+    .vstrip-head .vh-lbl { display:block; font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#4a5088; }
+    .vstrip-head .selectall { font-size:8px; }
+    .vstrip-body { flex:1 1 auto; min-height:0; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:5px; }
+    .vtog { position:relative; display:flex; align-items:center; gap:6px; width:100%; padding:5px 7px; border:2px solid var(--rule); border-radius:var(--r-chip); background:#fff; cursor:pointer; transition:all .12s; text-align:left; }
+    .vtog:hover:not(.on) { border-color:var(--dim); }
+    .vtog.on { border-color:var(--pink); background:rgba(245,130,174,0.10); }
+    .vtog-ic { width:18px; height:18px; flex:0 0 auto; }
+    .vtog-lab { display:flex; flex-direction:column; line-height:1.1; min-width:0; }
+    .vtog-role { font-size:7px; text-transform:uppercase; letter-spacing:0.03em; color:#8a8eb8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vtog-nm { font-size:9.5px; font-weight:800; color:#001858; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .selectall { font-weight:800; color:#d08530; cursor:pointer; background:none; border:none; white-space:nowrap; text-transform:uppercase; letter-spacing:0.04em; }
+    .selectall:hover { color:#b06d20; }
+
+    /* ===================== Readout cards (feeds, history) — copy follows §C.6 ghost cluster ===================== */
+    .rcard { position:relative; background:#fff; border:2px solid var(--rule); border-radius:var(--r-ctrl); padding:8px 10px; transition:border-color .12s; }
+    .rcard:hover { border-color:var(--dim); }
+    .rcard .rc-copy { position:absolute; top:6px; right:7px; opacity:0; transition:opacity .12s; }
+    .rcard:hover .rc-copy, .rcard:focus-within .rc-copy { opacity:1; }
+    .rc-name { font-size:11px; font-weight:800; }
+    .rc-time { font-size:9px; color:#8a8eb8; font-family:'JetBrains Mono',monospace; }
+    .rc-body { font-size:11px; color:#3a4878; line-height:1.45; margin-top:2px; }
+    .rc-log { font-family:'JetBrains Mono',monospace; font-size:10px; }
+    .dir-tag { font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:var(--r-pill); border:1px solid; }
+    .dir-out { color:#2d6ea8; border-color:#2d6ea8; background:rgba(45,110,168,0.08); }
+    .dir-in { color:#7e4ea0; border-color:#7e4ea0; background:rgba(126,78,160,0.08); }
+
+    /* Delivery-state badges — warm ramp sage->copper (§C.3) */
+    .dbadge { font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:var(--r-pill); border:1px solid; line-height:1.6; }
+    .db-sent { color:#2d7848; border-color:#2d7848; background:rgba(45,120,72,0.10); }
+    .db-next { color:#6f8f1f; border-color:#9aa83c; background:rgba(154,168,60,0.12); }
+    .db-queued { color:#b07a1c; border-color:#cf8136; background:rgba(207,129,54,0.12); }
+    .db-held { color:#b4502e; border-color:#c7603a; background:rgba(199,96,58,0.12); }
+
+    /* History card action row — Copy / Retry / Edit, right-aligned (§C.3) */
+    .hist-acts { display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:1px solid rgba(0,24,88,0.08); }
+
+    /* Mini toggles — feed direction + content-include (§D) */
+    .minibar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:7px 2px 9px; }
+    .minitog { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700; padding:4px 9px; border:1.5px solid var(--rule); border-radius:var(--r-pill); background:#fff; color:#4a5088; cursor:pointer; transition:all .1s; }
+    .minitog:hover:not(.on) { border-color:var(--dim); color:#001858; }
+    .minitog.on { border-color:var(--pink); background:rgba(245,130,174,0.14); color:#001858; }
+    .minitog svg { width:11px; height:11px; }
+    .mini-div { width:1px; align-self:stretch; background:rgba(0,24,88,0.14); margin:2px 3px; }
+    .mini-cap { font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#8a8eb8; }
+
+    /* Requests */
+    .req-head { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .req-badge { margin-left:auto; min-width:22px; height:20px; padding:0 7px; border-radius:var(--r-pill); display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; line-height:1; flex-shrink:0; background:#001858; color:#fff8ee; }
+    .req-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#3a4878; }
+    .opt { display:block; width:100%; text-align:left; border:2px solid var(--rule); border-radius:var(--r-ctrl); background:#fff; padding:7px 10px; cursor:pointer; transition:all 0.12s; }
+    .opt:hover:not(.on) { border-color:#8a8eb8; }
+    .opt.on { border-color:#f582ae; background:rgba(245,130,174,0.10); }
+    .opt-nm { display:block; font-size:11px; font-weight:800; color:#001858; }
+    .opt-desc { display:block; font-size:9.5px; color:#4a5088; line-height:1.3; margin-top:1px; }
+
+    /* Subheader / per-field edit / lifecycle limits / pickers (kept from v6p3) */
+    .subhead { background:var(--header); border-bottom:2px solid var(--navy); padding:6px 12px 8px; flex-shrink:0; }
+    .subhead-label { display:block; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#4a5088; }
+    .edit-ic { background:none; border:none; cursor:pointer; color:#8a8eb8; display:inline-flex; align-items:center; padding:0; line-height:0; }
+    .edit-ic:hover { color:#d08530; }
+    .field.editing .edit-ic { color:#3d946a; }
+    .field .ic-save { display:none; }
+    .field.editing .ic-pencil { display:none; }
+    .field.editing .ic-save { display:inline-block; }
+    .field:not(.editing) .lockable { opacity:0.45; pointer-events:none; filter:saturate(0.55); }
+    .grp-div { border-top:2px solid rgba(0,24,88,0.14); height:0; }
+    .lim-tog { width:100%; font-size:10px; font-weight:700; padding:5px 0; border:2px solid var(--rule); border-radius:var(--r-ctrl); background:#fff; color:#8a8eb8; cursor:pointer; transition:all 0.12s; }
+    .lim-tog:hover:not(.on) { border-color:#8a8eb8; color:#4a5088; }
+    .lim-tog.on { border-color:#f582ae; background:#f582ae14; color:#001858; }
+    .lim-in { width:100%; margin-top:4px; background:#fff; border:2px solid var(--rule); border-radius:var(--r-ctrl); padding:4px 6px; font-size:10px; font-weight:700; color:#001858; text-align:center; }
+    .lim-in:focus { outline:none; border-color:#f582ae; }
+    .lim-in:disabled { opacity:0.45; background:#f0e8d8; cursor:not-allowed; }
+    .lim-in::placeholder { color:#8a8eb8; font-weight:600; }
+    .swatch { width:20px; height:20px; flex:0 0 auto; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.12s; }
+    .swatch.on { outline:2px solid #001858; outline-offset:2px; }
+    .icobtn { width:28px; height:28px; flex:0 0 auto; border-radius:var(--r-ctrl); background:#fff; border:2px solid var(--rule); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.12s; }
+    .icobtn:hover { border-color:#8a8eb8; }
+    .icobtn.on { border-color:#001858; background:rgba(245,130,174,0.10); }
+    .hscroll { display:flex; flex-wrap:nowrap; gap:7px; overflow-x:auto; overflow-y:hidden; padding:3px 1px 6px; align-items:center; }
+    textarea.autosize { resize:none; overflow:hidden; min-height:30px; }
+    .ta-resize { resize:vertical; }
+    @keyframes slideIn { from { transform:translateX(40px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+
+    /* Session cluster (footer) */
+    .sess-btn { display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 10px; font-size:10px; font-weight:700; border:2px solid #001858; border-radius:var(--r-ctrl); background:transparent; color:#001858; cursor:pointer; transition:all .12s; }
+    .sess-btn:hover { border-color:#f582ae; background:rgba(245,130,174,0.14); color:#001858; }
+    .sess-btn svg { width:12px; height:12px; }
+    .tok-pill { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 11px; border-radius:var(--r-pill); background:rgba(245,130,174,0.18); border:1px solid #f582ae; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:#001858; }
+
+    /* Color Palette Reference — design reference panel, NOT part of the UI */
+    .ref-section { background:#ffffff; color:#172c66; margin:26px; border:2px solid #001858; border-radius:16px; padding:20px 28px 26px; box-shadow:0 10px 34px rgba(0,24,88,0.16); }
+    .ref-disclaimer { display:flex; align-items:center; justify-content:center; gap:8px; max-width:1400px; margin:0 auto 16px; padding:8px 14px; border:1.5px dashed #c74060; border-radius:10px; background:#fdecef; color:#c74060; font-size:11px; font-weight:700; letter-spacing:0.02em; text-align:center; }
+    .ref-heading { display:flex; align-items:center; justify-content:center; gap:12px; font-size:11px; font-weight:800; letter-spacing:0.18em; text-transform:uppercase; color:#3a4878; margin-bottom:14px; }
+    .ref-heading .rule { width:48px; height:1px; background:#c9c2b0; display:inline-block; }
+    .ref-grid { max-width:1400px; margin:0 auto; }
+    .ref-group { display:grid; grid-template-columns:118px 1fr; gap:16px; align-items:start; padding:10px 0; border-bottom:1px solid rgba(0,24,88,0.10); }
+    .ref-group:last-child { border-bottom:none; }
+    .ref-group-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#001858; padding-top:4px; }
+    .ref-chips { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:9px 14px; }
+    .ref-chip { display:flex; align-items:center; gap:9px; }
+    .ref-sw { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,24,88,0.18); flex-shrink:0; }
+    .ref-meta { display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+    .ref-hex { font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#172c66; font-weight:500; }
+    .ref-name { font-size:9.5px; color:#6b6f93; font-weight:600; }
+  </style>
+  <script>
+function switchTab(g,t){
+  document.querySelectorAll(`[data-group="${g}"]`).forEach(p=>p.classList.add('hidden'));
+  const pane=document.getElementById(`${g}-${t}`); if(pane)pane.classList.remove('hidden');
+  document.querySelectorAll(`[data-tab-group="${g}"]`).forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  const foots=document.querySelectorAll(`[data-group="${g}-foot"]`);
+  if(foots.length){foots.forEach(f=>f.classList.add('hidden'));const fm=document.getElementById(`${g}-foot-${t}`);if(fm)fm.classList.remove('hidden');}
+  if(g==='prompt'){
+    const ar=document.getElementById('prompt-actions'); if(ar)ar.classList.toggle('hidden',t==='history');
+    const rv=document.getElementById('revise-split'); if(rv)rv.classList.toggle('hidden',t!=='compose');
+  }
+  const s=JSON.parse(localStorage.getItem('awl-tabs7')||'{}');s[g]=t;localStorage.setItem('awl-tabs7',JSON.stringify(s));
+  if(typeof drawEdgesSoon==='function'&&g==='feed') drawEdgesSoon();
+}
+function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden');}
+function toggleChip(el){el.classList.toggle('on');}
+function pickChip(el){const w=el.closest('.vstrip-body')||el.parentElement;w.querySelectorAll('.vtog').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function segPick(btn){const g=btn.closest('.seg-ctrl');g.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
+function miniToggle(el){el.classList.toggle('on');}
+function selectAllV(btn){const wrap=btn.closest('[data-toggle-wrap]');const chips=[...wrap.querySelectorAll('.vtog')];const allOn=chips.length>0&&chips.every(c=>c.classList.contains('on'));const turnOn=!allOn;chips.forEach(c=>c.classList.toggle('on',turnOn));btn.textContent=turnOn?'Clear all':'Select all';}
+function initSelectAll(){document.querySelectorAll('[data-toggle-wrap]').forEach(w=>{const btn=w.querySelector('.selectall');if(!btn)return;const chips=[...w.querySelectorAll('.vtog')];btn.textContent=(chips.length>0&&chips.every(c=>c.classList.contains('on')))?'Clear all':'Select all';});}
+function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllPopups();if(!open)m.classList.add('open');}
+function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const lbl=menu.closest('.split').querySelector('.split-lbl');if(lbl)lbl.textContent=mi.dataset.short||mi.querySelector('b').textContent;menu.classList.remove('open');}
+function openReply(){const f=document.getElementById('reply-field');if(f){f.focus();f.scrollIntoView({block:'nearest'});}}
+function clearField(id){const el=document.getElementById(id);if(el){el.value='';if(el.classList.contains('autosize'))autosize(el);el.focus();}}
+function clearInput(btn){const i=btn.parentElement.querySelector('input,textarea');if(i){i.value='';i.focus();}}
+function copyField(id){const el=document.getElementById(id);if(el&&navigator.clipboard)navigator.clipboard.writeText(el.value||el.textContent||'').catch(()=>{});}
+function copyCard(btn){const c=btn.closest('.rcard');const b=c?c.querySelector('.rc-body,.rc-log'):null;if(b&&navigator.clipboard)navigator.clipboard.writeText(b.textContent||'').catch(()=>{});}
+let phSel=null;
+function pickPlaceholder(el){document.querySelectorAll('.ph-text').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');phSel=el;const ta=document.getElementById('tpl-fill-input');if(!ta)return;const col=el.dataset.color||'#001858';ta.style.setProperty('--ph',col);ta.style.borderColor=col;ta.style.color=col;ta.setAttribute('placeholder',el.dataset.tag||'');ta.value=el.dataset.value||'';autosize(ta);ta.focus();}
+function fillPlaceholder(){if(!phSel)return;const ta=document.getElementById('tpl-fill-input');const v=ta.value.trim();phSel.dataset.value=v;if(v){phSel.classList.add('filled');phSel.textContent=v;}else{phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;}phSel.classList.add('sel');}
+function resetPlaceholder(){if(!phSel)return;phSel.dataset.value='';phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;const ta=document.getElementById('tpl-fill-input');if(ta){ta.value='';autosize(ta);ta.focus();}}
+function cycleDir(b){const order=['ab','ba','both'];const glyph={ab:'\u2192',ba:'\u2190',both:'\u2194'};const tip={ab:'A \u2192 B',ba:'B \u2192 A',both:'A \u2194 B (both)'};let i=(order.indexOf(b.dataset.dir)+1)%3;b.dataset.dir=order[i];b.textContent=glyph[order[i]];b.title=tip[order[i]];}
+function toggleLimit(b){b.classList.toggle('on');const inp=b.parentElement.querySelector('.lim-in');if(inp)inp.disabled=!b.classList.contains('on');}
+function pickSwatch(el){const w=el.parentElement;w.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+function pickIcon(el){const w=el.closest('[data-icogroup]');w.querySelectorAll('.icobtn').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
+function toggleEdit(btn){btn.closest('.field').classList.toggle('editing');}
+function step(btn,d){const inp=btn.parentElement.querySelector('input');if(!inp)return;let v=parseInt(inp.value||'0',10)+d;const mn=inp.min!==''?parseInt(inp.min,10):0;if(!isNaN(mn))v=Math.max(mn,v);const mx=inp.max!==''?parseInt(inp.max,10):null;if(mx!==null&&!isNaN(mx))v=Math.min(mx,v);inp.value=v;}
+function autosize(el){el.style.height='auto';const cs=getComputedStyle(el);const border=(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);el.style.height=(el.scrollHeight+border)+'px';}
+function autosizeAll(){document.querySelectorAll('textarea.autosize').forEach(t=>autosize(t));}
+function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open').forEach(x=>x.classList.remove('open'));}
+window.addEventListener('DOMContentLoaded',()=>{const s=JSON.parse(localStorage.getItem('awl-tabs7')||'{}');Object.entries(s).forEach(([g,t])=>switchTab(g,t));const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();initSelectAll();if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));}});
+window.addEventListener('load',autosizeAll);
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(autosizeAll);}
+document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt'))closeAllPopups();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAllPopups();});
+setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
+(function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},400);})();
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.v-splitter').forEach(s=>{let sy,pe,ne,ph,nh;s.addEventListener('mousedown',e=>{e.preventDefault();sy=e.clientY;pe=s.previousElementSibling;ne=s.nextElementSibling;if(!pe||!ne)return;ph=pe.offsetHeight;nh=ne.offsetHeight;const mv=e2=>{const d=e2.clientY-sy;pe.style.height=Math.max(80,ph+d)+'px';pe.style.flex='none';ne.style.height=Math.max(80,nh-d)+'px';ne.style.flex='none';if(typeof drawEdges==='function')drawEdges();};const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});});});
+  </script>
+</head>
+<body class="bg-base-950 text-warm-100 font-sans">
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <!-- agent faces (outline emoji-style avatars, §E5) -->
+    <symbol id="a-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8 5 4l3.4 2.6"/><path d="M18.5 8 19 4l-3.4 2.6"/><path d="M5.5 11a6.5 6 0 0 0 13 0c0-2.4-1.5-4.3-3.3-4.9a14 14 0 0 0-6.4 0C7 6.7 5.5 8.6 5.5 11z"/><circle cx="9.6" cy="11.3" r=".95" fill="currentColor" stroke="none"/><circle cx="14.4" cy="11.3" r=".95" fill="currentColor" stroke="none"/><path d="M12 13v.8"/><path d="M12 13.8c-.7.8-2.2.6-2.6-.3M12 13.8c.7.8 2.2.6 2.6-.3"/><path d="M6.6 12l-2 .4M6.6 13.2l-2 .8M17.4 12l2 .4M17.4 13.2l2 .8"/></symbol>
+    <symbol id="a-fox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6c2 .4 3.6 1.2 4.6 2.2a15 15 0 0 1 4.8 0C15.4 7.2 17 6.4 19 6l-1.4 4.2"/><path d="M5 6l1.4 4.2"/><path d="M6.4 10.2c-.2 3 1.6 6.4 5.6 7.4 4-1 5.8-4.4 5.6-7.4"/><circle cx="9.5" cy="11.4" r=".95" fill="currentColor" stroke="none"/><circle cx="14.5" cy="11.4" r=".95" fill="currentColor" stroke="none"/><path d="M12 14l-1.3 1h2.6z" fill="currentColor"/><path d="M9.6 16.4c1.4.8 3.4.8 4.8 0"/></symbol>
+    <symbol id="a-owl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 6.5 8 9M18.5 6.5 16 9"/><path d="M12 4.5c-3.9 0-6.8 3-6.8 6.9S8.1 19 12 19s6.8-3.7 6.8-7.6S15.9 4.5 12 4.5z"/><circle cx="9" cy="11" r="2.2"/><circle cx="15" cy="11" r="2.2"/><circle cx="9" cy="11" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="11" r=".8" fill="currentColor" stroke="none"/><path d="M11 14.2l1 1.2 1-1.2z" fill="currentColor"/></symbol>
+    <symbol id="a-frog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.6" cy="7.4" r="2.5"/><circle cx="16.4" cy="7.4" r="2.5"/><circle cx="7.6" cy="7.4" r=".8" fill="currentColor" stroke="none"/><circle cx="16.4" cy="7.4" r=".8" fill="currentColor" stroke="none"/><path d="M5 11.5a7 5.2 0 0 0 14 0z"/><path d="M8.5 14.6c1 1.1 5 1.1 6 0"/></symbol>
+    <symbol id="a-bear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.6" cy="6.6" r="2.3"/><circle cx="17.4" cy="6.6" r="2.3"/><path d="M5.6 12a6.4 6 0 0 0 12.8 0c0-2.2-1.6-4.1-3.5-4.7a12 12 0 0 0-5.8 0C7.2 7.9 5.6 9.8 5.6 12z"/><circle cx="9.9" cy="11.4" r=".9" fill="currentColor" stroke="none"/><circle cx="14.1" cy="11.4" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.3"/></symbol>
+    <symbol id="a-bunny" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 8c-1.1-1.9-1.2-4.7.2-5.9C10.7 3.2 10.8 6 10.1 8"/><path d="M14.8 8c1.1-1.9 1.2-4.7-.2-5.9C13.3 3.2 13.2 6 13.9 8"/><path d="M6.6 13a5.4 5 0 0 0 10.8 0c0-2.3-2-4.4-5.4-4.4S6.6 10.7 6.6 13z"/><circle cx="10" cy="12.6" r=".9" fill="currentColor" stroke="none"/><circle cx="14" cy="12.6" r=".9" fill="currentColor" stroke="none"/><path d="M12 14v.9M10.6 16h2.8"/></symbol>
+    <symbol id="a-bird" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2c.6-1.1 1.4-1.5 2-1.3"/><circle cx="12" cy="11" r="6.4"/><circle cx="9.8" cy="10" r=".9" fill="currentColor" stroke="none"/><circle cx="14.2" cy="10" r=".9" fill="currentColor" stroke="none"/><path d="M12 12.4l2.4 1L12 14.6l-2.4-1.2z" fill="currentColor"/><path d="M5.7 12.5l-1.9.5 1.9 1M18.3 12.5l1.9.5-1.9 1"/></symbol>
+    <symbol id="a-fish" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12c2.5-4 7.5-5.2 11-3 1.8 1.1 2.8 2.4 3.2 3-.4.6-1.4 1.9-3.2 3-3.5 2.2-8.5 1-11-3z"/><path d="M17.7 12 21 9.2v5.6z"/><circle cx="8" cy="11" r=".9" fill="currentColor" stroke="none"/><path d="M6.5 13.5c1 .8 2.4.8 3.4 0"/></symbol>
+    <symbol id="a-bee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.5 6.5 4M15 6.5 17.5 4"/><circle cx="12" cy="12.5" r="6"/><circle cx="9.8" cy="11" r=".9" fill="currentColor" stroke="none"/><circle cx="14.2" cy="11" r=".9" fill="currentColor" stroke="none"/><path d="M6.6 13.2h10.8M7.4 16h9.2"/><path d="M10 14.6c.7.7 3.3.7 4 0"/></symbol>
+    <symbol id="a-ghost" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 19V11a6.5 6.5 0 0 1 13 0v8l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4z"/><circle cx="9.7" cy="10.8" r=".95" fill="currentColor" stroke="none"/><circle cx="14.3" cy="10.8" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="13.6" r="1.1"/></symbol>
+    <symbol id="a-alien" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4.5 7 2.6M16 4.5 17 2.6"/><path d="M12 4.5c-3.6 0-6 2.6-6 6 0 3.4 2.6 8 6 9 3.4-1 6-5.6 6-9 0-3.4-2.4-6-6-6z"/><path d="M8.4 10.5c.4 1.7 1.6 2.8 2.6 3 .2-1.4-.4-2.8-1.6-3.4-.4-.2-.8-.1-1 .4z" fill="currentColor" stroke="none"/><path d="M15.6 10.5c-.4 1.7-1.6 2.8-2.6 3-.2-1.4.4-2.8 1.6-3.4.4-.2.8-.1 1 .4z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="a-robot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2"/><circle cx="12" cy="2.4" r="1"/><rect x="5" y="6.5" width="14" height="12" rx="3.5"/><circle cx="9.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="14.5" cy="11.5" r="1.2" fill="currentColor" stroke="none"/><path d="M9.5 15h5"/><path d="M3 10.5v3M21 10.5v3"/></symbol>
+    <symbol id="a-skull" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 11c0-3.9 2.9-6.5 6.5-6.5s6.5 2.6 6.5 6.5c0 2.2-1 3.6-2 4.4v2.1a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-2.1c-1-.8-2-2.2-2-4.4z"/><circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/><path d="M12 13.5l-.8 1.6h1.6z" fill="currentColor"/><path d="M9.5 18v1.5M12 18v1.5M14.5 18v1.5"/></symbol>
+    <symbol id="a-imp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7C4.8 5.6 4.5 4 4.5 4S6.4 4.6 7.6 6M18 7c1.2-1.4 1.5-3 1.5-3s-1.9.6-3.1 2"/><path d="M5.5 11.5a6.5 6 0 0 0 13 0c0-2.2-1.3-4-3.2-4.8a14 14 0 0 0-6.6 0C6.8 7.5 5.5 9.3 5.5 11.5z"/><circle cx="9.6" cy="11.2" r=".95" fill="currentColor" stroke="none"/><circle cx="14.4" cy="11.2" r=".95" fill="currentColor" stroke="none"/><path d="M9 14.5c1.2 1.4 4.8 1.4 6 0"/></symbol>
+    <symbol id="a-blob" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13.5c-.5-4 2.4-7.5 6-7.5s6.5 3.2 6 7.5c-.3 2.4.8 2.7.6 3.6-.2.8-1.6.4-2.6.9-1.2.6-2.2 1.5-4 1.5s-2.8-.9-4-1.5c-1-.5-2.4-.1-2.6-.9-.2-.9.9-1.2.6-3.6z"/><circle cx="9.7" cy="12" r=".95" fill="currentColor" stroke="none"/><circle cx="14.3" cy="12" r=".95" fill="currentColor" stroke="none"/><path d="M10 14.4c.7.7 3.3.7 4 0"/></symbol>
+    <symbol id="a-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 4.5A8 8 0 1 0 19 13c-1 .6-2.2 1-3.5 1A6.5 6.5 0 0 1 9 7.5c0-1.1.3-2.2.9-3z"/><circle cx="9" cy="12.5" r=".9" fill="currentColor" stroke="none"/><path d="M7 15c.8.7 2 .8 3 .3"/></symbol>
+    <symbol id="a-mush" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11.5a7.5 6 0 0 1 15 0 1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M9.5 12.5v4a2.5 2.5 0 0 0 5 0v-4"/><circle cx="9.5" cy="9.5" r=".95" fill="currentColor" stroke="none"/><circle cx="14.5" cy="9.5" r=".95" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="a-axo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 8 4 6M6 11 3.2 10.5M6.5 14l-2.6 1.4M17.5 8 20 6M18 11l2.8-.5M17.5 14l2.6 1.4"/><path d="M6.5 11.5a5.5 5.5 0 0 0 11 0c0-2.6-2-5-5.5-5s-5.5 2.4-5.5 5z"/><circle cx="9.7" cy="11.4" r=".95" fill="currentColor" stroke="none"/><circle cx="14.3" cy="11.4" r=".95" fill="currentColor" stroke="none"/><path d="M10 14.4c.8.7 3.2.7 4 0"/></symbol>
+  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-pencil" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3z"/><path d="M9 4l3 3"/></symbol>
+    <symbol id="icon-save" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5L13.5 5.5V13.5H2.5z"/><path d="M5 2.5V6h5V2.5"/><path d="M5 9.5h6V13.5H5z"/></symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></symbol>
+    <symbol id="icon-shuffle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h2.6l6.4 8H14"/><path d="M2 12h2.6l6.4-8H14"/><path d="M11.6 2L14 4l-2.4 2"/><path d="M11.6 10L14 12l-2.4 2"/></symbol>
+    <symbol id="icon-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 12.5h6M9 15.5h6M9 18.5h3.5"/></symbol>
+    <symbol id="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.2A1.2 1.2 0 0 0 9.3 2H3.2A1.2 1.2 0 0 0 2 3.2v6.1A1.2 1.2 0 0 0 3.2 10.5h2.3"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10"/><path d="M6.5 4.5V3h3v1.5"/><path d="M4.6 4.5l.55 8.1a1 1 0 0 0 1 .9h3.7a1 1 0 0 0 1-.9l.55-8.1"/><path d="M6.8 7v4M9.2 7v4"/></symbol>
+    <symbol id="icon-send" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L7 9"/><path d="M14 2l-4.4 12-2.6-5L2 6.4z"/></symbol>
+    <symbol id="icon-chevron-down" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+    <symbol id="icon-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></symbol>
+    <symbol id="icon-insert" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10.5V3"/><path d="M5 6l3-3 3 3"/><path d="M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5"/></symbol>
+    <symbol id="icon-reset" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2"/><path d="M3 3v2.2h2.2"/></symbol>
+    <symbol id="icon-retry" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8a5 5 0 1 1-1.46-3.54"/><path d="M13 2.5V5h-2.5"/></symbol>
+    <symbol id="icon-wand" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L9 7"/><path d="M11.3 2.1 L12.2 3.8 L13.9 4.7 L12.2 5.6 L11.3 7.3 L10.4 5.6 L8.7 4.7 L10.4 3.8 Z" fill="currentColor" stroke="none"/><path d="M4.9 2.3 L5.4 3.2 L6.3 3.7 L5.4 4.2 L4.9 5.1 L4.4 4.2 L3.5 3.7 L4.4 3.2 Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="icon-format" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="3" cy="4" r="0.85" fill="currentColor" stroke="none"/><circle cx="3" cy="8" r="0.85" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="0.85" fill="currentColor" stroke="none"/><path d="M6 4h7M6 8h7M6 12h5"/></symbol>
+    <symbol id="icon-link" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5l3-3"/><path d="M7 5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1"/><path d="M9 11l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/></symbol>
+    <symbol id="i-rewind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5L3 7.5l3 3"/><path d="M3 7.5h5.5a4 4 0 1 1 0 8H4.5"/></symbol>
+    <symbol id="i-fork" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="3.5" r="1.6"/><circle cx="5" cy="12.5" r="1.6"/><circle cx="11" cy="6" r="1.6"/><path d="M5 5.1v5.8"/><path d="M11 7.6a3.5 3.5 0 0 1-3.5 3.5H5"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+  </svg>
+  <div class="app">
+  <!-- TITLE BAR (flat — §A rounding stops at window chrome) -->
+  <header class="bg-base-900 border-b-2 border-base-600 px-4 h-[36px] min-h-[36px] flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="text-sm font-extrabold text-warm-50 tracking-tight">AWL Multi-Agent Dashboard</span>
+      <span class="text-[9px] px-1.5 py-0.5 rounded bg-pink/20 text-pink font-mono font-bold">v7.2</span>
+      <span class="text-xs text-warm-500 font-semibold">13 agents</span>
+    </div>
+    <div class="flex items-center gap-2 text-[10px] text-warm-400 font-semibold">
+      <span id="clock" class="px-2 py-0.5 rounded-md bg-base-800 font-mono border border-base-700/20"></span>
+      <span class="px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20">WSL2</span>
+      <span class="px-2 py-0.5 rounded-md bg-base-800 border border-base-700/20">tmux</span>
+      <span class="px-2 py-0.5 rounded-full bg-sage/20 text-sage font-bold">Connected</span>
+    </div>
+  </header>
+
+  <!-- MAIN 3-PANE — cards on cream, gaps show the page through -->
+  <div class="three">
+
+    <!-- LEFT COLUMN -->
+    <div class="col" style="flex:4">
+
+      <!-- TEAM GRAPH -->
+      <div class="pcard" style="position:relative; height:368px">
+        <div class="pcard-head"><h3>Team Graph</h3><button onclick="toggleDrawer()" class="flex items-center gap-1 text-[11px] text-amber hover:text-amber/80 font-bold"><svg class="w-3 h-3"><use href="#icon-link"/></svg>Link Agents</button></div>
+        <div class="pcard-body overflow-auto" style="background:var(--page)">
+          <div class="graph-wrap p-3.5" id="graph-wrap">
+            <div class="graph-grid" id="graph-grid">
+
+              <div id="node-1" data-agent="researcher-01-sandy" class="agent-node selected cursor-pointer bg-base-800 border-2 border-agent-teal p-2.5 relative hover:border-agent-teal">
+                <div class="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-pink border-2 border-base-950 text-[7px] font-extrabold text-warm-50 tracking-wider whitespace-nowrap">VIEWING</div>
+                <div class="absolute -top-2 -left-2 min-w-[20px] h-[20px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center" title="3 requests awaiting"><span class="text-[11px] font-extrabold text-base-800 leading-none">3</span></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-teal shrink-0"><use href="#a-owl"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">researcher</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 sandy</div></div></div>
+                <div class="node-meta mb-1.5">opus 4.8 · auto · high</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-teal rounded" style="width:62%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">62%</span></div>
+                <div class="mt-auto pt-2 flex gap-1.5"><div class="subagent-mini" title="sub-1 (working)"><span class="text-[9px] font-bold text-agent-teal">1</span></div><div class="subagent-mini" title="sub-2 (idle)"><span class="text-[9px] font-bold text-agent-teal/50">2</span></div></div>
+              </div>
+
+              <div id="node-2" data-agent="synthesizer-01-kai" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-indigo p-2.5 relative hover:border-agent-indigo">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#9498bb" title="idle"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-indigo shrink-0"><use href="#a-fox"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">synthesizer</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 kai</div></div></div>
+                <div class="node-meta mb-1.5">sonnet 4.6 · edit · med</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-indigo rounded" style="width:34%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">34%</span></div>
+              </div>
+
+              <div id="node-3" data-agent="auditor-01-drew" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-forest p-2.5 relative hover:border-agent-forest">
+                <div class="absolute -top-2 -left-2 min-w-[20px] h-[20px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center" title="1 request awaiting"><span class="text-[11px] font-extrabold text-base-800 leading-none">1</span></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-forest shrink-0"><use href="#a-cat"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">auditor</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 drew</div></div></div>
+                <div class="node-meta mb-1.5">haiku 4.5 · plan · low</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-forest rounded" style="width:12%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">12%</span></div>
+              </div>
+
+              <div id="node-4" data-agent="coder-01-max" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-copper p-2.5 relative hover:border-agent-copper">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#3d946a" title="active"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-copper shrink-0"><use href="#a-robot"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">coder</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 max</div></div></div>
+                <div class="node-meta mb-1.5">sonnet 4.6 · auto · high</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-copper rounded" style="width:48%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">48%</span></div>
+                <div class="mt-auto pt-2 flex gap-1.5"><div class="subagent-mini" title="sub-1 (working)"><span class="text-[9px] font-bold text-agent-copper">1</span></div></div>
+              </div>
+
+              <div id="node-5" data-agent="researcher-02-rowan" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-rose p-2.5 relative hover:border-agent-rose">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#3d946a" title="active"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-rose shrink-0"><use href="#a-frog"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">researcher</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">02 rowan</div></div></div>
+                <div class="node-meta mb-1.5">opus 4.8 · auto · max</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-rose rounded" style="width:71%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">71%</span></div>
+              </div>
+
+              <div id="node-6" data-agent="tester-01-nova" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-plum p-2.5 relative hover:border-agent-plum">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#9498bb" title="idle"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-plum shrink-0"><use href="#a-bee"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">tester</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 nova</div></div></div>
+                <div class="node-meta mb-1.5">haiku 4.5 · ask · med</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-plum rounded" style="width:5%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">5%</span></div>
+              </div>
+
+              <div id="node-7" data-agent="reviewer-01-vega" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-cobalt p-2.5 relative hover:border-agent-cobalt">
+                <div class="absolute -top-2 -left-2 min-w-[20px] h-[20px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center" title="2 requests awaiting"><span class="text-[11px] font-extrabold text-base-800 leading-none">2</span></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-cobalt shrink-0"><use href="#a-bird"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">reviewer</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 vega</div></div></div>
+                <div class="node-meta mb-1.5">sonnet 4.6 · edit · high</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-cobalt rounded" style="width:88%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">88%</span></div>
+              </div>
+
+              <div id="node-8" data-agent="planner-01-quinn" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-vermil p-2.5 relative hover:border-agent-vermil">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#9498bb" title="idle"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-vermil shrink-0"><use href="#a-skull"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">planner</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 quinn</div></div></div>
+                <div class="node-meta mb-1.5">opus 4.8 · plan · extra</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-vermil rounded" style="width:22%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">22%</span></div>
+              </div>
+
+              <div id="node-9" data-agent="docs-01-wren" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-olive p-2.5 relative hover:border-agent-olive">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#3d946a" title="active"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-olive shrink-0"><use href="#a-mush"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">docs</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 wren</div></div></div>
+                <div class="node-meta mb-1.5">haiku 4.5 · auto · low</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-olive rounded" style="width:56%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">56%</span></div>
+              </div>
+
+              <div id="node-10" data-agent="designer-01-lex" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-magenta p-2.5 relative hover:border-agent-magenta">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#3d946a" title="active"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-magenta shrink-0"><use href="#a-axo"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">designer</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 lex</div></div></div>
+                <div class="node-meta mb-1.5">sonnet 4.6 · edit · high</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-magenta rounded" style="width:41%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">41%</span></div>
+                <div class="mt-auto pt-2 flex gap-1.5"><div class="subagent-mini" title="sub-1 (working)"><span class="text-[9px] font-bold text-agent-magenta">1</span></div></div>
+              </div>
+
+              <div id="node-11" data-agent="ops-01-sage" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-cyan p-2.5 relative hover:border-agent-cyan">
+                <div class="absolute -top-2 -left-2 min-w-[20px] h-[20px] px-1 rounded-full bg-gold border-2 border-base-600 flex items-center justify-center" title="1 request awaiting"><span class="text-[11px] font-extrabold text-base-800 leading-none">1</span></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-cyan shrink-0"><use href="#a-bunny"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">ops</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 sage</div></div></div>
+                <div class="node-meta mb-1.5">haiku 4.5 · auto · med</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-cyan rounded" style="width:67%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">67%</span></div>
+              </div>
+
+              <div id="node-12" data-agent="analyst-01-io" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-violet p-2.5 relative hover:border-agent-violet">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#9498bb" title="idle"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-violet shrink-0"><use href="#a-alien"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">analyst</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 io</div></div></div>
+                <div class="node-meta mb-1.5">opus 4.8 · ask · high</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-violet rounded" style="width:29%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">29%</span></div>
+              </div>
+
+              <div id="node-13" data-agent="scribe-01-fen" class="agent-node cursor-pointer bg-base-800 border-2 border-agent-bronze p-2.5 relative hover:border-agent-bronze">
+                <div class="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-base-950" style="background:#3d946a" title="active"></div>
+                <div class="flex items-center gap-1.5 mb-1"><svg class="w-5 h-5 text-agent-bronze shrink-0"><use href="#a-ghost"/></svg><div class="leading-tight min-w-0"><div class="text-[8.5px] text-warm-400 font-semibold truncate">scribe</div><div class="text-[10.5px] font-extrabold text-warm-50 truncate">01 fen</div></div></div>
+                <div class="node-meta mb-1.5">sonnet 4.6 · auto · low</div>
+                <div class="flex items-center gap-1.5"><div class="flex-1 h-1.5 bg-base-750 rounded overflow-hidden border border-base-700/20"><div class="h-full bg-agent-bronze rounded" style="width:14%"></div></div><span class="text-[8.5px] text-warm-400 font-mono font-bold">14%</span></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Link Config drawer — anchored over the card's right edge -->
+        <div id="link-drawer" class="hidden absolute top-0 right-0 w-[262px] h-full bg-base-850 border-l-2 border-base-600 z-30 overflow-y-auto" style="animation:slideIn 0.15s ease forwards">
+          <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><svg><use href="#icon-x"/></svg></button></div>
+          <div class="p-3 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0"><svg class="w-4 h-4 text-agent-teal shrink-0"><use href="#a-owl"/></svg><span class="leading-tight min-w-0"><span class="block text-[8px] text-warm-400 font-bold uppercase tracking-wide">researcher</span><span class="block text-[11px] font-extrabold text-warm-50 truncate">01 sandy</span></span></div>
+              <button id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="w-7 h-7 shrink-0 rounded-md bg-base-800 border-2 border-base-600 flex items-center justify-center text-[15px] font-extrabold text-amber hover:border-amber/60 transition-colors" title="A → B">→</button>
+              <div class="flex items-center gap-1.5 min-w-0 justify-end"><svg class="w-4 h-4 text-agent-indigo shrink-0"><use href="#a-fox"/></svg><span class="leading-tight min-w-0"><span class="block text-[8px] text-warm-400 font-bold uppercase tracking-wide">synthesizer</span><span class="block text-[11px] font-extrabold text-warm-50 truncate">01 kai</span></span></div>
+            </div>
+            <div><label class="text-[10px] text-warm-400 font-bold block mb-1.5">Trigger</label><div class="seg-ctrl"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
+            <div><label class="text-[10px] text-warm-400 font-bold block mb-1.5">Payload</label><div class="seg-ctrl"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
+            <div>
+              <label class="text-[10px] text-warm-400 font-bold block mb-1.5">End After <span class="text-warm-500 font-semibold normal-case">— no limit unless set</span></label>
+              <div class="grid grid-cols-3 gap-2">
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Turns</button><input type="text" class="lim-in" placeholder="50" disabled></div>
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Time</button><input type="text" class="lim-in" placeholder="30m" disabled></div>
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-1"><button class="flex-1 px-2 btn-primary">Save</button><button class="flex-1 px-2 btn-danger">Delete</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v-splitter"></div>
+      <!-- PROMPTS -->
+      <div class="pcard pcard--flow" style="flex:1 1 auto; min-height:0">
+        <div class="pcard-head">
+          <h3>Prompts</h3>
+          <div class="flex items-center gap-1 h-full">
+            <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
+            <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Library</button>
+            <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
+          </div>
+        </div>
+        <div class="pcard-body flex overflow-hidden">
+
+          <!-- §F Source (single-select) + Target (multi-select) strips, persist across tabs -->
+          <div class="vstrip m-2 mr-1" style="width:92px">
+            <div class="vstrip-head"><span class="vh-lbl">Source · from</span></div>
+            <div class="vstrip-body">
+              <button class="vtog on" onclick="pickChip(this)"><svg class="vtog-ic text-warm-50"><use href="#icon-user"/></svg><span class="vtog-lab"><span class="vtog-nm">User</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-teal"><use href="#a-owl"/></svg><span class="vtog-lab"><span class="vtog-nm">01 sandy</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-indigo"><use href="#a-fox"/></svg><span class="vtog-lab"><span class="vtog-nm">01 kai</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-forest"><use href="#a-cat"/></svg><span class="vtog-lab"><span class="vtog-nm">01 drew</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-copper"><use href="#a-robot"/></svg><span class="vtog-lab"><span class="vtog-nm">01 max</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-rose"><use href="#a-frog"/></svg><span class="vtog-lab"><span class="vtog-nm">02 rowan</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-cobalt"><use href="#a-bird"/></svg><span class="vtog-lab"><span class="vtog-nm">01 vega</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-olive"><use href="#a-mush"/></svg><span class="vtog-lab"><span class="vtog-nm">01 wren</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-magenta"><use href="#a-axo"/></svg><span class="vtog-lab"><span class="vtog-nm">01 lex</span></span></button>
+              <button class="vtog" onclick="pickChip(this)"><svg class="vtog-ic text-agent-cyan"><use href="#a-bunny"/></svg><span class="vtog-lab"><span class="vtog-nm">01 sage</span></span></button>
+            </div>
+          </div>
+          <div class="vstrip m-2 ml-0" style="width:92px" data-toggle-wrap>
+            <div class="vstrip-head flex items-center justify-between"><span class="vh-lbl">Target · to</span><button class="selectall" onclick="selectAllV(this)">Select all</button></div>
+            <div class="vstrip-body">
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-indigo"><use href="#a-fox"/></svg><span class="vtog-lab"><span class="vtog-nm">01 kai</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-forest"><use href="#a-cat"/></svg><span class="vtog-lab"><span class="vtog-nm">01 drew</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-copper"><use href="#a-robot"/></svg><span class="vtog-lab"><span class="vtog-nm">01 max</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-rose"><use href="#a-frog"/></svg><span class="vtog-lab"><span class="vtog-nm">02 rowan</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-cobalt"><use href="#a-bird"/></svg><span class="vtog-lab"><span class="vtog-nm">01 vega</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-vermil"><use href="#a-skull"/></svg><span class="vtog-lab"><span class="vtog-nm">01 quinn</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-olive"><use href="#a-mush"/></svg><span class="vtog-lab"><span class="vtog-nm">01 wren</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-magenta"><use href="#a-axo"/></svg><span class="vtog-lab"><span class="vtog-nm">01 lex</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-cyan"><use href="#a-bunny"/></svg><span class="vtog-lab"><span class="vtog-nm">01 sage</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-violet"><use href="#a-alien"/></svg><span class="vtog-lab"><span class="vtog-nm">01 io</span></span></button>
+            </div>
+          </div>
+
+          <!-- tab content (Source/Target persist alongside) -->
+          <div class="flex-1 min-w-0 flex flex-col p-2.5 pl-1.5 overflow-hidden">
+
+            <!-- COMPOSE -->
+            <div id="prompt-compose" data-group="prompt" class="flex-1 flex flex-col min-h-0">
+              <div class="field-tools"><span class="lbl">Compose · free prompt</span><button class="ghost-ic" title="Copy" onclick="copyField('compose-field')"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearField('compose-field')"><svg><use href="#icon-trash"/></svg></button></div>
+              <textarea id="compose-field" class="ta-resize flex-1 min-h-[90px] w-full bg-base-800 border-2 border-base-700/30 rounded-lg px-3 py-2.5 text-[12px] text-warm-100 leading-relaxed focus:outline-none focus:border-pink" placeholder="Write a prompt for the selected target agents…">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</textarea>
+            </div>
+
+            <!-- LIBRARY (contiguous list + inline-text placeholders) -->
+            <div id="prompt-library" data-group="prompt" class="hidden flex-1 flex flex-col min-h-0">
+              <div class="sec-h">Templates <span class="text-warm-500 font-semibold normal-case">12 saved</span></div>
+              <div class="lib-list shrink-0" style="max-height:120px; overflow-y:auto">
+                <button class="lib-row on" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Security audit request</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Code review request</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Refactor proposal</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Test coverage report</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Bug triage &amp; severity</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Architecture decision record</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Release notes draft</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Incident postmortem</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Dependency upgrade plan</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Performance profile</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Doc update request</button>
+                <button class="lib-row" onclick="selectLibRow(this)"><svg class="doticon"><use href="#icon-note"/></svg>Onboarding brief</button>
+              </div>
+
+              <div class="sec-h mt-3">Preview <span class="text-warm-500 font-semibold normal-case">— tap a placeholder to fill it</span></div>
+              <div class="tpl-view flex-1 min-h-[70px]">Run a focused security audit of <span class="ph-text filled" data-tag="{target_module}" data-value="src/auth/*" data-color="#228070" onclick="pickPlaceholder(this)">src/auth/*</span>. Flag anything at or above <span class="ph-text" data-tag="{severity_threshold}" data-color="#c04838" onclick="pickPlaceholder(this)">{severity_threshold}</span> severity, with a concrete exploit path for each finding. Post results to <span class="ph-text filled" data-tag="{destination}" data-value="the shared scratchpad" data-color="#7e4ea0" onclick="pickPlaceholder(this)">the shared scratchpad</span> grouped by severity, and notify <span class="ph-text" data-tag="{notify_agent}" data-color="#2d6ea8" onclick="pickPlaceholder(this)">{notify_agent}</span> when the <span class="ph-text" data-tag="{format}" data-color="#c07828" onclick="pickPlaceholder(this)">{format}</span> summary is ready by <span class="ph-text" data-tag="{deadline}" data-color="#3d946a" onclick="pickPlaceholder(this)">{deadline}</span>.</div>
+
+              <div class="tpl-fill mt-2 shrink-0">
+                <div style="position:absolute;top:0;left:6px;height:100%;display:flex;align-items:center;z-index:2"><button class="fill-ic" title="Reset this placeholder" onclick="resetPlaceholder()"><svg><use href="#icon-reset"/></svg></button></div>
+                <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Select a placeholder above to fill it…"></textarea>
+                <div class="fill-tools"><button class="fill-ic" title="Clear" onclick="clearInput(this)"><svg><use href="#icon-x"/></svg></button><button class="fill-ic fill-ic--go" title="Apply to placeholder" onclick="fillPlaceholder()"><svg><use href="#icon-insert"/></svg></button></div>
+              </div>
+            </div>
+
+            <!-- HISTORY (mixed delivery states; Copy / Retry / Edit) -->
+            <div id="prompt-history" data-group="prompt" class="hidden flex-1 overflow-y-auto -mr-1 pr-1">
+              <div class="flex flex-col gap-2">
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">User → 01 kai, 01 drew</span><span class="rc-time ml-auto">14:41</span></div><div class="rc-body">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-queued">Queued</span><span class="text-[9px] text-warm-400 font-bold">User → 01 max</span><span class="rc-time ml-auto">14:39</span></div><div class="rc-body">Once the rotation patch lands, open a PR with the changelog entry and request review from reviewer-01.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-next">Next</span><span class="text-[9px] text-warm-400 font-bold">User → 01 drew</span><span class="rc-time ml-auto">14:38</span></div><div class="rc-body">After the audit confirms, write up each finding with CVSS scores and a suggested fix owner.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-held">Held</span><span class="text-[9px] text-warm-400 font-bold">User → 01 sage</span><span class="rc-time ml-auto">14:36</span></div><div class="rc-body">Hold the production deploy until the expiry fix is merged and the smoke tests pass on staging.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">User → 01 kai</span><span class="rc-time ml-auto">14:34</span></div><div class="rc-body">Synthesize the three findings into a single remediation plan ordered by severity with owners and a checklist.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">User → broadcast (5)</span><span class="rc-time ml-auto">14:32</span></div><div class="rc-body">Standup: post a one-line status of what you're working on and any blockers to the scratchpad.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">01 kai → 01 max</span><span class="rc-time ml-auto">14:30</span></div><div class="rc-body">Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-queued">Queued</span><span class="text-[9px] text-warm-400 font-bold">User → 01 wren</span><span class="rc-time ml-auto">14:28</span></div><div class="rc-body">Draft the security advisory once the CVE id is assigned; keep it under 200 words and link the patch.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">User → 01 vega</span><span class="rc-time ml-auto">14:25</span></div><div class="rc-body">Review the patch diff on the rotation branch; focus on the refresh path and flag any missing tests.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-held">Held</span><span class="text-[9px] text-warm-400 font-bold">User → 01 io</span><span class="rc-time ml-auto">14:21</span></div><div class="rc-body">Profile the refresh endpoint under load — hold until staging has the new build deployed.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+                <div class="rcard"><div class="flex items-center gap-2 mb-1"><span class="dbadge db-sent">Sent</span><span class="text-[9px] text-warm-400 font-bold">User → 01 sandy</span><span class="rc-time ml-auto">14:18</span></div><div class="rc-body">Start a security audit of the auth module; prioritize token handling and session lifecycle.</div><div class="hist-acts"><button class="ghost-ic" title="Copy"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic" title="Retry"><svg><use href="#icon-retry"/></svg></button><button class="ghost-ic" title="Edit in Compose" onclick="switchTab('prompt','compose')"><svg><use href="#icon-pencil"/></svg></button></div></div>
+              </div>
+            </div>
+
+          </div><!-- /tab content -->
+        </div><!-- /pcard-body -->
+
+        <!-- ACTION STRIP — dropdown leads, icon action follows (§C) -->
+        <div class="pcard-foot px-2 py-2.5" id="prompt-actions">
+          <div class="flex items-center gap-2">
+            <div class="split split--outline" id="revise-split">
+              <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><svg><use href="#icon-chevron-down"/></svg><span class="split-lbl">Grammar</span></button>
+              <div class="split-div"></div>
+              <button class="split-act" title="Revise the draft"><svg><use href="#icon-wand"/></svg></button>
+              <div class="split-menu">
+                <div class="split-menu-h">Revise scope</div>
+                <button class="split-mi sel" data-short="Grammar" onclick="pickSplit(this)"><span class="lead"><b>Grammar</b><span class="sub">Fix spelling &amp; grammar only</span></span><span class="ck">✓</span></button>
+                <button class="split-mi" data-short="Language" onclick="pickSplit(this)"><span class="lead"><b>Language</b><span class="sub">Tighten wording &amp; tone</span></span><span class="ck">✓</span></button>
+                <button class="split-mi" data-short="Refactor" onclick="pickSplit(this)"><span class="lead"><b>Refactor</b><span class="sub">Restructure for clarity</span></span><span class="ck">✓</span></button>
+              </div>
+            </div>
+
+            <div class="fmt" id="fmt"><button class="fmt-btn" id="fmt-btn" onclick="event.stopPropagation();toggleFmt('fmt')" title="Response format"><svg class="ic"><use href="#icon-format"/></svg><span class="fmt-lbl">Response</span><span class="fmt-badge" id="fmt-badge">0</span><svg class="cv"><use href="#icon-chevron-down"/></svg></button><div class="fmt-menu up left" id="fmt-menu"></div></div>
+
+            <div class="flex-1"></div>
+
+            <div class="split split--primary">
+              <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><svg><use href="#icon-chevron-down"/></svg><span class="split-lbl">Now</span></button>
+              <div class="split-div"></div>
+              <button class="split-act" title="Send to target agents"><svg><use href="#icon-send"/></svg></button>
+              <div class="split-menu split-menu--right">
+                <div class="split-menu-h">When to deliver</div>
+                <button class="split-mi sel" data-short="Now" onclick="pickSplit(this)"><span class="lead"><b>Now</b><span class="sub">Interrupt &amp; deliver immediately</span></span><span class="ck">✓</span></button>
+                <button class="split-mi" data-short="Next" onclick="pickSplit(this)"><span class="lead"><b>Next turn</b><span class="sub">Deliver at the next turn boundary</span></span><span class="ck">✓</span></button>
+                <button class="split-mi" data-short="Queue" onclick="pickSplit(this)"><span class="lead"><b>Queue</b><span class="sub">Add to the agent's prompt queue</span></span><span class="ck">✓</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- MIDDLE COLUMN -->
+    <div class="col" style="flex:2.2">
+      <div class="pcard" style="flex:1 1 auto; min-height:0">
+        <div class="pcard-head">
+          <h3>Agent</h3>
+          <div class="flex items-center gap-1 h-full">
+            <button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="tab-btn active">Details</button>
+            <button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="tab-btn">Create</button>
+            <button data-tab-group="mid" data-tab="requests" onclick="switchTab('mid','requests')" class="tab-btn flex items-center gap-1.5">Requests<span class="req-badge" style="min-width:18px;height:16px;font-size:10px">3</span></button>
+          </div>
+        </div>
+        <div class="pcard-body overflow-y-auto" style="background:var(--surface)">
+
+          <!-- ===== DETAILS ===== -->
+          <div id="mid-details" data-group="mid" class="p-3 space-y-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-10 h-10 rounded-xl bg-base-800 border-2 border-agent-teal flex items-center justify-center shrink-0"><svg class="w-6 h-6 text-agent-teal"><use href="#a-owl"/></svg></div>
+              <div class="min-w-0 flex-1"><div class="text-[9px] text-warm-400 font-bold uppercase tracking-wide">researcher</div><div class="text-[15px] font-extrabold text-warm-50 leading-tight">01 sandy</div></div>
+              <span class="px-2.5 py-1 rounded-full bg-gold/20 text-[10px] font-extrabold uppercase tracking-wide" style="color:#b07a1c">Pending</span>
+            </div>
+
+            <div class="grp-div"></div>
+            <div class="text-[9px] font-extrabold uppercase tracking-wider text-warm-500">Configuration <span class="normal-case font-semibold text-warm-500/80">— tap the pencil to edit a field</span></div>
+
+            <div class="grid grid-cols-[1fr_72px] gap-2">
+              <div class="field">
+                <div class="flex items-center justify-between mb-1"><label class="subhead-label">Role</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+                <input class="lockable w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink" value="researcher">
+              </div>
+              <div class="field">
+                <div class="flex items-center justify-between mb-1"><label class="subhead-label">No.</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+                <input class="lockable w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink text-center" value="01">
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="flex items-center justify-between mb-1"><label class="subhead-label">Name</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+              <input class="lockable w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink" value="sandy">
+            </div>
+
+            <div class="field">
+              <div class="flex items-center justify-between mb-1"><label class="subhead-label">Description</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+              <textarea class="lockable autosize w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-100 leading-snug focus:outline-none focus:border-pink">Security researcher focused on auth vulnerabilities. Probes token handling, session lifecycle, and secret management; posts findings to the shared scratchpad.</textarea>
+            </div>
+
+            <div class="field">
+              <div class="flex items-center justify-between mb-1"><label class="subhead-label">Skills</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+              <div class="lockable flex flex-wrap gap-1.5">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-warm-50 bg-base-800 border-2 border-base-700/25 rounded-full pl-2.5 pr-1.5 py-0.5">security-review<button class="ghost-ic" style="width:14px;height:14px"><svg style="width:9px;height:9px"><use href="#icon-x"/></svg></button></span>
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-warm-50 bg-base-800 border-2 border-base-700/25 rounded-full pl-2.5 pr-1.5 py-0.5">threat-model<button class="ghost-ic" style="width:14px;height:14px"><svg style="width:9px;height:9px"><use href="#icon-x"/></svg></button></span>
+                <input class="flex-1 min-w-[80px] bg-transparent text-[11px] text-warm-50 font-semibold focus:outline-none placeholder:text-warm-500" placeholder="Type to add…">
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="flex items-center justify-between mb-1"><label class="subhead-label">Tools</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+              <div class="lockable flex items-center justify-between bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5"><span class="text-[11px] text-warm-50 font-semibold">All tools · <span class="text-warm-400">Bash, Read, Write, Grep, WebSearch</span></span><svg class="w-3 h-3 text-warm-500"><use href="#icon-chevron-down"/></svg></div>
+            </div>
+
+            <div class="field grid grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5"><label class="subhead-label">Color</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+                <div class="lockable flex flex-wrap gap-1.5">
+                  <button class="swatch on" style="background:#228070" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#b84568" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#4855b5" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#c07828" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#2d7848" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#7e4ea0" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#c04838" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#2d6ea8" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#1f96a6" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#7ba428" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#6b5dd3" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#b13d86" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#8a7820" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#5e7828" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#954e80" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#506480" onclick="pickSwatch(this)"></button>
+                </div>
+              </div>
+              <div data-icogroup>
+                <div class="flex items-center justify-between mb-1.5"><label class="subhead-label">Icon</label><button class="edit-ic" onclick="toggleEdit(this)"><svg class="w-3.5 h-3.5 ic-pencil"><use href="#icon-pencil"/></svg><svg class="w-3.5 h-3.5 ic-save"><use href="#icon-save"/></svg></button></div>
+                <div class="lockable hscroll">
+                  <button class="icobtn on" onclick="pickIcon(this)"><svg class="w-4 h-4 text-agent-teal"><use href="#a-owl"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-cat"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-fox"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-frog"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-bear"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-bunny"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-bird"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-fish"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-bee"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-robot"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-alien"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-skull"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-imp"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-ghost"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-blob"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-moon"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-mush"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-axo"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grp-div"></div>
+
+            <!-- MODEL — directly-editable button group (§E1, moved out of the locked band) -->
+            <div>
+              <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-warm-500 font-mono font-semibold" id="model-current">opus 4.8</span></div>
+              <div class="model-tabs" id="model-tabs">
+                <button class="model-tab" data-model="inherit">Inherit</button>
+                <button class="model-tab active" data-model="opus">Opus</button>
+                <button class="model-tab" data-model="sonnet">Sonnet</button>
+                <button class="model-tab" data-model="haiku">Haiku</button>
+                <button class="model-tab" data-model="fable">Fable</button>
+              </div>
+              <div class="ver-panel" id="ver-panel"></div>
+            </div>
+
+            <!-- MODE -->
+            <div>
+              <label class="ro-label block mb-1.5">Mode</label>
+              <div class="seg-ctrl">
+                <button onclick="segPick(this)">Plan</button>
+                <button onclick="segPick(this)">Ask</button>
+                <button onclick="segPick(this)">Edit</button>
+                <button class="active" onclick="segPick(this)">Auto</button>
+                <button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Fuckit</button>
+              </div>
+            </div>
+
+            <!-- EFFORT -->
+            <div>
+              <label class="ro-label block mb-1.5">Effort</label>
+              <div class="seg-ctrl">
+                <button onclick="segPick(this)">Low</button>
+                <button onclick="segPick(this)">Med</button>
+                <button class="active" onclick="segPick(this)">High</button>
+                <button onclick="segPick(this)">Extra</button>
+                <button onclick="segPick(this)">Max</button>
+                <button onclick="segPick(this)">Ultra</button>
+              </div>
+            </div>
+
+            <!-- LIFECYCLE -->
+            <div>
+              <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-warm-500">— auto-stop conditions</span></label>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div><span class="block text-[8.5px] text-warm-500 font-bold uppercase tracking-wide mb-1">Max turns</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="50" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-warm-500 font-bold uppercase tracking-wide mb-1">Context %</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="80" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+              </div>
+            </div>
+
+            <div class="grp-div"></div>
+
+            <!-- CONTEXT -->
+            <div>
+              <div class="ctx-head"><span class="ro-label">Context</span><button id="ctx-compact" class="ml-auto text-[10px] font-bold text-amber hover:text-amber/80" title="Compact this agent's context">Compact</button><span class="ctx-ratio" id="ctx-ratio" style="margin-left:8px">89.3k / 1.0M</span></div>
+              <button class="ctx-trigger" id="ctx-btn">
+                <div class="summary-row"><div class="ctxbar" id="ctx-bar"></div><span class="pct" id="ctx-pct">9%</span><svg class="chev" id="ctx-chev"><use href="#i-chev"/></svg></div>
+              </button>
+              <div class="acc" id="ctx-panel"></div>
+            </div>
+
+            <!-- HISTORY -->
+            <div>
+              <label class="ro-label block mb-1.5">History</label>
+              <div class="tri-tabs" id="hist-tabs">
+                <button class="tri-tab active" data-tri="rewind"><svg><use href="#i-rewind"/></svg>Rewind</button>
+                <button class="tri-tab" data-tri="handoff"><svg><use href="#i-fork"/></svg>Handoff</button>
+              </div>
+              <div class="acc open" style="display:block">
+                <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
+                <div class="tl-confirm" id="hist-confirm"></div>
+                <div class="tl" id="hist-panel"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== CREATE ===== -->
+          <div id="mid-create" data-group="mid" class="hidden p-3 space-y-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-10 h-10 rounded-xl bg-base-800 border-2 border-dashed border-warm-300 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-warm-400"><use href="#icon-user"/></svg></div>
+              <div class="min-w-0 flex-1"><div class="text-[15px] font-extrabold text-warm-50 leading-tight">New agent</div><div class="text-[10px] text-warm-400 font-semibold">configure, then create</div></div>
+            </div>
+
+            <div class="grid grid-cols-[1fr_72px] gap-2">
+              <div><label class="subhead-label block mb-1">Role</label><input class="w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink" placeholder="e.g. researcher"></div>
+              <div><label class="subhead-label block mb-1">No.</label><input class="w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink text-center" placeholder="02"></div>
+            </div>
+
+            <div>
+              <label class="subhead-label block mb-1">Name</label>
+              <div class="in-wrap flex items-center gap-2">
+                <input class="flex-1 bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-50 font-semibold focus:outline-none focus:border-pink" placeholder="auto-generated if blank" value="vale">
+                <button class="btn-outline btn-sm shrink-0" title="Randomize name"><svg class="w-3.5 h-3.5"><use href="#icon-shuffle"/></svg>Random</button>
+              </div>
+            </div>
+
+            <div><label class="subhead-label block mb-1">Description</label><textarea class="autosize w-full bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 text-[11px] text-warm-100 leading-snug focus:outline-none focus:border-pink" placeholder="What is this agent responsible for?"></textarea></div>
+
+            <div><label class="subhead-label block mb-1">Skills</label><div class="flex flex-wrap gap-1.5 bg-base-800 border-2 border-base-700/25 rounded-lg px-2 py-1.5"><input class="flex-1 min-w-[80px] bg-transparent text-[11px] text-warm-50 font-semibold focus:outline-none placeholder:text-warm-500" placeholder="Type a skill, press Enter…"></div></div>
+
+            <div><label class="subhead-label block mb-1">Tools</label><div class="flex items-center justify-between bg-base-800 border-2 border-base-700/25 rounded-lg px-2.5 py-1.5 cursor-pointer"><span class="text-[11px] text-warm-400 font-semibold">All tools</span><svg class="w-3 h-3 text-warm-500"><use href="#icon-chevron-down"/></svg></div></div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="subhead-label block mb-1.5">Color</label>
+                <div class="flex flex-wrap gap-1.5">
+                  <button class="swatch" style="background:#228070" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#b84568" onclick="pickSwatch(this)"></button><button class="swatch on" style="background:#6b5dd3" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#c07828" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#2d7848" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#7e4ea0" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#c04838" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#2d6ea8" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#1f96a6" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#7ba428" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#b13d86" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#8a7820" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#5e7828" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#954e80" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#506480" onclick="pickSwatch(this)"></button><button class="swatch" style="background:#4855b5" onclick="pickSwatch(this)"></button>
+                </div>
+              </div>
+              <div data-icogroup>
+                <label class="subhead-label block mb-1.5">Icon</label>
+                <div class="hscroll">
+                  <button class="icobtn on" onclick="pickIcon(this)"><svg class="w-4 h-4 text-agent-violet"><use href="#a-alien"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-blob"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-moon"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-imp"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-fish"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-bear"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-owl"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-cat"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-fox"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-robot"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-ghost"/></svg></button><button class="icobtn" onclick="pickIcon(this)"><svg class="w-4 h-4 text-warm-300"><use href="#a-skull"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grp-div"></div>
+
+            <div class="model-group">
+              <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-warm-500 font-mono font-semibold model-cur">inherit ← parent</span></div>
+              <div class="model-tabs">
+                <button class="model-tab active" data-model="inherit">Inherit</button>
+                <button class="model-tab" data-model="opus">Opus</button>
+                <button class="model-tab" data-model="sonnet">Sonnet</button>
+                <button class="model-tab" data-model="haiku">Haiku</button>
+                <button class="model-tab" data-model="fable">Fable</button>
+              </div>
+              <div class="ver-panel"></div>
+            </div>
+
+            <div>
+              <label class="ro-label block mb-1.5">Mode</label>
+              <div class="seg-ctrl"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Fuckit</button></div>
+            </div>
+            <div>
+              <label class="ro-label block mb-1.5">Effort</label>
+              <div class="seg-ctrl"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div>
+            </div>
+            <div>
+              <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-warm-500">— auto-stop conditions</span></label>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div><span class="block text-[8.5px] text-warm-500 font-bold uppercase tracking-wide mb-1">Max turns</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="40" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-warm-500 font-bold uppercase tracking-wide mb-1">Context %</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== REQUESTS ===== -->
+          <div id="mid-requests" data-group="mid" class="hidden p-3 space-y-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-10 h-10 rounded-xl bg-base-800 border-2 border-agent-teal flex items-center justify-center shrink-0"><svg class="w-6 h-6 text-agent-teal"><use href="#a-owl"/></svg></div>
+              <div class="min-w-0 flex-1"><div class="text-[9px] text-warm-400 font-bold uppercase tracking-wide">researcher</div><div class="text-[15px] font-extrabold text-warm-50 leading-tight">01 sandy</div></div>
+              <span class="req-badge">3</span>
+            </div>
+
+            <div class="req-head"><svg class="w-3 h-3" style="color:#d75a4f"><use href="#icon-x"/></svg><span class="req-label">Permission</span></div>
+            <div class="rcard" style="border-left:4px solid #d75a4f">
+              <div class="text-[11px] font-extrabold text-warm-50">Run bash command</div>
+              <div class="text-[10.5px] text-warm-300 font-mono mt-0.5 mb-2">rm -rf node_modules && pnpm install</div>
+              <div class="flex gap-2"><button class="btn-primary btn-sm px-3">Approve</button><button class="btn-outline btn-sm px-3">Deny</button><button class="btn-outline btn-sm px-3">Always allow</button></div>
+            </div>
+
+            <div class="req-head"><svg class="w-3 h-3" style="color:#cf8136"><use href="#icon-insert"/></svg><span class="req-label">Approval</span></div>
+            <div class="rcard" style="border-left:4px solid #cf8136">
+              <div class="text-[11px] font-extrabold text-warm-50">Merge remediation plan to main</div>
+              <div class="text-[10.5px] text-warm-300 mt-0.5 mb-2">3 files changed · +84 −19 · rotation path covered by new test</div>
+              <div class="flex gap-2"><button class="btn-primary btn-sm px-3">Approve</button><button class="btn-outline btn-sm px-3">Reject</button></div>
+            </div>
+
+            <div class="req-head"><svg class="w-3 h-3" style="color:#b9791f"><use href="#icon-chevron-down"/></svg><span class="req-label">Decision</span></div>
+            <div class="rcard" style="border-left:4px solid #b9791f">
+              <div class="text-[11px] font-extrabold text-warm-50 mb-1.5">Choose token rotation strategy</div>
+              <div class="space-y-1.5">
+                <button class="opt on" onclick="pickOpt(this)"><span class="opt-nm">A · Sliding window</span><span class="opt-desc">Refresh extends expiry; simplest, slightly weaker on replay.</span></button>
+                <button class="opt" onclick="pickOpt(this)"><span class="opt-nm">B · One-time rotation</span><span class="opt-desc">Each refresh invalidates the prior token; strongest, more churn.</span></button>
+              </div>
+            </div>
+
+            <div class="grp-div"></div>
+
+            <!-- in-content reply (§C.6 ghost cluster above the field) -->
+            <div>
+              <div class="field-tools"><span class="lbl">Reply to 01 sandy</span><button class="ghost-ic" title="Copy" onclick="copyField('reply-field')"><svg><use href="#icon-copy"/></svg></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearField('reply-field')"><svg><use href="#icon-trash"/></svg></button></div>
+              <textarea id="reply-field" class="autosize w-full bg-base-800 border-2 border-base-700/30 rounded-lg px-2.5 py-2 text-[11px] text-warm-100 leading-snug focus:outline-none focus:border-pink" placeholder="Send a note or instruction back to this agent…"></textarea>
+              <div class="flex justify-end mt-2"><button class="btn-primary px-3"><svg class="w-3.5 h-3.5"><use href="#icon-send"/></svg>Send reply</button></div>
+            </div>
+          </div>
+
+        </div><!-- /pcard-body -->
+
+        <!-- per-tab footers (collinear with Prompts footer) -->
+        <div class="pcard-foot px-2 py-2.5">
+          <div data-group="mid-foot" id="mid-foot-details" class="flex"><button class="btn-danger w-full px-2"><svg class="w-3.5 h-3.5"><use href="#icon-trash"/></svg>Retire agent</button></div>
+          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-primary px-2">Create agent</button><button class="btn-outline px-3">Reset</button><button class="btn-outline px-3">Cancel</button></div>
+          <div data-group="mid-foot" id="mid-foot-requests" class="hidden flex"><button class="btn-danger w-full px-2"><svg class="w-3.5 h-3.5"><use href="#icon-trash"/></svg>Retire agent</button></div>
+        </div>
+      </div>
+    </div>
+    <!-- RIGHT COLUMN -->
+    <div class="col" style="flex:3.8">
+      <!-- TEAM FEED -->
+      <div class="pcard" style="flex:1 1 auto; min-height:150px">
+        <div class="pcard-head">
+          <h3>Team Feed</h3>
+          <div class="flex items-center gap-2 h-full">
+            <div class="flex items-center gap-1 h-full">
+              <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
+              <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
+              <button data-tab-group="feed" data-tab="log" onclick="switchTab('feed','log')" class="tab-btn">Log</button>
+            </div>
+          </div>
+        </div>
+        <div class="pcard-body flex overflow-hidden">
+          <!-- §F agent filter strip (vertical, persists across tabs) -->
+          <div class="vstrip m-2 mr-0" data-toggle-wrap>
+            <div class="vstrip-head flex items-center justify-between"><span class="vh-lbl">Filter</span><button class="selectall" onclick="selectAllV(this)">Clear all</button></div>
+            <div class="vstrip-body">
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-warm-50"><use href="#icon-user"/></svg><span class="vtog-lab"><span class="vtog-role">human</span><span class="vtog-nm">User</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-teal"><use href="#a-owl"/></svg><span class="vtog-lab"><span class="vtog-role">research</span><span class="vtog-nm">01 sandy</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-indigo"><use href="#a-fox"/></svg><span class="vtog-lab"><span class="vtog-role">synth</span><span class="vtog-nm">01 kai</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-forest"><use href="#a-cat"/></svg><span class="vtog-lab"><span class="vtog-role">auditor</span><span class="vtog-nm">01 drew</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-copper"><use href="#a-robot"/></svg><span class="vtog-lab"><span class="vtog-role">coder</span><span class="vtog-nm">01 max</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-rose"><use href="#a-frog"/></svg><span class="vtog-lab"><span class="vtog-role">research</span><span class="vtog-nm">02 rowan</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-plum"><use href="#a-bee"/></svg><span class="vtog-lab"><span class="vtog-role">tester</span><span class="vtog-nm">01 nova</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-cobalt"><use href="#a-bird"/></svg><span class="vtog-lab"><span class="vtog-role">review</span><span class="vtog-nm">01 vega</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-vermil"><use href="#a-skull"/></svg><span class="vtog-lab"><span class="vtog-role">planner</span><span class="vtog-nm">01 quinn</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-olive"><use href="#a-mush"/></svg><span class="vtog-lab"><span class="vtog-role">docs</span><span class="vtog-nm">01 wren</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-magenta"><use href="#a-axo"/></svg><span class="vtog-lab"><span class="vtog-role">design</span><span class="vtog-nm">01 lex</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-cyan"><use href="#a-bunny"/></svg><span class="vtog-lab"><span class="vtog-role">ops</span><span class="vtog-nm">01 sage</span></span></button>
+              <button class="vtog" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-violet"><use href="#a-alien"/></svg><span class="vtog-lab"><span class="vtog-role">analyst</span><span class="vtog-nm">01 io</span></span></button>
+              <button class="vtog on" onclick="toggleChip(this)"><svg class="vtog-ic text-agent-bronze"><use href="#a-ghost"/></svg><span class="vtog-lab"><span class="vtog-role">scribe</span><span class="vtog-nm">01 fen</span></span></button>
+            </div>
+          </div>
+
+          <!-- feed content -->
+          <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <!-- MESSAGES (merged Outgoing+Incoming; direction + content toggles inside) -->
+            <div id="feed-messages" data-group="feed" class="flex-1 overflow-y-auto bg-term px-3 pt-1 pb-3">
+              <div class="minibar sticky top-0 bg-term z-10" style="border-bottom:1px solid rgba(0,24,88,0.1)">
+                <span class="mini-cap">Show</span>
+                <button class="minitog on" onclick="miniToggle(this)"><span class="dir-tag dir-out" style="border:none;background:none;padding:0">↗</span>Outgoing</button>
+                <button class="minitog on" onclick="miniToggle(this)"><span class="dir-tag dir-in" style="border:none;background:none;padding:0">↙</span>Incoming</button>
+                <span class="mini-div"></span>
+                <span class="mini-cap">Include</span>
+                <button class="minitog on" onclick="miniToggle(this)">Thinking</button>
+                <button class="minitog" onclick="miniToggle(this)">Read</button>
+                <button class="minitog" onclick="miniToggle(this)">Write</button>
+                <button class="minitog" onclick="miniToggle(this)">Bash</button>
+                <button class="minitog" onclick="miniToggle(this)">Diffs</button>
+                <button class="minitog" onclick="miniToggle(this)">Metadata</button>
+              </div>
+              <div class="flex flex-col gap-2 mt-2">
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-teal">researcher-01-sandy</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:41</span></div><div class="rc-body">Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-warm-50">User</span><span class="dir-tag dir-in">in</span><span class="rc-time ml-auto mr-5">14:42</span></div><div class="rc-body">Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-forest">auditor-01-drew</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:43</span></div><div class="rc-body">Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-cobalt">reviewer-01-vega</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:44</span></div><div class="rc-body">Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-indigo">synthesizer-01-kai</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:45</span></div><div class="rc-body">Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-teal">researcher-01-sandy</span><span class="dir-tag dir-in">in</span><span class="rc-time ml-auto mr-5">14:46</span></div><div class="rc-body">From coder-01-max: patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-copper">coder-01-max</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:47</span></div><div class="rc-body">Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-olive">docs-01-wren</span><span class="dir-tag dir-out">out</span><span class="rc-time ml-auto mr-5">14:48</span></div><div class="rc-body">Drafted the security advisory and changelog entry for the expiry fix; awaiting the final CVE id before publishing.</div></div>
+              </div>
+            </div>
+
+            <!-- SCRATCH (stacked cards) -->
+            <div id="feed-scratch" data-group="feed" class="hidden flex-1 overflow-y-auto bg-term px-3 py-3">
+              <div class="text-[9px] text-warm-500 font-mono mb-2">~/.claude/shared/scratchpad.md — live posts</div>
+              <div class="flex flex-col gap-2">
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-teal">researcher-01-sandy</span><span class="rc-time ml-auto mr-5">14:33:07</span></div><div class="rc-body">Posted finding: <b class="text-warm-50">Token Expiry Bypass (CRITICAL)</b> — validateToken() accepts expired tokens; refresh issues new tokens indefinitely.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-teal">researcher-01-sandy</span><span class="rc-time ml-auto mr-5">14:33:51</span></div><div class="rc-body">Posted finding: <b class="text-warm-50">Weak Secret Leak (HIGH)</b> — default dev secret hardcoded in config.defaults.ts.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-forest">auditor-01-drew</span><span class="rc-time ml-auto mr-5">14:37:18</span></div><div class="rc-body">Confirmed CRITICAL + HIGH. Demoted "no rate limiting" to MEDIUM — endpoint sits behind the gateway throttle.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-cobalt">reviewer-01-vega</span><span class="rc-time ml-auto mr-5">14:39:02</span></div><div class="rc-body">Review note: rotation path needs a regression test before merge; two style nits in the patch.</div></div>
+                <div class="rcard"><button class="ghost-ic rc-copy" title="Copy" onclick="copyCard(this)"><svg><use href="#icon-copy"/></svg></button><div class="flex items-center gap-2"><span class="rc-name text-agent-indigo">synthesizer-01-kai</span><span class="rc-time ml-auto mr-5">14:40:36</span></div><div class="rc-body">Wrote <b class="text-warm-50"># Auth Remediation Plan</b> — Critical → High → Medium with owners + checklist. Ready for approval.</div></div>
+              </div>
+            </div>
+
+            <!-- LOG (compact stacked cards) -->
+            <div id="feed-log" data-group="feed" class="hidden flex-1 overflow-y-auto bg-term px-3 py-3">
+              <div class="flex flex-col gap-1.5">
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:31:58</span> <span class="text-warm-50">user › dispatched researcher-01-sandy</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:32:04</span> <span class="text-agent-teal">researcher-01-sandy › started</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:33:07</span> <span class="text-agent-teal">researcher-01-sandy : posted scratch (CRITICAL)</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:33:11</span> <span class="text-agent-indigo">synthesizer-01-kai › started</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:34:22</span> <span class="text-agent-forest">auditor-01-drew › started</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:35:09</span> <span class="text-agent-teal">researcher-01 → synthesizer-01 link fired</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:35:40</span> <span class="text-agent-copper">coder-01-max › started</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:35:53</span> <span class="text-agent-indigo">synthesizer-01-kai : committed 3f2a1b</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:37:18</span> <span class="text-agent-forest">auditor-01-drew ! flagged 2</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:37:46</span> <span class="text-agent-copper">coder-01-max : patched validateToken()</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:38:30</span> <span class="text-gold">auditor-01-drew * permission request</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:39:02</span> <span class="text-agent-cobalt">reviewer-01-vega : review note added</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:40:36</span> <span class="text-agent-indigo">synthesizer-01-kai : wrote remediation plan</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:41:12</span> <span class="text-gold">researcher-01-sandy * approval request</span></div>
+                <div class="rcard rc-log py-1.5"><span class="text-warm-500">14:43:33</span> <span class="text-agent-cyan">ops-01-sage : deploy gate held</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.three -->
+  <!-- WINDOW FOOTER (flat — §H session controls + total tokens) -->
+  <footer class="bg-base-900 border-t-2 border-base-600 px-4 h-[36px] min-h-[36px] flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-2 text-[10px] font-semibold text-warm-500">
+      <span><b class="text-warm-50">13</b> agents</span><span class="text-warm-500" style="opacity:.45">·</span>
+      <span><b class="text-warm-50">4</b> subagents</span><span class="text-warm-500" style="opacity:.45">·</span>
+      <span><b class="text-warm-50">6</b> links</span><span class="text-warm-500" style="opacity:.45">·</span>
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:#3d946a"></span>5 active</span>
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:#9498bb"></span>4 idle</span>
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:#d4a050"></span>4 pending</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="sess-btn" title="Save this session's agents &amp; links"><svg><use href="#icon-save"/></svg>Save setup</button>
+      <button class="sess-btn" title="Load a saved session"><svg><use href="#icon-insert"/></svg>Load</button>
+      <span class="tok-pill" title="Total tokens this session">Σ 1.42M tokens</span>
+      <span class="text-[10px] font-mono font-semibold text-warm-400">02:14:08</span>
+    </div>
+  </footer>
+  </div><!-- /.app -->
+
+  <!-- COLOR PALETTE REFERENCE -->
+  <div class="ref-section">
+    <div class="ref-heading"><span class="rule"></span>Color Palette Reference<span class="rule"></span></div>
+    <div class="ref-disclaimer">⚠ Design reference only — this legend is NOT part of the dashboard UI. Do not render it inside the app.</div>
+    <div class="ref-grid">
+
+      <div class="ref-group">
+        <div class="ref-group-label">Page &amp; Surfaces</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:#fef6e4"></div><div class="ref-meta"><span class="ref-hex">#fef6e4</span><span class="ref-name">Page</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#f7f0e0"></div><div class="ref-meta"><span class="ref-hex">#f7f0e0</span><span class="ref-name">Header strip</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#fff8ee"></div><div class="ref-meta"><span class="ref-hex">#fff8ee</span><span class="ref-name">Card surface</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#ffffff"></div><div class="ref-meta"><span class="ref-hex">#ffffff</span><span class="ref-name">Raised / node</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#f0e8d8"></div><div class="ref-meta"><span class="ref-hex">#f0e8d8</span><span class="ref-name">Subtle fill</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#fdf1e6"></div><div class="ref-meta"><span class="ref-hex">#fdf1e6</span><span class="ref-name">Terminal / input</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#ebedf3"></div><div class="ref-meta"><span class="ref-hex">#ebedf3</span><span class="ref-name">Feed wash</span></div></div>
+        </div>
+      </div>
+
+      <div class="ref-group">
+        <div class="ref-group-label">Ink &amp; Text</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:#001858"></div><div class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">Navy — ink / border</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#172c66"></div><div class="ref-meta"><span class="ref-hex">#172c66</span><span class="ref-name">Body</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#3a4878"></div><div class="ref-meta"><span class="ref-hex">#3a4878</span><span class="ref-name">Muted</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#4a5088"></div><div class="ref-meta"><span class="ref-hex">#4a5088</span><span class="ref-name">Label</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#8a8eb8"></div><div class="ref-meta"><span class="ref-hex">#8a8eb8</span><span class="ref-name">Dim / placeholder</span></div></div>
+        </div>
+      </div>
+
+      <div class="ref-group">
+        <div class="ref-group-label">Accents &amp; Status</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:#f582ae"></div><div class="ref-meta"><span class="ref-hex">#f582ae</span><span class="ref-name">Pink — primary</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#d08530"></div><div class="ref-meta"><span class="ref-hex">#d08530</span><span class="ref-name">Amber — links/edit</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#3d946a"></div><div class="ref-meta"><span class="ref-hex">#3d946a</span><span class="ref-name">Sage — active/sent</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#d4a050"></div><div class="ref-meta"><span class="ref-hex">#d4a050</span><span class="ref-name">Gold — pending</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#e06654"></div><div class="ref-meta"><span class="ref-hex">#e06654</span><span class="ref-name">Coral — messages</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#c74060"></div><div class="ref-meta"><span class="ref-hex">#c74060</span><span class="ref-name">Danger</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#f3d2c1"></div><div class="ref-meta"><span class="ref-hex">#f3d2c1</span><span class="ref-name">Blush</span></div></div>
+        </div>
+      </div>
+
+      <div class="ref-group">
+        <div class="ref-group-label">Agent Palette · 16</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:#b84568"></div><div class="ref-meta"><span class="ref-hex">#b84568</span><span class="ref-name">rose</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#228070"></div><div class="ref-meta"><span class="ref-hex">#228070</span><span class="ref-name">teal</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#4855b5"></div><div class="ref-meta"><span class="ref-hex">#4855b5</span><span class="ref-name">indigo</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#c07828"></div><div class="ref-meta"><span class="ref-hex">#c07828</span><span class="ref-name">copper</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#2d7848"></div><div class="ref-meta"><span class="ref-hex">#2d7848</span><span class="ref-name">forest</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#7e4ea0"></div><div class="ref-meta"><span class="ref-hex">#7e4ea0</span><span class="ref-name">plum</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#c04838"></div><div class="ref-meta"><span class="ref-hex">#c04838</span><span class="ref-name">vermil</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#2d6ea8"></div><div class="ref-meta"><span class="ref-hex">#2d6ea8</span><span class="ref-name">cobalt</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#8a7820"></div><div class="ref-meta"><span class="ref-hex">#8a7820</span><span class="ref-name">bronze</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#5e7828"></div><div class="ref-meta"><span class="ref-hex">#5e7828</span><span class="ref-name">olive</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#954e80"></div><div class="ref-meta"><span class="ref-hex">#954e80</span><span class="ref-name">mauve</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#506480"></div><div class="ref-meta"><span class="ref-hex">#506480</span><span class="ref-name">steel</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#1f96a6"></div><div class="ref-meta"><span class="ref-hex">#1f96a6</span><span class="ref-name">cyan</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#7ba428"></div><div class="ref-meta"><span class="ref-hex">#7ba428</span><span class="ref-name">lime</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#6b5dd3"></div><div class="ref-meta"><span class="ref-hex">#6b5dd3</span><span class="ref-name">violet</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#b13d86"></div><div class="ref-meta"><span class="ref-hex">#b13d86</span><span class="ref-name">magenta</span></div></div>
+        </div>
+      </div>
+
+      <div class="ref-group">
+        <div class="ref-group-label">Context Bands</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:#c07828"></div><div class="ref-meta"><span class="ref-hex">#c07828</span><span class="ref-name">System prompt</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#2d6ea8"></div><div class="ref-meta"><span class="ref-hex">#2d6ea8</span><span class="ref-name">System tools</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#2d7848"></div><div class="ref-meta"><span class="ref-hex">#2d7848</span><span class="ref-name">MCP tools</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#d4a050"></div><div class="ref-meta"><span class="ref-hex">#d4a050</span><span class="ref-name">Custom agents</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#7e4ea0"></div><div class="ref-meta"><span class="ref-hex">#7e4ea0</span><span class="ref-name">Memory files</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#e06654"></div><div class="ref-meta"><span class="ref-hex">#e06654</span><span class="ref-name">Messages</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:#bcb6a4"></div><div class="ref-meta"><span class="ref-hex">#bcb6a4</span><span class="ref-name">Free space</span></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <script>
+/* ===== MODEL button groups (all instances) ===== */
+const MODELS={inherit:[],opus:['4.8','4.6','4.5','4.1'],sonnet:['4.6','4.5','3.7'],haiku:['4.5','3.5'],fable:['5']};
+const DEFV={opus:'4.8',sonnet:'4.6',haiku:'4.5',fable:'5'};
+document.querySelectorAll('.model-tabs').forEach(tabs=>{
+  const wrap=tabs.parentElement, ver=tabs.nextElementSibling, curEl=wrap.querySelector('#model-current,.model-cur');
+  const act=tabs.querySelector('.model-tab.active');
+  const state={model:act?act.dataset.model:'opus', ver:Object.assign({},DEFV)};
+  const label=()=> state.model==='inherit' ? 'inherit \u2190 parent' : state.model+' '+state.ver[state.model];
+  function renderVer(){
+    const vs=MODELS[state.model]||[];
+    if(!vs.length){ver.classList.remove('open');ver.innerHTML='';return;}
+    ver.innerHTML=vs.map(v=>'<div class="ver-row'+(v===state.ver[state.model]?' sel':'')+'" data-v="'+v+'"><span class="ver-name">'+state.model+'-'+v+'</span><span class="ver-check">\u2713</span></div>').join('');
+    ver.querySelectorAll('.ver-row').forEach(r=>r.onclick=()=>{state.ver[state.model]=r.dataset.v;if(curEl)curEl.textContent=label();ver.classList.remove('open');renderVer();});
+    ver.classList.add('open');
+  }
+  tabs.querySelectorAll('.model-tab').forEach(t=>t.onclick=()=>{
+    const m=t.dataset.model;
+    if(state.model===m && ver.classList.contains('open')){ver.classList.remove('open');return;}
+    state.model=m; tabs.querySelectorAll('.model-tab').forEach(x=>x.classList.toggle('active',x===t));
+    if(curEl)curEl.textContent=label(); renderVer();
+  });
+  if(curEl)curEl.textContent=label();
+});
+
+/* ===== CONTEXT breakdown ===== */
+const CTX={model:'claude-opus-4-8',used:'89.3k',total:'1.0M',pct:9,cats:[
+  {nm:'System prompt',tk:'1.5k',pc:'0.1%',c:'#c07828'},
+  {nm:'System tools',tk:'5.1k',pc:'0.5%',c:'#2d6ea8'},
+  {nm:'MCP tools',tk:'27.5k',pc:'2.8%',c:'#2d7848'},
+  {nm:'Custom agents',tk:'1.8k',pc:'0.2%',c:'#d4a050'},
+  {nm:'Memory files',tk:'10.8k',pc:'1.1%',c:'#7e4ea0'},
+  {nm:'Messages',tk:'44.9k',pc:'4.5%',c:'#e06654'},
+  {nm:'Free space',tk:'908.3k',pc:'90.8%',c:'#bcb6a4'}]};
+const MEMF=[{p:'~\\.claude\\CLAUDE.md',t:'8.8k'},{p:'~\\MeDocuments\\\u2026\\CLAUDE.md',t:'2.1k'}];
+const ACTX=[{n:'superpowers:code-reviewer',t:'348'},{n:'vibe-guide',t:'93'},{n:'echo',t:'88'},{n:'gsd-project-researcher',t:'86'},{n:'gsd-ui-researcher',t:'86'}];
+const barHTML=()=>CTX.cats.map(c=>'<i style="width:'+parseFloat(c.pc)+'%;background:'+c.c+'"></i>').join('');
+function breakdownHTML(){
+  return '<div class="bd"><div class="bd-head"><span class="bd-model">'+CTX.model+'</span><span class="bd-tot">'+CTX.used+' / '+CTX.total+' \u00b7 '+CTX.pct+'%</span></div>'
+    +'<div class="bd-bar">'+barHTML()+'</div>'
+    +CTX.cats.map(c=>'<div class="cat"><span class="sw" style="background:'+c.c+'"></span><span class="nm">'+c.nm+'</span><span class="tk">'+c.tk+'</span><span class="pc">'+c.pc+'</span></div>').join('')
+    +'<div class="bd-sub"><h5><span class="slash">/</span> Memory files</h5>'+MEMF.map(m=>'<div class="ml"><span class="p">'+m.p+'</span><span class="t">'+m.t+'</span></div>').join('')+'</div>'
+    +'<div class="bd-sub"><h5><span class="slash">/</span> Custom agents</h5>'+ACTX.map(a=>'<div class="ml"><span class="p">'+a.n+'</span><span class="t">'+a.t+'</span></div>').join('')+'</div></div>';
+}
+(function(){
+  const bar=document.getElementById('ctx-bar'); if(bar)bar.innerHTML=barHTML();
+  const panel=document.getElementById('ctx-panel'); if(panel)panel.innerHTML=breakdownHTML();
+  const btn=document.getElementById('ctx-btn');
+  if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('ctx-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('ctx-chev');if(ch)ch.classList.toggle('up',open);});
+})();
+
+/* ===== HISTORY timeline (rewind / handoff) ===== */
+const TOTAL=60;
+const TURNS=[
+  {n:49,time:'13:58',ctx:38,desc:'Loaded auth module & mapped middleware'},
+  {n:50,time:'14:02',ctx:41,desc:'Identified token refresh entry points'},
+  {n:51,time:'14:09',ctx:45,desc:'Found expiry not validated on refresh'},
+  {n:52,time:'14:14',ctx:49,desc:'Traced refresh-token reuse path'},
+  {n:53,time:'14:21',ctx:54,desc:'Posted CRITICAL finding to scratchpad'},
+  {n:54,time:'14:28',ctx:61,desc:'Cross-checked with auditor-01 to confirm'},
+  {n:55,time:'14:33',ctx:67,desc:'Demoted rate-limit finding to medium'},
+  {n:56,time:'14:39',ctx:72,desc:'Reviewed coder-01 patch diff'},
+  {n:57,time:'14:44',ctx:78,desc:'Requested regression test for rotation'},
+  {n:58,time:'14:48',ctx:83,desc:'Re-checked expiry path under reuse'},
+  {n:59,time:'14:52',ctx:88,desc:'Approved remediation plan ordering'},
+  {n:60,time:'14:56',ctx:91,desc:'Awaiting deploy gate decision',cur:true}];
+function ctxColor(p){return p<50?'#3d946a':(p<=75?'#d4a050':'#e06654');}
+function renderHist(mode){
+  const panel=document.getElementById('hist-panel'); if(!panel)return;
+  const icon=mode==='handoff'?'#i-fork':'#i-rewind';
+  const tip=mode==='handoff'?'Hand off from here':'Rewind to here';
+  panel.innerHTML=TURNS.map(t=>'<div class="tl-row'+(t.cur?' current':'')+'"><div class="tl-main"><div class="tl-top"><span class="tl-turn">Turn '+t.n+'/'+TOTAL+'</span>'+(t.cur?'<span class="tl-now">now</span>':'')+'<span class="tl-time">'+t.time+'</span><span class="tl-ctx" style="color:'+ctxColor(t.ctx)+'">'+t.ctx+'%</span></div><div class="tl-desc">'+t.desc+'</div></div><button class="tl-ic" title="'+tip+'" onclick="confirmPick('+t.n+",'"+mode+"')\"><svg><use href=\""+icon+'"/></svg></button></div>').join('');
+  const cur=panel.querySelector('.tl-row.current'); if(cur)cur.scrollIntoView({block:'nearest'});
+}
+function confirmPick(n,mode){
+  const c=document.getElementById('hist-confirm'); if(!c)return; c.style.display='flex';
+  c.innerHTML='<span>'+(mode==='handoff'?'Hand off a new agent seeded through Turn '+n+'?':'Rewind this agent to the end of Turn '+n+'?')+'</span>';
+  const b=document.createElement('button'); b.className='btn-outline btn-sm px-2'; b.style.marginLeft='auto'; b.textContent='Cancel'; b.onclick=()=>{c.style.display='none';}; c.appendChild(b);
+}
+(function(){
+  renderHist('rewind');
+  document.querySelectorAll('#hist-tabs .tri-tab').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('#hist-tabs .tri-tab').forEach(x=>x.classList.toggle('active',x===t));
+    const mode=t.dataset.tri;
+    const ph=document.getElementById('hist-phead');
+    if(ph)ph.textContent= mode==='handoff' ? 'Hand off from a point \u2014 starts a new agent seeded with context up to that turn' : "Rewind to a point \u2014 restores this agent's context to the end of that turn";
+    const c=document.getElementById('hist-confirm'); if(c)c.style.display='none';
+    renderHist(mode);
+  });
+})();
+
+/* ===== RESPONSE / FORMAT grouped multi-select (fmt + feedfmt) ===== */
+const FMT_DATA={
+  fmt:[
+    {nm:'Length',mode:'one',opts:['Concise','Elaborate'],sel:['Concise']},
+    {nm:'Altitude',mode:'one',opts:['High-level','Low-level'],sel:[]},
+    {nm:'Register',mode:'one',opts:['Technical','Plain'],sel:[]},
+    {nm:'Structure',mode:'multi',opts:['Numbered list','Bullets','Tables','Prose'],sel:['Bullets']},
+    {nm:'Emphasis',mode:'multi',opts:['Lead with the answer','Cite sources','Skip hedging'],sel:[]}],
+  feedfmt:[
+    {nm:'Format',mode:'one',opts:['Raw','Formatted'],sel:['Formatted']}]
+};
+function countFmt(id){return FMT_DATA[id].reduce((a,g)=>a+g.sel.length,0);}
+function renderFmtMenu(id){
+  const menu=document.getElementById(id+'-menu'); const groups=FMT_DATA[id]; if(!menu)return;
+  menu.innerHTML=groups.map((g,gi)=>'<div class="fmt-group"><div class="fmt-gh"><span class="nm">'+g.nm+'</span><span class="mode">'+(g.mode==='one'?'pick one':'multi')+'</span></div><div class="fmt-pills">'+g.opts.map(o=>'<button class="fmt-pill'+(g.sel.indexOf(o)>=0?' on':'')+'" onclick="togglePill(\''+id+'\','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div></div>').join('')
+    +'<div class="fmt-foot"><span class="fmt-count">'+countFmt(id)+' selected</span><button class="fmt-clear" onclick="clearFmt(\''+id+'\')">Clear all</button></div>';
+}
+function togglePill(id,gi,el){
+  const o=el.dataset.o, g=FMT_DATA[id][gi];
+  if(g.mode==='one'){ g.sel = (g.sel.indexOf(o)>=0)?[]:[o]; }
+  else { const i=g.sel.indexOf(o); if(i>=0)g.sel.splice(i,1); else g.sel.push(o); }
+  renderFmtMenu(id); updateFmt(id);
+}
+function clearFmt(id){ FMT_DATA[id].forEach(g=>g.sel=[]); renderFmtMenu(id); updateFmt(id); }
+function updateFmt(id){
+  const n=countFmt(id), btn=document.getElementById(id+'-btn');
+  if(btn)btn.classList.toggle('active',n>0);
+  const badge=document.getElementById(id+'-badge'); if(badge)badge.textContent=n;
+  if(id==='feedfmt'&&btn){const lbl=btn.querySelector('.fmt-lbl'); if(lbl)lbl.textContent=FMT_DATA.feedfmt[0].sel[0]||'Format';}
+}
+function toggleFmt(id){
+  const menu=document.getElementById(id+'-menu'); if(!menu)return;
+  const open=menu.classList.contains('open'); closeAllPopups();
+  if(!open){ renderFmtMenu(id); menu.classList.add('open'); }
+}
+updateFmt('fmt'); updateFmt('feedfmt');
+
+/* ===== Library row selection ===== */
+function selectLibRow(el){el.parentElement.querySelectorAll('.lib-row').forEach(r=>r.classList.remove('on'));el.classList.add('on');}
+
+/* ===== TEAM GRAPH directed edges ===== */
+const LINKS=[['node-1','node-2',false],['node-1','node-3',false],['node-2','node-4',false],['node-3','node-7',true],['node-4','node-10',false],['node-5','node-1',false]];
+function drawEdges(){
+  const layer=document.getElementById('edge-layer'), wrap=document.getElementById('graph-wrap'); if(!layer||!wrap)return;
+  const wr=wrap.getBoundingClientRect();
+  const W=wrap.scrollWidth, H=wrap.scrollHeight;
+  layer.setAttribute('width',W); layer.setAttribute('height',H);
+  layer.style.width=W+'px'; layer.style.height=H+'px';
+  const defs=layer.querySelector('defs'); layer.innerHTML=''; if(defs)layer.appendChild(defs);
+  const NS='http://www.w3.org/2000/svg';
+  LINKS.forEach(function(L){
+    const ea=document.getElementById(L[0]), eb=document.getElementById(L[1]); if(!ea||!eb)return;
+    const ra=ea.getBoundingClientRect(), rb=eb.getBoundingClientRect();
+    const ax=ra.left+ra.width/2-wr.left, ay=ra.top+ra.height/2-wr.top;
+    const bx=rb.left+rb.width/2-wr.left, by=rb.top+rb.height/2-wr.top;
+    const dx=bx-ax, dy=by-ay, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+    const padA=Math.min(ra.width,ra.height)/2-3, padB=Math.min(rb.width,rb.height)/2-3;
+    const x1=ax+ux*padA, y1=ay+uy*padA, x2=bx-ux*padB, y2=by-uy*padB;
+    const ln=document.createElementNS(NS,'line');
+    ln.setAttribute('x1',x1);ln.setAttribute('y1',y1);ln.setAttribute('x2',x2);ln.setAttribute('y2',y2);
+    ln.setAttribute('stroke','#4a5088');ln.setAttribute('stroke-width','2');ln.setAttribute('stroke-dasharray','5 4');ln.setAttribute('stroke-opacity','0.5');ln.setAttribute('marker-end','url(#arrow)');
+    if(L[2])ln.setAttribute('marker-start','url(#arrow)');
+    layer.appendChild(ln);
+  });
+}
+function drawEdgesSoon(){requestAnimationFrame(()=>requestAnimationFrame(drawEdges));}
+(function(){
+  drawEdgesSoon();
+  const wrap=document.getElementById('graph-wrap');
+  if(window.ResizeObserver&&wrap){new ResizeObserver(()=>drawEdges()).observe(wrap);}
+  window.addEventListener('resize',drawEdges);
+  window.addEventListener('load',drawEdgesSoon);
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(drawEdgesSoon);}
+})();
+  </script>
+  <script src="design-tools.js"></script>
+</body>
+</html>

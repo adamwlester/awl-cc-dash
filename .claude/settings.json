@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Edit(/**)",
+      "Read(/**)",
+      "Write(/**)",
+      "NotebookEdit(/**)",
+      "PowerShell(*)",
+      "mcp__excalidraw__clear_canvas",
+      "mcp__excalidraw__batch_create_elements",
+      "mcp__excalidraw__get_canvas_screenshot",
+      "mcp__excalidraw__update_element",
+      "Skill(session-brief)",
+      "Skill(session-brief:*)"
+    ],
+    "deny": [
+      "Read(./.vscode/claude-prompts.code-snippets)"
+    ],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\Users\\lester\\.vscode\\extensions\\html-preview-default",
+      "C:\\Users\\lester\\.vscode\\extensions\\awl-html-preview",
+      "C:\\Users\\lester\\.claude\\docs\\core-docs",
+      "C:\\Users\\lester",
+      "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\claude-code-sandbox\\.claude\\agents",
+      "C:\\Users\\lester\\.claude\\agent-memory",
+      "C:\\Users\\lester\\.claude\\agents",
+      "C:\\Users\\lester\\.claude\\templates"
+    ]
+  },
+  "agent": "vibe-guide",
+  "enableAllProjectMcpServers": true,
+  "plansDirectory": "./.claude/plans"
+}

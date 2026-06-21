@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model · Context · History</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page:#fef6e4; --header:#f7f0e0; --surface:#fff8ee; --card:#ffffff; --subtle:#f0e8d8;
+    --navy:#001858; --dim:#8a8eb8; --body:#172c66; --label:#4a5088; --muted:#3a4878;
+    --pink:#f582ae; --pink-dk:#e8709a; --amber:#d08530; --coral:#e06654; --danger:#c74060;
+    --sage:#3d946a; --gold:#d4a050; --field:#fdf1e6; --term:#ebedf3; --rule:#c9c2b0;
+    --c-sys:#c07828; --c-tools:#2d6ea8; --c-mcp:#2d7848; --c-agents:#d4a050;
+    --c-mem:#7e4ea0; --c-msg:#e06654; --c-free:#bcb6a4;
+  }
+  *{box-sizing:border-box; scrollbar-width:thin; scrollbar-color:#8a8eb8 #f0e8d8;}
+  ::-webkit-scrollbar{width:7px; height:7px;}
+  ::-webkit-scrollbar-track{background:#f0e8d8;}
+  ::-webkit-scrollbar-thumb{background:#8a8eb8; border-radius:4px; border:1px solid #f0e8d8;}
+  ::-webkit-scrollbar-thumb:hover{background:#f582ae;}
+  body{margin:0; background:var(--page); color:var(--body); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;}
+
+  .wrap{max-width:760px; margin:0 auto; padding:40px 24px 80px;}
+  .pagehead{margin-bottom:22px;}
+  .pagehead h1{font-size:18px; font-weight:800; color:var(--navy); margin:0 0 4px; letter-spacing:-0.01em;}
+  .pagehead p{font-size:12.5px; line-height:1.55; color:var(--muted); margin:0; max-width:560px;}
+  .pagehead code{font-family:'JetBrains Mono',monospace; font-size:0.92em; background:var(--subtle); padding:1px 5px; border-radius:3px; color:var(--navy);}
+
+  .stage{display:flex; gap:26px; align-items:flex-start; flex-wrap:wrap;}
+  .rail-cap{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); margin-bottom:7px;}
+  .rail{width:360px; max-width:100%; background:var(--surface); border:2px solid var(--navy); border-radius:6px; padding:16px;}
+
+  .ro-head{display:flex; align-items:center; gap:8px; margin-bottom:7px;}
+  .ro-label{font-size:9px; color:var(--label); text-transform:uppercase; letter-spacing:0.05em; font-weight:800;}
+  .link-amber{font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0;}
+  .link-amber:hover{color:#b06d20;}
+
+  /* ---------- separation between Model and the rest ---------- */
+  .rail-sep{height:0; border-top:2px solid rgba(0,24,88,0.10); margin:26px 0;}
+
+  /* ================= MODEL — single-select version-dropdown group ================= */
+  .model-tabs{display:flex; border:2px solid var(--navy); border-radius:4px 4px 0 0; overflow:hidden; background:var(--subtle);}
+  .model-tabs.flat{border-radius:4px;}
+  .model-tab{flex:1 1 0; min-width:0; font-size:9.5px; font-weight:700; padding:7px 3px; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .model-tab:last-child{border-right:none;}
+  .model-tab:hover:not(.active):not(.open){color:var(--navy); background:rgba(0,24,88,0.04);}
+  .model-tab.open{background:rgba(0,24,88,0.06); color:var(--navy);}
+  .model-tab.active{flex:1.5 1 0; background:var(--card); color:var(--navy); font-weight:800; box-shadow:inset 0 -2px 0 var(--pink);}
+
+  .ver-panel{display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 4px 4px; background:var(--card); padding:6px;}
+  .ver-panel.open{display:block;}
+  .ver-h{font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label); padding:4px 7px 6px;}
+  .ver-row{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; font-weight:600; color:var(--navy); padding:7px 9px; border-radius:4px; cursor:pointer; border:1.5px solid transparent; transition:all .1s;}
+  .ver-row + .ver-row{margin-top:2px;}
+  .ver-row:hover{background:var(--subtle);}
+  .ver-row.sel{border-color:var(--pink); background:rgba(245,130,174,0.10); font-weight:800;}
+  .ver-name{font-family:'JetBrains Mono',monospace;}
+  .ver-check{color:var(--pink); font-weight:900; font-size:12px; opacity:0;}
+  .ver-row.sel .ver-check{opacity:1;}
+
+  /* ================= CONTEXT — panel-3 look, panel-1 mechanics ================= */
+  .ctx-head{display:flex; align-items:center; gap:8px; margin-bottom:7px;}
+  .ctx-ratio{margin-left:auto; font-size:10px; font-weight:600; color:#8a8eb8; font-family:'JetBrains Mono',monospace; white-space:nowrap;}
+
+  .ctx-trigger{width:100%; text-align:left; background:var(--card); border:2px solid var(--rule); border-radius:4px; padding:9px 10px; cursor:pointer; transition:all .12s;}
+  .ctx-trigger:hover{border-color:var(--dim);}
+  .ctx-trigger.open{border-color:var(--navy); border-bottom:none; border-radius:4px 4px 0 0;}
+  .summary-row{display:flex; align-items:center; gap:9px;}
+  .ctxbar{display:flex; height:7px; border-radius:3px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); flex:1 1 auto;}
+  .ctxbar > i{display:block; height:100%;}
+  .pct{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace; flex:0 0 auto;}
+  .chev{width:13px; height:13px; color:var(--dim); transition:transform .18s; flex:0 0 auto;}
+  .chev.up{transform:rotate(180deg);}
+
+  /* shared accordion panel (context + history) */
+  .panel{display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 4px 4px; background:var(--card); overflow:hidden;}
+  .panel.open{display:block;}
+
+  /* ---------- /context breakdown block ---------- */
+  .bd{padding:11px;}
+  .bd-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px;}
+  .bd-model{font-size:11px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace;}
+  .bd-tot{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace;}
+  .bd-bar{display:flex; height:9px; border-radius:4px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); margin-bottom:11px;}
+  .bd-bar > i{display:block; height:100%;}
+  .cat{display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px;}
+  .cat + .cat{border-top:1px solid rgba(0,24,88,0.07);}
+  .cat .sw{width:9px; height:9px; border-radius:2px; flex:0 0 auto;}
+  .cat .nm{flex:1 1 auto; color:var(--muted); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cat .tk{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); font-size:10.5px;}
+  .cat .pc{font-family:'JetBrains Mono',monospace; color:var(--dim); font-size:10px; width:38px; text-align:right; flex:0 0 auto;}
+  .bd-sub{margin-top:11px; padding-top:9px; border-top:2px solid rgba(0,24,88,0.12);}
+  .bd-sub h5{font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; color:var(--label); margin:0 0 6px; display:flex; align-items:center; gap:6px;}
+  .bd-sub h5 .slash{color:var(--pink); font-family:'JetBrains Mono',monospace;}
+  .ml{display:flex; align-items:flex-start; gap:8px; padding:3px 0; font-size:10px;}
+  .ml .p{flex:1 1 auto; color:var(--muted); font-family:'JetBrains Mono',monospace; word-break:break-all; line-height:1.35;}
+  .ml .t{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); flex:0 0 auto;}
+
+  /* ================= HISTORY — rewind / handoff ================= */
+  .tri-tabs{display:flex; border:2px solid var(--navy); border-radius:4px 4px 0 0; overflow:hidden; background:var(--subtle);}
+  .tri-tabs.flat{border-radius:4px;}
+  .tri-tab{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:700; padding:6px 0; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s;}
+  .tri-tab:last-child{border-right:none;}
+  .tri-tab svg{width:12px; height:12px;}
+  .tri-tab:hover:not(.active){color:var(--navy); background:rgba(0,24,88,0.04);}
+  .tri-tab.active{background:var(--card); color:var(--navy); box-shadow:inset 0 -2px 0 var(--pink);}
+
+  .tl-phead{padding:7px 11px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--subtle); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);}
+  .tl-confirm{display:none; align-items:center; gap:7px; margin:8px 10px 0; padding:7px 9px; border-radius:4px; background:rgba(61,148,106,0.10); border:1px solid rgba(61,148,106,0.45); color:#2d7848; font-size:10px; font-weight:700;}
+  .tl{padding:8px 10px; display:flex; flex-direction:column; gap:6px; max-height:236px; overflow-y:auto;}
+
+  .tl-row{display:flex; align-items:center; gap:9px; border:1px solid var(--rule); border-radius:4px; padding:7px 8px 7px 10px; transition:all .12s;}
+  .tl-row:hover{border-color:var(--dim);}
+  .tl-row.current{border-color:rgba(245,130,174,0.55); background:rgba(245,130,174,0.06);}
+  .tl-main{flex:1 1 auto; min-width:0;}
+  .tl-top{display:flex; align-items:center; flex-wrap:wrap; line-height:1.2; margin-bottom:3px;}
+  .tl-turn{font-size:10px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace;}
+  .tl-now{font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--pink); border:1px solid var(--pink); border-radius:3px; padding:0 4px; margin-left:6px; line-height:1.5;}
+  .tl-time{font-size:9.5px; color:var(--label); font-family:'JetBrains Mono',monospace;}
+  .tl-time::before{content:'·'; color:var(--dim); margin:0 6px;}
+  .tl-ctx{font-size:9.5px; font-weight:700; font-family:'JetBrains Mono',monospace;}
+  .tl-ctx::before{content:'·'; color:var(--dim); margin:0 6px; font-weight:400;}
+  .tl-desc{font-size:11px; color:var(--muted); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  .tl-ic{flex:0 0 auto; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid var(--rule); border-radius:4px; background:var(--card); color:var(--label); cursor:pointer; transition:all .12s;}
+  .tl-ic svg{width:14px; height:14px;}
+  .tl-ic:hover{border-color:var(--pink); background:rgba(245,130,174,0.12); color:var(--navy);}
+  .tl-row.current .tl-ic{border-color:rgba(245,130,174,0.6);}
+
+  .foot{margin-top:34px; padding-top:18px; border-top:2px solid rgba(0,24,88,0.12); font-size:11.5px; line-height:1.6; color:var(--muted); max-width:560px;}
+  .foot b{color:var(--navy);}
+  .foot code{font-family:'JetBrains Mono',monospace; font-size:0.92em; background:var(--subtle); padding:1px 5px; border-radius:3px; color:var(--navy);}
+</style>
+</head>
+<body>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-rewind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5L3 7.5l3 3"/><path d="M3 7.5h5.5a4 4 0 1 1 0 8H4.5"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="3.5" r="1.6"/><circle cx="5" cy="12.5" r="1.6"/><circle cx="11" cy="6" r="1.6"/><path d="M5 5.1v5.8"/><path d="M11 7.6a3.5 3.5 0 0 1-3.5 3.5H5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="pagehead">
+    <h1>Model · Context · History</h1>
+    <p>One rail, three reworked controls. The <b>Model</b> group is a single-select strip where each button opens its own version list; <b>Context</b> keeps Panel 3's trigger but expands inline like Panel 1; <b>History</b> is your existing look with reformatted turn cards. Everything below is live, click it. Version numbers are placeholders, edit in <code>MODELS</code>.</p>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="rail-cap">live</div>
+      <div class="rail">
+
+        <!-- ===================== MODEL ===================== -->
+        <div>
+          <div class="ro-head"><span class="ro-label">Model</span></div>
+          <div class="model-tabs flat" id="model-tabs"></div>
+          <div class="ver-panel" id="ver-panel"></div>
+        </div>
+
+        <div class="rail-sep"></div>
+
+        <!-- ===================== CONTEXT ===================== -->
+        <div>
+          <div class="ctx-head">
+            <span class="ro-label">Context</span>
+            <button class="link-amber">Compact</button>
+            <span class="ctx-ratio">89.3k / 1.0M</span>
+          </div>
+          <button class="ctx-trigger" id="ctx-btn">
+            <div class="summary-row">
+              <div class="ctxbar" id="ctx-bar"></div>
+              <span class="pct">9%</span>
+              <svg class="chev"><use href="#i-chev"/></svg>
+            </div>
+          </button>
+          <div class="panel" id="ctx-panel"></div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <!-- ===================== HISTORY ===================== -->
+        <div>
+          <div class="ro-head"><span class="ro-label">History</span></div>
+          <div class="tri-tabs flat" id="hist-tabs">
+            <button class="tri-tab" data-mode="rewind"><svg><use href="#i-rewind"/></svg>Rewind</button>
+            <button class="tri-tab" data-mode="handoff"><svg><use href="#i-fork"/></svg>Handoff</button>
+          </div>
+          <div class="panel" id="hist-panel"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>Model:</b> click a model to drop its versions; the picked version stays on that button (<code>Opus 4.8</code>) and any prior selection reverts to its bare name. Inherit is blank and has no list.<br><br>
+    <b>Context:</b> the absolute ratio sits in the heading, right-aligned and muted; the trigger still shows the live fill, and the breakdown opens inline.<br><br>
+    <b>History:</b> each card's top line is <code>Turn n/total · time · context%</code> (the % is color-graded so a heavy point is obvious), description below, one icon action on the right matching the active tab. The list opens scrolled to the current turn.
+  </p>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+const MODELS = [
+  {id:'inherit', name:'Inherit', versions:[]},
+  {id:'opus',    name:'Opus',    versions:['4.8','4.6','4.5','4.1']},
+  {id:'sonnet',  name:'Sonnet',  versions:['4.6','4.5','3.7']},
+  {id:'haiku',   name:'Haiku',   versions:['4.5','3.5']},
+  {id:'fable',   name:'Fable',   versions:['5']},
+];
+
+const CTX = {
+  model:'claude-opus-4-8', used:'89.3k', total:'1.0M', pct:'9%',
+  cats:[
+    {nm:'System prompt', tk:'1.5k',  pc:'0.1%', c:'var(--c-sys)',   w:0.1},
+    {nm:'System tools',  tk:'5.1k',  pc:'0.5%', c:'var(--c-tools)', w:0.5},
+    {nm:'MCP tools',     tk:'27.5k', pc:'2.8%', c:'var(--c-mcp)',   w:2.8},
+    {nm:'Custom agents', tk:'1.8k',  pc:'0.2%', c:'var(--c-agents)',w:0.2},
+    {nm:'Memory files',  tk:'10.8k', pc:'1.1%', c:'var(--c-mem)',   w:1.1},
+    {nm:'Messages',      tk:'44.9k', pc:'4.5%', c:'var(--c-msg)',   w:4.5},
+    {nm:'Free space',    tk:'908.3k',pc:'90.8%',c:'var(--c-free)',  w:90.8},
+  ],
+  memory:[
+    {p:'~\\.claude\\CLAUDE.md', t:'8.8k'},
+    {p:'~\\MeDocuments\\AppData\\Anthropic\\claude-code-sandbox\\CLAUDE.md', t:'2.1k'},
+  ],
+  agents:[
+    {n:'superpowers:code-reviewer', t:'348'},
+    {n:'vibe-guide', t:'93'},
+    {n:'echo', t:'88'},
+    {n:'gsd-project-researcher', t:'86'},
+    {n:'gsd-ui-researcher', t:'86'},
+  ]
+};
+
+const TOTAL = 60;
+const TURNS = [
+  {n:49, time:'14:30:12', ctx:43, desc:'Searched for validateToken() callers'},
+  {n:50, time:'14:31:05', ctx:46, desc:'Read src/auth/jwt.ts'},
+  {n:51, time:'14:32:20', ctx:49, desc:'Planned the expiry-enforcement fix'},
+  {n:52, time:'14:33:30', ctx:52, desc:'Edited validateToken() to check exp'},
+  {n:53, time:'14:34:12', ctx:55, desc:'Found 3 edge cases in the refresh flow'},
+  {n:54, time:'14:35:48', ctx:58, desc:'Read src/auth/refresh.ts'},
+  {n:55, time:'14:36:20', ctx:61, desc:'Flagged expiry bypass on token rotation'},
+  {n:56, time:'14:38:02', ctx:64, desc:'Wrote vitest cases for expiry'},
+  {n:57, time:'14:39:40', ctx:67, desc:'Ran the suite — 2 specs failing'},
+  {n:58, time:'14:41:15', ctx:70, desc:'Patched refresh-token rotation'},
+  {n:59, time:'14:42:50', ctx:74, desc:'Re-ran the suite — all green'},
+  {n:60, time:'14:43:33', ctx:78, desc:'Summarized the changes for handoff', cur:true},
+];
+
+/* ---------------- renderers ---------------- */
+function barHTML(){ return CTX.cats.map(c=>`<i style="flex:${c.w} 1 ${c.w<1?'3px':'0'};background:${c.c};"></i>`).join(''); }
+
+function breakdownHTML(){
+  const rows = CTX.cats.map(c=>`<div class="cat"><span class="sw" style="background:${c.c}"></span><span class="nm">${c.nm}</span><span class="tk">${c.tk}</span><span class="pc">${c.pc}</span></div>`).join('');
+  const mem = CTX.memory.map(m=>`<div class="ml"><span class="p">${m.p}</span><span class="t">${m.t}</span></div>`).join('');
+  const ag  = CTX.agents.map(a=>`<div class="ml"><span class="p" style="word-break:normal">${a.n}</span><span class="t">${a.t}</span></div>`).join('');
+  return `<div class="bd">
+    <div class="bd-head"><span class="bd-model">${CTX.model}</span><span class="bd-tot">${CTX.used} / ${CTX.total} (${CTX.pct})</span></div>
+    <div class="bd-bar">${barHTML()}</div>
+    ${rows}
+    <div class="bd-sub"><h5>Memory files <span class="slash">/memory</span></h5>${mem}</div>
+    <div class="bd-sub"><h5>Custom agents <span class="slash">/agents</span></h5>${ag}</div>
+  </div>`;
+}
+
+function ctxColor(p){ return p < 50 ? 'var(--sage)' : (p <= 75 ? 'var(--gold)' : 'var(--coral)'); }
+
+function timelineHTML(mode){
+  const ic   = mode === 'handoff' ? 'i-fork' : 'i-rewind';
+  const head = mode === 'handoff' ? 'Hand off from a point' : 'Rewind to a point';
+  const tip  = mode === 'handoff' ? 'Hand off from this point' : 'Rewind to this point';
+  const rows = TURNS.map(t=>`
+    <div class="tl-row${t.cur?' current':''}">
+      <div class="tl-main">
+        <div class="tl-top">
+          <span class="tl-turn">Turn ${t.n}/${TOTAL}</span>${t.cur?'<span class="tl-now">current</span>':''}
+          <span class="tl-time">${t.time}</span>
+          <span class="tl-ctx" style="color:${ctxColor(t.ctx)}">${t.ctx}%</span>
+        </div>
+        <div class="tl-desc">${t.desc}</div>
+      </div>
+      <button class="tl-ic" title="${tip}" onclick="confirmPick(this,'${mode}')"><svg><use href="#${ic}"/></svg></button>
+    </div>`).join('');
+  return `<div class="tl-phead">${head}</div><div class="tl-confirm"><span>&#10003;</span><span class="tl-text"></span></div><div class="tl">${rows}</div>`;
+}
+
+function confirmPick(btn, mode){
+  const wrap = btn.closest('.panel');
+  const box  = wrap.querySelector('.tl-confirm');
+  const turn = btn.closest('.tl-row').querySelector('.tl-turn').textContent;
+  box.querySelector('.tl-text').textContent = (mode==='handoff' ? 'Handed off from ' : 'Rewound to ') + turn;
+  box.style.display = 'flex';
+}
+
+/* ---------------- MODEL group ---------------- */
+const modelTabs = document.getElementById('model-tabs');
+const verPanel  = document.getElementById('ver-panel');
+let selModel = 'inherit', selVer = '', openModel = null;
+
+function renderModelTabs(){
+  modelTabs.innerHTML = MODELS.map(m=>{
+    const isSel = m.id === selModel;
+    const label = (isSel && selVer) ? `${m.name} ${selVer}` : m.name;
+    const cls = (isSel ? ' active' : '') + (m.id === openModel ? ' open' : '');
+    return `<button class="model-tab${cls}" data-id="${m.id}" title="${label}">${label}</button>`;
+  }).join('');
+  modelTabs.classList.toggle('flat', openModel === null);
+}
+function renderVerPanel(){
+  if(!openModel){ verPanel.classList.remove('open'); verPanel.innerHTML=''; return; }
+  const m = MODELS.find(x=>x.id===openModel);
+  const rows = m.versions.map(v=>{
+    const sel = (m.id===selModel && v===selVer) ? ' sel' : '';
+    return `<div class="ver-row${sel}" data-id="${m.id}" data-ver="${v}"><span class="ver-name">${m.name} ${v}</span><span class="ver-check">&#10003;</span></div>`;
+  }).join('');
+  verPanel.innerHTML = `<div class="ver-h">Select ${m.name} version</div>${rows}`;
+  verPanel.classList.add('open');
+}
+modelTabs.addEventListener('click', e=>{
+  const b = e.target.closest('.model-tab'); if(!b) return;
+  const id = b.dataset.id;
+  const m = MODELS.find(x=>x.id===id);
+  if(m.versions.length === 0){              // Inherit: commit directly, no dropdown
+    selModel = id; selVer = ''; openModel = null;
+  } else {
+    openModel = (openModel === id) ? null : id;   // toggle browse, no commit yet
+  }
+  renderModelTabs(); renderVerPanel();
+});
+verPanel.addEventListener('click', e=>{
+  const r = e.target.closest('.ver-row'); if(!r) return;
+  selModel = r.dataset.id; selVer = r.dataset.ver; openModel = null;
+  renderModelTabs(); renderVerPanel();
+});
+
+/* ---------------- CONTEXT (panel-3 look, panel-1 mechanic) ---------------- */
+const ctxBtn = document.getElementById('ctx-btn');
+const ctxPanel = document.getElementById('ctx-panel');
+const ctxChev = ctxBtn.querySelector('.chev');
+document.getElementById('ctx-bar').innerHTML = barHTML();
+ctxBtn.addEventListener('click', ()=>{
+  const willOpen = !ctxPanel.classList.contains('open');
+  if(willOpen) ctxPanel.innerHTML = breakdownHTML();
+  ctxPanel.classList.toggle('open', willOpen);
+  ctxBtn.classList.toggle('open', willOpen);
+  ctxChev.classList.toggle('up', willOpen);
+});
+
+/* ---------------- HISTORY (rewind / handoff) ---------------- */
+const histTabs = document.getElementById('hist-tabs');
+const histPanel = document.getElementById('hist-panel');
+let histMode = null;
+histTabs.addEventListener('click', e=>{
+  const b = e.target.closest('.tri-tab'); if(!b) return;
+  const mode = b.dataset.mode;
+  if(histMode === mode){ closeHist(); return; }
+  histMode = mode;
+  histTabs.querySelectorAll('.tri-tab').forEach(x=>x.classList.toggle('active', x===b));
+  histTabs.classList.remove('flat');
+  histPanel.innerHTML = timelineHTML(mode);
+  histPanel.classList.add('open');
+  const tl = histPanel.querySelector('.tl');           // open scrolled to the current turn
+  if(tl) tl.scrollTop = tl.scrollHeight;
+});
+function closeHist(){
+  histMode = null;
+  histTabs.querySelectorAll('.tri-tab').forEach(x=>x.classList.remove('active'));
+  histTabs.classList.add('flat');
+  histPanel.classList.remove('open');
+  histPanel.innerHTML = '';
+}
+
+/* keyboard: Esc closes the open accordions */
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    if(ctxPanel.classList.contains('open')){ ctxPanel.classList.remove('open'); ctxBtn.classList.remove('open'); ctxChev.classList.remove('up'); }
+    if(histMode) closeHist();
+    if(openModel){ openModel=null; renderModelTabs(); renderVerPanel(); }
+  }
+});
+
+renderModelTabs();
+</script>
+</body>
+</html>

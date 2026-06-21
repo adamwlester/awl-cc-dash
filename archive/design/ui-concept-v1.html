@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Multi-Agent Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #18181b; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+    .agent-node { transition: all 0.15s ease; }
+    .agent-node:hover { transform: translateY(-1px); }
+  </style>
+  <script>
+    function switchTab(groupId, tabName) {
+      document.querySelectorAll(`[data-group="${groupId}"]`).forEach(p => p.classList.add('hidden'));
+      document.getElementById(`${groupId}-${tabName}`).classList.remove('hidden');
+      document.querySelectorAll(`[data-tab-group="${groupId}"]`).forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+          btn.classList.add('border-violet-400', 'text-zinc-200');
+          btn.classList.remove('border-transparent', 'text-zinc-500');
+        } else {
+          btn.classList.remove('border-violet-400', 'text-zinc-200');
+          btn.classList.add('border-transparent', 'text-zinc-500');
+        }
+      });
+      // Remember tab state across refreshes
+      const state = JSON.parse(localStorage.getItem('awl-tabs') || '{}');
+      state[groupId] = tabName;
+      localStorage.setItem('awl-tabs', JSON.stringify(state));
+    }
+
+    // Restore tab state on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const state = JSON.parse(localStorage.getItem('awl-tabs') || '{}');
+      Object.entries(state).forEach(([group, tab]) => switchTab(group, tab));
+    });
+
+    // Live clock
+    setInterval(() => {
+      const el = document.getElementById('clock');
+      if (el) el.textContent = new Date().toLocaleTimeString();
+    }, 1000);
+
+    // Auto-refresh: poll for file changes, reload only when content updates
+    (function() {
+      let lastModified = null;
+      setInterval(async () => {
+        try {
+          const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+          const modified = res.headers.get('Last-Modified');
+          if (lastModified && modified && modified !== lastModified) {
+            window.location.reload();
+          }
+          lastModified = modified;
+        } catch(e) {}
+      }, 300);
+    })();
+  </script>
+</head>
+<body class="bg-zinc-950 text-zinc-300 font-sans h-screen overflow-hidden flex flex-col">
+
+  <!-- Title Bar -->
+  <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5">
+        <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+        <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+        <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+      </div>
+      <span class="text-sm font-semibold text-zinc-200 tracking-tight">AWL Multi-Agent Dashboard</span>
+      <span class="text-[9px] px-1.5 py-0.5 rounded bg-violet-900/50 text-violet-400 font-mono">v0.1-concept</span>
+      <span class="text-xs text-zinc-600">3 agents active</span>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-zinc-500">
+      <span class="px-2 py-0.5 rounded bg-zinc-800">WSL2</span>
+      <span class="px-2 py-0.5 rounded bg-zinc-800">tmux</span>
+      <span id="clock" class="px-2 py-0.5 rounded bg-zinc-800 font-mono"></span>
+      <span class="px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-400 animate-pulse">● Connected</span>
+    </div>
+  </header>
+
+  <!-- Main 3-Pane Layout -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- ═══════════ LEFT PANE (~37%) ═══════════ -->
+    <div class="w-[37%] border-r border-zinc-800 flex flex-col overflow-hidden">
+
+      <!-- 2.1 Team Graph -->
+      <div class="p-4 border-b border-zinc-800 shrink-0">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Team Graph</h2>
+          <button class="text-xs text-violet-400 hover:text-violet-300 transition">+ Link Agents</button>
+        </div>
+        <div class="relative bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-6 min-h-[180px]">
+          <div class="flex items-start justify-center gap-8">
+            <div class="agent-node cursor-pointer bg-zinc-900 border-2 border-red-500/60 rounded-lg p-3 w-[120px] shadow-lg shadow-red-500/5 hover:shadow-red-500/20 hover:border-red-400/80">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-2.5 h-2.5 rounded-full bg-red-500 shadow shadow-red-500/50"></div>
+                <span class="text-xs font-semibold text-zinc-200">res-01</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mb-2">opus · auto</div>
+              <div class="flex items-center gap-1.5">
+                <div class="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-red-500/70 rounded-full" style="width:62%"></div></div>
+                <span class="text-[10px] text-zinc-500">62%</span>
+              </div>
+            </div>
+            <div class="agent-node cursor-pointer bg-zinc-900 border-2 border-blue-500/60 rounded-lg p-3 w-[120px] shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20 hover:border-blue-400/80">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow shadow-blue-500/50"></div>
+                <span class="text-xs font-semibold text-zinc-200">syn-01</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mb-2">sonnet · edit</div>
+              <div class="flex items-center gap-1.5">
+                <div class="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-blue-500/70 rounded-full" style="width:34%"></div></div>
+                <span class="text-[10px] text-zinc-500">34%</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-center my-3">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-red-400 font-mono">3</span>
+              <div class="w-16 h-px bg-zinc-700 relative"><div class="absolute -top-1 right-0 w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-l-[5px] border-l-zinc-600"></div></div>
+              <span class="text-[10px] text-blue-400 font-mono">2</span>
+            </div>
+          </div>
+          <div class="flex justify-center">
+            <div class="agent-node cursor-pointer bg-zinc-900 border-2 border-green-500/60 rounded-lg p-3 w-[120px] shadow-lg shadow-green-500/5 hover:shadow-green-500/20 hover:border-green-400/80">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow shadow-green-500/50"></div>
+                <span class="text-xs font-semibold text-zinc-200">aud-01</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mb-2">haiku · plan</div>
+              <div class="flex items-center gap-1.5">
+                <div class="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-green-500/70 rounded-full" style="width:12%"></div></div>
+                <span class="text-[10px] text-zinc-500">12%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.2 Team Feed -->
+      <div class="flex-1 flex flex-col overflow-hidden border-b border-zinc-800">
+        <div class="px-4 pt-3 shrink-0">
+          <div class="flex items-center gap-1 mb-2">
+            <button data-tab-group="feed" data-tab="out" onclick="switchTab('feed','out')" class="text-xs px-2 py-1 font-medium border-b-2 border-violet-400 text-zinc-200 cursor-pointer">Outgoing</button>
+            <button data-tab-group="feed" data-tab="in" onclick="switchTab('feed','in')" class="text-xs px-2 py-1 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">Incoming</button>
+            <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="text-xs px-2 py-1 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">Scratch</button>
+            <button data-tab-group="feed" data-tab="pending" onclick="switchTab('feed','pending')" class="text-xs px-2 py-1 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400 relative">
+              Pending
+              <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full text-[9px] text-black font-bold flex items-center justify-center">1</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-3 mb-2">
+            <label class="flex items-center gap-1 text-[10px]"><input type="checkbox" checked class="w-3 h-3 accent-red-500"> <span class="text-red-400">res</span></label>
+            <label class="flex items-center gap-1 text-[10px]"><input type="checkbox" checked class="w-3 h-3 accent-blue-500"> <span class="text-blue-400">syn</span></label>
+            <label class="flex items-center gap-1 text-[10px]"><input type="checkbox" checked class="w-3 h-3 accent-green-500"> <span class="text-green-400">aud</span></label>
+          </div>
+        </div>
+
+        <!-- Outgoing tab -->
+        <div id="feed-out" data-group="feed" class="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+          <div><div class="text-xs font-semibold text-red-400 mb-0.5">res-01-sandy</div><div class="text-xs text-zinc-400 leading-relaxed">Found 3 auth vulnerabilities in the JWT middleware. The token refresh logic doesn't validate expiry before issuing a new token, which allows...</div></div>
+          <div><div class="text-xs font-semibold text-green-400 mb-0.5">aud-01-drew</div><div class="text-xs text-zinc-400 leading-relaxed">Confirmed 2 of 3 reported vulns. The expiry bypass is critical — tokens can be refreshed indefinitely. The third finding (weak secret) is...</div></div>
+          <div><div class="text-xs font-semibold text-blue-400 mb-0.5">syn-01-kai</div><div class="text-xs text-zinc-400 leading-relaxed">Synthesizing findings from res-01 and aud-01. Draft remediation plan written to scratchpad. Key recommendations: 1) add expiry validation...</div></div>
+        </div>
+
+        <!-- Incoming tab -->
+        <div id="feed-in" data-group="feed" class="hidden flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+          <div>
+            <div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-zinc-300">User</span><span class="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-500">user</span></div>
+            <div class="text-xs text-zinc-400 leading-relaxed">Analyze the JWT middleware in src/auth/ for security vulnerabilities. Focus on token refresh, secret management, and rate limiting.</div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-red-400">res-01-sandy</span><span class="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-500">queued</span></div>
+            <div class="text-xs text-zinc-400 leading-relaxed">&lt;msg_body&gt; Found 3 auth vulnerabilities in the JWT middleware. Please audit and confirm findings. Priority: token expiry bypass. &lt;/msg_body&gt;</div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 mb-0.5"><span class="text-xs font-semibold text-red-400">res-01-sandy</span><span class="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-500">queued</span></div>
+            <div class="text-xs text-zinc-400 leading-relaxed">&lt;msg_body&gt; Detailed analysis ready. Forwarding full context for synthesis into remediation plan. &lt;/msg_body&gt;</div>
+          </div>
+        </div>
+
+        <!-- Scratchpad tab -->
+        <div id="feed-scratch" data-group="feed" class="hidden flex-1 overflow-y-auto px-4 pb-3">
+          <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 font-mono text-[11px] text-zinc-400 leading-relaxed space-y-2">
+            <div class="text-zinc-500 text-[10px]">~/.claude/shared/scratchpad.md — auto-refreshing</div>
+            <div class="border-t border-zinc-800 pt-2">
+              <div class="text-zinc-200 font-semibold mb-1"># Auth Module Remediation Plan</div>
+              <div class="text-zinc-300 mb-2">## Critical Findings</div>
+              <div class="text-zinc-400">1. **Token Expiry Bypass** (Severity: CRITICAL)</div>
+              <div class="text-zinc-500 ml-3">- `validateToken()` in refresh.ts accepts expired tokens</div>
+              <div class="text-zinc-500 ml-3">- No `exp` claim check before issuing new token</div>
+              <div class="text-zinc-500 ml-3">- Fix: Add `jwt.verify()` with `ignoreExpiration: false`</div>
+              <div class="mt-2 text-zinc-400">2. **Weak Secret Leak** (Severity: HIGH)</div>
+              <div class="text-zinc-500 ml-3">- Default dev secret `"changeme"` in config.defaults.ts</div>
+              <div class="text-zinc-500 ml-3">- No env var override enforced in production</div>
+              <div class="text-zinc-500 ml-3">- Fix: Require JWT_SECRET env var, fail startup if missing</div>
+              <div class="mt-2 text-zinc-400">3. **No Rate Limiting** (Severity: MEDIUM)</div>
+              <div class="text-zinc-500 ml-3">- Refresh endpoint has no throttling</div>
+              <div class="text-zinc-500 ml-3">- Fix: Add express-rate-limit to /auth/refresh</div>
+              <div class="mt-3 text-zinc-300">## Status</div>
+              <div class="text-zinc-500">- [x] Research complete (res-01)</div>
+              <div class="text-zinc-500">- [x] Audit confirmed 2/3 (aud-01)</div>
+              <div class="text-zinc-500">- [ ] Implementation pending</div>
+              <div class="mt-2 text-zinc-600 italic">Last updated by syn-01-kai at 14:39</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pending tab -->
+        <div id="feed-pending" data-group="feed" class="hidden flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+          <div class="bg-zinc-900/50 border border-amber-800/30 rounded-lg p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold text-green-400">aud-01-drew</span>
+                <span class="text-zinc-600 text-xs">→</span>
+                <span class="text-xs font-semibold text-red-400">res-01-sandy</span>
+              </div>
+              <span class="text-[9px] text-zinc-600 font-mono">14:38</span>
+            </div>
+            <div class="text-xs text-zinc-400 leading-relaxed">Confirmed the expiry bypass. Requesting res-01 investigate whether the same pattern exists in the OAuth2 token exchange flow at src/auth/oauth.ts — similar `validateToken()` call spotted.</div>
+            <div class="flex gap-2 pt-1">
+              <button class="text-[10px] font-medium py-1 px-3 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition">Approve</button>
+              <button class="text-[10px] font-medium py-1 px-3 rounded bg-red-900/20 text-red-400/70 hover:bg-red-900/30 transition">Deny</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-center py-4">
+            <span class="text-[10px] text-zinc-600">No other pending messages</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.3 Activity Log -->
+      <div class="h-[140px] shrink-0 flex flex-col">
+        <div class="px-4 pt-2 pb-1"><h2 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Activity Log</h2></div>
+        <div class="flex-1 overflow-y-auto px-4 pb-2 font-mono text-[11px] space-y-1">
+          <div class="text-red-400/70"><span class="text-zinc-600">14:32</span> res-01 ▸ started</div>
+          <div class="text-blue-400/70"><span class="text-zinc-600">14:33</span> syn-01 ▸ started</div>
+          <div class="text-green-400/70"><span class="text-zinc-600">14:34</span> aud-01 ▸ started</div>
+          <div class="text-red-400/70"><span class="text-zinc-600">14:35</span> res-01 → syn-01 link triggered</div>
+          <div class="text-blue-400/70"><span class="text-zinc-600">14:35</span> syn-01 ✓ committed <span class="text-zinc-500">3f2a1b</span></div>
+          <div class="text-green-400/70"><span class="text-zinc-600">14:37</span> aud-01 ⚠ flagged 2 issues</div>
+          <div class="text-red-400/70"><span class="text-zinc-600">14:38</span> res-01 context at 62%</div>
+          <div class="text-blue-400/70"><span class="text-zinc-600">14:39</span> syn-01 ▸ writing to scratchpad</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ MIDDLE PANE (~25%) ═══════════ -->
+    <div class="w-[25%] border-r border-zinc-800 flex flex-col overflow-hidden">
+
+      <!-- Agent Tab Group header -->
+      <div class="shrink-0 border-b border-zinc-800">
+        <div class="flex px-4 pt-3">
+          <button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-violet-400 text-zinc-200 cursor-pointer">Details</button>
+          <button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">Create New</button>
+        </div>
+      </div>
+
+      <!-- Details tab -->
+      <div id="mid-details" data-group="mid" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="w-3 h-3 rounded-full bg-red-500"></div>
+          <span class="text-sm font-semibold text-zinc-100">res-01-sandy</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400 ml-auto">Working</span>
+        </div>
+        <div class="space-y-2.5">
+          <div><label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Name</label><input type="text" value="res-01-sandy" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:border-violet-500 focus:outline-none"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Model <span class="text-zinc-700">🔒</span></label><select class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-400 opacity-60" disabled><option>opus</option></select></div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Mode</label>
+            <div class="flex gap-1.5">
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="mode" class="w-3 h-3 accent-violet-500"> Default</label>
+              <label class="flex items-center gap-1 text-[10px] text-violet-400"><input type="radio" name="mode" checked class="w-3 h-3 accent-violet-500"> Auto</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="mode" class="w-3 h-3 accent-violet-500"> Edit</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="mode" class="w-3 h-3 accent-violet-500"> Plan</label>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Effort</label>
+            <div class="flex bg-zinc-900 rounded border border-zinc-800 overflow-hidden">
+              <button class="flex-1 text-[10px] py-1 text-zinc-500">Low</button>
+              <button class="flex-1 text-[10px] py-1 text-zinc-500">Med</button>
+              <button class="flex-1 text-[10px] py-1 bg-violet-600/20 text-violet-400 font-medium border-x border-zinc-800">High</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Color</label>
+            <div class="flex gap-1.5">
+              <button class="w-5 h-5 rounded-full bg-red-500 ring-2 ring-red-400 ring-offset-1 ring-offset-zinc-950"></button>
+              <button class="w-5 h-5 rounded-full bg-blue-500"></button>
+              <button class="w-5 h-5 rounded-full bg-green-500"></button>
+              <button class="w-5 h-5 rounded-full bg-yellow-500"></button>
+              <button class="w-5 h-5 rounded-full bg-fuchsia-500"></button>
+              <button class="w-5 h-5 rounded-full bg-cyan-500"></button>
+              <button class="w-5 h-5 rounded-full bg-orange-500"></button>
+              <button class="w-5 h-5 rounded-full bg-white"></button>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Context</label>
+            <div class="flex items-center gap-2">
+              <div class="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full" style="width:62%"></div></div>
+              <span class="text-xs text-zinc-400 font-mono">62%</span>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div><label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Queue</label><span class="text-xs text-zinc-300 font-mono">2</span></div>
+            <div><label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Target</label><select class="bg-zinc-900 border border-zinc-700 rounded px-2 py-0.5 text-xs text-zinc-300"><option>User</option><option>syn-01-kai</option><option>aud-01-drew</option></select></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create New tab -->
+      <div id="mid-create" data-group="mid" class="hidden flex-1 overflow-y-auto p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-zinc-100 mb-1">Create New Agent</h3>
+        <div class="space-y-2.5">
+          <div><label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Name</label><input type="text" value="researcher-04-haven" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:border-violet-500 focus:outline-none"></div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Model</label>
+            <select class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:border-violet-500 focus:outline-none">
+              <option selected>opus</option><option>sonnet</option><option>haiku</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Role</label>
+            <select class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:border-violet-500 focus:outline-none">
+              <option selected>researcher</option><option>synthesizer</option><option>auditor</option><option>implementer</option><option>echo</option><option>(none)</option>
+            </select>
+            <div class="text-[9px] text-zinc-600 mt-0.5">.claude/agents/*.md</div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Mode</label>
+            <div class="flex gap-1.5">
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="create-mode" class="w-3 h-3 accent-violet-500"> Default</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="create-mode" class="w-3 h-3 accent-violet-500"> Edit</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="create-mode" class="w-3 h-3 accent-violet-500"> Plan</label>
+              <label class="flex items-center gap-1 text-[10px] text-violet-400"><input type="radio" name="create-mode" checked class="w-3 h-3 accent-violet-500"> Auto</label>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Color</label>
+            <div class="flex gap-1.5">
+              <button class="w-5 h-5 rounded-full bg-red-500 opacity-40" title="in use"></button>
+              <button class="w-5 h-5 rounded-full bg-blue-500 opacity-40" title="in use"></button>
+              <button class="w-5 h-5 rounded-full bg-green-500 opacity-40" title="in use"></button>
+              <button class="w-5 h-5 rounded-full bg-yellow-500 ring-2 ring-yellow-400 ring-offset-1 ring-offset-zinc-950" title="auto-assigned"></button>
+              <button class="w-5 h-5 rounded-full bg-fuchsia-500"></button>
+              <button class="w-5 h-5 rounded-full bg-cyan-500"></button>
+              <button class="w-5 h-5 rounded-full bg-orange-500"></button>
+              <button class="w-5 h-5 rounded-full bg-white"></button>
+            </div>
+            <div class="text-[9px] text-zinc-600 mt-0.5">Yellow auto-assigned (first available)</div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Working Directory</label>
+            <input type="text" value="C:\Users\lester\project" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono focus:border-violet-500 focus:outline-none">
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button class="flex-1 text-xs font-medium py-2 rounded bg-violet-600 text-white hover:bg-violet-500 transition">Create</button>
+            <button class="text-xs font-medium py-2 px-4 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.5 Actions -->
+      <div class="shrink-0 border-t border-zinc-800 p-3">
+        <div class="grid grid-cols-2 gap-2">
+          <button class="text-[10px] font-medium py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition flex items-center justify-center gap-1">Clone <span class="text-zinc-500">▼</span></button>
+          <button class="text-[10px] font-medium py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition">Compact</button>
+          <button class="text-[10px] font-medium py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition">Rename</button>
+          <button class="text-[10px] font-medium py-1.5 rounded bg-red-950/50 text-red-400 hover:bg-red-900/40 transition">Retire</button>
+        </div>
+      </div>
+
+      <!-- 2.6 Context Sharing -->
+      <div class="shrink-0 border-t border-zinc-800 p-4 space-y-3">
+        <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Context Sharing</h3>
+        <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 space-y-2.5">
+          <div class="text-xs text-zinc-300"><span class="text-red-400 font-medium">res-01</span><span class="text-zinc-600 mx-1">→</span><span class="text-blue-400 font-medium">syn-01</span></div>
+          <div>
+            <label class="text-[10px] text-zinc-500 block mb-1">Trigger</label>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-0.5">
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="trigger" class="w-2.5 h-2.5 accent-violet-500"> Immediate</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="trigger" class="w-2.5 h-2.5 accent-violet-500"> Next</label>
+              <label class="flex items-center gap-1 text-[10px] text-violet-400"><input type="radio" name="trigger" checked class="w-2.5 h-2.5 accent-violet-500"> Queued</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="trigger" class="w-2.5 h-2.5 accent-violet-500"> Held</label>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 block mb-1">Payload</label>
+            <div class="space-y-0.5">
+              <label class="flex items-center gap-1 text-[10px] text-violet-400"><input type="radio" name="payload" checked class="w-2.5 h-2.5 accent-violet-500"> Freeform</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="payload" class="w-2.5 h-2.5 accent-violet-500"> Context <span class="text-zinc-600">[Full]</span></label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="payload" class="w-2.5 h-2.5 accent-violet-500"> Manual only</label>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 block mb-1">End after</label>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-0.5">
+              <label class="flex items-center gap-1 text-[10px] text-violet-400"><input type="radio" name="end" checked class="w-2.5 h-2.5 accent-violet-500"> None</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="end" class="w-2.5 h-2.5 accent-violet-500"> Turns</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="end" class="w-2.5 h-2.5 accent-violet-500"> Timeout</label>
+              <label class="flex items-center gap-1 text-[10px] text-zinc-400"><input type="radio" name="end" class="w-2.5 h-2.5 accent-violet-500"> Tokens</label>
+            </div>
+          </div>
+          <div class="flex gap-1.5 pt-1">
+            <button class="flex-1 text-[10px] font-medium py-1 rounded bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 transition">Save</button>
+            <button class="flex-1 text-[10px] font-medium py-1 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition">1-Shot</button>
+            <button class="flex-1 text-[10px] font-medium py-1 rounded bg-zinc-800 text-red-400/70 hover:bg-red-900/20 transition">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ RIGHT PANE (~38%) ═══════════ -->
+    <div class="w-[38%] flex flex-col overflow-hidden">
+
+      <!-- 2.7 Claude Code CLI -->
+      <div class="flex-1 flex flex-col overflow-hidden border-b border-zinc-800">
+        <div class="px-4 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-lg shadow-red-500/50"></div>
+            <span class="text-xs font-semibold text-zinc-300">res-01-sandy</span>
+            <span class="text-[10px] text-zinc-600 font-mono">tmux:claude-res-01</span>
+          </div>
+          <span class="text-[10px] text-emerald-400">● Working</span>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-[#0d0d0f] p-4 font-mono text-xs leading-relaxed">
+          <div class="text-zinc-500 mb-2">$ claude --agent researcher.md --model opus --allowedTools '*'</div>
+          <div class="text-zinc-300 mb-3"><span class="text-violet-400">Claude</span> <span class="text-zinc-600">></span> I'll analyze the auth module for security vulnerabilities. Let me start by examining the JWT implementation.</div>
+          <div class="text-zinc-500 mb-1 text-[10px]"><span class="text-emerald-500/70">◆</span> Read src/auth/jwt.ts</div>
+          <div class="text-zinc-300 mb-3"><span class="text-violet-400">Claude</span> <span class="text-zinc-600">></span> Found several issues in the JWT middleware:</div>
+          <div class="text-zinc-400 ml-2 mb-1">1. Token refresh doesn't validate expiry before issuing new token</div>
+          <div class="text-zinc-400 ml-2 mb-1">2. Weak default secret in development config leaks to prod</div>
+          <div class="text-zinc-400 ml-2 mb-3">3. No rate limiting on refresh endpoint</div>
+          <div class="text-zinc-500 mb-1 text-[10px]"><span class="text-emerald-500/70">◆</span> Read src/auth/refresh.ts</div>
+          <div class="text-zinc-300 mb-2"><span class="text-violet-400">Claude</span> <span class="text-zinc-600">></span> Analyzing the refresh handler now. The <code class="text-amber-300/80">validateToken()</code> function accepts expired tokens without checking the <code class="text-amber-300/80">exp</code> claim...</div>
+          <div class="inline-block w-2 h-4 bg-zinc-400 animate-pulse"></div>
+        </div>
+      </div>
+
+      <!-- 2.8 Prompt Tab Group -->
+      <div class="h-[280px] shrink-0 flex flex-col">
+        <div class="flex px-4 pt-2 border-b border-zinc-800 shrink-0">
+          <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-violet-400 text-zinc-200 cursor-pointer">Compose</button>
+          <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">Library</button>
+          <button data-tab-group="prompt" data-tab="broadcast" onclick="switchTab('prompt','broadcast')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">Broadcast</button>
+          <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="text-xs px-3 py-1.5 font-medium border-b-2 border-transparent text-zinc-500 cursor-pointer hover:text-zinc-400">History</button>
+        </div>
+
+        <!-- Compose tab -->
+        <div id="prompt-compose" data-group="prompt" class="flex-1 p-4 space-y-2 overflow-y-auto">
+          <div class="flex items-center gap-2">
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider w-12 shrink-0">Source</label>
+            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option>User</option><option>res-01-sandy</option><option>syn-01-kai</option><option>aud-01-drew</option></select>
+          </div>
+          <textarea rows="5" placeholder="Compose your prompt..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:border-violet-500 focus:outline-none resize-none font-mono leading-relaxed">Write your findings to the scratchpad and flag any critical vulnerabilities that need immediate attention. Include severity ratings.</textarea>
+          <div class="flex items-center gap-2">
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider w-12 shrink-0">Target</label>
+            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option>res-01-sandy</option><option>syn-01-kai</option><option>aud-01-drew</option></select>
+          </div>
+          <div class="flex gap-2">
+            <button class="flex-1 text-xs font-medium py-1.5 rounded bg-gradient-to-r from-violet-600 to-violet-500 text-white hover:from-violet-500 hover:to-violet-400 transition shadow-lg shadow-violet-600/20">Send</button>
+            <button class="text-xs font-medium py-1.5 px-3 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition">Clear</button>
+            <button class="text-xs font-medium py-1.5 px-3 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition">Queue</button>
+          </div>
+        </div>
+
+        <!-- Library tab -->
+        <div id="prompt-library" data-group="prompt" class="hidden flex-1 p-4 overflow-y-auto">
+          <div class="flex gap-3 h-full">
+            <!-- Template list -->
+            <div class="w-[40%] space-y-1">
+              <div class="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Templates</div>
+              <div class="bg-violet-600/10 border border-violet-500/30 rounded px-2 py-1.5 text-xs text-violet-300 cursor-pointer">analyze-codebase.md</div>
+              <div class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-xs text-zinc-400 cursor-pointer hover:border-zinc-700">review-pr.md</div>
+              <div class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-xs text-zinc-400 cursor-pointer hover:border-zinc-700">property-research.md</div>
+              <div class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-xs text-zinc-400 cursor-pointer hover:border-zinc-700">security-audit.md</div>
+            </div>
+            <!-- Preview + fill -->
+            <div class="flex-1 space-y-2">
+              <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2 text-[11px] text-zinc-400 font-mono leading-relaxed h-[90px] overflow-y-auto">
+                Analyze the codebase for <span class="text-amber-400">{{focus_area}}</span> and report findings to scratchpad. Include: file structure, key patterns, potential issues.
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-500 block mb-1">focus_area</label>
+                <input type="text" value="auth module" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:border-violet-500 focus:outline-none">
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] text-zinc-500 w-12 shrink-0">Target</label>
+                <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option>res-01-sandy</option><option>syn-01-kai</option><option>aud-01-drew</option></select>
+              </div>
+              <div class="flex gap-2">
+                <button class="flex-1 text-xs font-medium py-1 rounded bg-violet-600 text-white hover:bg-violet-500 transition">Send</button>
+                <button class="text-xs font-medium py-1 px-3 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition">Queue</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Broadcast tab -->
+        <div id="prompt-broadcast" data-group="prompt" class="hidden flex-1 p-4 space-y-2 overflow-y-auto">
+          <div class="flex items-center gap-2">
+            <label class="text-[10px] text-zinc-500 uppercase tracking-wider w-12 shrink-0">Source</label>
+            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option>User</option><option>res-01-sandy</option><option>syn-01-kai</option><option>aud-01-drew</option></select>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-[10px] text-zinc-500 uppercase tracking-wider">Target</label>
+              <div class="flex gap-2">
+                <button class="text-[9px] text-violet-400 hover:text-violet-300">All</button>
+                <button class="text-[9px] text-zinc-600 hover:text-zinc-400">None</button>
+              </div>
+            </div>
+            <div class="space-y-1 bg-zinc-900/50 border border-zinc-800 rounded-lg p-2">
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" checked class="w-3 h-3 accent-red-500"><span class="text-red-400">res-01-sandy</span></label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" checked class="w-3 h-3 accent-blue-500"><span class="text-blue-400">syn-01-kai</span></label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="w-3 h-3 accent-green-500"><span class="text-zinc-500">aud-01-drew</span></label>
+            </div>
+          </div>
+          <textarea rows="3" placeholder="Message to broadcast..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:border-violet-500 focus:outline-none resize-none font-mono">Stop current work and report status to scratchpad</textarea>
+          <button class="w-full text-xs font-medium py-1.5 rounded bg-violet-600 text-white hover:bg-violet-500 transition">Send to checked</button>
+        </div>
+
+        <!-- History tab -->
+        <div id="prompt-history" data-group="prompt" class="hidden flex-1 p-4 overflow-y-auto space-y-2">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] text-zinc-500 uppercase tracking-wider">History for</span>
+            <span class="text-xs font-semibold text-red-400">res-01-sandy</span>
+          </div>
+          <div class="space-y-2">
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2.5">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-zinc-300">User</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[9px] text-zinc-600 font-mono">14:32</span>
+                  <button class="text-[9px] text-violet-400 hover:text-violet-300">Reuse</button>
+                </div>
+              </div>
+              <div class="text-[11px] text-zinc-400 leading-relaxed">Analyze the JWT middleware in src/auth/ for security vulnerabilities. Focus on token refresh, secret management, and rate limiting.</div>
+            </div>
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2.5">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-green-400">aud-01-drew</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-600">queued</span>
+                  <span class="text-[9px] text-zinc-600 font-mono">14:38</span>
+                  <button class="text-[9px] text-violet-400 hover:text-violet-300">Reuse</button>
+                </div>
+              </div>
+              <div class="text-[11px] text-zinc-400 leading-relaxed">Confirmed the expiry bypass. Please investigate whether the same pattern exists in the OAuth2 flow at src/auth/oauth.ts.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div id="verify-box" style="position:fixed;left:350px;top:580px;width:222px;height:288px;border:3px solid #eab308;background:rgba(234,179,8,0.12);z-index:99990;pointer-events:none;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:18px;color:#eab308;font-weight:bold;">222×288 @ (350,580)</div>
+  <script src="design-tools.js"></script>
+</body>
+</html>

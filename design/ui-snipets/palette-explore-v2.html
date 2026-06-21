@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWL Dashboard — Palette Exploration v2 (agent-color families)</title>
+<!--
+  v2 — the UI palette + controls are LOCKED to ui-concept-v8p3.html (cream/navy/pink, neobrutalism:
+  2px navy borders, hard offset shadows, flat fills, 5px radius, Archivo). The only thing this file
+  explores is the AGENT IDENTITY color family — >=16 colors that must stay in a different visual
+  register from the UI's pink/teal/semantic signals so an agent never reads as a UI state.
+  Each family is generated in OKLCH (even hue spacing, fixed lightness) so the set is perceptually
+  even and one quality (chroma) defines the family. Resolved hexes are computed live via canvas.
+  (v1 = the earlier exploration of surface directions.)
+-->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* ===================== tokens — copied verbatim from ui-concept-v8p3 ===================== */
+  :root{
+    --background:#fef6e4; --secondary-background:#ffffff; --foreground:#001858; --main-foreground:#001858;
+    --main:#f582ae; --select:#f9cbdf; --secondary:#8bd3dd; --secondary-foreground:#001858;
+    --border:#001858; --surface-3:#f5ecd9; --muted:#5b5f86; --muted-2:#9a93b4; --rule:#d8cfb8;
+    --success:#2f9e6f; --warning:#d98a2b; --danger:#d23b6a;
+    --req-permission:#d23b4a; --req-approval:#cf7a2c; --req-decision:#a9710f;
+    --ag-user:#7b7fa6; --icon-fg:#ffffff;
+    --shadow:4px 4px 0 0 var(--border); --shadow-sm:2px 2px 0 0 var(--border);
+    --radius:5px;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  *{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--surface-3); }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--muted); border:2px solid var(--border); }
+  body{ font-family:'Archivo',sans-serif; font-weight:500; background:var(--background); color:var(--foreground); }
+  h1,h2,h3,h4{ font-weight:800; }
+  svg.lucide{ display:inline-block; vertical-align:middle; flex:0 0 auto; }
+  .mono{ font-family:'JetBrains Mono',monospace; }
+
+  /* ===================== page chrome ===================== */
+  .topbar{ position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px; height:44px;
+    padding:0 18px; background:var(--main); border-bottom:2px solid var(--border); }
+  .topbar h1{ font-size:14px; font-weight:900; color:var(--main-foreground); letter-spacing:-0.01em; }
+  .topbar .sub{ font-size:11px; font-weight:600; color:var(--main-foreground); opacity:.8; }
+  .topbar .chip{ margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:800;
+    background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius); padding:2px 8px; }
+  main{ max-width:1280px; margin:0 auto; padding:20px 22px 80px; }
+
+  .card{ background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px 22px; margin-bottom:22px; }
+  .card > h2{ font-size:13px; text-transform:uppercase; letter-spacing:0.07em; }
+  .card > .lead{ font-size:12.5px; line-height:1.55; color:var(--muted); margin-top:6px; max-width:920px; }
+  .card > .lead b{ color:var(--foreground); }
+  .divline{ height:0; border-top:2px solid var(--rule); margin:18px 0; }
+  .blkcap{ font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin:0 0 9px; }
+
+  /* ---- token legend ---- */
+  .legend{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px 22px; }
+  .lgrp h4{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin-bottom:8px; }
+  .swrow{ display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+  .sw{ width:28px; height:28px; border-radius:4px; flex:0 0 auto; border:2px solid var(--border); }
+  .swmeta{ line-height:1.2; min-width:0; }
+  .swmeta b{ font-size:11px; font-weight:800; display:block; }
+  .swmeta span{ font-size:9px; opacity:.7; }
+
+  /* ===================== neobrutalism controls (verbatim behaviour from v8p3) ===================== */
+  .gallery{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px 26px; }
+  .gsec .cap{ font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:9px; }
+  .row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+  .btn,.btn-main,.btn-secondary,.btn-danger,.btn-ghost{ font-family:'Archivo',sans-serif; display:inline-flex;
+    align-items:center; justify-content:center; gap:6px; height:30px; padding:0 12px; font-size:11px; font-weight:800;
+    cursor:pointer; border:2px solid var(--border); border-radius:var(--radius); color:var(--foreground);
+    background:var(--secondary-background); box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+  .btn:hover,.btn-main:hover,.btn-secondary:hover,.btn-danger:hover{ transform:translate(2px,2px); box-shadow:none; }
+  .btn-main{ background:var(--main); color:var(--main-foreground); }
+  .btn-secondary{ background:var(--secondary); color:var(--secondary-foreground); }
+  .btn-danger{ color:var(--danger); }            /* white button, danger TEXT — never a red fill w/ light text */
+  .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; color:var(--muted-2); }
+  .btn-sm{ height:25px; padding:0 9px; font-size:10px; }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
+  .btn i,.btn-main i,.btn-secondary i,.btn-danger i,.btn-ghost i{ width:13px; height:13px; }
+
+  .split{ display:inline-flex; align-items:stretch; height:30px; }
+  .split-drop{ display:inline-flex; align-items:center; gap:5px; padding:0 9px; font-size:11px; font-weight:800;
+    border:2px solid var(--border); border-right:none; border-radius:var(--radius) 0 0 var(--radius); cursor:pointer; }
+  .split-act{ display:inline-flex; align-items:center; justify-content:center; width:36px; border:2px solid var(--border);
+    border-radius:0 var(--radius) var(--radius) 0; cursor:pointer; box-shadow:var(--shadow-sm); }
+  .split-drop i,.split-act i{ width:13px; height:13px; }
+  .split--primary .split-drop{ background:#ef7aa6; color:var(--main-foreground); }
+  .split--primary .split-act{ background:var(--main); color:var(--main-foreground); }
+  .split--secondary .split-drop{ background:#bfe6ec; color:var(--secondary-foreground); }
+  .split--secondary .split-act{ background:var(--secondary); color:var(--secondary-foreground); }
+
+  .seg{ display:inline-flex; border:2px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--surface-3); }
+  .seg button{ font-family:'Archivo',sans-serif; font-size:10px; font-weight:700; padding:6px 12px; border:none;
+    border-right:2px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; }
+  .seg button:last-child{ border-right:none; }
+  .seg button.active{ background:var(--main); color:var(--main-foreground); font-weight:800; }
+
+  .in{ display:flex; align-items:center; gap:6px; background:var(--secondary-background); border:2px solid var(--border);
+    border-radius:var(--radius); padding:6px 9px; }
+  .in input{ flex:1; border:none; outline:none; background:transparent; font-family:'Archivo',sans-serif; font-size:11px; font-weight:600; color:var(--foreground); }
+  .in .clr{ width:14px; height:14px; color:var(--muted-2); cursor:pointer; }
+  .lbl{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:5px; display:block; }
+
+  .dot{ width:9px; height:9px; border-radius:50%; border:2px solid var(--border); display:inline-block; }
+  .statline{ display:inline-flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; }
+  .sbadge{ display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; padding:2px 8px;
+    border-radius:var(--radius); border:2px solid var(--border); }
+  .sbadge i{ width:11px; height:11px; }
+  .countbadge{ min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--main); color:var(--main-foreground);
+    font-size:10px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--border); font-family:'JetBrains Mono',monospace; }
+
+  .pbar-wrap{ display:flex; align-items:center; gap:9px; }
+  .pbar{ flex:1; height:9px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); }
+  .pbar > i{ display:block; height:100%; }
+  .pbar-pc{ font-size:10px; font-weight:800; font-family:'JetBrains Mono',monospace; }
+
+  /* ---- agent identity primitives (the recolorable tile is the whole point) ---- */
+  .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border:2px solid var(--border);
+    border-radius:var(--radius); }
+  .agtile i{ color:var(--icon-fg); stroke-width:2.4; }
+  .aglist{ border:2px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--secondary-background); }
+  .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent;
+    border:none; border-top:2px solid var(--rule); cursor:pointer; }
+  .agrow:first-child{ border-top:none; }
+  .agrow:hover:not(.on){ background:var(--surface-3); }
+  .agrow.on{ background:var(--select); }
+  .agrow .agtile{ width:28px; height:28px; }
+  .agrow .agtile i{ width:15px; height:15px; }
+  .ag-lab{ display:flex; flex-direction:column; line-height:1.12; min-width:0; flex:1; }
+  .ag-role{ font-size:7.5px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .agrow.on .ag-role{ color:var(--main-foreground); opacity:.7; }
+  .ag-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ag-ck{ width:14px; height:14px; color:var(--main-foreground); opacity:0; flex:0 0 auto; }
+  .agrow.on .ag-ck{ opacity:1; }
+
+  /* ---- graph node ---- */
+  .node{ position:relative; display:flex; flex-direction:column; gap:6px; background:var(--secondary-background);
+    border:2px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:9px; }
+  .node-dot{ position:absolute; top:-7px; left:-7px; width:14px; height:14px; border-radius:50%; border:2px solid var(--border); }
+  .node-top{ display:flex; align-items:center; gap:7px; }
+  .node-top .agtile{ width:30px; height:30px; }
+  .node-top .agtile i{ width:16px; height:16px; }
+  .node-role{ font-size:7.5px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700; color:var(--muted); }
+  .node-name{ font-size:12px; font-weight:900; color:var(--foreground); }
+  .node-meta{ font-size:8px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+
+  /* ---- feed message card ---- */
+  .rcard{ position:relative; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius); padding:7px 9px; }
+  .rc-head{ display:flex; align-items:center; gap:7px; }
+  .rc-name{ font-size:11px; font-weight:800; }
+  .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:3px; border:2px solid var(--border); background:transparent; color:var(--muted); }
+  .rc-time{ margin-left:auto; font-size:9px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+  .rc-body{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin-top:3px; }
+
+  /* ---- request card ---- */
+  .req{ position:relative; border:2px solid var(--border); border-radius:var(--radius); background:var(--secondary-background);
+    padding:8px 10px 8px 13px; box-shadow:var(--shadow-sm); overflow:hidden; }
+  .req::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:6px; background:var(--stripe); }
+  .req-top{ display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+  .req-top .agtile{ width:26px; height:26px; }
+  .req-top .agtile i{ width:14px; height:14px; }
+  .req-id .r{ font-size:7.5px; font-weight:700; text-transform:uppercase; color:var(--muted); }
+  .req-id .n{ font-size:11px; font-weight:900; color:var(--foreground); }
+  .req-type{ margin-left:auto; display:inline-flex; align-items:center; gap:4px; font-size:8.5px; font-weight:800; padding:2px 7px; border-radius:var(--radius); border:2px solid var(--border); }
+  .req-type i{ width:10px; height:10px; }
+  .req-title{ font-size:11px; font-weight:800; }
+  .req-sub{ font-size:10px; color:var(--muted); margin-top:1px; line-height:1.4; }
+  .req-acts{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+
+  /* ===================== family explorer ===================== */
+  .extabs{ display:flex; gap:6px; margin-left:auto; }
+  .extab{ font-family:'Archivo',sans-serif; font-size:11px; font-weight:800; padding:5px 12px; border:2px solid transparent;
+    border-radius:var(--radius); background:transparent; color:var(--muted); cursor:pointer; }
+  .extab:hover{ color:var(--foreground); }
+  .extab.active{ background:var(--main); color:var(--main-foreground); border-color:var(--border); box-shadow:var(--shadow-sm); }
+  .exhead{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+
+  .fampanel{ display:none; }
+  .fampanel.show{ display:block; }
+  .qchips{ display:flex; gap:7px; flex-wrap:wrap; margin:10px 0 4px; }
+  .qchip{ font-size:10px; font-weight:800; padding:3px 10px; border:2px solid var(--border); border-radius:var(--radius); background:var(--surface-3); }
+
+  /* register comparison */
+  .compare{ display:grid; grid-template-columns:1fr; gap:12px; background:var(--background); border:2px dashed var(--rule);
+    border-radius:var(--radius); padding:13px 15px; margin:14px 0 18px; }
+  .cmprow{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .cmplab{ width:150px; flex:0 0 auto; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+  .cmpsw{ display:flex; gap:6px; flex-wrap:wrap; }
+  .cmpsw .s{ width:26px; height:26px; border:2px solid var(--border); border-radius:4px; }
+
+  /* swatch grid */
+  .swatchgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:11px; }
+  .scard{ display:flex; align-items:center; gap:9px; }
+  .scard .agtile{ width:38px; height:38px; }
+  .scard .agtile i{ width:19px; height:19px; }
+  .scard .meta{ line-height:1.2; min-width:0; }
+  .scard .meta b{ font-size:11px; font-weight:800; text-transform:capitalize; display:block; }
+  .scard .meta span{ font-size:9px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+
+  /* context grid */
+  .ctxgrid{ display:grid; grid-template-columns:minmax(220px,0.9fr) minmax(300px,1.3fr); gap:20px; align-items:start; }
+  @media (max-width:900px){ .ctxgrid{ grid-template-columns:1fr; } }
+  .nodes{ display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+  .feedstack{ display:flex; flex-direction:column; gap:8px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>AWL Palette — Agent-Color Families</h1>
+  <span class="sub">v2 · UI palette locked to v8p3 · the only variable is the agent identity family</span>
+  <span class="chip">v2</span>
+</header>
+
+<main>
+  <!-- ===================== LOCKED UI ===================== -->
+  <section class="card">
+    <h2>Locked — UI palette &amp; controls (from v8p3)</h2>
+    <p class="lead">These tokens and controls are <b>fixed</b> — pulled straight from
+      <b>ui-concept-v8p3.html</b>. The neobrutalism rule holds everywhere: <b>navy ink on every fill</b>,
+      hard 2px borders, flat offset shadows. The <b>only</b> light/knockout text in the whole UI is the
+      <b>white agent glyph</b> on a colored tile. (That's the fix for the washed-out light button text in v1.)
+      Nothing below changes between the family options — it's here so you can judge each agent family
+      <i>against</i> the real UI signals.</p>
+
+    <div class="divline"></div>
+    <div class="blkcap">Tokens</div>
+    <div class="legend" id="ui-legend"></div>
+
+    <div class="divline"></div>
+    <div class="blkcap">Controls — navy ink on every fill</div>
+    <div class="gallery">
+      <div class="gsec"><div class="cap">Buttons</div>
+        <div class="row">
+          <button class="btn-main"><i data-lucide="send-horizontal"></i>Send</button>
+          <button class="btn-secondary"><i data-lucide="wand-sparkles"></i>Revise</button>
+          <button class="btn">Default</button>
+          <button class="btn-danger"><i data-lucide="power"></i>Retire</button>
+          <button class="btn-ghost"><i data-lucide="copy"></i></button>
+          <button class="btn" disabled>Disabled</button>
+        </div>
+      </div>
+      <div class="gsec"><div class="cap">Split buttons (primary · secondary)</div>
+        <div class="row">
+          <span class="split split--primary"><button class="split-drop"><i data-lucide="chevron-down"></i>Now</button><button class="split-act"><i data-lucide="send-horizontal"></i></button></span>
+          <span class="split split--secondary"><button class="split-drop"><i data-lucide="chevron-down"></i>Grammar</button><button class="split-act"><i data-lucide="wand-sparkles"></i></button></span>
+        </div>
+      </div>
+      <div class="gsec"><div class="cap">Segmented · count</div>
+        <div class="row">
+          <span class="seg"><button>Plan</button><button class="active">Auto</button><button>Edit</button><button>Ask</button></span>
+          <span class="countbadge">4</span>
+        </div>
+      </div>
+      <div class="gsec"><div class="cap">Status — good → bad</div>
+        <div class="row" style="gap:13px;margin-bottom:9px">
+          <span class="statline"><span class="dot" style="background:var(--success)"></span>active</span>
+          <span class="statline"><span class="dot" style="background:var(--muted-2)"></span>idle</span>
+          <span class="statline"><span class="dot" style="background:var(--warning)"></span>pending</span>
+        </div>
+        <div class="row">
+          <span class="sbadge" style="background:#e3f2eb;color:var(--success)"><i data-lucide="circle-check"></i>Success</span>
+          <span class="sbadge" style="background:#f7ecda;color:var(--warning)"><i data-lucide="clock"></i>Pending</span>
+          <span class="sbadge" style="background:#fbe4ea;color:var(--danger)"><i data-lucide="circle-x"></i>Error</span>
+        </div>
+      </div>
+      <div class="gsec"><div class="cap">Context usage</div>
+        <div class="pbar-wrap"><div class="pbar"><i style="width:40%;background:var(--success)"></i></div><span class="pbar-pc">40%</span></div>
+        <div class="pbar-wrap" style="margin-top:7px"><div class="pbar"><i style="width:88%;background:var(--danger)"></i></div><span class="pbar-pc">88%</span></div>
+      </div>
+      <div class="gsec"><div class="cap">Input</div>
+        <label class="lbl">Name</label>
+        <div class="in"><input value="researcher-01-sandy"><i data-lucide="x" class="clr"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAMILY EXPLORER ===================== -->
+  <section class="card">
+    <div class="exhead">
+      <div>
+        <h2>Explore — agent identity family <span class="mono" style="font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0">(16 colors)</span></h2>
+        <p class="lead" style="margin-top:6px">Each agent owns one color, used everywhere it appears (graph dot + tile, feed
+          name, rows, requests). The goal: a set that's <b>internally even</b> (no agent louder than another) and sits in a
+          <b>different register from the UI signals</b> above, so a colored tile never gets mistaken for pink-selected,
+          teal-secondary, or a green/amber/red state. All three families are built in <b>OKLCH</b> — 16 hues spaced evenly
+          around the wheel at a fixed lightness; only the <b>chroma/lightness "quality" changes per family</b>.</p>
+      </div>
+      <div class="extabs" id="extabs"></div>
+    </div>
+    <div id="fam-stage"></div>
+  </section>
+</main>
+
+<script>
+/* ===================== UI token legend (locked) ===================== */
+const UI_LEGEND = [
+  ['Surfaces', [
+    ['--background','#fef6e4','canvas + feed wells'],
+    ['--secondary-background','#ffffff','cards · inputs · rows'],
+    ['--surface-3','#f5ecd9','headers · toolbars · chrome'],
+    ['--rule','#d8cfb8','hairline row dividers'],
+  ]],
+  ['Ink & lines', [
+    ['--border / --foreground','#001858','2px navy stroke + headings'],
+    ['--muted','#5b5f86','labels / meta'],
+    ['--muted-2','#9a93b4','faint / disabled / idle'],
+  ]],
+  ['Brand / action', [
+    ['--main','#f582ae','primary action · active · badges'],
+    ['--select','#f9cbdf','selected-row fill (lists)'],
+    ['--secondary','#8bd3dd','secondary action (Revise)'],
+  ]],
+  ['Status — good → bad', [
+    ['--success','#2f9e6f','active / success'],
+    ['--warning','#d98a2b','pending / approval'],
+    ['--danger','#d23b6a','danger / deny / error'],
+    ['req · permission','#d23b4a','highest-urgency request'],
+    ['req · decision','#a9710f','lowest-urgency request'],
+  ]],
+];
+document.getElementById('ui-legend').innerHTML = UI_LEGEND.map(([t,rows])=>`
+  <div class="lgrp"><h4>${t}</h4>${rows.map(([nm,c,use])=>`
+    <div class="swrow"><span class="sw" style="background:${c}"></span>
+      <span class="swmeta"><b>${nm}</b><span class="mono">${c}</span> · <span>${use}</span></span></div>`).join('')}</div>`).join('');
+
+/* ===================== agent families (OKLCH) ===================== */
+/* 16 hues, evenly spaced around the wheel; only chroma/lightness define each family's "quality". */
+const HUES  = [25,47.5,70,92.5,115,137.5,160,182.5,205,227.5,250,272.5,295,317.5,340,2.5];
+const NAMES = ['vermilion','amber','gold','citron','lime','fern','emerald','teal','cyan','azure','cobalt','indigo','violet','orchid','magenta','crimson'];
+const ROSTER = [
+  ['researcher','01 sandy','wand-sparkles'],['synthesizer','01 kai','box'],['auditor','01 drew','shield'],
+  ['coder','01 max','bot'],['reviewer','01 vega','eye'],['planner','01 quinn','compass'],
+  ['docs','01 wren','file-text'],['designer','01 lex','palette'],['ops','01 sage','gauge'],
+  ['analyst','01 io','brain'],['tester','01 nova','flask-conical'],['scribe','01 fen','pen-tool'],
+  ['researcher','02 rowan','search'],['architect','01 cass','cpu'],['ops','02 bly','rocket'],['writer','01 dot','sparkles'],
+];
+
+const FAMILIES = [
+  { key:'A', name:'Jewel — deep & rich', L:0.52, C:0.150,
+    quality:['deep / saturated','equal-weight jewel tones','clearly darker than UI pastels'],
+    rationale:'Rich, dark, fully-saturated hues. The most identity-forward set — each tile is a solid, confident color. Because the UI signals (pink, teal, the status ramp) are all <b>lighter</b>, these deep tiles read as a distinctly heavier "material" and never blur into a UI state. Closest in spirit to today\'s v8p3 set, but regularized so hues are evenly spaced and equally weighted.' },
+  { key:'B', name:'Muted — earthy & grayed', L:0.53, C:0.082,
+    quality:['low chroma / grayed','calm, recessive','UI signals always win attention'],
+    rationale:'Same darkness, far less chroma — sophisticated, slightly earthy tones. The differentiation here is <b>loudness</b>: agent identity becomes a quiet background layer, so the saturated UI signals (a pink Send, a red permission stripe, a green active dot) always pop above it. Best when the screen is dense and you want state to outrank identity.' },
+  { key:'C', name:'Vivid — bright & even', L:0.585, C:0.135,
+    quality:['a touch lighter','punchy but even','maximally distinct from each other'],
+    rationale:'Lifts lightness and keeps strong chroma for the most energetic, scannable identities — the 16 are very easy to tell apart at a glance in a busy graph. Still a different register from the UI (more saturated and full-hue than the pink/teal pastels), but the boldest of the three; watch the lighter tiles against white-glyph contrast.' },
+];
+
+/* resolve oklch() -> hex via canvas (modern Chromium) */
+const _cv = document.createElement('canvas'); _cv.width = _cv.height = 1;
+const _ctx = _cv.getContext('2d', { willReadFrequently:true });
+function toHex(css){
+  try{ _ctx.fillStyle = '#000'; _ctx.fillStyle = css; _ctx.fillRect(0,0,1,1);
+    const d = _ctx.getImageData(0,0,1,1).data;
+    return '#'+[d[0],d[1],d[2]].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+  catch(e){ return css; }
+}
+const famColor = (f,i)=>`oklch(${f.L} ${f.C} ${HUES[i]})`;
+
+/* UI signal swatches for the register comparison */
+const UI_SIGNALS = ['#f582ae','#f9cbdf','#8bd3dd','#2f9e6f','#d98a2b','#d23b6a'];
+
+function tile(color,glyph,cls=''){ return `<span class="agtile ${cls}" style="background:${color}"><i data-lucide="${glyph}"></i></span>`; }
+
+function swatchGrid(f){
+  return `<div class="swatchgrid">${ROSTER.map((r,i)=>{
+    const col = famColor(f,i);
+    return `<div class="scard">${tile(col,r[2])}<div class="meta"><b>${NAMES[i]}</b><span>${toHex(col)}</span></div></div>`;
+  }).join('')}</div>`;
+}
+
+function rowsList(f){
+  return `<div class="aglist">${ROSTER.map((r,i)=>`
+    <button class="agrow${i===0||i===3||i===6?' on':''}">
+      ${tile(famColor(f,i),r[2])}
+      <span class="ag-lab"><span class="ag-role">${r[0]}</span><span class="ag-name">${r[1]}</span></span>
+      <i data-lucide="check" class="ag-ck"></i>
+    </button>`).join('')}</div>`;
+}
+
+function nodes(f){
+  const pick=[0,3,6,10]; const pcs=['62%','34%','88%','12%']; const cols=['var(--success)','var(--warning)','var(--danger)','var(--success)'];
+  return `<div class="nodes">${pick.map((i,k)=>{const r=ROSTER[i];const col=famColor(f,i);return `
+    <div class="node"><span class="node-dot" style="background:${col}"></span>
+      <div class="node-top">${tile(col,r[2])}<div><div class="node-role">${r[0]}</div><div class="node-name">${r[1]}</div></div></div>
+      <div class="node-meta">opus 4.8 · auto · high</div>
+      <div class="pbar-wrap"><div class="pbar"><i style="width:${pcs[k]};background:${cols[k]}"></i></div><span class="pbar-pc">${pcs[k]}</span></div>
+    </div>`;}).join('')}</div>`;
+}
+
+function feed(f){
+  const msgs=[
+    [1,'synthesizer-01-kai','recv','14:41','Merged the three findings into a remediation plan, ordered critical → high → medium.'],
+    [null,'User','sent','14:42','Confirm the expiry bypass with auditor-01 and post the plan to the scratchpad.'],
+    [2,'auditor-01-drew','recv','14:43','Confirmed 2 of 3. Expiry bypass is critical — tokens refresh indefinitely.'],
+    [4,'reviewer-01-vega','recv','14:44','Reviewed the diff: two style nits and one missing test on the rotation path.'],
+  ];
+  return `<div class="feedstack">${msgs.map(([i,nm,dir,t,body])=>{
+    const col = i===null ? 'var(--foreground)' : famColor(f,i);
+    return `<div class="rcard"><div class="rc-head"><span class="rc-name" style="color:${col}">${nm}</span>
+      <span class="dir-tag">${dir}</span><span class="rc-time">${t}</span></div>
+      <div class="rc-body">${body}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function requests(f){
+  const reqs=[
+    ['var(--req-permission)','Permission','circle-alert',2,'Run bash command','<span class="mono">rm -rf node_modules &amp;&amp; pnpm install</span>',
+      '<button class="btn-main btn-sm">Approve</button><button class="btn btn-sm">Deny</button><button class="btn btn-sm">Always</button>'],
+    ['var(--req-decision)','Decision','git-branch',4,'Choose token rotation strategy','Sliding window vs one-time rotation — pick before merge.',
+      '<button class="btn-main btn-sm" disabled>Approve</button><button class="btn btn-sm"><i data-lucide="send-horizontal"></i>Reply</button>'],
+  ];
+  return `<div class="feedstack">${reqs.map(([stripe,type,ic,i,title,sub,acts])=>{const r=ROSTER[i];return `
+    <div class="req" style="--stripe:${stripe}">
+      <div class="req-top">${tile(famColor(f,i),r[2])}
+        <span class="req-id"><span class="r">${r[0]}</span><br><span class="n">${r[1]}</span></span>
+        <span class="req-type" style="color:${stripe}"><i data-lucide="${ic}"></i>${type}</span></div>
+      <div class="req-title">${title}</div><div class="req-sub">${sub}</div>
+      <div class="req-acts">${acts}</div>
+    </div>`;}).join('')}</div>`;
+}
+
+function compare(f){
+  return `<div class="compare">
+    <div class="cmprow"><span class="cmplab">UI signal colors</span>
+      <div class="cmpsw">${UI_SIGNALS.map(c=>`<span class="s" style="background:${c}"></span>`).join('')}</div></div>
+    <div class="cmprow"><span class="cmplab">Agent identity (this family)</span>
+      <div class="cmpsw">${ROSTER.map((r,i)=>`<span class="s" style="background:${famColor(f,i)}"></span>`).join('')}</div></div>
+  </div>`;
+}
+
+function buildFamily(f, first){
+  const panel = document.createElement('div');
+  panel.className = 'fampanel'+(first?' show':'');
+  panel.id = 'fam-'+f.key;
+  panel.innerHTML = `
+    <div class="divline"></div>
+    <h3 style="font-size:17px;font-weight:900;letter-spacing:-0.01em">Family ${f.key} — ${f.name}</h3>
+    <div class="qchips">${f.quality.map(q=>`<span class="qchip">${q}</span>`).join('')}</div>
+    <p class="lead" style="margin-top:8px">${f.rationale}</p>
+    <div class="blkcap" style="margin-top:16px">Register check — agent family vs the UI signals it must stay clear of</div>
+    ${compare(f)}
+    <div class="blkcap">The 16 colors <span style="font-weight:600;text-transform:none;letter-spacing:0">· oklch(${f.L} ${f.C} h) · resolved hexes shown</span></div>
+    ${swatchGrid(f)}
+    <div class="divline"></div>
+    <div class="blkcap">In context — the same colors on the real v8p3 surfaces</div>
+    <div class="ctxgrid">
+      <div>
+        <div class="blkcap">Identity rows (Filter / Source / Target)</div>
+        ${rowsList(f)}
+      </div>
+      <div>
+        <div class="blkcap">Team Graph cards</div>
+        ${nodes(f)}
+        <div class="blkcap" style="margin-top:16px">Team Feed — names colored by agent</div>
+        ${feed(f)}
+        <div class="blkcap" style="margin-top:16px">Requests — agent tile + semantic stripe</div>
+        ${requests(f)}
+      </div>
+    </div>`;
+  return panel;
+}
+
+const stage = document.getElementById('fam-stage');
+const extabs = document.getElementById('extabs');
+FAMILIES.forEach((f,i)=>{
+  const b = document.createElement('button');
+  b.className = 'extab'+(i===0?' active':'');
+  b.textContent = 'Family '+f.key;
+  b.onclick = ()=>{
+    document.querySelectorAll('.extab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.querySelectorAll('.fampanel').forEach(p=>p.classList.remove('show'));
+    document.getElementById('fam-'+f.key).classList.add('show');
+    lucide.createIcons();
+  };
+  extabs.appendChild(b);
+  stage.appendChild(buildFamily(f, i===0));
+});
+
+lucide.createIcons();
+
+/* live-reload on save (design iteration) */
+(function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},700);})();
+</script>
+</body>
+</html>

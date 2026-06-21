@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../../../../.claude"
+		}
+	],
+	"settings": {
+		"claude-history.export.directory": ".claude/cc-exports"
+	}
+}

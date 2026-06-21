@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-filter header dropdowns + identity badges — concepts</title>
+  <!--
+    Option 3 (header dropdowns) for ALL agent filters, with rich multi-select BADGES.
+    Chosen direction: From/To (Prompts) and Filter (Feed) become dropdown triggers in a thin sub-header
+    (no always-on column). This snippet focuses on the multi-select TRIGGER: instead of plain mini-tiles,
+    each selected agent shows as a floating BADGE carrying its full identity (icon + role + number·name),
+    the same info as a list row. Constraint: the multi trigger must stay the SAME HEIGHT as the single
+    From/Source trigger — so badges are sized to one row, and overflow collapses to a "+N" chip.
+    Two badge formats to compare (the trade-off is whether two lines survive at single-dropdown height):
+      A — two-line (list format): small icon + role over number·name. Most faithful to the list.
+      B — one-line, icon fills the full badge height: square stamped icon + a single "01 name" line.
+      C — one-line + inline role: like B with a faded role after the name.
+    In context: Prompts (From + To) uses A; Feed (Filter) uses B — so both are visible at once. Pick one
+    format for both. Tokens/classes ported ~1:1 from ui-concept-v9p8.html.
+  -->
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root{
+      --background:#fef6e4; --secondary-background:#ffffff; --foreground:#001858; --main-foreground:#001858;
+      --main:#f582ae; --border:#001858; --ring:#8bd3dd; --overlay:rgba(0,24,88,0.55);
+      --secondary:#8bd3dd; --secondary-foreground:#001858; --select:#a9dde7;
+      --surface-3:#f5ecd9; --muted:#5b5f86; --muted-2:#9a93b4; --rule:#d8cfb8; --surface-btn:#fbf5e8;
+      --success:#2f9e6f; --warning:#d98a2b; --danger:#d23b6a; --ag-user:#7b7fa6; --icon-fg:#ffffff;
+      --shadow:4px 4px 0 0 var(--border); --shadow-sm:2px 2px 0 0 var(--border);
+      --radius-base:5px;
+    }
+    *{ box-sizing:border-box; scrollbar-width:thin; scrollbar-color:var(--muted) var(--surface-3); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+    ::-webkit-scrollbar-track{ background:var(--surface-3); border-left:2px solid var(--border); }
+    ::-webkit-scrollbar-thumb{ background:var(--muted); border:2px solid var(--border); }
+    body{ margin:0; background:var(--background); color:var(--foreground); font-family:'Archivo',sans-serif; font-weight:500; }
+    h1,h2,h3,h4,h5{ font-weight:800; margin:0; }
+    svg.lucide{ display:inline-block; vertical-align:middle; flex:0 0 auto; }
+
+    /* ---- ported components (trimmed) ---- */
+    .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden;
+      border:2px solid var(--border); border-radius:var(--radius-base); background:transparent; }
+    .agtile .ag-svg{ width:100%; height:100%; display:block; }
+    .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
+    .agtile--user{ background:var(--ag-user); }
+    .agrow .agtile{ width:28px; height:28px; }
+
+    .pcard-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0;
+      height:36px; min-height:36px; padding:0 10px; background:var(--surface-3); border-bottom:2px solid var(--border); }
+    .pcard-head h3{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--foreground); white-space:nowrap; }
+    .pcard-body{ flex:1 1 auto; min-height:0; background:var(--background); }
+    .pcard-foot{ flex-shrink:0; background:var(--surface-3); border-top:2px solid var(--border); }
+    .req-badge{ min-width:18px; height:16px; padding:0 5px; border:2px solid var(--border); border-radius:8px; display:inline-flex;
+      align-items:center; justify-content:center; font-size:9.5px; font-weight:900; background:var(--main); color:var(--main-foreground); margin-left:4px; }
+
+    .btn,.btn-main{ display:inline-flex; align-items:center; justify-content:center; gap:6px; height:30px; padding:0 12px;
+      font-size:11px; font-weight:800; cursor:pointer; border:2px solid var(--border); border-radius:var(--radius-base);
+      color:var(--foreground); background:var(--surface-btn); box-shadow:var(--shadow-sm);
+      transition:transform .07s ease, box-shadow .07s ease, background .12s; white-space:nowrap; }
+    .btn:hover,.btn-main:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .btn-main{ background:var(--main); color:var(--main-foreground); }
+    .btn-sm{ height:25px; padding:0 9px; font-size:10px; }
+
+    .tabset{ display:flex; align-items:center; gap:5px; height:100%; }
+    .tab-btn{ display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 9px; font-size:10.5px; font-weight:800;
+      color:var(--muted); background:transparent; border:2px solid transparent; border-radius:var(--radius-base); cursor:pointer; }
+    .tab-btn.active{ color:var(--main-foreground); background:var(--main); border-color:var(--border); box-shadow:var(--shadow-sm); }
+
+    .in{ width:100%; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base);
+      padding:6px 9px; font-size:11px; font-weight:600; color:var(--foreground); outline:none; line-height:1.5; }
+    textarea.ta-resize{ resize:none; }
+    .sec-h{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);
+      margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+    .mini-link{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; }
+    .mini-link:hover{ color:#b06d20; }
+
+    .aglist{ border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    .aglist.scroll{ overflow-y:auto; }
+    .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent;
+      border:none; border-top:2px solid var(--rule); cursor:pointer; transition:background .1s; }
+    .agrow:first-child{ border-top:none; }
+    .agrow:hover:not(.on){ background:var(--surface-3); }
+    .agrow.on{ background:var(--select); }
+    .ag-lab{ display:flex; flex-direction:column; line-height:1.12; min-width:0; flex:1; }
+    .ag-role{ font-size:7.5px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ag-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .agrow.on .ag-role{ color:var(--main-foreground); opacity:.7; }
+    .ag-ck{ width:14px; height:14px; color:var(--main-foreground); opacity:0; flex:0 0 auto; }
+    .agrow.on .ag-ck{ opacity:1; }
+
+    .src-pop{ display:none; position:absolute; z-index:70; top:calc(100% + 6px); left:0; right:0; min-width:230px; max-height:288px; overflow-y:auto;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:5px; }
+    .src-pop.open{ display:block; }
+    .src-pop .aglist{ border:none; }
+    .picker-cv{ width:13px; height:13px; color:var(--muted); flex:0 0 auto; }
+
+    .mic-btn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:0 0 auto; padding:0;
+      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground);
+      cursor:pointer; box-shadow:var(--shadow-sm); }
+    .mic-btn svg{ width:14px; height:14px; }
+    .rcard{ background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); padding:8px 10px; }
+    .rc-name{ font-size:11px; font-weight:800; }
+    .rc-time{ font-size:9px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+    .rc-body{ font-size:11px; color:var(--foreground); line-height:1.45; margin-top:2px; opacity:.92; }
+    .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; padding:1px 6px; border-radius:3px; border:2px solid var(--border); color:var(--muted); }
+
+    /* ======================= the dropdown TRIGGER (single + multi, equal height) ======================= */
+    .dd{ position:relative; }
+    .dd-trig{ width:100%; display:flex; align-items:center; gap:7px; height:40px; padding:0 8px; cursor:pointer; text-align:left;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
+      transition:transform .07s, box-shadow .07s; }
+    .dd-trig:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .dd-trig > .agtile{ width:26px; height:26px; }          /* single (From) identity tile */
+    .dd-trig .picker-cv{ margin-left:auto; }
+    .dd-badges{ display:flex; align-items:center; gap:5px; flex:1; min-width:0; overflow:hidden; }
+    .b-empty{ font-size:10px; font-weight:700; color:var(--muted-2); }
+
+    /* ---- identity BADGE (3 formats) ---- */
+    .badge{ display:inline-flex; align-items:center; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
+    /* A — two-line, list format */
+    .badge-a{ height:30px; gap:5px; padding:0 7px 0 3px; }
+    .badge-a .agtile{ width:22px; height:22px; }
+    .badge-a .b-lab{ display:flex; flex-direction:column; line-height:1.04; min-width:0; }
+    .badge-a .b-role{ font-size:6.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; color:var(--muted); white-space:nowrap; }
+    .badge-a .b-name{ font-size:9.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    /* B & C — one line, icon fills the FULL badge height (square, with a divider) */
+    .badge-b, .badge-c{ height:28px; }
+    .badge-b .agtile, .badge-c .agtile{ height:100%; width:26px; border:none; border-right:2px solid var(--border); border-radius:0; }
+    .b-one{ padding:0 8px; display:inline-flex; align-items:center; font-size:10.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    .b-sub{ font-size:8.5px; font-weight:700; color:var(--muted); margin-left:5px; }
+    /* +N overflow chip */
+    .badge-more{ height:28px; padding:0 9px; display:inline-flex; align-items:center; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base);
+      background:var(--surface-3); font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:800; color:var(--muted); }
+
+    /* ======================= sub-header (From/To · Filter) ======================= */
+    .subbar{ display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:2px solid var(--border); background:var(--surface-3); }
+    .subbar-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); flex:0 0 auto; }
+    .subbar .dd.single{ flex:0 0 150px; }
+    .subbar .dd.multi{ flex:1; min-width:0; }
+    .compose-area{ flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; }
+    .compose-area textarea{ flex:1; min-height:60px; }
+
+    /* ======================= page scaffold ======================= */
+    .page{ max-width:1180px; margin:0 auto; padding:24px 22px 60px; }
+    .page > h1{ font-size:20px; font-weight:900; }
+    .lede{ font-size:12.5px; color:var(--muted); max-width:880px; line-height:1.6; margin:8px 0 0; }
+    .lede b{ color:var(--foreground); } .lede code{ font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 4px; }
+    h2.sec{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:30px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--rule); }
+    .vgrid{ display:flex; flex-wrap:wrap; gap:18px; }
+    .vcard{ width:360px; max-width:100%; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:13px 14px 15px; }
+    .vtitle{ font-size:12px; font-weight:900; margin-bottom:2px; }
+    .vtitle .k{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--main); font-weight:800; margin-right:5px; }
+    .vsub{ font-size:10.5px; color:var(--muted); line-height:1.5; margin:0 0 12px; }
+    .vrow{ display:flex; align-items:center; gap:9px; margin-top:8px; }
+    .vrow > .vlab{ width:34px; flex:0 0 auto; font-size:8.5px; font-weight:800; text-transform:uppercase; color:var(--muted); }
+    .vrow > .dd{ flex:1; min-width:0; }
+    .hint{ font-size:9.5px; color:var(--muted-2); margin-top:11px; font-style:italic; }
+    .mock{ width:620px; max-width:100%; }
+    .mock-cap{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#fff; background:var(--foreground);
+      display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border:2px solid var(--border); border-radius:var(--radius-base) var(--radius-base) 0 0; border-bottom:none; }
+    .panel{ width:100%; height:330px; display:flex; flex-direction:column; background:var(--background); border:2px solid var(--border);
+      border-radius:0 var(--radius-base) var(--radius-base) var(--radius-base); box-shadow:var(--shadow); overflow:hidden; }
+    .note{ font-size:11.5px; color:var(--muted); line-height:1.55; margin:10px 2px 0; }
+    .note b{ color:var(--foreground); }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute"><defs>
+    <symbol id="ag-wizard" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256.3 19.42C204 57.2 177.2 111 152.5 160.7c43.4-24.6 101.7-32.9 126.9-28.7-63.8 10.6-108 25.8-144.4 64.3-2.2 4.5-4.1 8.3-6.4 13.1 115.4-27.8 134.4-27 250.9-.7C368 158.6 343 126.6 304 65.83 345.9 118.4 428.1 208.1 424.3 190.6 401.4 85.73 324.2 23.49 256.3 19.42zM88 231.3c-31 7.4-53.9 17.5-62.8 26.7.9 11.7 6.7 22.1 17.5 32 11.8 10.8 29.6 20.4 51.3 28.1 2.69.9 5.39 1.8 8.1 2.7-8.4-11-11.2-26.3-13-41.1 0-15.4-3-33.5-1.1-48.4zm336 0c2.2 16.2.6 34.5-1.1 48.4-1.8 14.8-4.6 30.1-13 41.1 20.2-7 44.6-17.6 59.4-30.8 10.8-9.9 16.6-20.3 17.5-32-8.9-9.2-31.7-19.3-62.8-26.7zm-274.4.3-7 14h98.8l-7-14zm128 0-7 14h98.8l-7-14zM119 241c-4.7 1.3-9.4 2.6-14 4.1 1 19.9.6 47.6 11.6 64.5h2.4zm274 0v68.6h2.4c10.5-20.7 11.3-41.8 11.6-64.5-4.6-1.5-9.3-2.8-14-4.1zm-255.9 22.6c-.3 18.8 2 39.5 6.2 55.7 21.1-14.1 41.9-25.7 64.7-25.7 3.2 0 6.4.2 9.4.4l5.2-15.7c-5.6 5.7-12.9 8.9-23.2 8.5-25.2-.8-33.9-11.1-37.5-23.2zm109.4 0-12.4 37.2 21.9 27.4 21.9-27.4-12.4-37.2zm103.6 0c-3.6 12.1-12.3 22.4-37.5 23.2-10.3.4-17.6-2.8-23.2-8.5l5.2 15.7c3.1-.3 6.3-.4 9.4-.4 22.8 0 43.6 11.6 64.7 25.7 4.4-20.1 6.8-37.6 6.2-55.7zm-142.1 48c-20 0-43 14.5-68.9 32.4-19.2 13.3-39.9 28.1-63.3 38.4 28.6 6.1 65.8 4.8 98.2-2.6 21.3-4.8 40.5-12.1 53.7-20.5 8.5-5.5 14.1-11.1 17-16.4l-24.2-30.3c-3.7-.6-7.9-1-12.5-1zm96 0c-4.6 0-8.8.4-12.5 1l-24.2 30.3c2.9 5.3 8.5 10.9 17 16.4 13.2 8.4 32.4 15.7 53.7 20.5 32.4 7.4 69.6 8.7 98.2 2.6-23.4-10.3-44.1-25.1-63.3-38.4-25.9-17.9-48.9-32.4-68.9-32.4zm-48 46.7c-4.6 5.7-10.6 10.8-17.4 15.3h34.8c-6.8-4.5-12.8-9.6-17.4-15.3zm-56.7 33.3c-6.9 2.2-14 4.1-21.3 5.8-9.5 2.2-19.2 3.9-28.9 5.1 6.1 19.6 14.1 39.5 23 58.2l.1.2c4.3-6.7 9.4-13.1 13.5-19.8-2.4 13.9-3.3 27.9-2.3 41.8 1.7 3.3 3.5 6.5 5.3 9.7h134.6c3.6-6.3 7-12.7 10.3-19.2 5.4-21.9 3.9-42.8 5.4-64.2 3.1 11.5 6.1 23 8.5 34.7 5.8-13.6 11.1-27.6 15.4-41.4-9.7-1.2-19.4-2.9-28.9-5.1-7.3-1.7-14.4-3.6-21.3-5.8z"/></symbol>
+    <symbol id="ag-golem" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 33.85 168.2 63.1l-6.6 52.9 94.4 27 94.4-27-6.6-52.9zm-54 60.51a10 9.999 0 0 1 10 10.04 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10.04zm108 0a10 9.999 0 0 1 10 10.04 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10.04zM103 104.4v64h18v-23h18.8l2.1-16.2-.4-.1.5-1.7h-21v-23zm153 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm135 0v23h-21l.5 1.7-.4.1 2.1 16.2H391v23h18v-64zm-231.7 29.8-6.5 52.2-16 48.1 20.1 26.8 16.8-50.3 48.7 81.2 24.6-61.5v-71.5zm193.4 0-87.7 25v71.5l24.6 61.5 48.7-81.2 16.8 50.3 20.1-26.8-16-48.1zm-178.7 22 57.2 23.7-3.3 17.3-65.3 1 8.7-32.2zm164 0 11.4 42-65.3-1-3.3-17.3 47.8-19.8zm-221.9 80.7-9.1 36.5 43 8.6zm279.8 0L362 282l43-8.6zm-217.6 16.9-10.5 31.8 32.6 6.5 1.1.2zm155.4 0-23.2 38.5 15-3 18.7-3.7zm-77.7 2.8-17.3 43.1 17.3 3.5 17.3-3.5zm-149 35.2 28.8 172.5L247 478.2V376.4h18v101.8l111.2-13.9L405 291.8l-149 29.8zm111 80.6a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm76 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm-76 64a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm76 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10z"/></symbol>
+    <symbol id="ag-gasmask" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M364.563 27.5c-24.54 10.796-66.057 18.094-113.875 18.094-47.3 0-89.258-6.898-113.907-17.5C107.477 64.73 97.12 118.44 107 177c10.73 63.596 50.354 119.6 85.688 155.78 17.285-4.952 36.943-7.717 57.843-7.717 20.725 0 40.228 2.72 57.407 7.593 35.5-36.38 75.654-92.59 86.407-155.656 10.04-58.882-.233-112.842-29.78-149.5zm-187.625 80.03c10.768.263 21.255 4.955 29.937 12.282 11.577 9.77 20.607 24.33 25.25 41.657 4.643 17.326 4.078 34.437-1.063 48.686-5.14 14.25-15.398 26.053-29.78 29.906-14.384 3.854-29.174-1.23-40.75-11-11.577-9.77-20.608-24.328-25.25-41.656-4.644-17.327-4.08-34.47 1.062-48.72 5.14-14.248 15.398-26.02 29.78-29.874a38.094 38.094 0 0 1 10.814-1.28zm146.75 0c3.59-.086 7.216.32 10.812 1.282 14.383 3.854 24.64 15.626 29.78 29.876 5.142 14.25 5.707 31.39 1.064 48.718-4.643 17.328-13.674 31.887-25.25 41.656-11.577 9.77-26.367 14.854-40.75 11-14.383-3.853-24.64-15.657-29.78-29.906-5.142-14.25-5.707-31.36-1.064-48.687 4.643-17.33 13.673-31.888 25.25-41.657 8.682-7.328 19.17-12.02 29.938-12.282zm-148.47 18.657c-1.44.063-2.867.286-4.25.657-7.374 1.976-13.434 8.13-17.062 18.187-3.628 10.058-4.295 23.6-.562 37.532 3.733 13.933 11.08 25.324 19.25 32.22 8.17 6.894 16.47 9.194 23.844 7.218 4.996-1.34 9.37-4.6 12.812-9.688-.557.206-1.108.376-1.688.532-14.782 3.96-31.402-10.042-37.093-31.28-5.692-21.24 1.685-41.665 16.468-45.626 3.214-.862 6.526-.853 9.78-.125a47.7 47.7 0 0 0-1.905-1.72c-6.128-5.17-12.326-7.766-18.157-7.905-.486-.012-.957-.02-1.437 0zm148.75 0c-5.83.14-12.028 2.736-18.156 7.907-8.17 6.895-15.516 18.255-19.25 32.187-3.733 13.934-3.065 27.476.563 37.532 3.628 10.057 9.657 16.212 17.03 18.188 7.376 1.976 15.706-.324 23.876-7.22.87-.732 1.748-1.51 2.595-2.343-3.923 1.263-7.97 1.453-11.875.407-14.783-3.96-22.13-24.386-16.438-45.625 5.692-21.24 22.28-35.244 37.063-31.282 1.253.335 2.45.812 3.594 1.375-3.514-5.533-8.07-9.064-13.314-10.47a20.076 20.076 0 0 0-5.687-.656zm-73.437 217.594c-30.047 0-57.177 6.322-76 15.94-18.82 9.616-28.155 21.615-28.155 32.686 0 2.838.615 5.752 1.844 8.656 5.233-4.285 11.252-8.117 17.81-11.468 22.253-11.37 51.873-18 84.5-18 32.63 0 62.25 6.63 84.5 18 6.547 3.344 12.56 7.163 17.783 11.437 1.22-2.894 1.843-5.794 1.843-8.624 0-11.07-9.334-23.07-28.156-32.687-18.822-9.618-45.92-15.94-75.97-15.94zm0 46.5c-30.047 0-57.177 6.322-76 15.94-18.82 9.616-28.155 21.615-28.155 32.686 0 11.07 9.334 23.07 28.156 32.688 18.823 9.617 45.953 15.97 76 15.97 30.05-.002 57.148-6.353 75.97-15.97 18.822-9.617 28.156-21.617 28.156-32.688 0-11.07-9.334-23.07-28.156-32.687-18.822-9.618-45.92-15.94-75.97-15.94zm0 28.19c15.2 0 28.952 2.186 39.75 6.186 5.4 2 10.118 4.412 14 7.813 3.884 3.4 7.25 8.417 7.25 14.467 0 6.05-3.366 11.07-7.25 14.47-3.882 3.4-8.6 5.812-14 7.812-10.798 4-24.55 6.186-39.75 6.186-15.197 0-28.98-2.187-39.78-6.187-5.4-2-10.086-4.413-13.97-7.814-3.882-3.4-7.25-8.418-7.25-14.47 0-6.05 3.368-11.067 7.25-14.467 3.884-3.402 8.57-5.814 13.97-7.814 10.8-4 24.583-6.187 39.78-6.187zm0 18.686c-13.327 0-25.384 2.107-33.28 5.03-3.948 1.464-6.812 3.168-8.156 4.345-.292.256-.263.258-.406.408.143.15.114.15.406.406 1.344 1.177 4.208 2.913 8.156 4.375 7.896 2.923 19.953 5 33.28 5 13.33 0 25.387-2.077 33.282-5 3.948-1.463 6.812-3.2 8.157-4.376.29-.255.26-.257.405-.406-.144-.15-.115-.152-.406-.407-1.346-1.176-4.21-2.88-8.158-4.342-7.895-2.925-19.953-5.032-33.28-5.032z"/></symbol>
+    <symbol id="ag-robot" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 19c-13.8 0-27.9 3.02-41.5 8.48L256 79.44l41.5-51.96C283.9 22.02 269.8 19 256 19zm-59.4 16.96c-18.5 10.27-35.9 24.69-50.9 41.74-10.8 12.21-20.2 25.7-24.8 32.4l-64.8 87.1 59.1 83L95.9 348l71.6 64.2-6.9-27.3 36.1-108.2-40.7 27.1-75.98-106.3 42.28-56.3 97.4 48.7h72.7l97.4-48.7 42.3 56.3-76 106.3-40.8-27.2 1 3.2 35.2 105.1-6.9 27.3 71.5-64.2-19.4-67.8 59.2-83-64.8-87.1c-4.6-6.7-14-20.19-24.8-32.4-15-17.05-32.4-31.47-50.9-41.74L256 110.2zm15.1 256.44-5 15h98.6l-5-15zm-11.5 34.2-16.3 49.1h144.2l-16.4-49.1zm-17.3 68.3 12.3 49.2h121.6l12.2-49.2zm33.6 68.4L256 493l39.5-29.7z"/></symbol>
+    <symbol id="ag-fox" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M141.22 16.563c3.515 67.68 1 131.198-4.126 193.78l-23.625-12.312 14.374 41.595L66.5 215.47l53.03 54.093-41.28 2.78c30.542 19.568 68.55 32.376 90.72 59.532 27.797 39.67 43.262 79.654 44.75 155.625 22.76 10.636 51.078 10.06 71.593 0 4.882-78.093 15.104-113.097 43.03-154.78.038-.056.09-.102.126-.158 22.083-27.63 60.45-40.486 91.25-60.218l-41.25-2.78 53-54.095-61.314 24.155 14.375-41.594-22.25 11.626c-10.843-61.14-19.04-122.3-16.436-183.437-28.406 44.014-51.705 99.365-63.78 150.5l-18.19-4.282c3.06-12.948 6.76-26.1 11.063-39.25-17.632-2.987-35.196-3.496-52.812-1.125 4.92 12.803 9.39 26.1 13.28 40l-18 5.03C200.25 115.816 171.18 66.398 141.22 16.564zm46.75 244.375c9.412-.07 19.09 5.25 28.718 15.25 18.017 18.714 14.723 47.67-.907 70.53 2.77-40.466-15.15-63.874-51.905-72.5 7.7-8.95 15.788-13.218 24.094-13.28zm126.593 0c7.47.056 14.662 3.535 21.375 10.75l-.688 3.25c-35.184 9.16-53.046 32.384-51.938 71.78-14.707-22.86-16.835-51.816 1.938-70.53 10.03-10 19.902-15.32 29.313-15.25z"/></symbol>
+    <symbol id="ag-eagle" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M242.9 20.46c6.7 19.75 19.7 41.39 4 50.44-38.6 22.04-81.4 41.5-106.2 90.7C103.3 235.7 91.69 412 29.81 451c48.6 3.8 89.69-16.3 108.89-44.2 7.1 34.3 32.6 67 63 84.7-5.2-29-1.8-59.4 19-92.5 16.5 22.9 31.1 59.3 73.8 75.3-16.4-27.5-13.7-52.8-10.7-84.2 8.8 26.9 38.5 50 72.9 58.9-16.8-18.6-23.9-45.5-21-66 14.6 24.9 43.4 38.4 67.1 39.7-153.3-179.6-48.7-291.6 79.4-194.4-.5-49.7-31.4-66.7-67.2-95.7-.9-15.4-9.6-29.3-17.5-43.36-53.7-9.99-121.5-42.01-154.6-68.78zm81.2 74.88c26.1 10.86 46.2 22.56 56.4 35.46-16.6-3.6-39.8-3.5-70-1.1 15-9.7 16.5-21.7 13.6-34.36z"/></symbol>
+    <symbol id="ag-centurion" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 25c-38.5 0-75.7 10.76-108.4 28.79l17.9 34.65-31.6-26.54C85.5 92.66 48.34 139.4 32.89 189.7l42.31 17.6-46.81.1c-2.04 10.1-3.18 20.3-3.32 30.5.15.1.01 0 .49.3 2 1.3 5.88 2.9 10.8 4.4 9.82 3 23.85 5.5 38.24 6.4 14.39 1 29.3.4 40.8-2 10.2-2.2 16.9-6.1 19.6-9.6.7-21.4 9.3-44.1 23.5-64.1L128 144l41.2 16c.1 0 .1-.1.1-.1 18.4-20.1 43.4-35.9 72.3-39.9L256 48l14.4 72c28.9 4 53.9 19.8 72.3 39.9 0 0 0 .1.1.1l41.2-16-30.5 29.3c14.2 20 22.8 42.7 23.5 64.1 2.7 3.5 9.4 7.4 19.6 9.6 11.5 2.4 26.4 3 40.8 2 14.4-.9 28.4-3.4 38.2-6.4 5-1.5 8.8-3.1 10.8-4.4.5-.3.4-.2.5-.3-.1-10.2-1.3-20.4-3.3-30.5l-46.8-.1 42.3-17.6c-15.4-50.3-52.6-97.04-101-127.8l-31.6 26.54 17.9-34.65C331.7 35.76 294.5 25 256 25zm0 112c-29 0-54.7 14.5-73.3 35.1-16.1 17.6-26.5 39.7-29 58.9h14c6-6.3 13-11.7 20.8-16.2 3.9-9.4 9.9-18 17.1-25.2C219.1 176.2 237 167 256 167s36.9 9.2 50.4 22.6c7.2 7.2 13.2 15.8 17.1 25.2 7.8 4.5 14.8 9.9 20.8 16.2h14c-2.5-19.2-12.9-41.3-29-58.9C310.7 151.5 285 137 256 137zm0 80c-38.2 0-62.9 11-79 30.7-9.6 11.7-16.2 27-20 45.6 70.2 13 127.8 13 198 0-3.8-18.6-10.4-33.9-20-45.6-16.1-19.7-40.8-30.7-79-30.7zm-101.7 94.1c-.6 5.7-.9 11.6-1.1 17.8 59.6 13.3 146 13.3 205.6 0-.2-6.2-.5-12.1-1.1-17.8-71.5 13.1-131.9 13.1-203.4 0zm-2.8 35.8-14.4 101.3c0 1.2 1.1 4.8 3.9 9.1 2.9 4.3 7.4 9.3 12.8 13.8 9.6 8.1 22.3 14.4 34.2 15.6 1.4-1.8 3.3-4.3 5.2-7.2 3.8-5.9 6-13.3 5.9-14.1-.3-2.2-6.5-10.3-13.6-15.9-7.1-5.7-14-9.7-14-9.7l-14.5-8.4 15-7.5c14.9-7.4 20.8-14.1 23-19.4 2.3-5.2 1.6-10.6-.8-17.7-5.9-17.8-11.8-28.7-16.3-35.1-9.1-1.3-17.9-2.9-26.4-4.8zm209 0c-8.5 1.9-17.3 3.5-26.4 4.8-4.5 6.4-10.4 17.3-16.3 35.1-2.4 7.1-3.1 12.5-.8 17.7 2.2 5.3 8.1 12 23 19.4l15 7.5-14.5 8.4s-6.9 4-14 9.7c-7.1 5.6-13.3 13.7-13.6 15.9-.1.8 2.1 8.2 5.9 14.1 1.9 2.9 3.8 5.4 5.2 7.2 11.9-1.2 24.6-7.5 34.2-15.6 5.4-4.5 9.9-9.5 12.8-13.8 2.8-4.3 3.9-7.9 3.9-9.1l-14.4-101.3z"/></symbol>
+    <symbol id="ag-parrot" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M246 18.844c-2.157.02-4.292.068-6.406.156-73.28 3.064-120.385 46.286-139.406 94.094-11.706 29.42-12.328 60.463-1.813 84.78 10.515 24.32 31.522 42.552 66.906 47.845 18.85 2.818 37.402 5.89 55.314 9.5 59.88-25.15 71.217-72.16 86.625-115.19 7.735-21.602 16.277-42.437 33.874-56.655 12.758-10.31 29.792-16.212 52.47-16.563-28.51-20.475-62.022-35.544-99.095-43.093-17.22-3.507-33.372-5.024-48.47-4.876zm147.47 66.53c-19.04.243-31.413 5.12-40.626 12.564-12.818 10.356-20.528 27.42-28.03 48.374-13.216 36.904-26.567 85.154-75.752 115.282 42.035 10.47 78.926 24.997 105.188 47.5 21.364 18.306 35.342 42.586 37.406 72.75 1.54 22.492-3.3 47.973-15.25 77.187C477.462 385.23 506.27 291.847 488.844 209.75c-9.833-46.322-34.647-89.155-70.344-122.5-9.447-1.382-17.738-1.968-25.03-1.875zm-308.376 15.44c-20.48 6.425-42.002 17.384-64.28 33.655l-.002 359.155h230.875c11.166-23.298 19.82-46.743 26.188-69.97-34.545-1.148-67.374-12.59-94.563-31.06-48.912-33.232-80.487-89.767-72.25-149.22-13.442-10.208-23.455-23.32-29.843-38.094-12.89-29.806-11.65-65.73 1.624-99.093.717-1.802 1.46-3.587 2.25-5.374zm144.656 27.124c23.412 0 42.406 18.968 42.406 42.374 0 23.407-18.994 42.375-42.406 42.375s-42.375-18.968-42.375-42.375c0-23.406 18.963-42.375 42.375-42.375zM128.78 254.125c-3.5 48.926 23.382 94.734 65.032 123.03 44.693 30.365 105.29 39.94 162.657 9.658a146.338 146.338 0 0 1-17.376-3.907c-13.214-17.616-20.057-42.566-18.688-63.187a70.28 70.28 0 0 1 1.5-10.533c-5.35-3.108-11.05-6.05-17.094-8.812-1.66 5.77-2.648 11.858-3.062 18.094-1.14 17.168 2.01 35.7 9.188 52.592-35.888-20.445-55.414-55.432-58.22-88.875-27.608-7.465-58.322-13.202-90.187-17.968-12.5-1.87-23.76-5.332-33.75-10.095z"/></symbol>
+    <symbol id="ag-tribal" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="m208.906 18.688 22.375 248.468h66.19l17.124-248.47-105.688.002zm263.156 5.093C425.9 34.41 378.79 42.034 331.438 46.063l-5.156 74.782c6.96-3.386 14.792-5.28 23.033-5.28 28.118 0 51.468 22.157 51.468 49.75 0 27.59-23.35 49.78-51.467 49.78a52.441 52.441 0 0 1-28.907-8.656l-4.375 63.5c49.813-4.658 98.347-16.405 140.22-35.5 11.706-64.972 15.46-137.184 15.813-210.657zm-414.75.47c.54 72.185 5.904 143.733 18.907 208.438 39.154 19.32 86.55 31.668 136.5 36.812l-5.814-64.813a52.45 52.45 0 0 1-31.406 10.407c-28.118 0-51.47-22.19-51.47-49.78 0-27.593 23.352-49.75 51.47-49.75a52.516 52.516 0 0 1 23.875 5.717L192.687 47c-45.744-3.466-91.08-10.858-135.375-22.75zM81.25 255.625c5.254 22.24 11.47 43.552 18.844 63.625 3.833 10.436 7.945 20.523 12.375 30.25l24.155-67.188 2.406-6.718c-20.27-5.324-39.652-12-57.78-19.97zm370.594 1.094c-19.698 8.17-40.49 14.915-61.97 20.186l4.782 10.688 27.75 62.03a398.431 398.431 0 0 0 12.5-31.562c6.75-19.376 12.32-39.912 16.938-61.343zM152.938 279l1.187 3.063 35.906 91.718 35.47-72.655 5.313-10.875c-26.643-1.772-52.83-5.524-77.875-11.25zm227.812.03c-22.253 4.998-45.168 8.462-68.28 10.44l5.436 11.842 30.125 65.532 29.314-78.688 3.406-9.125zm-74.97 11a540.92 540.92 0 0 1-67.655.69l4.438 11 28.187 69.842 30.094-70.03 4.937-11.5zm-159.967 22.033-21.782 60.625c3.623 6.662 7.402 13.115 11.376 19.343a504.054 504.054 0 0 0 46.125 11.283l-1.155-2.907-34.563-88.344zm241.093 4-29.187 78.406-3.19 8.5a453.163 453.163 0 0 0 45.69-11.876c4.05-6.318 7.87-12.87 11.5-19.625l-24.814-55.408zm-153.812 12.125-35.625 72.906-2.282 4.687c23.9 3.938 47.784 5.975 71.656 6.033l-5.03-12.47-28.72-71.156zm76.625 0L279.06 399.53l-5.25 12.25c23.708-.325 47.41-2.653 71.125-6.967l-4.468-9.72-30.75-66.906zm72.686 87.437c-76.626 19.9-153.423 19.205-229.937.313 28.78 36.042 65.446 62.172 112.06 75.156 50.554-13.98 88.787-40.065 117.876-75.47z"/></symbol>
+    <symbol id="ag-astronaut" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 23c-16.076 0-32.375 3.73-48.178 10.24-2.126 6.525-3.877 14.76-4.877 23.754-1.31 11.79-1.73 24.706-1.87 36.819 33.864-3.704 75.986-3.704 109.85 0-.14-12.113-.56-25.03-1.87-36.82-1-8.992-2.75-17.228-4.877-23.753C288.375 26.73 272.076 23 256 23zm100.564 19.332c9.315 7.054 18.107 14.878 26.282 23.234 1.53-6.65 4.69-12.696 9.03-17.695zm-170.03 1.49c-34.675 20.22-65.047 52.714-82.552 86.334-33.08 63.536-39.69 156.956-.53 214.8C132.786 388.278 200.276 405 256 405c55.725 0 123.215-16.72 152.547-60.045 39.162-57.843 32.55-151.263-.53-214.8-17.504-33.62-47.876-66.112-82.55-86.333.578 3.65 1.057 7.388 1.478 11.184 1.522 13.694 1.912 28.197 2.014 41.267C347.664 99.427 362 104 368 110c32 32 75.537 134.695 16 224-37.654 56.48-218.346 56.48-256 0-59.537-89.305-16-192 16-224 6-6 20.335-10.573 39.04-13.727.103-13.07.493-27.573 2.015-41.267.42-3.796.9-7.534 1.478-11.184zM64 48c-8.837 0-16 7.163-16 16a16 16 0 0 0 7 13.227V145.5L73 132V77.21A16 16 0 0 0 80 64c0-8.837-7.163-16-16-16zm358.81 3.68c-12.81 0-23 10.19-23 23s10.19 23 23 23 23-10.19 23-23-10.19-23-23-23zm25.272 55.205c-6.98 5.497-15.758 8.795-25.27 8.795-.745 0-1.48-.027-2.214-.067a216.57 216.57 0 0 1 2.38 4.37l29.852 22.39zm-238.822 2.5c-17.257.09-37.256 3.757-53.233 16.12-26.634 20.608-43.034 114.763-33.49 146.763 16.584-61.767 31.993-124.02 107.92-161.274a133.445 133.445 0 0 0-21.197-1.61zm-135.055 44.21L40.15 179.138l-14.48 72.408 38.18 45.814c-10.947-46.523-5.776-98.723 10.355-143.764zm363.59 0c16.13 45.042 21.302 97.242 10.355 143.764l38.18-45.815-14.48-72.408zM106.645 375.93c-3.583 1.17-7.252 3.406-10.282 6.435-4.136 4.136-6.68 9.43-7.164 14.104.21.364.603 1.157 1.73 2.162 2.453 2.188 6.693 5.17 12.127 8.358 10.867 6.38 26.55 13.757 44.205 20.623 21.177 8.237 45.35 15.704 67.738 20.38v-27.61c-39.47-5.12-79.897-18.325-108.355-44.452zm298.71 0C376.897 402.055 336.47 415.26 297 420.38v27.61c22.387-4.676 46.56-12.143 67.738-20.38 17.655-6.865 33.338-14.243 44.205-20.622 5.434-3.19 9.674-6.17 12.127-8.36 1.127-1.004 1.52-1.797 1.73-2.16-.482-4.675-3.027-9.97-7.163-14.105-3.03-3.03-6.7-5.264-10.282-6.435zM77.322 410.602 18 450.15V494h37v-18h18v18h366v-18h18v18h37v-43.85l-59.322-39.548c-.537.488-1.08.97-1.623 1.457-3.922 3.497-8.932 6.89-14.998 10.452-12.133 7.12-28.45 14.743-46.795 21.877C334.572 458.656 290.25 471 256 471s-78.572-12.343-115.262-26.61c-18.345-7.135-34.662-14.757-46.795-21.878-6.066-3.56-11.076-6.955-14.998-10.453-.543-.487-1.086-.97-1.623-1.458zM233 422.184v28.992c8.236 1.162 16.012 1.824 23 1.824 6.988 0 14.764-.662 23-1.824v-28.992a324.912 324.912 0 0 1-46 0z"/></symbol>
+  </defs></svg>
+
+  <div class="page">
+    <h1>Agent filters · header dropdowns + identity badges</h1>
+    <p class="lede">
+      Option 3 for every agent filter: <b>From/To</b> (Prompts) and <b>Filter</b> (Feed) become header dropdowns.
+      The multi-select trigger fills with <b>identity badges</b> (icon + role + number·name), kept to the <b>same
+      height as the single From dropdown</b>; extra selections collapse to a <code>+N</code> chip. Below: the badge
+      format compared three ways, then both panels in context. Click a trigger to open its list and toggle agents.
+    </p>
+
+    <h2 class="sec">Badge format — pick one (all three triggers are the same height as From)</h2>
+    <div class="vgrid">
+
+      <div class="vcard">
+        <div class="vtitle"><span class="k">A</span>Two-line · list format</div>
+        <p class="vsub">Small icon + <b>role</b> over <b>number·name</b> — identical info to a list row. Most faithful, but two lines are tight at one-row height (role shrinks to ~6.5px).</p>
+        <div class="vrow"><span class="vlab">From</span><div class="dd single" data-from></div></div>
+        <div class="vrow"><span class="vlab">To</span><div class="dd multi" data-variant="a" data-cap="2" data-preset="2"></div></div>
+        <div class="hint">From + To shown stacked so you can check they're the same height.</div>
+      </div>
+
+      <div class="vcard">
+        <div class="vtitle"><span class="k">B</span>One-line · icon fills height</div>
+        <p class="vsub">Square icon <b>stamped full-height</b> with a divider, then a single <b>number·name</b> line. Cleanest and densest; drops the role label.</p>
+        <div class="vrow"><span class="vlab">From</span><div class="dd single" data-from></div></div>
+        <div class="vrow"><span class="vlab">To</span><div class="dd multi" data-variant="b" data-cap="2" data-preset="2"></div></div>
+        <div class="hint">Reads like a stamped tag; fits ~1 more badge than A.</div>
+      </div>
+
+      <div class="vcard">
+        <div class="vtitle"><span class="k">C</span>One-line · name + faded role</div>
+        <p class="vsub">Like B, but keeps the role as a <b>faded suffix</b> after the name. A middle ground — full context, still one line (a touch wider).</p>
+        <div class="vrow"><span class="vlab">From</span><div class="dd single" data-from></div></div>
+        <div class="vrow"><span class="vlab">To</span><div class="dd multi" data-variant="c" data-cap="2" data-preset="2"></div></div>
+        <div class="hint">Widest of the three; fewest badges before <code>+N</code>.</div>
+      </div>
+
+    </div>
+
+    <h2 class="sec">In context — Prompts (From + To, format A) &amp; Feed (Filter, format B)</h2>
+    <div class="vgrid" style="gap:24px">
+
+      <div class="mock">
+        <div class="mock-cap"><i data-lucide="send-horizontal" style="width:12px;height:12px"></i>Prompts · From + To</div>
+        <section class="panel">
+          <div class="pcard-head"><h3>Prompts</h3>
+            <div class="tabset"><button class="tab-btn active">Compose</button><button class="tab-btn">Library</button><button class="tab-btn">History</button></div>
+          </div>
+          <div class="pcard-body" style="display:flex;flex-direction:column;min-height:0">
+            <div class="subbar">
+              <span class="subbar-lab">From</span><div class="dd single" data-from></div>
+              <span class="subbar-lab">To</span><div class="dd multi" data-variant="a" data-cap="3" data-preset="5" data-allnone></div>
+            </div>
+            <div class="compose-area">
+              <div class="sec-h">Compose</div>
+              <textarea class="in ta-resize">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse.</textarea>
+            </div>
+          </div>
+          <div class="pcard-foot" style="padding:8px 10px">
+            <div style="display:flex;align-items:center;gap:8px"><button class="mic-btn"><i data-lucide="mic"></i></button><div style="flex:1"></div>
+              <button class="btn-main btn-sm"><i data-lucide="send-horizontal" style="width:13px;height:13px"></i>Send · Now</button></div>
+          </div>
+        </section>
+        <p class="note"><b>To</b> holds 5 targets → 3 badges + <b>+2</b>, same height as <b>From</b>. Click To to open the list.</p>
+      </div>
+
+      <div class="mock">
+        <div class="mock-cap"><i data-lucide="rss" style="width:12px;height:12px"></i>Feed · Filter (single list)</div>
+        <section class="panel">
+          <div class="pcard-head"><h3>Feed</h3>
+            <div class="tabset"><button class="tab-btn active">Messages</button><button class="tab-btn">Scratch</button><button class="tab-btn">Log</button><button class="tab-btn">Inbox<span class="req-badge">4</span></button></div>
+          </div>
+          <div class="pcard-body" style="display:flex;flex-direction:column;min-height:0">
+            <div class="subbar">
+              <span class="subbar-lab">Filter</span><div class="dd multi" data-variant="b" data-cap="4" data-preset="6" data-allnone></div>
+            </div>
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px">
+              <div class="rcard"><div style="display:flex;align-items:center;gap:8px"><span class="rc-name" style="color:#008149">researcher-01-sandy</span><span class="dir-tag">recv</span><span class="rc-time" style="margin-left:auto">14:41</span></div><div class="rc-body">Found 3 auth vulnerabilities in the JWT middleware — token refresh doesn't validate expiry.</div></div>
+              <div class="rcard"><div style="display:flex;align-items:center;gap:8px"><span class="rc-name">User</span><span class="dir-tag">sent</span><span class="rc-time" style="margin-left:auto">14:42</span></div><div class="rc-body">Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.</div></div>
+              <div class="rcard"><div style="display:flex;align-items:center;gap:8px"><span class="rc-name" style="color:#387b12">auditor-01-drew</span><span class="dir-tag">recv</span><span class="rc-time" style="margin-left:auto">14:43</span></div><div class="rc-body">Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely.</div></div>
+            </div>
+          </div>
+        </section>
+        <p class="note"><b>Filter</b> is the only control — one multi trigger spans the bar. 6 selected → 4 badges + <b>+2</b>.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const LU=()=>window.lucide&&lucide.createIcons();
+    const AGENTS=[
+      {role:'human',name:'User',lucide:'user',color:'var(--ag-user)'},
+      {role:'researcher',name:'01 sandy',icon:'ag-wizard',color:'#008149'},
+      {role:'synthesizer',name:'01 kai',icon:'ag-golem',color:'#006bbb'},
+      {role:'auditor',name:'01 drew',icon:'ag-gasmask',color:'#387b12'},
+      {role:'coder',name:'01 max',icon:'ag-robot',color:'#aa4600'},
+      {role:'researcher',name:'02 rowan',icon:'ag-fox',color:'#aa3a61'},
+      {role:'reviewer',name:'01 vega',icon:'ag-eagle',color:'#007f91'},
+      {role:'planner',name:'01 quinn',icon:'ag-centurion',color:'#af3c3a'},
+      {role:'docs',name:'01 wren',icon:'ag-parrot',color:'#876300'},
+      {role:'designer',name:'01 lex',icon:'ag-tribal',color:'#9e3f84'},
+      {role:'ops',name:'01 sage',icon:'ag-astronaut',color:'#008370'},
+    ];
+    function tileHTML(a,opt){ opt=opt||{}; const cls='agtile'+(a.icon?'':' agtile--user');
+      const st=(opt.sz?`width:${opt.sz}px;height:${opt.sz}px;`:'')+(a.icon?`color:${a.color}`:`background:${a.color}`);
+      const inner=a.icon?`<svg class="ag-svg"><use href="#${a.icon}"/></svg>`:`<i data-lucide="${a.lucide}" class="agtile-luc"></i>`;
+      return `<span class="${cls}" style="${st}">${inner}</span>`; }
+    function badge(a,v){
+      if(v==='a') return `<span class="badge badge-a">${tileHTML(a,{sz:22})}<span class="b-lab"><span class="b-role">${a.role}</span><span class="b-name">${a.name}</span></span></span>`;
+      if(v==='b') return `<span class="badge badge-b">${tileHTML(a)}<span class="b-one">${a.name}</span></span>`;
+      return `<span class="badge badge-c">${tileHTML(a)}<span class="b-one">${a.name}<span class="b-sub">${a.role}</span></span></span>`;
+    }
+    function rowsHTML(){ return AGENTS.map((a,i)=>`<button class="agrow" data-i="${i}" onclick="toggleRow(this)">${tileHTML(a)}<span class="ag-lab"><span class="ag-role">${a.role}</span><span class="ag-name">${a.name}</span></span><i data-lucide="check" class="ag-ck"></i></button>`).join(''); }
+
+    /* ---- single (From / Source) ---- */
+    function buildSingle(dd){
+      dd.innerHTML=`<button class="dd-trig" onclick="togglePop(this)">${tileHTML(AGENTS[0],{sz:26})}<span class="ag-lab"><span class="ag-role">${AGENTS[0].role}</span><span class="ag-name">${AGENTS[0].name}</span></span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+        <div class="src-pop"><div class="aglist">${AGENTS.map((a,i)=>`<button class="agrow${i===0?' on':''}" onclick="pickSource(this)">${tileHTML(a)}<span class="ag-lab"><span class="ag-role">${a.role}</span><span class="ag-name">${a.name}</span></span><i data-lucide="check" class="ag-ck"></i></button>`).join('')}</div></div>`;
+    }
+    function pickSource(row){ const dd=row.closest('.dd'); dd.querySelectorAll('.agrow').forEach(r=>r.classList.remove('on')); row.classList.add('on');
+      const trig=dd.querySelector('.dd-trig'); const t=row.querySelector('.agtile').cloneNode(true); t.style.width='26px'; t.style.height='26px';
+      const lab=row.querySelector('.ag-lab').cloneNode(true); const cv=trig.querySelector('.picker-cv');
+      trig.innerHTML=''; trig.append(t,lab,cv); dd.querySelector('.src-pop').classList.remove('open'); LU(); }
+
+    /* ---- multi (To / Filter) ---- */
+    function buildMulti(dd){
+      const v=dd.dataset.variant, allnone=dd.hasAttribute('data-allnone');
+      dd.innerHTML=`<button class="dd-trig" onclick="togglePop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+        <div class="src-pop">${allnone?'<div style="display:flex;justify-content:space-between;align-items:center;padding:1px 4px 6px"><span class="sec-h" style="margin:0">Agents</span><button class="mini-link" onclick="allNone(this)">All</button></div>':''}<div class="aglist" data-list>${rowsHTML()}</div></div>`;
+      const list=dd.querySelector('[data-list]'); const preset=+dd.dataset.preset||0;
+      [...list.querySelectorAll('.agrow')].forEach((r,i)=>{ if(i>=1&&i<=preset) r.classList.add('on'); }); // skip User(0), pick next N
+      updateMulti(dd);
+    }
+    function updateMulti(dd){
+      const v=dd.dataset.variant, cap=+dd.dataset.cap||3;
+      const on=[...dd.querySelectorAll('[data-list] .agrow.on')];
+      const wrap=dd.querySelector('[data-badges]');
+      let html=on.slice(0,cap).map(r=>badge(AGENTS[+r.dataset.i],v)).join('');
+      if(on.length>cap) html+=`<span class="badge-more">+${on.length-cap}</span>`;
+      if(!on.length) html=`<span class="b-empty">No agents</span>`;
+      wrap.innerHTML=html;
+      const link=dd.querySelector('.mini-link'); const total=dd.querySelectorAll('[data-list] .agrow').length;
+      if(link) link.textContent=(on.length>=total)?'None':'All';
+      LU();
+    }
+    function toggleRow(btn){ btn.classList.toggle('on'); updateMulti(btn.closest('.dd')); }
+    function allNone(link){ const dd=link.closest('.dd'); const rows=[...dd.querySelectorAll('[data-list] .agrow')];
+      const allOn=rows.every(r=>r.classList.contains('on')); rows.forEach(r=>r.classList.toggle('on',!allOn)); updateMulti(dd); }
+
+    function togglePop(btn){ const dd=btn.closest('.dd'); const pop=dd.querySelector('.src-pop'); const open=pop.classList.contains('open');
+      document.querySelectorAll('.src-pop.open').forEach(p=>p.classList.remove('open')); if(!open)pop.classList.add('open'); }
+    document.addEventListener('click',e=>{ if(!e.target.closest('.dd')) document.querySelectorAll('.src-pop.open').forEach(p=>p.classList.remove('open')); });
+
+    document.querySelectorAll('.dd.single, [data-from]').forEach(buildSingle);
+    document.querySelectorAll('.dd.multi').forEach(buildMulti);
+    LU();
+  </script>
+</body>
+</html>

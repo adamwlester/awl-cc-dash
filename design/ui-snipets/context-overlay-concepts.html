@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context · Rewind · Handoff — interaction concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page:#fef6e4; --header:#f7f0e0; --surface:#fff8ee; --card:#ffffff; --subtle:#f0e8d8;
+    --navy:#001858; --dim:#8a8eb8; --body:#172c66; --label:#4a5088; --muted:#3a4878;
+    --pink:#f582ae; --pink-dk:#e8709a; --amber:#d08530; --coral:#e06654; --danger:#c74060;
+    --sage:#3d946a; --gold:#d4a050; --field:#fdf1e6; --term:#ebedf3; --rule:#c9c2b0;
+    /* /context category colors */
+    --c-sys:#c07828; --c-tools:#2d6ea8; --c-mcp:#2d7848; --c-agents:#d4a050;
+    --c-mem:#7e4ea0; --c-msg:#e06654; --c-free:#bcb6a4;
+  }
+  *{box-sizing:border-box; scrollbar-width:thin; scrollbar-color:#8a8eb8 #f0e8d8;}
+  ::-webkit-scrollbar{width:7px; height:7px;}
+  ::-webkit-scrollbar-track{background:#f0e8d8;}
+  ::-webkit-scrollbar-thumb{background:#8a8eb8; border-radius:4px; border:1px solid #f0e8d8;}
+  ::-webkit-scrollbar-thumb:hover{background:#f582ae;}
+  body{margin:0; background:var(--page); color:var(--body); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+
+  /* ---------- page scaffold (deliberately quiet, frames the live concepts) ---------- */
+  .page{max-width:1180px; margin:0 auto; padding:34px 28px 90px;}
+  .topbar{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px;}
+  .topbar h1{font-size:19px; font-weight:800; color:var(--navy); letter-spacing:-0.01em; margin:0;}
+  .ver{font-size:10px; font-weight:700; color:var(--pink); background:rgba(245,130,174,0.16); padding:2px 7px; border-radius:4px; font-family:'JetBrains Mono',monospace;}
+  .lede{font-size:13px; line-height:1.6; color:var(--muted); max-width:760px; margin:8px 0 0;}
+  .lede b{color:var(--navy); font-weight:700;}
+
+  .reco{margin:22px 0 30px; border:2px solid var(--navy); border-radius:6px; background:var(--card); overflow:hidden;}
+  .reco-h{display:flex; align-items:center; gap:8px; background:var(--header); border-bottom:2px solid var(--navy); padding:8px 14px;}
+  .reco-h .dot{width:9px; height:9px; border-radius:50%; background:var(--pink);}
+  .reco-h span{font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:var(--navy);}
+  .reco-b{padding:12px 16px; font-size:12.5px; line-height:1.55; color:var(--muted);}
+  .reco-b ul{margin:8px 0 0; padding-left:0; list-style:none;}
+  .reco-b li{display:flex; gap:9px; padding:3px 0; align-items:baseline;}
+  .reco-b li .k{flex:0 0 auto; font-weight:800; color:var(--navy); min-width:64px;}
+  .reco-b li b{color:var(--navy);}
+
+  /* idea block layout */
+  .idea{margin-top:34px; border-top:2px solid rgba(0,24,88,0.14); padding-top:26px;}
+  .idea-grid{display:grid; grid-template-columns:1fr 360px; gap:34px; align-items:start;}
+  @media(max-width:860px){.idea-grid{grid-template-columns:1fr;}}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--pink);}
+  .eyebrow .num{font-family:'JetBrains Mono',monospace; color:var(--navy); background:var(--subtle); border:1.5px solid var(--navy); border-radius:4px; padding:1px 6px;}
+  .idea h2{font-size:17px; font-weight:800; color:var(--navy); margin:10px 0 6px; letter-spacing:-0.01em;}
+  .thesis{font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 14px;}
+  .thesis b{color:var(--navy);}
+  .tradeoffs{display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; margin-top:4px;}
+  @media(max-width:520px){.tradeoffs{grid-template-columns:1fr;}}
+  .to-col h4{font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; margin:0 0 6px;}
+  .to-col.good h4{color:var(--sage);} .to-col.bad h4{color:var(--coral);}
+  .to-col ul{margin:0; padding-left:0; list-style:none;}
+  .to-col li{font-size:11.5px; line-height:1.5; color:var(--muted); padding:2px 0 2px 14px; position:relative;}
+  .to-col li::before{content:''; position:absolute; left:1px; top:9px; width:5px; height:5px; border-radius:50%;}
+  .to-col.good li::before{background:var(--sage);} .to-col.bad li::before{background:var(--coral);}
+
+  /* ---------- mock right-rail (the habitat) ---------- */
+  .rail-wrap{position:sticky; top:18px;}
+  .rail-cap{font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); margin-bottom:6px; text-align:center;}
+  .rail{position:relative; width:100%; background:var(--surface); border:2px solid var(--navy); border-radius:6px; padding:14px; display:flex; flex-direction:column; gap:14px; overflow:hidden;}
+  .ro-label{font-size:9px; color:var(--label); text-transform:uppercase; letter-spacing:0.05em; font-weight:800;}
+  .seg-ctrl{display:flex; border-radius:4px; overflow:hidden; border:2px solid var(--navy); background:var(--subtle);}
+  .seg-ctrl button{flex:1; font-size:10px; padding:6px 0; color:var(--dim); font-weight:600; border:none; background:transparent; cursor:pointer; transition:all .12s; border-right:1px solid rgba(0,24,88,0.1);}
+  .seg-ctrl button:last-child{border-right:none;}
+  .seg-ctrl button.active{background:var(--pink); color:var(--navy); font-weight:700;}
+  .seg-ctrl button:hover:not(.active){color:var(--label); background:rgba(0,24,88,0.04);}
+  .ro-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .link-amber{font-size:9px; font-weight:800; color:var(--amber); background:none; border:none; cursor:pointer; padding:0;}
+  .link-amber:hover{color:#b06d20;}
+
+  /* slim summary bar (always-on usage readout) */
+  .ctxbar{display:flex; height:6px; border-radius:3px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle);}
+  .ctxbar > i{display:block; height:100%;}
+  .summary-row{display:flex; align-items:center; gap:8px;}
+  .summary-row .meta{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace; white-space:nowrap;}
+
+  /* clickable summary trigger */
+  .ctx-trigger{width:100%; text-align:left; background:var(--card); border:2px solid var(--rule); border-radius:4px; padding:8px 9px; cursor:pointer; transition:all .12s; display:flex; flex-direction:column; gap:7px;}
+  .ctx-trigger:hover{border-color:var(--dim);}
+  .ctx-trigger.live{border-color:var(--pink);}
+  .ctx-trigger .top{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .ctx-trigger .top .lab{font-size:9px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--label);}
+  .chev{width:13px; height:13px; color:var(--dim); transition:transform .18s;}
+  .chev.up{transform:rotate(180deg);}
+
+  /* ---------- tri-tabs (reworked rewind/handoff, now incl. context) ---------- */
+  .tri-tabs{display:flex; border:2px solid var(--navy); border-radius:4px 4px 0 0; overflow:hidden; background:var(--subtle);}
+  .tri-tabs.flat{border-radius:4px;}
+  .tri-tab{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; font-size:10px; font-weight:700; padding:6px 0; color:var(--label); background:transparent; border:none; border-right:1px solid rgba(0,24,88,0.12); cursor:pointer; transition:all .12s;}
+  .tri-tab:last-child{border-right:none;}
+  .tri-tab svg{width:12px; height:12px;}
+  .tri-tab:hover:not(.active){color:var(--navy); background:rgba(0,24,88,0.04);}
+  .tri-tab.active{background:var(--card); color:var(--navy); box-shadow:inset 0 -2px 0 var(--pink);}
+
+  .tri-panel{display:none; border:2px solid var(--navy); border-top:none; border-radius:0 0 4px 4px; background:var(--card); overflow:hidden;}
+  .tri-panel.open{display:block;}
+
+  /* ---------- /context breakdown block ---------- */
+  .bd{padding:11px 11px 12px;}
+  .bd-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px;}
+  .bd-model{font-size:11px; font-weight:800; color:var(--navy); font-family:'JetBrains Mono',monospace;}
+  .bd-tot{font-size:10px; font-weight:700; color:var(--label); font-family:'JetBrains Mono',monospace;}
+  .bd-bar{display:flex; height:9px; border-radius:4px; overflow:hidden; border:1px solid rgba(0,24,88,0.18); background:var(--subtle); margin-bottom:11px;}
+  .bd-bar > i{display:block; height:100%;}
+  .cat{display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px;}
+  .cat + .cat{border-top:1px solid rgba(0,24,88,0.07);}
+  .cat .sw{width:9px; height:9px; border-radius:2px; flex:0 0 auto;}
+  .cat .nm{flex:1 1 auto; color:var(--muted); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cat .tk{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); font-size:10.5px;}
+  .cat .pc{font-family:'JetBrains Mono',monospace; color:var(--dim); font-size:10px; width:38px; text-align:right; flex:0 0 auto;}
+  .bd-sub{margin-top:11px; padding-top:9px; border-top:2px solid rgba(0,24,88,0.12);}
+  .bd-sub h5{font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:800; color:var(--label); margin:0 0 6px; display:flex; align-items:center; gap:6px;}
+  .bd-sub h5 .slash{color:var(--pink); font-family:'JetBrains Mono',monospace;}
+  .ml{display:flex; align-items:flex-start; gap:8px; padding:3px 0; font-size:10px;}
+  .ml .p{flex:1 1 auto; color:var(--muted); font-family:'JetBrains Mono',monospace; word-break:break-all; line-height:1.35;}
+  .ml .t{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); flex:0 0 auto;}
+
+  /* ---------- timeline (rewind / handoff point list) ---------- */
+  .tl{padding:8px 10px; display:flex; flex-direction:column; gap:6px; max-height:210px; overflow-y:auto;}
+  .tl-phead{display:flex; align-items:center; gap:7px; padding:7px 10px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--subtle); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);}
+  .tl-phead svg{width:12px; height:12px;}
+  .tl-row{display:flex; align-items:center; justify-content:space-between; gap:8px; border:1px solid var(--rule); border-radius:4px; padding:7px 9px; transition:all .12s;}
+  .tl-row:hover{border-color:var(--dim);}
+  .tl-lab{min-width:0; font-size:10px; color:var(--label); line-height:1.3;}
+  .tl-lab b{font-weight:800; color:var(--navy);}
+  .tl-pick{opacity:0; transition:opacity .14s; font-size:9.5px; font-weight:800; padding:4px 9px; border-radius:4px; white-space:nowrap; border:2px solid var(--pink); background:var(--pink); color:var(--navy); cursor:pointer; flex:0 0 auto;}
+  .tl-pick:hover{background:var(--pink-dk); border-color:var(--pink-dk);}
+  .tl-row:hover .tl-pick, .tl-row:focus-within .tl-pick{opacity:1;}
+  .tl-confirm{display:none; align-items:center; gap:7px; margin:8px 10px 0; padding:7px 9px; border-radius:4px; background:rgba(61,148,106,0.10); border:1px solid rgba(61,148,106,0.45); color:#2d7848; font-size:10px; font-weight:700;}
+
+  /* ---------- modal overlay (idea 2) ---------- */
+  .scrim{position:absolute; inset:0; background:rgba(0,24,88,0.34); backdrop-filter:blur(1.5px); display:none; align-items:center; justify-content:center; padding:14px; z-index:40;}
+  .scrim.open{display:flex; animation:fade .14s ease;}
+  @keyframes fade{from{opacity:0;} to{opacity:1;}}
+  .modal{width:100%; max-width:330px; max-height:100%; background:var(--card); border:2px solid var(--navy); border-radius:6px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 18px 48px rgba(0,24,88,0.32); animation:pop .16s ease;}
+  @keyframes pop{from{transform:translateY(8px) scale(.98); opacity:0;} to{transform:none; opacity:1;}}
+  .modal-h{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 13px; border-bottom:2px solid var(--navy); background:var(--header);}
+  .modal-h .t{font-size:12px; font-weight:800; color:var(--navy);}
+  .icon-x{width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer; color:var(--label); border-radius:4px;}
+  .icon-x:hover{background:rgba(0,24,88,0.07); color:var(--navy);}
+  .icon-x svg{width:13px; height:13px;}
+  .modal-b{overflow-y:auto;}
+
+  /* ---------- popover (idea 3) ---------- */
+  .pop-anchor{position:relative;}
+  .pop{position:absolute; bottom:calc(100% + 8px); left:0; right:0; z-index:30; background:var(--card); border:2px solid var(--navy); border-radius:5px; box-shadow:0 -8px 26px rgba(0,24,88,0.20); display:none; max-height:300px; overflow-y:auto; animation:popup .14s ease;}
+  .pop.open{display:block;}
+  @keyframes popup{from{transform:translateY(6px); opacity:0;} to{transform:none; opacity:1;}}
+  .pop::after{content:''; position:absolute; top:100%; left:24px; border:7px solid transparent; border-top-color:var(--navy);}
+  .pop-h{display:flex; align-items:center; justify-content:space-between; padding:7px 11px; border-bottom:2px solid rgba(0,24,88,0.14); background:var(--header); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);}
+
+  /* ---------- bottom sheet (idea 4) ---------- */
+  .rail.sheet-host{min-height:300px; justify-content:flex-start;}
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:var(--card); border-top:2px solid var(--navy); border-radius:8px 8px 0 0; box-shadow:0 -10px 30px rgba(0,24,88,0.16); transform:translateY(100%); transition:transform .24s cubic-bezier(.22,.61,.36,1); z-index:20; display:flex; flex-direction:column; max-height:86%;}
+  .sheet.up{transform:translateY(0);}
+  .sheet-grab{display:flex; flex-direction:column; align-items:center; gap:7px; padding:8px 10px 6px; cursor:pointer; flex:0 0 auto;}
+  .sheet-grab .bar{width:34px; height:4px; border-radius:2px; background:var(--rule);}
+  .sheet-grab:hover .bar{background:var(--pink);}
+  .sheet-tabs{display:flex; width:100%; border:2px solid var(--navy); border-radius:4px; overflow:hidden; background:var(--subtle);}
+  .sheet-body{overflow-y:auto; flex:1 1 auto;}
+  .sheet-dim{position:absolute; inset:0; background:rgba(0,24,88,0.10); opacity:0; pointer-events:none; transition:opacity .24s; z-index:15;}
+  .sheet-dim.on{opacity:1;}
+
+  .hint{font-size:9px; color:var(--dim); text-align:center; margin-top:2px;}
+  .footnote{margin-top:46px; padding-top:18px; border-top:2px solid rgba(0,24,88,0.14); font-size:11.5px; line-height:1.6; color:var(--muted);}
+  .footnote b{color:var(--navy);}
+  code{font-family:'JetBrains Mono',monospace; font-size:0.92em; background:var(--subtle); padding:1px 5px; border-radius:3px; color:var(--navy);}
+</style>
+</head>
+<body>
+
+<!-- shared icon defs -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-rewind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5L3 7.5l3 3"/><path d="M3 7.5h5.5a4 4 0 1 1 0 8H4.5"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="3.5" r="1.6"/><circle cx="5" cy="12.5" r="1.6"/><circle cx="11" cy="6" r="1.6"/><path d="M5 5.1v5.8"/><path d="M11 7.6a3.5 3.5 0 0 1-3.5 3.5H5"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12a5.5 5.5 0 0 1 11 0"/><path d="M8 12l3-3"/><circle cx="8" cy="12" r="1"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></symbol>
+</svg>
+
+<div class="page">
+
+  <div class="topbar">
+    <h1>Context · Rewind · Handoff</h1>
+    <span class="ver">concepts</span>
+  </div>
+  <p class="lede">
+    Four ways to surface the <b>/context</b> breakdown (your screenshot 2) while keeping the slim usage bar as the always-on readout, with <b>Rewind</b> and <b>Handoff</b> (screenshot 1) folded in as siblings. Every control below is live, click it. All use the v6.3 tokens. The core idea across all of them: <b>Context, Rewind, and Handoff are three reads on session state</b>, so they want one shared surface rather than three unrelated affordances.
+  </p>
+
+  <div class="reco">
+    <div class="reco-h"><span class="dot"></span><span>The short version</span></div>
+    <div class="reco-b">
+      Your hunch is right: <b>tabs beat the loose button group.</b> My ranking, with the tradeoff each one is buying:
+      <ul>
+        <li><span class="k">Default</span><span><b>Idea 1 — inline tri-tabs.</b> Native to your <code>rw-tabs</code>, nothing floats, the bar stays put. Best if the breakdown can live in the rail.</span></li>
+        <li><span class="k">If big</span><span><b>Idea 2 — modal.</b> Faithful to screenshot 2, full room, rail never reflows. Best when memory files + agents lists grow long.</span></li>
+        <li><span class="k">Lightest</span><span><b>Idea 3 — anchored popover.</b> Closest to your <code>split-menu</code> pattern. No dim, no reflow, fast in-and-out.</span></li>
+        <li><span class="k">Bonus</span><span><b>Idea 4 — shared bottom sheet.</b> One resizable surface, three feeds. Best if you want history persistently parked, not transient.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============================ IDEA 1 ============================ -->
+  <div class="idea" id="idea1">
+    <div class="idea-grid">
+      <div>
+        <span class="eyebrow"><span class="num">1</span> Inline tri-tabs</span>
+        <h2>One tab strip, three views, expands in place</h2>
+        <p class="thesis">The cleanest rework of your "strange buttons." A single <b>Context · Rewind · Handoff</b> strip (your exact <code>rw-tabs</code> styling). The slim usage bar sits <b>above the tabs and never leaves</b>, so the main-window readout always shows. Clicking a tab opens an accordion panel underneath; clicking the active tab again collapses it. No overlays, no floating layers.</p>
+        <div class="tradeoffs">
+          <div class="to-col good">
+            <h4>Buys you</h4>
+            <ul>
+              <li>Zero new UI vocabulary, it's your timeline tabs plus one more tab</li>
+              <li>Bar is always visible as the collapsed summary</li>
+              <li>Keyboard / focus trivial, nothing to trap or dismiss</li>
+            </ul>
+          </div>
+          <div class="to-col bad">
+            <h4>Costs you</h4>
+            <ul>
+              <li>An open panel pushes the rail content below it down</li>
+              <li>Long memory/agent lists need an inner scroll cap</li>
+              <li>Only one of the three open at a time</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="rail-cap">live · click a tab</div>
+        <div class="rail">
+          <div>
+            <div class="ro-head"><span class="ro-label">Effort</span></div>
+            <div class="seg-ctrl"><button>Low</button><button>Med</button><button class="active">High</button><button>Extra</button><button>Max</button></div>
+          </div>
+          <div>
+            <div class="ro-head"><span class="ro-label">Session</span><button class="link-amber">Compact</button></div>
+            <!-- always-on summary bar -->
+            <div class="summary-row" style="margin-bottom:9px;">
+              <div class="ctxbar" id="i1-bar" style="flex:1 1 auto;"></div>
+              <span class="meta">89.3k / 1.0M · 9%</span>
+            </div>
+            <div class="tri-tabs flat" id="i1-tabs">
+              <button class="tri-tab" data-tab="context"><svg><use href="#i-gauge"/></svg>Context</button>
+              <button class="tri-tab" data-tab="rewind"><svg><use href="#i-rewind"/></svg>Rewind</button>
+              <button class="tri-tab" data-tab="handoff"><svg><use href="#i-fork"/></svg>Handoff</button>
+            </div>
+            <div class="tri-panel" id="i1-panel"></div>
+          </div>
+          <div>
+            <div class="ro-head"><span class="ro-label">Model</span></div>
+            <div class="seg-ctrl"><button>inherit</button><button class="active">opus</button><button>sonnet</button><button>haiku</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ IDEA 2 ============================ -->
+  <div class="idea" id="idea2">
+    <div class="idea-grid">
+      <div>
+        <span class="eyebrow"><span class="num">2</span> Modal overlay</span>
+        <h2>Press Context, a focused panel opens over the workspace</h2>
+        <p class="thesis">What you literally described. The bar stays a slim row in the rail; the whole row is now a button. Pressing it opens a dimmed, centered panel that mirrors <b>screenshot 2</b> exactly, model, token total, stacked bar, the full category table, memory files and custom agents. The <b>Rewind / Handoff</b> tabs open the <i>same kind</i> of overlay, pre-set to that verb, so the long point list never crowds the rail.</p>
+        <div class="tradeoffs">
+          <div class="to-col good">
+            <h4>Buys you</h4>
+            <ul>
+              <li>The detail gets full room; lists can be long</li>
+              <li>Rail layout never shifts, the bar stays one line</li>
+              <li>Reads as a real "drill-in," matches /context mental model</li>
+            </ul>
+          </div>
+          <div class="to-col bad">
+            <h4>Costs you</h4>
+            <ul>
+              <li>Heaviest interaction, dims and covers the workspace</li>
+              <li>Needs Esc / click-out / focus handling done properly</li>
+              <li>Overkill if you just want a glance</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="rail-cap">live · press the rows</div>
+        <div class="rail" id="i2-rail">
+          <div>
+            <div class="ro-head"><span class="ro-label">Effort</span></div>
+            <div class="seg-ctrl"><button>Low</button><button>Med</button><button class="active">High</button><button>Extra</button><button>Max</button></div>
+          </div>
+          <div>
+            <div class="ro-head"><span class="ro-label">Context</span><button class="link-amber">Compact</button></div>
+            <button class="ctx-trigger" id="i2-ctx-btn">
+              <div class="top"><span class="lab">Usage · tap for /context</span><svg class="chev"><use href="#i-chev"/></svg></div>
+              <div class="summary-row"><div class="ctxbar" id="i2-bar" style="flex:1 1 auto;"></div><span class="meta">9%</span></div>
+            </button>
+          </div>
+          <div>
+            <div class="ro-head"><span class="ro-label">History</span></div>
+            <div class="tri-tabs flat" style="border-color:var(--rule);">
+              <button class="tri-tab" id="i2-rw"><svg><use href="#i-rewind"/></svg>Rewind</button>
+              <button class="tri-tab" id="i2-hf"><svg><use href="#i-fork"/></svg>Handoff</button>
+            </div>
+          </div>
+
+          <!-- context modal -->
+          <div class="scrim" id="i2-ctx-scrim">
+            <div class="modal">
+              <div class="modal-h"><span class="t">Context usage</span><button class="icon-x" data-close="i2-ctx-scrim"><svg><use href="#i-x"/></svg></button></div>
+              <div class="modal-b" id="i2-ctx-body"></div>
+            </div>
+          </div>
+          <!-- history modal -->
+          <div class="scrim" id="i2-hist-scrim">
+            <div class="modal">
+              <div class="modal-h"><span class="t" id="i2-hist-title">Rewind to a point</span><button class="icon-x" data-close="i2-hist-scrim"><svg><use href="#i-x"/></svg></button></div>
+              <div class="modal-b" id="i2-hist-body"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ IDEA 3 ============================ -->
+  <div class="idea" id="idea3">
+    <div class="idea-grid">
+      <div>
+        <span class="eyebrow"><span class="num">3</span> Anchored popover</span>
+        <h2>A floating card, hung off the bar like your split-menu</h2>
+        <p class="thesis">The middle path, and the closest match to the dropdown chip pattern you already built. Clicking Context pops a card <b>upward off the bar</b> (same direction and shadow as <code>split-menu</code>) with the breakdown inside, no screen dim, no reflow. Rewind and Handoff each pop their own card the same way. Click elsewhere or hit Esc to dismiss.</p>
+        <div class="tradeoffs">
+          <div class="to-col good">
+            <h4>Buys you</h4>
+            <ul>
+              <li>Lightest of the "doesn't move the layout" options</li>
+              <li>Reuses muscle memory from your split-button menu</li>
+              <li>Fast glance-and-go; one click to open, one to close</li>
+            </ul>
+          </div>
+          <div class="to-col bad">
+            <h4>Costs you</h4>
+            <ul>
+              <li>A 7-row table plus two lists can feel cramped floating</li>
+              <li>Can clip near the viewport edge, needs flip logic</li>
+              <li>Less "official" than a modal for a primary readout</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="rail-cap">live · click to pop</div>
+        <div class="rail" id="i3-rail">
+          <div>
+            <div class="ro-head"><span class="ro-label">Effort</span></div>
+            <div class="seg-ctrl"><button>Low</button><button>Med</button><button class="active">High</button><button>Extra</button><button>Max</button></div>
+          </div>
+          <div class="pop-anchor">
+            <div class="ro-head"><span class="ro-label">Context</span><button class="link-amber">Compact</button></div>
+            <button class="ctx-trigger" id="i3-ctx-btn">
+              <div class="summary-row"><div class="ctxbar" id="i3-bar" style="flex:1 1 auto;"></div><span class="meta">9%</span><svg class="chev"><use href="#i-chev"/></svg></div>
+            </button>
+            <div class="pop" id="i3-ctx-pop"></div>
+          </div>
+          <div class="pop-anchor">
+            <div class="ro-head"><span class="ro-label">History</span></div>
+            <div class="tri-tabs flat" style="border-color:var(--rule);">
+              <button class="tri-tab" id="i3-rw"><svg><use href="#i-rewind"/></svg>Rewind</button>
+              <button class="tri-tab" id="i3-hf"><svg><use href="#i-fork"/></svg>Handoff</button>
+            </div>
+            <div class="pop" id="i3-hist-pop"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ IDEA 4 ============================ -->
+  <div class="idea" id="idea4">
+    <div class="idea-grid">
+      <div>
+        <span class="eyebrow"><span class="num">4</span> Shared bottom sheet</span>
+        <h2>One drawer slides up; tabs swap what's in it</h2>
+        <p class="thesis">If you'd rather <b>park</b> history than summon it. A single sheet slides up over the rail with a grab handle; the <b>Context · Rewind · Handoff</b> strip lives in its header and swaps the contents of the one surface. The slim bar stays visible up top; selecting a tab raises the sheet, the handle drops it. One persistent, resizable region instead of three transient ones.</p>
+        <div class="tradeoffs">
+          <div class="to-col good">
+            <h4>Buys you</h4>
+            <ul>
+              <li>One surface to design, style and scroll, three feeds</li>
+              <li>Feels deliberate and "dockable," good for long sessions</li>
+              <li>Handle invites resize; height is yours to set</li>
+            </ul>
+          </div>
+          <div class="to-col bad">
+            <h4>Costs you</h4>
+            <ul>
+              <li>Covers the lower rail while open (partial dim)</li>
+              <li>Most moving parts of the four to build</li>
+              <li>Closest in spirit to Idea 1, may be redundant</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="rail-cap">live · tabs raise, handle drops</div>
+        <div class="rail sheet-host" id="i4-rail">
+          <div style="width:100%;">
+            <div class="ro-head"><span class="ro-label">Effort</span></div>
+            <div class="seg-ctrl"><button>Low</button><button>Med</button><button class="active">High</button><button>Extra</button><button>Max</button></div>
+          </div>
+          <div style="width:100%;">
+            <div class="ro-head"><span class="ro-label">Session</span><button class="link-amber">Compact</button></div>
+            <div class="summary-row" style="margin-bottom:9px;"><div class="ctxbar" id="i4-bar" style="flex:1 1 auto;"></div><span class="meta">89.3k / 1.0M · 9%</span></div>
+            <div class="tri-tabs flat" id="i4-tabs">
+              <button class="tri-tab" data-tab="context"><svg><use href="#i-gauge"/></svg>Context</button>
+              <button class="tri-tab" data-tab="rewind"><svg><use href="#i-rewind"/></svg>Rewind</button>
+              <button class="tri-tab" data-tab="handoff"><svg><use href="#i-fork"/></svg>Handoff</button>
+            </div>
+            <p class="hint">tabs open the sheet ↓</p>
+          </div>
+
+          <div class="sheet-dim" id="i4-dim"></div>
+          <div class="sheet" id="i4-sheet">
+            <div class="sheet-grab" id="i4-grab" title="Drag / click to close">
+              <span class="bar"></span>
+              <div class="sheet-tabs" id="i4-sheet-tabs" style="border-color:var(--navy);">
+                <button class="tri-tab" data-tab="context"><svg><use href="#i-gauge"/></svg>Context</button>
+                <button class="tri-tab" data-tab="rewind"><svg><use href="#i-rewind"/></svg>Rewind</button>
+                <button class="tri-tab" data-tab="handoff"><svg><use href="#i-fork"/></svg>Handoff</button>
+              </div>
+            </div>
+            <div class="sheet-body" id="i4-sheet-body"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    <b>On the two numbers:</b> screenshot 1's bar reads <b>62%</b> and screenshot 2 reads <b>9%</b>, because they're different metrics, percent-toward-auto-compact vs. absolute tokens of the 1M window. In these mocks the slim bar <i>is</i> a miniature of the <code>/context</code> stacked bar (same segment colors), so collapsed and expanded always agree at <b>9%</b>. If you want the bar to track "% to compact" instead, swap the single fill back in and keep the breakdown for the drill-in only, both wire to the same component.<br><br>
+    <b>Reuse:</b> the breakdown block and the timeline list are rendered once in JS and injected into all four ideas, so whichever you pick, there's a single source for each. Pick a direction and I'll wire it straight into <code>ui-concept-v6p3.html</code> against the real <code>openRewind()</code> / Compact handlers.
+  </p>
+
+</div>
+
+<script>
+/* ---------- shared data (screenshot 2 + screenshot 1) ---------- */
+const CTX = {
+  model:'claude-opus-4-8', used:'89.3k', total:'1.0M', pct:'9%',
+  cats:[
+    {nm:'System prompt', tk:'1.5k',  pc:'0.1%', c:'var(--c-sys)',   w:0.1},
+    {nm:'System tools',  tk:'5.1k',  pc:'0.5%', c:'var(--c-tools)', w:0.5},
+    {nm:'MCP tools',     tk:'27.5k', pc:'2.8%', c:'var(--c-mcp)',   w:2.8},
+    {nm:'Custom agents', tk:'1.8k',  pc:'0.2%', c:'var(--c-agents)',w:0.2},
+    {nm:'Memory files',  tk:'10.8k', pc:'1.1%', c:'var(--c-mem)',   w:1.1},
+    {nm:'Messages',      tk:'44.9k', pc:'4.5%', c:'var(--c-msg)',   w:4.5},
+    {nm:'Free space',    tk:'908.3k',pc:'90.8%',c:'var(--c-free)',  w:90.8},
+  ],
+  memory:[
+    {p:'~\\.claude\\CLAUDE.md', t:'8.8k'},
+    {p:'~\\MeDocuments\\AppData\\Anthropic\\claude-code-sandbox\\CLAUDE.md', t:'2.1k'},
+  ],
+  agents:[
+    {n:'superpowers:code-reviewer', t:'348'},
+    {n:'vibe-guide', t:'93'},
+    {n:'echo', t:'88'},
+    {n:'gsd-project-researcher', t:'86'},
+    {n:'gsd-ui-researcher', t:'86'},
+  ]
+};
+const TURNS = [
+  ['Turn 1','14:32:09','initial prompt: analyze JWT middleware'],
+  ['Turn 2','14:32:51','planned the analysis'],
+  ['Turn 3','14:33:30','read src/auth/jwt.ts'],
+  ['Turn 4','14:34:12','found 3 issues'],
+  ['Turn 5','14:35:48','read src/auth/refresh.ts'],
+  ['Turn 6','14:36:20','flagged expiry bypass'],
+  ['Now','','current state'],
+];
+
+/* ---------- renderers ---------- */
+function barHTML(){            // slim or detail stacked bar
+  return CTX.cats.map(c=>`<i style="flex:${c.w} 1 ${c.w<1?'3px':'0'};background:${c.c};"></i>`).join('');
+}
+function breakdownHTML(){
+  const rows = CTX.cats.map(c=>`
+    <div class="cat"><span class="sw" style="background:${c.c}"></span><span class="nm">${c.nm}</span><span class="tk">${c.tk}</span><span class="pc">${c.pc}</span></div>`).join('');
+  const mem = CTX.memory.map(m=>`<div class="ml"><span class="p">${m.p}</span><span class="t">${m.t}</span></div>`).join('');
+  const ag  = CTX.agents.map(a=>`<div class="ml"><span class="p" style="word-break:normal">${a.n}</span><span class="t">${a.t}</span></div>`).join('');
+  return `
+    <div class="bd">
+      <div class="bd-head"><span class="bd-model">${CTX.model}</span><span class="bd-tot">${CTX.used} / ${CTX.total} (${CTX.pct})</span></div>
+      <div class="bd-bar">${barHTML()}</div>
+      ${rows}
+      <div class="bd-sub"><h5>Memory files <span class="slash">/memory</span></h5>${mem}</div>
+      <div class="bd-sub"><h5>Custom agents <span class="slash">/agents</span></h5>${ag}</div>
+    </div>`;
+}
+function timelineHTML(mode, withHead){
+  const verb = mode==='handoff' ? 'Handoff here' : 'Rewind here';
+  const head = withHead ? `<div class="tl-phead"><svg><use href="#i-${mode==='handoff'?'fork':'rewind'}"/></svg>${mode==='handoff'?'Hand off from a point':'Rewind to a point'}</div>` : '';
+  const rows = TURNS.map(t=>`
+    <div class="tl-row"><span class="tl-lab"><b>${t[0]}</b>${t[1]?' · '+t[1]:''} — ${t[2]}</span><button class="tl-pick" onclick="confirmPick(this,'${mode}')">${verb}</button></div>`).join('');
+  return `${head}<div class="tl-confirm"><span>&#10003;</span><span class="tl-text"></span></div><div class="tl">${rows}</div>`;
+}
+function confirmPick(btn, mode){
+  const wrap = btn.closest('.tri-panel, .modal-b, .pop, .sheet-body');
+  if(!wrap) return;
+  const box = wrap.querySelector('.tl-confirm');
+  const label = btn.closest('.tl-row').querySelector('b').textContent;
+  if(box){ box.querySelector('.tl-text').textContent = (mode==='handoff'?'Handed off from ':'Rewound to ')+label; box.style.display='flex'; }
+}
+
+/* fill every slim bar */
+document.querySelectorAll('#i1-bar,#i2-bar,#i3-bar,#i4-bar').forEach(b=>b.innerHTML=barHTML());
+
+/* ====================== IDEA 1 — inline tri-tabs ====================== */
+(function(){
+  const tabs=document.getElementById('i1-tabs'), panel=document.getElementById('i1-panel');
+  let cur=null;
+  tabs.addEventListener('click',e=>{
+    const b=e.target.closest('.tri-tab'); if(!b) return;
+    const t=b.dataset.tab;
+    if(cur===t){ close(); return; }
+    cur=t;
+    tabs.querySelectorAll('.tri-tab').forEach(x=>x.classList.toggle('active',x===b));
+    tabs.classList.remove('flat');
+    panel.innerHTML = t==='context' ? breakdownHTML() : timelineHTML(t,true);
+    panel.classList.add('open');
+  });
+  function close(){ cur=null; tabs.querySelectorAll('.tri-tab').forEach(x=>x.classList.remove('active')); tabs.classList.add('flat'); panel.classList.remove('open'); panel.innerHTML=''; }
+})();
+
+/* ====================== IDEA 2 — modal overlay ====================== */
+(function(){
+  const ctxScrim=document.getElementById('i2-ctx-scrim'), histScrim=document.getElementById('i2-hist-scrim');
+  document.getElementById('i2-ctx-body').innerHTML = breakdownHTML();
+  document.getElementById('i2-ctx-btn').addEventListener('click',()=>open(ctxScrim));
+  function openHist(mode){
+    document.getElementById('i2-hist-title').textContent = mode==='handoff'?'Hand off from a point':'Rewind to a point';
+    document.getElementById('i2-hist-body').innerHTML = timelineHTML(mode,false);
+    open(histScrim);
+  }
+  document.getElementById('i2-rw').addEventListener('click',()=>openHist('rewind'));
+  document.getElementById('i2-hf').addEventListener('click',()=>openHist('handoff'));
+  function open(s){ s.classList.add('open'); }
+  document.querySelectorAll('#idea2 [data-close]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.close).classList.remove('open')));
+  [ctxScrim,histScrim].forEach(s=>s.addEventListener('click',e=>{ if(e.target===s) s.classList.remove('open'); }));
+})();
+
+/* ====================== IDEA 3 — anchored popover ====================== */
+(function(){
+  const ctxPop=document.getElementById('i3-ctx-pop'), histPop=document.getElementById('i3-hist-pop');
+  const ctxBtn=document.getElementById('i3-ctx-btn'), chev=ctxBtn.querySelector('.chev');
+  ctxPop.innerHTML = `<div class="pop-h">Context usage <span style="font-family:'JetBrains Mono',monospace">${CTX.pct}</span></div>` + breakdownHTML();
+  function closeAll(except){
+    [ctxPop,histPop].forEach(p=>{ if(p!==except){ p.classList.remove('open'); }});
+    chev.classList.toggle('up', ctxPop.classList.contains('open'));
+    document.querySelectorAll('#idea3 .tri-tab').forEach(t=>t.classList.remove('active'));
+    if(histOpenMode) document.getElementById('i3-'+(histOpenMode==='handoff'?'hf':'rw')).classList.toggle('active', histPop.classList.contains('open'));
+  }
+  ctxBtn.addEventListener('click',e=>{ e.stopPropagation(); const willOpen=!ctxPop.classList.contains('open'); closeAll(ctxPop); ctxPop.classList.toggle('open',willOpen); histPop.classList.remove('open'); histOpenMode=null; chev.classList.toggle('up',willOpen); });
+  let histOpenMode=null;
+  function openHist(mode,btn){
+    const same = histPop.classList.contains('open') && histOpenMode===mode;
+    ctxPop.classList.remove('open'); chev.classList.remove('up');
+    histOpenMode = same?null:mode;
+    if(same){ histPop.classList.remove('open'); btn.classList.remove('active'); return; }
+    histPop.innerHTML = `<div class="pop-h">${mode==='handoff'?'Hand off from a point':'Rewind to a point'}</div>` + timelineHTML(mode,false);
+    histPop.classList.add('open');
+    document.querySelectorAll('#idea3 .tri-tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  document.getElementById('i3-rw').addEventListener('click',e=>{ e.stopPropagation(); openHist('rewind',e.currentTarget); });
+  document.getElementById('i3-hf').addEventListener('click',e=>{ e.stopPropagation(); openHist('handoff',e.currentTarget); });
+  document.getElementById('idea3').addEventListener('click',e=>{ if(!e.target.closest('.pop')&&!e.target.closest('.ctx-trigger')&&!e.target.closest('.tri-tab')){ ctxPop.classList.remove('open'); histPop.classList.remove('open'); chev.classList.remove('up'); histOpenMode=null; document.querySelectorAll('#idea3 .tri-tab').forEach(t=>t.classList.remove('active')); } });
+})();
+
+/* ====================== IDEA 4 — shared bottom sheet ====================== */
+(function(){
+  const sheet=document.getElementById('i4-sheet'), dim=document.getElementById('i4-dim'),
+        body=document.getElementById('i4-sheet-body'),
+        topTabs=document.getElementById('i4-tabs'), sheetTabs=document.getElementById('i4-sheet-tabs'),
+        grab=document.getElementById('i4-grab');
+  let cur=null;
+  function fill(t){
+    cur=t;
+    [topTabs,sheetTabs].forEach(g=>g.querySelectorAll('.tri-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t)));
+    body.innerHTML = t==='context' ? breakdownHTML() : timelineHTML(t,true);
+  }
+  function raise(t){ fill(t); sheet.classList.add('up'); dim.classList.add('on'); }
+  function drop(){ sheet.classList.remove('up'); dim.classList.remove('on'); [topTabs,sheetTabs].forEach(g=>g.querySelectorAll('.tri-tab').forEach(x=>x.classList.remove('active'))); }
+  topTabs.addEventListener('click',e=>{ const b=e.target.closest('.tri-tab'); if(b) (cur===b.dataset.tab&&sheet.classList.contains('up'))?drop():raise(b.dataset.tab); });
+  sheetTabs.addEventListener('click',e=>{ const b=e.target.closest('.tri-tab'); if(b) fill(b.dataset.tab); });
+  grab.addEventListener('click',e=>{ if(!e.target.closest('.sheet-tabs')) drop(); });
+  dim.addEventListener('click',drop);
+})();
+
+/* global Esc closes overlays/popovers/sheet */
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){
+  document.querySelectorAll('.scrim.open').forEach(s=>s.classList.remove('open'));
+  document.querySelectorAll('.pop.open').forEach(p=>p.classList.remove('open'));
+  document.querySelectorAll('#idea3 .tri-tab,#idea3 .chev').forEach(x=>x.classList.remove('active','up'));
+  const sh=document.getElementById('i4-sheet'); if(sh) sh.classList.remove('up');
+  const dm=document.getElementById('i4-dim'); if(dm) dm.classList.remove('on');
+}});
+</script>
+</body>
+</html>
