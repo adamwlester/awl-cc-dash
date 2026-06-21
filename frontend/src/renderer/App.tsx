@@ -184,8 +184,9 @@ function EventRenderer({ event }: { event: SDKEvent }) {
 
   // Assistant message
   if (sdk === 'AssistantMessage') {
-    const msg = event.data?.message || {}
-    const content = msg.content || []
+    // Sidecar flattens message attrs to the top level (event.content); keep the
+    // older data.message.content shape as a fallback.
+    const content = event.content || event.data?.message?.content || []
     return (
       <>
         {content.map((block: any, i: number) => {
@@ -200,8 +201,9 @@ function EventRenderer({ event }: { event: SDKEvent }) {
 
   // User message (tool results)
   if (sdk === 'UserMessage') {
-    const msg = event.data?.message || {}
-    const content = msg.content || []
+    // Sidecar flattens message attrs to the top level (event.content); keep the
+    // older data.message.content shape as a fallback.
+    const content = event.content || event.data?.message?.content || []
     return (
       <>
         {content.map((block: any, i: number) => {

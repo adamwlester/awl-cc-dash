@@ -45,6 +45,29 @@ wiring and the React/neobrutalism build-out.
 
 ## Log
 
+### 2026-06-21 08:33:22 — Sidecar driver seam (#1) + frontend render fix; live end-to-end verified
+
+**#1 driver seam:** refactored the SDK-coupled sidecar onto a pluggable `AgentDriver` interface
+(`sidecar/drivers/{base,sdk,bridge}.py` + factory). `sdk` stays the default (behavior unchanged);
+`bridge` is a new selectable driver (`AWL_DRIVER=bridge` or per-session `driver`) that runs a real
+Claude Code TUI via the tmux bridge, polling the JSONL transcript → events (transcript blocks already
+carry Anthropic `.type`). Serialization moved to `sidecar/serialize.py` (carries the block-type fix);
+`main.py` is now driver-agnostic and `/health` reports the active driver.
+
+**Frontend render fix (caught by the rendered-UI check, not the API test):** the renderer read
+assistant content from `event.data.message.content`, but the sidecar emits `content` at the event top
+level — so cards never appeared even after the block-type fix. Fixed `App.tsx` EventRenderer to read
+`event.content` (with the old shape as fallback). This was the *actual* reason the MVP showed no output.
+
+**Verified live end-to-end:** installed sidecar deps into `.venv` + `npm install` the frontend; ran the
+live sidecar (7690, sdk driver) + the electron-vite renderer; created a session and sent a prompt — the
+agent used Glob/Grep/Read and the feed rendered tool-call cards, tool-result cards, and the assistant
+text answer, with the cost/turns result bar. Checked narrow (680px) + wide (1800px): no overflow;
+expand/collapse works; no console errors. Driver-seam unit checks (factory selection, bridge transcript
+mapping) pass. The bridge driver is implemented but its live WSL/tmux path is not yet end-to-end verified.
+
+Files: added sidecar/serialize.py + sidecar/drivers/{__init__,base,sdk,bridge}.py; rewrote sidecar/main.py (driver-agnostic); fixed frontend/src/renderer/App.tsx (event.content)
+
 ### 2026-06-21 08:02:11 — Completed root requirements.txt; fixed content-block rendering bug in live sidecar
 
 Two fixes. (1) **Root `requirements.txt`** was missing the sidecar's web deps — rewrote it with the
