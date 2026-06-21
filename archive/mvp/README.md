@@ -65,9 +65,10 @@ cost/turns/duration result bar, etc.), with the session's running cost updating 
 browser works too — `App.tsx` falls back to the hardcoded `http://127.0.0.1:7691` sidecar URL
 when it's not running inside Electron. Useful for headless UI testing.
 
-> If `npm run dev` crashes with `Cannot read properties of undefined (reading 'whenReady')`,
+> If a manual `npm run dev` crashes with `Cannot read properties of undefined (reading 'whenReady')`,
 > your shell has `ELECTRON_RUN_AS_NODE=1` set (some IDE-integrated terminals do). It makes the
 > Electron binary run as plain Node. Launch from a clean shell, or clear that variable first.
+> (`start-mvp.bat` clears it for you, so launching via the `.bat` avoids this entirely.)
 
 ## Known limitations (current SDK)
 

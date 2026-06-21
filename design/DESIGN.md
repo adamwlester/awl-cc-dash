@@ -70,10 +70,11 @@ net. That's the whole stack the UI sits on — deeper implementation notes live 
 ## Layout — the three-column model
 
 A title bar on top, a status footer on the bottom, and three vertical columns between them. The
-**Agent** column (left) is the narrow one; **Team Graph + Prompts** (middle) and **Team Feed**
-(right) are the wide ones. Columns and their stacked sections are separated by draggable splitters.
-The whole frame is **full-bleed** — the header, the three-pane body, and the footer meet flush and
-run edge-to-edge, with no outer margin.
+**Agent** column (left) is the narrow one, full-height; the **middle** and **right** columns are the
+wide ones, each split top/bottom into two stacked panels — **Team Graph** over **Documentation** in
+the middle, **Team Feed** over **Prompt** on the right. Columns and their stacked sections are
+separated by draggable splitters. The whole frame is **full-bleed** — the header, the three-pane
+body, and the footer meet flush and run edge-to-edge, with no outer margin.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -84,33 +85,33 @@ run edge-to-edge, with no outer margin.
 │ Agent              │ Team Graph                 │ Team Feed                     │
 │ ├ Details          │   (agent cards)            │ ├ Messages                    │
 │ └ Create           │   + Link Config drawer     │ ├ Scratch                     │
-│                    │   ──────────────────────   │ ├ Log                         │
-│                    │ Prompts                    │ └ Inbox                       │
-│                    │ ├ Compose ├ Library        │   + shared agent filter       │
-│                    │ └ History                  │     (persists across tabs)    │
-│                    │   + Source dropdown        │   + Messages footer           │
-│                    │     over Target            │                               │
-│                    │   + action row (mic …)     │                               │
+│                    │ ────────────────────────── │ ├ Log                         │
+│                    │ Documentation              │ └ Inbox                       │
+│                    │ ├ Plan  ├ Todo             │   + shared agent filter       │
+│                    │ ├ Readme └ Claude          │     (persists, Inbox incl.)   │
+│                    │   + line-numbered          │ ───────────────────────────── │
+│                    │     editor + rail          │ Prompt                        │
+│                    │   + review / comments      │ ├ Compose ├ Library           │
+│                    │                            │ └ History                     │
+│                    │                            │   + From / To dropdowns       │
+│                    │                            │   + action row (mic · Send)   │
 ├────────────────────┴────────────────────────────┴───────────────────────────────┤
 │ Footer — agents/subagents/linked counts · active/idle/pending · session age     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> *(Layout note — the diagram shows the v7/v9p4-era arrangement. The mockup has since evolved
-> (v9p7–v9p14): a **Documentation** panel was added (tabs **Plan · Todo · Readme · Claude**), **Prompt**
-> (renamed from Prompts) moved into the right column beneath the Feed, the Feed's last tab was renamed
-> **Requests → Inbox**, and the
-> always-on agent-selector columns (Prompt **From/To**, Feed **Filter**) became **header
-> dropdowns** — the multi-selects fill with **two-line identity badges** (full-height tile + role over
-> number·name, mirroring the list rows) and collapse to a `+N` chip, so Compose and
-> the feed streams now span the full panel width. The **Plan** tab renders the native Claude Code plan
-> file (`~/.claude/plans/*.md`) as **line-numbered markdown** with a per-card review system — see
-> [Documentation](#documentation-middle-bottom). Feed/History cards are **expandable** with a header
-> **checkbox** for multi-select and a shared **Copy · Summarize · Share** footer (Summarize opens a
-> slide-over summary; Share reuses the agent target picker). Panels are separated by a clear navy divider
-> (the draggable splitter's grip nub was removed in v9p14; the strip is still drag-resizable). The
-> [current mockup](ui-concept-v9p14.html) is the visual authority; a full layout-section refresh
-> is tracked as backlog E3.)*
+> *(Layout note — the schematic above is deliberately simplified; each panel's full behavior lives in
+> its own section under [Panels](#panels). A few cross-panel specifics worth flagging here: the
+> always-on agent-selector columns (Prompt **From/To**, Feed **Filter**) are **header dropdowns** — the
+> multi-selects fill with **two-line identity badges** (full-height tile + role over number·name,
+> mirroring the list rows) and collapse to a `+N` chip, so Compose and the feed streams span the full
+> panel width. The **Plan** tab renders the native Claude Code plan file (`~/.claude/plans/*.md`) as
+> **line-numbered markdown** with a per-card review system — see [Documentation](#documentation-middle-bottom).
+> Feed/History cards are **expandable** with a header **checkbox** for multi-select and a shared
+> **Copy · Summarize · Share** footer (Summarize opens a slide-over summary; Share reuses the agent
+> target picker). Major panels are separated by a clear **navy divider** (the draggable splitter's grip
+> nub was removed in v9p14; the strip is still drag-resizable). The
+> [current mockup](ui-concept-v9p14.html) is the visual authority.)*
 
 The columns are tied together by **selection**: clicking an agent card in the Team Graph loads that
 agent into the **Agent** panel, so the graph highlight and the Agent panel always describe the same
@@ -159,11 +160,13 @@ being viewed.
   cards**; the current mockup doesn't draw them yet (linking lives in the drawer + footer count
   for now).
 
-### Team Feed (right)
+### Team Feed (right, top)
 
-The full-height right column: a real-time, cross-agent view of communication, attention, and events,
-as four tabs over a **shared agent filter** — a multi-select **list** of agent identity rows
-(including a **User** row) with a single **contextual All/None** toggle — that persists across all
+The top panel of the right column (the Feed sits above [Prompt](#prompts-right-bottom)): a real-time,
+cross-agent view of communication, attention, and events, as four tabs over a **shared agent Filter**
+— a header **dropdown** (in a sub-bar) whose popover is a multi-select **list** of agent identity rows
+(including a **User** row) with a single **contextual All/None** toggle. Selected agents fill the
+trigger as identity **badges** (collapsing to a **+N** chip past a cap); the filter persists across all
 four tabs, **Inbox included**.
 
 Tab order puts the everyday streams first and the **Inbox** (approvals) last (Messages · Scratch ·
@@ -200,7 +203,7 @@ request **type**, color-ranked along a warm reddish→copper ramp (see [Design s
   plan's own Approve routing a card back into the Inbox — is the same handoff in reverse.)*
 - **Reply routes to Prompts.** Every card has its own **Reply** button, set off to the far right of
   the card (separate from the approve/deny controls so it reads as its own path). It doesn't open an
-  inline field — it **hands you to the [Prompts](#prompts-middle-bottom) panel**, jumping to Compose
+  inline field — it **hands you to the [Prompts](#prompts-right-bottom) panel**, jumping to Compose
   with that agent pre-selected as the sole target, so a free-form reply is composed and sent from the
   one place all prompts originate. *(Supersedes the earlier shared in-tab reply field.)*
 
@@ -234,21 +237,24 @@ Everything about **one** agent — whichever is selected in the graph. Two tabs 
   Lifecycle. **Handoff** lands here with the source agent's settings prepopulated (and editable).
   - **Footer:** **Create · Reset · Cancel**.
 
-### Prompts (middle, bottom)
+### Prompts (right, bottom)
 
-The compose-first heart of the app — three tabs over a **shared sub-header**, so the way you
-address a prompt is consistent no matter which tab you're on.
+The compose-first heart of the app — the bottom panel of the **right** column, beneath the Team Feed.
+*(The panel header reads **Prompt**, singular — relabelled in v9p10; tab ids/handlers are unchanged.)*
+Three tabs sit over a **shared sub-header**, so the way you address a prompt is consistent no matter
+which tab you're on.
 
-- **Shared Source + Target** (persist across all three tabs), stacked in one column:
-  - **Source** (single-select) — who the prompt is *from*: **User**, or an agent (sending *as*
-    that agent for coordination). Rendered as a compact **dropdown** showing only the active
-    selection (the same agent identity-row styling, collapsed); no All/None (single-select needs
-    neither).
-  - **Target** (multi-select) — who it goes *to*: the full agent **identity-row list** (recolorable
-    tile + two-line role·name, no truncation), led by a **Scratch** row that posts to the
-    [shared scratchpad](#the-shared-scratchpad), with a single **contextual All/None** toggle (shows
-    *All* until everything is selected, then *None*). Multi-target replaces a separate "broadcast"
-    mode — you just pick several.
+- **Shared From + To** — a header **sub-bar** of two dropdowns (the selection persists across all three
+  tabs); the old always-on selector column is gone, so Compose and the streams span the full width:
+  - **From / Source** (single-select) — who the prompt is *from*: **User**, or an agent (sending *as*
+    that agent for coordination). A compact **dropdown** whose trigger shows only the active selection
+    as a collapsed identity badge; no All/None (single-select needs neither).
+  - **To / Target** (multi-select) — who it goes *to*: a **dropdown** whose popover is the full agent
+    **identity-row list** (recolorable tile + two-line role·name, no truncation), led by a **Scratch**
+    row that posts to the [shared scratchpad](#the-shared-scratchpad), with a single **contextual
+    All/None** toggle (shows *All* until everything is selected, then *None*). Picked targets fill the
+    trigger as identity **badges** and collapse to a **+N** chip past a cap; multi-target replaces a
+    separate "broadcast" mode — you just pick several.
 - **Tabs:**
   - **Compose** — a free-text prompt area, with **copy** / **clear** as ghost icons in its header.
   - **Library** — reusable prompt **templates** with fill-in-the-blank placeholders; see
@@ -394,8 +400,8 @@ prompts go through as plain text.
 ### The shared scratchpad
 
 A single shared markdown document agents post to as a **living** workspace — each post attributed
-to an agent and timestamped, viewable live in the Team Feed's [Scratch tab](#team-feed-right)
-and writable from [Prompts → Target → Scratch](#prompts-middle-bottom). The attribution/timestamps
+to an agent and timestamped, viewable live in the Team Feed's [Scratch tab](#team-feed-right-top)
+and writable from [Prompts → Target → Scratch](#prompts-right-bottom). The attribution/timestamps
 exist because it's a running log of who-said-what; a clean, stateless document can be produced from
 it at the end. *(Posting in, reading out is the whole interaction for now; richer per-post
 selecting/commenting is a [future direction](#future-directions).)*

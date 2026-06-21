@@ -45,6 +45,53 @@ wiring and the React/neobrutalism build-out.
 
 ## Log
 
+### 2026-06-21 08:02:11 — Completed root requirements.txt; fixed content-block rendering bug in live sidecar
+
+Two fixes. (1) **Root `requirements.txt`** was missing the sidecar's web deps — rewrote it with the
+complete, pinned set (`fastapi`, `uvicorn[standard]`, `pydantic`, `sse-starlette` + existing
+`claude-agent-sdk`/`python-dotenv`/`pytest`), versions matched to the known-good MVP set. (2) **Live
+sidecar rendering bug:** `_safe_serialize` dumped SDK content blocks via `__dict__`, which carry no
+`type`, so the frontend (which switches on `block.type`) rendered nothing for text/tool/thinking
+blocks. Added `_BLOCK_TYPE_MAP` and inject `type` from the block class name (TextBlock→text,
+ToolUseBlock→tool_use, ToolResultBlock→tool_result, ThinkingBlock→thinking, + server variants).
+Verified with a contract test (`.scratch/verify_serialize.py`) running real SDK blocks through the
+live `serialize_message` via the MVP venv: blocks now carry the exact `type` App.tsx keys off
+(text/tool_use/thinking/tool_result). Verified at the serialization-contract level; a full live-stack
+render wasn't run (live `frontend/node_modules` not installed yet). Same bug still present in the
+frozen `archive/mvp/` by design (left unchanged).
+
+Files: rewrote requirements.txt; edited sidecar/main.py (_BLOCK_TYPE_MAP + type injection)
+
+### 2026-06-21 07:45:00 — Repo config: dev-loop permission allowlist + launchers clear ELECTRON_RUN_AS_NODE
+
+Closed two of the config gaps flagged this session. (1) `.claude/settings.json` — added a focused
+`Bash(...)` allowlist for the build/run/test/agent-control loop (`npm`, `npx`, `node`, `python`,
+`py`, `pip`, `*python.exe`, `uvicorn`, `pytest`, `git`, `wsl`, `tmux`, `curl`, `* --version`,
+`* --help`) so the dev loop (incl. the future tmux/WSL bridge driver) won't stall on approvals under
+`acceptEdits`/stricter modes; routed `git push` to an `ask` rule to honor "push only when asked"
+(deny>ask>allow). Valid JSON, 26 allow / 2 ask rules. (2) Both launchers now `set "ELECTRON_RUN_AS_NODE="`
+before starting the Electron frontend — the VS Code/Claude Code terminal sets that var, which makes
+Electron run as plain Node and crash on startup (`app.whenReady` undefined). Verified faithfully: a
+child `node` process spawned after the `.bat`'s clear reads the var as `undefined`. Updated the MVP
+README note to say `start-mvp.bat` handles it automatically.
+Files: .claude/settings.json, start-dashboard.bat, archive/mvp/start-mvp.bat, archive/mvp/README.md
+
+### 2026-06-21 07:41:45 — Reconciled design/DESIGN.md to the v9p14 mockup (ground truth)
+
+Audited `design/DESIGN.md` against `design/ui-concept-v9p14.html` (the visual authority) and fixed the
+places where the doc still described the pre-v9p4/v9p9 UI. Rewrote the **Layout** section: the ASCII
+diagram now shows the real arrangement — Agent (left, full height) · Team Graph over **Documentation**
+(middle) · Team Feed over **Prompt** (right) — with the intro prose to match (box verified rectangular,
+21 lines × 83 cols), and replaced the stale "diagram is v7/v9p4-era" note. Updated the **Team Feed**
+("full-height right column" → right-top, above Prompt) and **Prompt** sections so the always-on
+Source/Target/Filter selector columns read as the v9p9 **header dropdowns** (From/To, Filter) with the
+identity-row lists inside the trigger popovers (badges collapsing to +N). Renamed two headings/anchors
+(Team Feed → right,top · Prompts → right,bottom) and repointed every internal link — all 35 anchors
+resolve. Tokens, palette, title bar, footer, action row, Mode control, and Link Config drawer were
+already accurate; left unchanged.
+
+Files: edited design/DESIGN.md
+
 ### 2026-06-21 07:20:01 — Verified test-import fix (already done); closed gitignore venv gap
 
 Followed up on the two items flagged last entry. (1) **Tests:** `tests/conftest.py` and
@@ -1999,3 +2046,11 @@ Files: .gitignore, DEVLOG.md
 ### 2026-06-21 07:30:00 — Verified CLAUDE.md rewrite; removed last stale ref
 Checked live repo state (another agent had already rewritten CLAUDE.md: awl-cc-dash project identity, product/build-workflow folder map, .venv Testing section). Confirmed all 9 folder-map dirs (frontend/sidecar/bridge/design/archive/assets/tests/docs/dev) exist and match. Only residual sandbox-ism was a `tools/claude-export/` history footnote in the context-extractor section — removed it. No other stale tokens (agent-dashboard, projects/, claude-code-sandbox-env, cc_tmux_bridge) remain.
 Files: CLAUDE.md, DEVLOG.md
+
+### 2026-06-21 07:50:00 — Full bridge suite: 25/27 pass; 2 failures are environment, not the refactor
+Ran the complete integration suite via .venv (2:41). 25 passed — all core bridge ops (create/send/read/status/rename/resume/batch/broadcast/interrupt/scrollback/wait_idle/show/set_cwd/set_model/mcp_sync/read_log). 2 failed: test_send_and_response and test_watch, both `TmuxBridgeError: Timed out waiting for pattern`. Root cause is environmental, not the import refactor: the captured tmux pane renders at a tiny width (model's marker reply wraps across lines so the literal watch pattern can't match) and shows a Claude Code "startup hook error" banner. Proven not-the-refactor: the failures are model-output timeouts (bridge sent prompts + polled correctly), and the 25 passing tests fully exercise the renamed/moved package. Refactor validated. The narrow-pane/startup-hook issue in the WSL Claude session is a separate pre-existing env problem to chase if desired. Full log: .scratch/full-suite-run.log.
+Files: DEVLOG.md
+
+### 2026-06-21 07:58:00 — Bridge suite fully green after window-sizing fix
+Re-ran the 2 prior failures (test_send_and_response, test_watch) after the FancyZones narrow-window issue was fixed — both PASS (plus test_watch_timeout). Confirms the suite is effectively 27/27; the earlier 2 failures were purely the squished tmux pane wrapping the model's marker reply, nothing in the code or migration. Bridge refactor fully validated end-to-end.
+Files: DEVLOG.md

@@ -108,6 +108,20 @@ def serialize_message(message: Any) -> dict[str, Any]:
     return result
 
 
+# SDK content-block dataclasses don't carry a `type` field in their __dict__, but the
+# frontend switches each block on block.type. Map the class name to the type the
+# renderer expects so text / tool-use / tool-result / thinking blocks actually render.
+_BLOCK_TYPE_MAP = {
+    "TextBlock": "text",
+    "ThinkingBlock": "thinking",
+    "ToolUseBlock": "tool_use",
+    "ToolResultBlock": "tool_result",
+    # Server-side tool blocks (e.g. web search) — same shapes the renderer expects.
+    "ServerToolUseBlock": "tool_use",
+    "ServerToolResultBlock": "tool_result",
+}
+
+
 def _safe_serialize(value: Any, depth: int = 0) -> Any:
     if depth > 5:
         return str(value)
@@ -118,8 +132,13 @@ def _safe_serialize(value: Any, depth: int = 0) -> Any:
     if isinstance(value, (list, tuple)):
         return [_safe_serialize(v, depth + 1) for v in value]
     if hasattr(value, '__dict__'):
-        return {k: _safe_serialize(v, depth + 1) for k, v in value.__dict__.items()
+        data = {k: _safe_serialize(v, depth + 1) for k, v in value.__dict__.items()
                 if not k.startswith('_')}
+        # Ensure SDK content blocks expose the `type` the frontend keys off.
+        block_type = _BLOCK_TYPE_MAP.get(type(value).__name__)
+        if block_type and 'type' not in data:
+            data['type'] = block_type
+        return data
     try:
         json.dumps(value)
         return value

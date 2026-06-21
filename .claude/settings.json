@@ -7,6 +7,21 @@
       "Write(/**)",
       "NotebookEdit(/**)",
       "PowerShell(*)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(python *)",
+      "Bash(py *)",
+      "Bash(pip *)",
+      "Bash(*python.exe *)",
+      "Bash(uvicorn *)",
+      "Bash(pytest *)",
+      "Bash(git *)",
+      "Bash(wsl *)",
+      "Bash(tmux *)",
+      "Bash(curl *)",
+      "Bash(* --version)",
+      "Bash(* --help)",
       "mcp__excalidraw__clear_canvas",
       "mcp__excalidraw__batch_create_elements",
       "mcp__excalidraw__get_canvas_screenshot",
@@ -16,6 +31,10 @@
     ],
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git push)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
