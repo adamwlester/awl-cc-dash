@@ -416,4 +416,4 @@ async def get_context_usage(session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=7690, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=7691, log_level="info")

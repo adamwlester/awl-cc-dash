@@ -27,23 +27,69 @@
 
 ## Status
 
-**Last updated:** 2026-06-21 06:30:00
+**Last updated:** 2026-06-21 07:11:00
 
 **Current state:** Forked out of `claude-code-sandbox` into the dedicated **`awl-cc-dash`** repo.
 Fresh git history (re-init'd on `main`, **no remote/commit yet**); ~1.2 GB of sandbox cruft purged.
 Structure migrated toward the target: product dirs flat at root (`frontend/`, `sidecar/`, `bridge/`,
 `design/`, `tests/`, `docs/`), `bridge/` promoted from `tools/cc_tmux_bridge`, `dev/` holds the
-build-workflow assets (`notes/`, `prompts/`, `tools/`). The working MVP (`frontend/` + `sidecar/`,
-SDK-direct, FastAPI on 7690) is being frozen into **`archive/mvp/`** as a runnable reference while
-the real app is rebuilt in place. Design authority = neobrutalism mockup `design/ui-concept-v9p14.html`.
+build-workflow assets (`notes/`, `prompts/`, `tools/`). The working MVP is now **frozen and runnable
+in `archive/mvp/`** on port **7691** — verified end-to-end (sidecar API + UI round-trip, Connected
+badge) — as a reference while the real app is rebuilt in place. Design authority = neobrutalism
+mockup `design/ui-concept-v9p14.html`.
 
-**Next step:** Make `archive/mvp/` runnable on port 7691 (prompt ready in `dev/prompts/`), then the
-first clean commit + wire the `awl-cc-dash` remote. After that: sidecar→bridge driver wiring and the
-React/neobrutalism build-out.
+**Next step:** First clean commit + wire the `awl-cc-dash` remote. After that: sidecar→bridge driver
+wiring and the React/neobrutalism build-out.
 
 ---
 
 ## Log
+
+### 2026-06-21 07:20:01 — Verified test-import fix (already done); closed gitignore venv gap
+
+Followed up on the two items flagged last entry. (1) **Tests:** `tests/conftest.py` and
+`tests/test_tmux_bridge.py` already import from `bridge` (not `cc_tmux_bridge`) — the fix had been
+applied since my earlier survey; verified the suite collects cleanly (27 tests, no import errors)
+and `from bridge import TmuxBridge` resolves. No code change needed. (2) **.gitignore:** `.venv/`
+and `venv/` were already present (and `.venv/` covers `archive/mvp/.venv/`); added `*-env/` to also
+ignore the `<folder>-env` venv that `dev/tools/bootstrap-env.ps1` creates (e.g. `awl-cc-dash-env`).
+Verified every venv path is ignored via `git check-ignore`.
+
+Files: edited .gitignore (added *-env/ venv pattern)
+
+### 2026-06-21 07:13:58 — Updated CLAUDE.md to current structure; deduped the design reference
+
+Rewrote CLAUDE.md for the awl-cc-dash layout: new Project identity (dedicated dashboard repo, not a
+sandbox), product-vs-`dev/` folder map, refreshed Key files (`design/DESIGN.md`,
+`dev/notes/repo-migration.md`), `claude-context-extractor` path → `dev/tools/`, and a Testing
+section pointing at the repo-root `.venv` (old `claude-code-sandbox-env` is gone). Resolved the
+design-reference duplication: the re-added `design/README.md` and my earlier `docs/DESIGN.md` were
+byte-identical — made `design/DESIGN.md` the single canonical copy (co-located with its mockups),
+fixed two broken `design/ui-concept-v9p14.html` links to siblings, and removed `docs/DESIGN.md`.
+Preserved the Behavioral rules verbatim. NOTE: `tests/conftest.py` still imports `cc_tmux_bridge`
+from `tools/` — stale since the bridge moved to root `bridge/`; tests will fail until fixed.
+
+Files: edited CLAUDE.md; renamed design/README.md → design/DESIGN.md (+link fixes); deleted docs/DESIGN.md
+
+### 2026-06-21 07:11:00 — Made the frozen MVP (`archive/mvp/`) runnable on port 7691, verified end-to-end
+
+Repointed the archived MVP off the live build's port: 7690→**7691** in all three hard-coded spots
+(`sidecar/main.py` uvicorn, `frontend/src/preload/index.ts`, `App.tsx` fallback). Built a dedicated
+gitignored venv (`archive/mvp/.venv`) and wrote a **complete pinned `requirements.txt`** (the old one
+was missing fastapi/uvicorn/pydantic/sse-starlette). `npm install` needed `--legacy-peer-deps`
+(lockfile pins vite 8 vs electron-vite 5's vite ≤7 peer). Verified functional: sidecar `/health` ok,
+created a session + sent prompts via API and got real streamed events; in the UI (browser over the
+vite port + the Electron GUI) the **Connected** badge shows, +New/select/delete and the prompt
+round-trip work, session-init cards expand/collapse, the cost/turns/duration result bar updates live;
+checked narrow (640px) and wide (1920px) extremes — no overflow. Added `README.md` (run steps,
+prereqs incl. the `claude` CLI, frozen-reference note) and `start-mvp.bat`. **Known frozen-MVP gap
+left unchanged:** under the current `claude-agent-sdk` (0.2.106), assistant text + tool-call cards
+don't render — the sidecar serializes SDK content blocks via `__dict__` (no `type` field) while the
+frontend keys off `block.type`; documented in the README, not fixed (no logic edits permitted).
+Did not touch the root `frontend/`/`sidecar/`, the rest of `archive/`, or the test suite. The
+`ELECTRON_RUN_AS_NODE=1` env from the IDE terminal must be cleared for Electron to launch (noted in
+README). Also added `.venv/`+`venv/` to `.gitignore`.
+Files: archive/mvp/sidecar/main.py, archive/mvp/frontend/src/preload/index.ts, archive/mvp/frontend/src/renderer/App.tsx, archive/mvp/requirements.txt, archive/mvp/README.md, archive/mvp/start-mvp.bat, .gitignore
 
 ### 2026-06-21 06:24:00 — Wrote agent prompt to make the frozen MVP runnable from archive/mvp/
 
@@ -1937,3 +1983,19 @@ Files: DEVLOG.md
 ### 2026-06-21 06:42:00 — Pre-commit cleanup: quarantined archived transcripts; annotated migration doc
 First-commit pre-flight found 22MB of personal Claude transcripts in `archive/cc-exports/` (incl. a 14.7MB .jsonl) that would have been baked into history. Kept `archive/` per request; created `archive/_ignored/` (name signals untracked), moved the old cc-exports there, and gitignored it. Commit payload dropped 33.6MB→12.1MB / 162 files; no secrets staged. Added a prominent "SUPER TENTATIVE — reference only" banner to the top of `dev/notes/repo-migration.md`. Repo now clean for first commit (fresh `git init -b main`, no remote yet).
 Files: .gitignore, archive/_ignored/ (moved cc-exports in), dev/notes/repo-migration.md, DEVLOG.md
+
+### 2026-06-21 06:55:00 — First commit + push to awl-cc-dash remote
+Pre-flight verified: fresh git init (main, identity AdamWardLester), no secrets staged, 12.1MB payload. Removed the throwaway plansDirectory test plan from staging. Added remote origin (github.com/adamwlester/awl-cc-dash), committed 161 files as 768c47c "Initial commit", pushed -u origin main (clean history, first commit). Structure at commit: frontend/ sidecar/ bridge/ (was tools/cc_tmux_bridge) design/ dev/tools/ (bootstrap-env + context-extractor) tests/ archive/ (transcripts quarantined in archive/_ignored/).
+Files: (git) initial commit 768c47c, DEVLOG.md
+
+### 2026-06-21 07:05:00 — Refactored bridge imports after rename/move; test suite green again
+Got the bridge test suite working after `tools/cc_tmux_bridge` → root `bridge/` rename and `tools/` → `dev/tools/` moves. Package internals were already relative-import based (no change needed). Functional fixes: conftest.py now adds the repo root to sys.path and imports `from bridge import TmuxBridge`; test_tmux_bridge.py imports `from bridge.bridge import TmuxBridgeError`. Standardized the venv on `.venv` (matches new .gitignore) — updated tests/run.ps1 and .vscode interpreter path off the stale `claude-code-sandbox-env`. Created `.venv`, installed requirements.txt (pytest+claude-agent-sdk+dotenv). Coherence updates for the rename: logger name, cli/__main__ docstrings, bridge/README.md, tests/README.md, and the CLAUDE.md bridge import/CLI section. Verified: 27 tests collect; live `test_list_empty` + `test_send_to_nonexistent_errors` pass against real WSL2/tmux (via both pytest and tests/run.ps1). Did not run the 24 tests that spawn paid live Claude sessions. Deferred: broader sandbox→dashboard CLAUDE.md rewrite (folder map, Testing venv name).
+Files: tests/conftest.py, tests/test_tmux_bridge.py, tests/run.ps1, tests/README.md, .vscode/settings.json, bridge/bridge.py, bridge/cli.py, bridge/__main__.py, bridge/README.md, CLAUDE.md, requirements (.venv created), DEVLOG.md
+
+### 2026-06-21 07:12:00 — Gitignored electron-vite out/ build output
+Handled the stray archive/mvp working-tree changes: the 7690→7691 port bumps (preload/App/sidecar) and the new frozen requirements.txt are intentional (archived MVP made independently runnable), so kept as-is. Only actionable was the untracked build dir — added `out/` to .gitignore (covers frontend/ and archive/mvp/frontend/). Verified archive/mvp/frontend/out/ is now ignored.
+Files: .gitignore, DEVLOG.md
+
+### 2026-06-21 07:30:00 — Verified CLAUDE.md rewrite; removed last stale ref
+Checked live repo state (another agent had already rewritten CLAUDE.md: awl-cc-dash project identity, product/build-workflow folder map, .venv Testing section). Confirmed all 9 folder-map dirs (frontend/sidecar/bridge/design/archive/assets/tests/docs/dev) exist and match. Only residual sandbox-ism was a `tools/claude-export/` history footnote in the context-extractor section — removed it. No other stale tokens (agent-dashboard, projects/, claude-code-sandbox-env, cc_tmux_bridge) remain.
+Files: CLAUDE.md, DEVLOG.md

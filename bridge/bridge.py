@@ -16,7 +16,7 @@ from .paths import is_windows, win_to_wsl, WSL_CLAUDE_DIR, CLAUDE_BIN
 
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
-log = logging.getLogger("cc_tmux_bridge")
+log = logging.getLogger("bridge")
 
 
 class TmuxBridgeError(Exception):

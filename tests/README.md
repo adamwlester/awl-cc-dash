@@ -1,16 +1,15 @@
-# Workspace tests
+# Tests
 
-Workspace-level tests — things that exercise tooling shared across the whole
-sandbox (not tied to a single project). Project-specific tests live in that
-project's own `tests/` directory (e.g. `projects/fb-group-search/tests/`).
+Tests for this repo's shared tooling — currently the `bridge` package (tmux
+agent control). Add new suites in a `tests/` dir at the relevant scope.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `test_tmux_bridge.py` | Integration suite for the `cc_tmux_bridge` library (real WSL2/tmux + live TUI). |
+| `test_tmux_bridge.py` | Integration suite for the `bridge` package (real WSL2/tmux + live TUI). |
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) and per-run log-file setup. |
-| `run.ps1` | Convenience runner — resolves the shared venv and invokes pytest. |
+| `run.ps1` | Convenience runner — resolves the local `.venv` and invokes pytest. |
 | `log/` | Timestamped DEBUG logs, one file per run. Gitignored. |
 
 ## Running
@@ -24,7 +23,7 @@ tests\run.ps1 -m integration  # by marker
 Or directly with the venv python:
 
 ```powershell
-.\claude-code-sandbox-env\Scripts\python.exe -m pytest tests/
+.\.venv\Scripts\python.exe -m pytest tests/
 ```
 
 ## Where to look when something fails

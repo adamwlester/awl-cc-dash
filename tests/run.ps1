@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Run the workspace-level test suite (pytest) with the shared venv.
+    Run the test suite (pytest) with the local .venv.
 
 .DESCRIPTION
-    Resolves the shared claude-code-sandbox-env venv, then runs pytest against
-    this tests/ directory. Console output is concise; a full DEBUG log is written
-    to tests/log/<timestamped>.log (configured in conftest.py).
+    Resolves the local .venv, then runs pytest against this tests/ directory.
+    Console output is concise; a full DEBUG log is written to
+    tests/log/<timestamped>.log (configured in conftest.py).
 
     Any extra arguments are passed straight through to pytest.
 
@@ -18,11 +18,11 @@
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $repoRoot = Split-Path $here -Parent
-$py = Join-Path $repoRoot "claude-code-sandbox-env\Scripts\python.exe"
+$py = Join-Path $repoRoot ".venv\Scripts\python.exe"
 
 if (-not (Test-Path $py)) {
     Write-Host "ERROR: venv python not found at $py" -ForegroundColor Red
-    Write-Host "       Run tools\bootstrap-env.ps1 first." -ForegroundColor Yellow
+    Write-Host "       Create it: python -m venv .venv; .venv\Scripts\python -m pip install -r requirements.txt" -ForegroundColor Yellow
     exit 1
 }
 

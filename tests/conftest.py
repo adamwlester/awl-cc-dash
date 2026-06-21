@@ -15,14 +15,14 @@ from pathlib import Path
 
 import pytest
 
-# The tmux bridge library lives in this workspace's tools/ directory. Add it to
-# the import path (resolved relative to the repo root, so cwd doesn't matter).
-_TOOLS_DIR = str(Path(__file__).resolve().parent.parent / "tools")
-if _TOOLS_DIR not in sys.path:
-    sys.path.insert(0, _TOOLS_DIR)
+# The tmux bridge package lives at the repo root (`bridge/`). Add the repo root
+# to the import path (resolved relative to this file, so cwd doesn't matter).
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
-from cc_tmux_bridge import TmuxBridge  # noqa: E402
+from bridge import TmuxBridge  # noqa: E402
 
 LOG_DIR = Path(__file__).parent / "log"
 

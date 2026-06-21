@@ -1,4 +1,4 @@
-"""Integration tests for the ``cc_tmux_bridge`` library.
+"""Integration tests for the ``bridge`` library (tmux Claude Code control).
 
 These are real integration tests: they spin up actual Claude Code TUI sessions
 in WSL2/tmux, send real prompts, and read real screens. Nothing is mocked.
@@ -19,7 +19,7 @@ import time
 
 import pytest
 
-from cc_tmux_bridge.bridge import TmuxBridgeError
+from bridge.bridge import TmuxBridgeError
 
 log = logging.getLogger("tests.tmux_bridge")
 

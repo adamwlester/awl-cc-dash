@@ -6,7 +6,7 @@ part is *for* and *why it behaves the way it does*.
 
 > **About this doc — read once.**
 > - **The mockup owns the visuals.** The current wireframe,
->   [design/ui-concept-v9p14.html](design/ui-concept-v9p14.html), is the authority on exact layout,
+>   [ui-concept-v9p14.html](ui-concept-v9p14.html), is the authority on exact layout,
 >   sizing, and styling. It is a **[neobrutalism.dev](https://www.neobrutalism.dev) refactor** of the
 >   earlier v7p3 mockup — token names + utility classes mirror that library's Tailwind theme so the
 >   static mockup ports ~1:1 to a React/shadcn build. This README avoids pixels/hexes/labels except in
@@ -109,7 +109,7 @@ run edge-to-edge, with no outer margin.
 > **checkbox** for multi-select and a shared **Copy · Summarize · Share** footer (Summarize opens a
 > slide-over summary; Share reuses the agent target picker). Panels are separated by a clear navy divider
 > (the draggable splitter's grip nub was removed in v9p14; the strip is still drag-resizable). The
-> [current mockup](design/ui-concept-v9p14.html) is the visual authority; a full layout-section refresh
+> [current mockup](ui-concept-v9p14.html) is the visual authority; a full layout-section refresh
 > is tracked as backlog E3.)*
 
 The columns are tied together by **selection**: clicking an agent card in the Team Graph loads that

@@ -2,7 +2,7 @@
 CC tmux Bridge — CLI interface.
 
 Usage:
-    python -m cc_tmux_bridge <command> [args...]
+    python -m bridge <command> [args...]
 
 Or directly:
     python cli.py <command> [args...]

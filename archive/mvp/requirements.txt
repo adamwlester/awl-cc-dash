@@ -1,0 +1,19 @@
+# AWL Dashboard — FROZEN MVP sidecar dependencies
+# Complete set actually imported by sidecar/main.py, pinned to what was installed
+# into archive/mvp/.venv (Python 3.12). This is a frozen reference, not the build target.
+#
+# Setup:
+#   python -m venv .venv
+#   .venv\Scripts\python.exe -m pip install -r requirements.txt
+#
+# The Claude Agent SDK shells out to the `claude` CLI — it must be on PATH.
+
+claude-agent-sdk==0.2.106
+fastapi==0.138.0
+uvicorn[standard]==0.49.0
+pydantic==2.13.4
+sse-starlette==3.4.5
+python-dotenv==1.2.2
+
+# Testing (optional)
+pytest==9.1.1

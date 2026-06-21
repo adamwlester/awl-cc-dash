@@ -17,21 +17,27 @@ Each session is a named tmux session running a live Claude Code TUI. Every sessi
 
 ### Installation
 
-The library lives in the `claude-code-sandbox` workspace at `tools/cc_tmux_bridge/`.
+The package lives at the repo root as `bridge/`. From the repo root it's a
+top-level package, so:
 
-To import, add the workspace `tools/` directory to `sys.path`:
+```python
+from bridge import TmuxBridge
+```
+
+If you import from code that isn't run with the repo root on `sys.path`, add it
+first (this is what the test suite's `conftest.py` does):
 
 ```python
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path("tools").resolve()))   # from the repo root
-from cc_tmux_bridge import TmuxBridge
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # repo root
+from bridge import TmuxBridge
 ```
 
-Or set `PYTHONPATH` to the workspace `tools/` directory:
+Or set `PYTHONPATH` to the repo root:
 
 ```
-set PYTHONPATH=%CD%\tools;%PYTHONPATH%
+set PYTHONPATH=%CD%;%PYTHONPATH%
 ```
 
 ### MCP Server Sync
@@ -48,7 +54,7 @@ Translates `cmd /c npx` → `npx`, passes through HTTP servers, skips Windows-on
 ## Python API
 
 ```python
-from cc_tmux_bridge import TmuxBridge
+from bridge import TmuxBridge
 
 bridge = TmuxBridge()
 ```
@@ -166,8 +172,8 @@ bridge = TmuxBridge(
 ## CLI
 
 ```bash
-cd tools          # the workspace tools/ directory
-python -m cc_tmux_bridge <command> [args...]
+cd <repo-root>    # where the bridge/ package lives
+python -m bridge <command> [args...]
 ```
 
 ### Commands
@@ -199,20 +205,20 @@ mcp-sync
 
 ```bash
 # Create and interact (opens a WT tab automatically)
-python -m cc_tmux_bridge create my-agent --cwd "C:/project"
-python -m cc_tmux_bridge send my-agent "Hello, what files are in this project?"
-python -m cc_tmux_bridge read my-agent --lines 30
+python -m bridge create my-agent --cwd "C:/project"
+python -m bridge send my-agent "Hello, what files are in this project?"
+python -m bridge read my-agent --lines 30
 
 # Monitor
-python -m cc_tmux_bridge wait-idle my-agent --timeout 60
-python -m cc_tmux_bridge status my-agent
+python -m bridge wait-idle my-agent --timeout 60
+python -m bridge status my-agent
 
 # Multi-agent (each gets a WT tab)
-python -m cc_tmux_bridge batch-create '[{"name":"a","cwd":"C:/p"},{"name":"b","cwd":"C:/p"}]'
-python -m cc_tmux_bridge broadcast a,b "Run the tests"
+python -m bridge batch-create '[{"name":"a","cwd":"C:/p"},{"name":"b","cwd":"C:/p"}]'
+python -m bridge broadcast a,b "Run the tests"
 
 # Tear down everything
-python -m cc_tmux_bridge shutdown
+python -m bridge shutdown
 ```
 
 ## Error Handling
@@ -231,7 +237,7 @@ except Exception as e:
 ```
 [tmux sessions in WSL2]     ← always running, survive WT/VS Code restarts
         ↑
-[cc_tmux_bridge]    ← Python API to control them
+[bridge]    ← Python API to control them
         ↑
 [Windows Terminal tabs]      ← visible display, auto-managed
 ```
@@ -245,7 +251,7 @@ except Exception as e:
 ## File Structure
 
 ```
-tools/cc_tmux_bridge/
+bridge/
 ├── __init__.py       # Package exports
 ├── __main__.py       # python -m entry point
 ├── bridge.py         # TmuxBridge class (all operations)

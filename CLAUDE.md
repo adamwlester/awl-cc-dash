@@ -1,25 +1,41 @@
 # CLAUDE.md
 
-## Workspace identity
+## Project identity
 
-This is Adam's Claude Code sandbox — a general-purpose VS Code-based workspace for AI/agentic workflows, research, and personal knowledge management. Its current primary build focus is the **AWL multi-agent dashboard** (see **Key files**). This runs on a real laptop — not a container or VM. Files outside the project directory are real and permanent.
+This is **awl-cc-dash** — a dedicated VS Code/Claude Code workspace for the **AWL Multi-Agent
+Dashboard**: a single-window Electron desktop app for running, monitoring, and coordinating many
+Claude Code agents at once. Forked out of the old `claude-code-sandbox` general workspace on
+2026-06-21 (fresh git history). This runs on a real laptop — not a container or VM. Files outside
+the project directory are real and permanent.
+
+The repo separates two layers: the **product** (the dashboard itself) lives in flat dirs at the
+root; the **build workflow** (how this gets built with Claude Code in VS Code) lives under `dev/`.
 
 ## Folder map
 
+**Product (the dashboard):**
+
 | Folder | Purpose |
 |--------|---------|
-| `agent-dashboard/` | Dashboard UI — design wireframes, Electron frontend, FastAPI sidecar |
-| `archive/` | Completed or inactive items, kept for reference |
-| `briefs/` | Session briefs — distilled intent documents from agents |
-| `cc-exports/` | Exported Claude Code session transcripts |
-| `claude-code-sandbox-env/` | Shared Python virtualenv for the workspace (used by the test runner and tooling) |
-| `docs/` | Documentation, research, guides, and `temp/` subfolder for scratch work |
-| `projects/` | Standalone projects with their own dev logs (fb-group-search, property-research) |
-| `prompts/` | Reusable prompts and system instructions |
-| `tools/` | Scripts and utilities (e.g. `cc_tmux_bridge/`) |
-| `tests/` | Workspace-level test suites (pytest). See **Testing** below. |
-| `.claude/` | Claude Code config — settings, permissions, agents, skills, plugins |
-| `.vscode/` | VS Code workspace settings and tasks |
+| `frontend/` | The desktop app — Electron + React (electron-vite). The UI today is largely one `src/renderer/App.tsx`. |
+| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690). SDK-direct today (drives `claude_agent_sdk`); swapping to the bridge driver is planned. |
+| `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **Custom Tooling**. |
+| `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `ui-concept-v9p14.html` is the current visual authority. |
+| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans) and the **frozen MVP** under `archive/mvp/` (a runnable reference copy of frontend+sidecar). |
+| `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
+| `tests/` | pytest suite (currently the bridge integration suite). See **Testing** below. |
+| `docs/` | Committed, curated product reference docs. |
+
+**Build workflow & config:**
+
+| Folder | Purpose |
+|--------|---------|
+| `dev/` | Claude-CLI / VS Code build-workflow assets — **not the app**: `notes/` (working notes + `research/`), `prompts/` (dev-loop prompts), `tools/` (`bootstrap-env.ps1`, `claude-context-extractor/`). |
+| `.claude/` | Claude Code config — `settings.json` (permissions, `plansDirectory: ./.claude/plans`), `agents/`, `plans/`, `cc-exports/`. |
+| `.vscode/` | VS Code workspace (`awl-cc-dash.code-workspace`), `settings.json`, `tasks.json`, `claude-prompts.code-snippets`. |
+
+**Root files:** `CLAUDE.md`, `DEVLOG.md`, `requirements.txt`, `pyproject.toml`, `.gitignore`,
+`start-dashboard.bat` (launches the sidecar + Electron together).
 
 ## Key files
 
@@ -27,26 +43,31 @@ Cross-cutting docs every session should know about — read the relevant one bef
 
 | File | What it is |
 |------|------------|
-| `DEVLOG.md` | Append-only project log for the whole workspace (bridges, backend, dashboard, tooling). **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. |
-| `agent-dashboard/README.md` | Ground-truth **design reference** for the multi-agent dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the wireframe mockups in `agent-dashboard/design/` own the exact visuals. |
+| `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling). **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. |
+| `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the mockups in `design/` (authority: `ui-concept-v9p14.html`) own the exact visuals. |
+| `dev/notes/repo-migration.md` | Loose, possibly-stale notes from the sandbox→awl-cc-dash migration (target layout, what moved where). Background only — trust the actual files over it. |
 
 ## Custom Tooling
 
-### cc_tmux_bridge
+### bridge (tmux agent control)
 
-Python package at `tools/cc_tmux_bridge/` (workspace-local).
+Python package at the repo root: `bridge/`.
 
 Controls Claude Code TUI sessions running in tmux inside WSL2. Every session automatically gets a visible Windows Terminal tab. Sessions persist even if WT is closed — `show()` reconnects.
 
-**Import:** add the `tools/` directory to `sys.path`, then import. For example:
+**Import:** `bridge` is a top-level package from the repo root:
+```python
+from bridge import TmuxBridge
+```
+If your code isn't run with the repo root on `sys.path`, add it first:
 ```python
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path("tools").resolve()))   # repo-root-relative
-from cc_tmux_bridge import TmuxBridge
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # repo root
+from bridge import TmuxBridge
 ```
 
-**CLI:** `python -m cc_tmux_bridge <command>` (run from the `tools/` directory or with `PYTHONPATH=tools`).
+**CLI:** `python -m bridge <command>` (run from the repo root or with `PYTHONPATH=<repo-root>`).
 
 **20 methods:** create, send, keys, read, read_log, list, show, close, shutdown, rename, resume, status, batch_create, broadcast, interrupt, scrollback, watch, wait_idle, export, mcp_sync. Plus config setters: set_cwd, set_model.
 
@@ -67,8 +88,7 @@ from cc_tmux_bridge import TmuxBridge
 
 ### claude-context-extractor
 
-Python script at `tools/claude-context-extractor/` (moved here from `projects/` on 2026-06-14 — it's
-a reusable utility, not a standalone project).
+Python script at `dev/tools/claude-context-extractor/` (a reusable dev utility, kept under `dev/`).
 
 Pulls a full **claude.ai** (web/desktop) conversation via the internal API — tool calls, results,
 citations, artifacts, and full thinking — and saves raw `conversation.json` + a clean `transcript.md`
@@ -83,25 +103,24 @@ session. Stdlib-only core; run from its own folder.
   `count_tokens` endpoint (needs `ANTHROPIC_API_KEY`); heuristic/tiktoken are offline estimates.
 - **Gotchas:** `out/` + `session_key.txt` are gitignored; large `conversation.json` exports can
   exceed a connector's ~1MB tool-result cap — feed `transcript.md`/`summary.md` or chunked reads instead.
-- History: absorbed an earlier sibling, `tools/claude-export/` — its inline `--session-key` and `--out` were folded in and that dir was removed (2026-06-14).
 
 ## Testing
 
-**Use pytest for all tests.** This is the workspace standard — reach for it when adding or
-changing testable behavior, rather than writing ad-hoc scripts.
+**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable
+behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root (currently the
+bridge integration suite). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped
+per-run debug logs.
 
-**Where tests live:** a `tests/` directory at the relevant scope.
-- Workspace-level tooling → `tests/` at the repo root.
-- A project → `tests/` inside that project (e.g. `projects/fb-group-search/tests/`).
-
-Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
-
-**How to run:**
+**How to run** (uses a repo-root `.venv`):
 ```powershell
-tests\run.ps1                 # workspace suite via the shared venv
-.\claude-code-sandbox-env\Scripts\python.exe -m pytest <path>   # any suite
+tests\run.ps1                                  # runs everything in tests/ via .venv
+.\.venv\Scripts\python.exe -m pytest tests\    # equivalent, direct
 ```
-No `testpaths` is configured (multi-project workspace) — pass the path you want to run.
+Create the venv if it's missing:
+```powershell
+python -m venv .venv; .\.venv\Scripts\python -m pip install -r requirements.txt
+```
+No `testpaths` is configured — pass the path you want to run.
 
 **Conventions** (config in `pyproject.toml`, fuller notes in `tests/README.md`):
 - Console output stays concise; full DEBUG detail (commands, payloads, raw screens,

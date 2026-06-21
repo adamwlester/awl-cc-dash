@@ -6,7 +6,12 @@ credentials*.json
 # Obsidian config (editor-specific, not project content)
 .obsidian/
 
-# Python virtual environment
+# Python virtual environments — repo-root .venv (per tests/run.ps1), any nested
+# .venv (e.g. archive/mvp/.venv), and the <folder>-env name dev/tools/bootstrap-env.ps1
+# creates (covers the legacy claude-code-sandbox-env too).
+.venv/
+venv/
+*-env/
 claude-code-sandbox-env/
 
 # OS junk
@@ -16,6 +21,9 @@ Desktop.ini
 
 # Node
 node_modules/
+
+# Electron-vite build output (frontend/ and archive/mvp/frontend/)
+out/
 
 # Scratch — transient agent artifacts (screenshots, scratch HTML, debug dumps).
 # Keep the folder discoverable, ignore its contents.

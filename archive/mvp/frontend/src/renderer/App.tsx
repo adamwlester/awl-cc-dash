@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 
 // Sidecar URL — injected via preload or hardcoded for browser testing
-const API = (window as any).awl?.sidecarUrl || 'http://127.0.0.1:7690'
+const API = (window as any).awl?.sidecarUrl || 'http://127.0.0.1:7691'
 
 // ============================================================================
 // Types
