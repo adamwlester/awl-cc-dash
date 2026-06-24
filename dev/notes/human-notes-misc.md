@@ -494,9 +494,7 @@ Backlog of changes for the dashboard mockup — the latest `agent-dashboard/desi
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 
 ## Scratch
-- We have too many different styled badges in terms of fills and and fonts. We need to 
+- We have too many different styled badges in terms of fills and and fonts. We need to refine these down to a hand full of badge styles we use consistently.
 - I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 
 # General notes
-- Need to confure things so "plans" are saved to project .claude
-- Need to see if we can change the location of cc-export

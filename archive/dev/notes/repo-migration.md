@@ -108,7 +108,6 @@ awl-cc-dash/                        # ── the repo (committed) ──
 │
 ├── CLAUDE.md                       # project memory + the UI-verification rule
 ├── DEVLOG.md                       # append-only project log
-├── README.md                       # short: what it is + how to run it
 ├── requirements.txt                # sidecar + bridge Python deps
 ├── pyproject.toml                  # pytest config + markers
 ├── .gitignore
@@ -136,7 +135,7 @@ notes into `docs/` (the sandbox's `docs/human-notes-misc.md` is the anti-pattern
 | `agent-dashboard/frontend/` (src, config — **not** `node_modules/`, **not** `out/`) | `frontend/` | the desktop app |
 | `agent-dashboard/sidecar/main.py` (**not** `__pycache__/`) | `sidecar/main.py` | the API service |
 | `agent-dashboard/design/` | `design/` | mockups / palette work |
-| `agent-dashboard/README.md` | `README.md` | the design reference |
+| `agent-dashboard/README.md` | `design/DESIGN.md` | the design reference |
 | `agent-dashboard/start-dashboard.bat` | `start-dashboard.bat` | launcher (path-update) |
 | `tools/cc_tmux_bridge/` (**not** `__pycache__/`) | `bridge/` | **the backbone** — agent control |
 | `tools/bootstrap-env.ps1` | `dev/bootstrap-env.ps1` | venv setup for the sidecar (Claude Agent SDK) — saves re-setup |
@@ -259,6 +258,6 @@ forward-compatible for multi-project later):
 - Final repo name confirmed: `awl-cc-dash`.
 - **`dev/` dir name** — confirm `dev/` vs an alt (`workbench/`, `.dev/`).
 - **`context-extractor`** — bring the code into `dev/` now, or leave it in the sandbox for later.
-- **README handling** — move the big design reference to `docs/DESIGN.md` and write a short real
-  root `README.md` (recommended), or keep it as the root `README.md` for now.
+- **README handling** — RESOLVED: the big design reference lives at `design/DESIGN.md`. No root
+  `README.md` — CLAUDE.md covers orientation, so a root README isn't needed right now.
 - Whether to also wire a multi-root `.code-workspace` so the sandbox stays visible alongside.

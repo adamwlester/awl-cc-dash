@@ -27,23 +27,33 @@
 
 ## Status
 
-**Last updated:** 2026-06-21 07:11:00
+**Last updated:** 2026-06-23 18:11:14
 
-**Current state:** Forked out of `claude-code-sandbox` into the dedicated **`awl-cc-dash`** repo.
-Fresh git history (re-init'd on `main`, **no remote/commit yet**); ~1.2 GB of sandbox cruft purged.
-Structure migrated toward the target: product dirs flat at root (`frontend/`, `sidecar/`, `bridge/`,
-`design/`, `tests/`, `docs/`), `bridge/` promoted from `tools/cc_tmux_bridge`, `dev/` holds the
-build-workflow assets (`notes/`, `prompts/`, `tools/`). The working MVP is now **frozen and runnable
-in `archive/mvp/`** on port **7691** — verified end-to-end (sidecar API + UI round-trip, Connected
-badge) — as a reference while the real app is rebuilt in place. Design authority = neobrutalism
-mockup `design/ui-concept-v9p14.html`.
+**Current state:** Migrated into `awl-cc-dash` (clean history, pushed to `origin/main`). Root
+`frontend/`+`sidecar/` = the **working MVP**, built in place; `archive/mvp/` = the frozen original
+reference (port 7691, untouched). The sidecar now has a **driver seam** (`drivers/` base/sdk/bridge
++ `serialize.py`): `sdk` is the default and is **verified live** (tool-call + text cards render in
+the feed); the `bridge` driver (real Claude Code TUI via tmux/WSL2) is implemented but **not yet
+live-verified**, selectable via `AWL_DRIVER=bridge`. Design authority = `design/ui-concept-v9p14.html`.
 
-**Next step:** First clean commit + wire the `awl-cc-dash` remote. After that: sidecar→bridge driver
-wiring and the React/neobrutalism build-out.
+**Next step:** Get the `bridge` (tmux streaming) path working end-to-end as a confident MVP —
+to be done with a separate agent.
 
 ---
 
 ## Log
+
+### 2026-06-23 18:11:14 — CLAUDE.md currency: driver seam + working-MVP labeling
+
+Brought CLAUDE.md's Folder map in line with reality before a bridge-streaming handoff to another
+agent. Sidecar row now describes the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`;
+`sdk` default, `bridge` selectable via `AWL_DRIVER`, not yet live-verified) instead of the stale
+"SDK-direct; bridge swap planned." Labeled root `frontend/`+`sidecar/` as the **working MVP** (built
+in place) and `archive/mvp/` as the **frozen original** (do not edit). Also refreshed the Status block.
+This commit additionally sweeps in in-flight user edits: `dev/notes/human-notes-misc.md` and the move
+of `dev/notes/repo-migration.md` → `archive/dev/notes/`.
+
+Files: edited CLAUDE.md, DEVLOG.md (+ user edits: dev/notes/human-notes-misc.md, dev/notes/repo-migration.md → archive/dev/notes/)
 
 ### 2026-06-21 08:33:22 — Sidecar driver seam (#1) + frontend render fix; live end-to-end verified
 
@@ -2077,3 +2087,7 @@ Files: DEVLOG.md
 ### 2026-06-21 07:58:00 — Bridge suite fully green after window-sizing fix
 Re-ran the 2 prior failures (test_send_and_response, test_watch) after the FancyZones narrow-window issue was fixed — both PASS (plus test_watch_timeout). Confirms the suite is effectively 27/27; the earlier 2 failures were purely the squished tmux pane wrapping the model's marker reply, nothing in the code or migration. Bridge refactor fully validated end-to-end.
 Files: DEVLOG.md
+
+### 2026-06-21 14:30:00 — Removed root-README to-do notes (decided not needed; CLAUDE.md covers it)
+Per decision that no root README is needed (CLAUDE.md handles orientation), cleaned the root-README to-dos from dev/notes/repo-migration.md: dropped README.md from the target tree, repointed the design-reference mapping to design/DESIGN.md (its actual home), and marked the "README handling" open question RESOLVED (design/DESIGN.md; no root README). Left legit references to other READMEs (tests/, bridge/, context-extractor, the dashboard's readme-reading feature) untouched.
+Files: dev/notes/repo-migration.md, DEVLOG.md

@@ -17,11 +17,11 @@ root; the **build workflow** (how this gets built with Claude Code in VS Code) l
 
 | Folder | Purpose |
 |--------|---------|
-| `frontend/` | The desktop app — Electron + React (electron-vite). The UI today is largely one `src/renderer/App.tsx`. |
-| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690). SDK-direct today (drives `claude_agent_sdk`); swapping to the bridge driver is planned. |
+| `frontend/` | The desktop app — Electron + React (electron-vite); the **working MVP**, built in place. The UI today is largely one `src/renderer/App.tsx`. |
+| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`) with shared `serialize.py`: `sdk` (Claude Agent SDK) is the default; the `bridge` driver (real Claude Code TUI via tmux/WSL2 — implemented, **not yet live-verified**) is selectable via `AWL_DRIVER=bridge` or the per-session `driver` field. |
 | `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **Custom Tooling**. |
 | `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `ui-concept-v9p14.html` is the current visual authority. |
-| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans) and the **frozen MVP** under `archive/mvp/` (a runnable reference copy of frontend+sidecar). |
+| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans) and the **frozen original MVP** under `archive/mvp/` (a runnable reference copy — **do not edit**; the working MVP is root `frontend/`+`sidecar/`). |
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
 | `tests/` | pytest suite (currently the bridge integration suite). See **Testing** below. |
 | `docs/` | Committed, curated product reference docs. |
