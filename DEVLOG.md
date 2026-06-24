@@ -4,32 +4,15 @@
 >
 > Read this file top-to-bottom before making changes to the codebase.
 >
-> **Status** — the ONLY section you may update in-place. Replace the whole block
-> each session to reflect current state. Keep it to ~5 lines.
+> **Status** — the ONLY section you may update in-place. Replace the whole block each session to reflect current state. Keep it to ~5 lines.
 >
-> **Log** — append-only, ordered **oldest → newest** (oldest entry at the top of the Log, newest at
-> the bottom). Every entry's heading MUST begin with a timestamp in
-> `YYYY-MM-DD HH:MM:SS` (24-hour clock, to the second). **Add a new entry at the BOTTOM of the Log
-> before you end any turn that changed the repo** — created, deleted, moved, or meaningfully edited any
-> file (code, config, docs, or design) — and before you report "done." **Default to logging:** the bar is
-> "did the repo change?", not "was it big?" Don't let the log fall behind the code (it has happened
-> before). If you discover something was wrong, add a new correction entry — don't edit the old one.
-> **Template:** a `### YYYY-MM-DD HH:MM:SS — short title` heading, 1–4 lines (what changed + the
-> observable outcome), then a `Files:` line.
+> **Log** — append-only, ordered **oldest → newest** (oldest entry at the top of the Log, newest at the bottom). Every entry's heading MUST begin with a timestamp in `YYYY-MM-DD HH:MM:SS` (24-hour clock, to the second). **Add a new entry at the BOTTOM of the Log before you end any turn that changed the repo** — created, deleted, moved, or meaningfully edited any file (code, config, docs, or design) — and before you report "done." **Default to logging:** the bar is "did the repo change?", not "was it big?" Don't let the log fall behind the code (it has happened before). If you discover something was wrong, add a new correction entry — don't edit the old one. **Template:** a `### YYYY-MM-DD HH:MM:SS — short title` heading, 1–4 lines (what changed + the observable outcome), then a `Files:` line.
 >
-> **General** — never strike out, rewrite, or delete existing entries in the Log.
-> The only exception is the Status block.
+> **General** — never strike out, rewrite, or delete existing entries in the Log. The only exception is the Status block.
 >
-> **Scope** — this log covers the entire workspace: bridges, backend, dashboard
-> design, frontend, tooling, and infrastructure. Projects under `projects/`
-> maintain their own logs.
+> **Scope** — this log covers the entire workspace: bridges, backend, dashboard design, frontend, tooling, and infrastructure. Projects under `projects/` maintain their own logs.
 >
-> **Rotation** — when this file grows past **~700 lines**, archive the oldest entries to keep it
-> small. The oldest entries are at the **top** of the Log (this file is oldest → newest), so cut from
-> the top: move them **verbatim** (cut only at `### ` headings, never mid-entry) into the newest
-> `archive/devlog/DEVLOG-archive-NN.md`, appending in order, until this file is back under **~300
-> lines**; then refresh the digest + index row in **Archived history** at the bottom. Each archive file
-> is itself oldest → newest. Never edit moved entries.
+> **Rotation** — when this file grows past **~700 lines**, archive the oldest entries to keep it small. The oldest entries are at the **top** of the Log (this file is oldest → newest), so cut from the top: move them **verbatim** (cut only at `### ` headings, never mid-entry) into the newest `archive/devlog/DEVLOG-archive-NN.md`, appending in order, until this file is back under **~300 lines**; then refresh the digest + index row in **Archived history** at the bottom. Each archive file is itself oldest → newest. Never edit moved entries.
 
 ---
 
@@ -37,244 +20,104 @@
 
 **Last updated:** 2026-06-23 21:29:33
 
-**Current state:** Migrated into `awl-cc-dash` (clean history, pushed to `origin/main`). Root
-`frontend/`+`sidecar/` = the **working MVP**, built in place; `archive/mvp/` = the frozen original
-reference, now **synced to behavioral parity with root** (only difference is its port, 7691). Both
-sidecars share the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`): `sdk` is the
-default and is **verified live** in both (tool-call + text cards render in the feed); the `bridge`
-driver (real Claude Code TUI via tmux/WSL2) is implemented but **not yet live-verified**, selectable
-via `AWL_DRIVER=bridge`. Design authority = `design/ui-concept-v9p14.html`.
+**Current state:** Migrated into `awl-cc-dash` (clean history, pushed to `origin/main`). Root `frontend/`+`sidecar/` = the **working MVP**, built in place; `archive/mvp/` = the frozen original reference, now **synced to behavioral parity with root** (only difference is its port, 7691). Both sidecars share the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`): `sdk` is the default and is **verified live** in both (tool-call + text cards render in the feed); the `bridge` driver (real Claude Code TUI via tmux/WSL2) is implemented but **not yet live-verified**, selectable via `AWL_DRIVER=bridge`. Design authority = `design/ui-concept-v9p14.html`.
 
-**Next step:** Get the `bridge` (tmux streaming) path working end-to-end as a confident MVP —
-to be done with a separate agent.
+**Next step:** Get the `bridge` (tmux streaming) path working end-to-end as a confident MVP — to be done with a separate agent.
 
 ---
 
 ## Log
 
-> This file is the **recent window**. Older entries (2026-03-26 → 2026-06-21 08:20, including all
-> `[Reconstructed]` history) have been rotated into `archive/devlog/` — see **Archived history** below.
+> This file is the **recent window**. Older entries (2026-03-26 → 2026-06-21 08:20, including all `[Reconstructed]` history) have been rotated into `archive/devlog/` — see **Archived history** below.
 
 ### 2026-06-21 08:33:22 — Sidecar driver seam (#1) + frontend render fix; live end-to-end verified
 
-**#1 driver seam:** refactored the SDK-coupled sidecar onto a pluggable `AgentDriver` interface
-(`sidecar/drivers/{base,sdk,bridge}.py` + factory). `sdk` stays the default (behavior unchanged);
-`bridge` is a new selectable driver (`AWL_DRIVER=bridge` or per-session `driver`) that runs a real
-Claude Code TUI via the tmux bridge, polling the JSONL transcript → events (transcript blocks already
-carry Anthropic `.type`). Serialization moved to `sidecar/serialize.py` (carries the block-type fix);
-`main.py` is now driver-agnostic and `/health` reports the active driver.
+**#1 driver seam:** refactored the SDK-coupled sidecar onto a pluggable `AgentDriver` interface (`sidecar/drivers/{base,sdk,bridge}.py` + factory). `sdk` stays the default (behavior unchanged); `bridge` is a new selectable driver (`AWL_DRIVER=bridge` or per-session `driver`) that runs a real Claude Code TUI via the tmux bridge, polling the JSONL transcript → events (transcript blocks already carry Anthropic `.type`). Serialization moved to `sidecar/serialize.py` (carries the block-type fix); `main.py` is now driver-agnostic and `/health` reports the active driver.
 
-**Frontend render fix (caught by the rendered-UI check, not the API test):** the renderer read
-assistant content from `event.data.message.content`, but the sidecar emits `content` at the event top
-level — so cards never appeared even after the block-type fix. Fixed `App.tsx` EventRenderer to read
-`event.content` (with the old shape as fallback). This was the *actual* reason the MVP showed no output.
+**Frontend render fix (caught by the rendered-UI check, not the API test):** the renderer read assistant content from `event.data.message.content`, but the sidecar emits `content` at the event top level — so cards never appeared even after the block-type fix. Fixed `App.tsx` EventRenderer to read `event.content` (with the old shape as fallback). This was the *actual* reason the MVP showed no output.
 
-**Verified live end-to-end:** installed sidecar deps into `.venv` + `npm install` the frontend; ran the
-live sidecar (7690, sdk driver) + the electron-vite renderer; created a session and sent a prompt — the
-agent used Glob/Grep/Read and the feed rendered tool-call cards, tool-result cards, and the assistant
-text answer, with the cost/turns result bar. Checked narrow (680px) + wide (1800px): no overflow;
-expand/collapse works; no console errors. Driver-seam unit checks (factory selection, bridge transcript
-mapping) pass. The bridge driver is implemented but its live WSL/tmux path is not yet end-to-end verified.
+**Verified live end-to-end:** installed sidecar deps into `.venv` + `npm install` the frontend; ran the live sidecar (7690, sdk driver) + the electron-vite renderer; created a session and sent a prompt — the agent used Glob/Grep/Read and the feed rendered tool-call cards, tool-result cards, and the assistant text answer, with the cost/turns result bar. Checked narrow (680px) + wide (1800px): no overflow; expand/collapse works; no console errors. Driver-seam unit checks (factory selection, bridge transcript mapping) pass. The bridge driver is implemented but its live WSL/tmux path is not yet end-to-end verified.
 
 Files: added sidecar/serialize.py + sidecar/drivers/{__init__,base,sdk,bridge}.py; rewrote sidecar/main.py (driver-agnostic); fixed frontend/src/renderer/App.tsx (event.content)
 
 ### 2026-06-21 09:30:00 — Dashboard mockup v9p14: Plan-card resize fixes, turns bars, labels, delineation
-Branched ui-concept-v9p14.html from v9p13 (full copy → targeted edits; everything else preserved) and
-worked a 14-item handoff with emphasis on resize/layout that needs live testing. Headline fixes (all
-verified in headless Chromium): (A1) the Plan nav is now a flex column that stretches to the text
-column's height, so the feedback cards aren't clipped when the comment UI opens — measured nav 358→487px
-on open, with the list scrollbar flush to the nav edge (gap 0); widened to 212px so each card's verdict +
-section badges sit side by side. (A2) a neutral Copy·Edit·Comment strip now sits under the text box with
-the comment popout/composer opening BETWEEN the text and the strip (popAboveStrip verified). (A3) footer
-Share·Review left / Revise·Reject·Approve right, labels sized to match. (A4/A5) selected text highlights
-light pink; left rail cells color-coded (pink title = select-all, dark teal section, light teal line) with
-re-click-to-clear (toggle + select-all logic verified). (A12/A13) agent cards + the Agent panel show
-TURNS as a labeled health bar (panel "History"→"Turns" with inline count·bar·%, then Rewind/Handoff).
-(A8/A11/A14) Mode FREE!→Bypass; Thinking→Thoughts, Metadata→Meta; full-width "Opus fast-mode"/"Thinking
-mode" toggles. (A10) count badges squared. (A7) resize-nub removed, 3px navy panel dividers. (A9) proposed
-a slash-command approach (Compose palette scoped by Target) in the changelog. All script blocks parse.
-Files: agent-dashboard/design/ui-concept-v9p14.html (new)
+Branched ui-concept-v9p14.html from v9p13 (full copy → targeted edits; everything else preserved) and worked a 14-item handoff with emphasis on resize/layout that needs live testing. Headline fixes (all verified in headless Chromium): (A1) the Plan nav is now a flex column that stretches to the text column's height, so the feedback cards aren't clipped when the comment UI opens — measured nav 358→487px on open, with the list scrollbar flush to the nav edge (gap 0); widened to 212px so each card's verdict + section badges sit side by side. (A2) a neutral Copy·Edit·Comment strip now sits under the text box with the comment popout/composer opening BETWEEN the text and the strip (popAboveStrip verified). (A3) footer Share·Review left / Revise·Reject·Approve right, labels sized to match. (A4/A5) selected text highlights light pink; left rail cells color-coded (pink title = select-all, dark teal section, light teal line) with re-click-to-clear (toggle + select-all logic verified). (A12/A13) agent cards + the Agent panel show TURNS as a labeled health bar (panel "History"→"Turns" with inline count·bar·%, then Rewind/Handoff). (A8/A11/A14) Mode FREE!→Bypass; Thinking→Thoughts, Metadata→Meta; full-width "Opus fast-mode"/"Thinking mode" toggles. (A10) count badges squared. (A7) resize-nub removed, 3px navy panel dividers. (A9) proposed a slash-command approach (Compose palette scoped by Target) in the changelog. All script blocks parse. Files: agent-dashboard/design/ui-concept-v9p14.html (new)
 
 ### 2026-06-21 12:00:00 — Folded loose notes into dashboard "Next up" (A1–A14)
-Cleaned 16 loose notes against ui-concept-v9p13.html into Section A of docs/human-notes-misc.md as A1–A14 (numbered, bold-headered). Dropped 2 as already implemented: doc rail line/section indexing (v9p12) and flat non-interactive badges (v9p13). Loose notes bucket emptied; Scratch left untouched.
-Files: docs/human-notes-misc.md, DEVLOG.md
+Cleaned 16 loose notes against ui-concept-v9p13.html into Section A of docs/human-notes-misc.md as A1–A14 (numbered, bold-headered). Dropped 2 as already implemented: doc rail line/section indexing (v9p12) and flat non-interactive badges (v9p13). Loose notes bucket emptied; Scratch left untouched. Files: docs/human-notes-misc.md, DEVLOG.md
 
 ### 2026-06-21 13:10:00 — Dashboard v9p14 tweaks (Plan footer regroup, nav-card selection) + README sync
-Three in-place tweaks to ui-concept-v9p14.html, each verified live in headless Chromium: (1) the Plan
-action strip is now FULL-WIDTH (spans under the nav pane + text), with Copy·Edit·Comment left and
-Share·Review pulled up from the footer and right-aligned; the footer below the divider is just the
-decision trio (Revise·Reject·Approve, right). (2) Feedback nav cards are now selectable like other cards —
-light-teal fill that persists until you deselect (re-click) or close the popout, and selecting one
-highlights its section in the plan text (teal, linking card↔text); verified select/toggle/close + that
-the nav still resizes with the comment UI (320→449px). (3) removed the nav's horizontal overflow at the
-root (cards were width:100% + 7px margin → overflowed; set width:auto), so no horizontal scrollbar.
-Then synced agent-dashboard/README.md to current design intent: mockup pointer v9p4→v9p14; rewrote the
-layout note; Team Graph now describes the dual Turns+Ctx labeled bars; Agent panel Mode Bypass + the
-"Opus fast-mode"/"Thinking mode" toggles + the Turns readout; Feed Messages toggles →Thoughts/Meta; added
-a full **Documentation (middle, bottom)** panel section (doc editor, plan review system, nav rail,
-comment popout, action strip + decision footer, Inbox cross-link); and design-system notes for the 3px
-panel dividers (grip nub removed), rounded-square + flat badges, and the pink/teal selection roles.
-Files: agent-dashboard/design/ui-concept-v9p14.html, agent-dashboard/README.md
+Three in-place tweaks to ui-concept-v9p14.html, each verified live in headless Chromium: (1) the Plan action strip is now FULL-WIDTH (spans under the nav pane + text), with Copy·Edit·Comment left and Share·Review pulled up from the footer and right-aligned; the footer below the divider is just the decision trio (Revise·Reject·Approve, right). (2) Feedback nav cards are now selectable like other cards — light-teal fill that persists until you deselect (re-click) or close the popout, and selecting one highlights its section in the plan text (teal, linking card↔text); verified select/toggle/close + that the nav still resizes with the comment UI (320→449px). (3) removed the nav's horizontal overflow at the root (cards were width:100% + 7px margin → overflowed; set width:auto), so no horizontal scrollbar. Then synced agent-dashboard/README.md to current design intent: mockup pointer v9p4→v9p14; rewrote the layout note; Team Graph now describes the dual Turns+Ctx labeled bars; Agent panel Mode Bypass + the "Opus fast-mode"/"Thinking mode" toggles + the Turns readout; Feed Messages toggles →Thoughts/Meta; added a full **Documentation (middle, bottom)** panel section (doc editor, plan review system, nav rail, comment popout, action strip + decision footer, Inbox cross-link); and design-system notes for the 3px panel dividers (grip nub removed), rounded-square + flat badges, and the pink/teal selection roles. Files: agent-dashboard/design/ui-concept-v9p14.html, agent-dashboard/README.md
 
 ### 2026-06-21 13:30:00 — Refreshed dashboard "Next up" against v9p14 (A1–A2)
-Cleared old A1–A14 (all implemented in ui-concept-v9p14.html per its changelog) and folded 2 new loose notes into Section A of docs/human-notes-misc.md: A1 Plan Footer Grouping, A2 Nav Card Selection. Loose notes bucket emptied; Scratch left untouched.
-Files: docs/human-notes-misc.md, DEVLOG.md
+Cleared old A1–A14 (all implemented in ui-concept-v9p14.html per its changelog) and folded 2 new loose notes into Section A of docs/human-notes-misc.md: A1 Plan Footer Grouping, A2 Nav Card Selection. Loose notes bucket emptied; Scratch left untouched. Files: docs/human-notes-misc.md, DEVLOG.md
 
 ### 2026-06-21 14:20:00 — Dashboard v9p14: Plan footer back to one strip, Comment→button, 3-indicator sync
-Reverted the separate upper action strip (the grouping wasn't working): **all plan actions live in the one
-shared footer again** — Copy · Edit · Comment · Share · Review left-aligned, the decision trio (Revise ·
-Reject · Approve) right-justified; wraps to a 2nd row on the narrow Documentation column (verified). The
-**Comment** control is now a plain icon button (the upload action + verdict split are gone); the verdict
-moved INTO the composer as a **"Mark as" dropdown** (Approve/Revise/Block, color-coded) — Save reads it.
-Made the three feedback indicators move in lockstep: openCmtPop is the single sync point, so selecting a
-Feedback card OR clicking the in-text rail-gutter badge fills the card (teal) + highlights its section
-(teal) + opens the popout; closing/deselecting clears all three; a different comment switches all three
-(added data-fbsec/fbverdict + selectMatchingCards; verified from both entry points incl. switch + toggle).
-Synced the README Documentation bullets (shared footer, Comment button + Mark-as dropdown, the linked
-three-indicator selection). All script blocks parse.
-Files: agent-dashboard/design/ui-concept-v9p14.html, agent-dashboard/README.md
+Reverted the separate upper action strip (the grouping wasn't working): **all plan actions live in the one shared footer again** — Copy · Edit · Comment · Share · Review left-aligned, the decision trio (Revise · Reject · Approve) right-justified; wraps to a 2nd row on the narrow Documentation column (verified). The **Comment** control is now a plain icon button (the upload action + verdict split are gone); the verdict moved INTO the composer as a **"Mark as" dropdown** (Approve/Revise/Block, color-coded) — Save reads it. Made the three feedback indicators move in lockstep: openCmtPop is the single sync point, so selecting a Feedback card OR clicking the in-text rail-gutter badge fills the card (teal) + highlights its section (teal) + opens the popout; closing/deselecting clears all three; a different comment switches all three (added data-fbsec/fbverdict + selectMatchingCards; verified from both entry points incl. switch + toggle). Synced the README Documentation bullets (shared footer, Comment button + Mark-as dropdown, the linked three-indicator selection). All script blocks parse. Files: agent-dashboard/design/ui-concept-v9p14.html, agent-dashboard/README.md
 
 ### 2026-06-21 14:30:00 — Removed root-README to-do notes (decided not needed; CLAUDE.md covers it)
-Per decision that no root README is needed (CLAUDE.md handles orientation), cleaned the root-README to-dos from dev/notes/repo-migration.md: dropped README.md from the target tree, repointed the design-reference mapping to design/DESIGN.md (its actual home), and marked the "README handling" open question RESOLVED (design/DESIGN.md; no root README). Left legit references to other READMEs (tests/, bridge/, context-extractor, the dashboard's readme-reading feature) untouched.
-Files: dev/notes/repo-migration.md, DEVLOG.md
+Per decision that no root README is needed (CLAUDE.md handles orientation), cleaned the root-README to-dos from dev/notes/repo-migration.md: dropped README.md from the target tree, repointed the design-reference mapping to design/DESIGN.md (its actual home), and marked the "README handling" open question RESOLVED (design/DESIGN.md; no root README). Left legit references to other READMEs (tests/, bridge/, context-extractor, the dashboard's readme-reading feature) untouched. Files: dev/notes/repo-migration.md, DEVLOG.md
 
 ### 2026-06-23 18:11:14 — CLAUDE.md currency: driver seam + working-MVP labeling
 
-Brought CLAUDE.md's Folder map in line with reality before a bridge-streaming handoff to another
-agent. Sidecar row now describes the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`;
-`sdk` default, `bridge` selectable via `AWL_DRIVER`, not yet live-verified) instead of the stale
-"SDK-direct; bridge swap planned." Labeled root `frontend/`+`sidecar/` as the **working MVP** (built
-in place) and `archive/mvp/` as the **frozen original** (do not edit). Also refreshed the Status block.
-This commit additionally sweeps in in-flight user edits: `dev/notes/human-notes-misc.md` and the move
-of `dev/notes/repo-migration.md` → `archive/dev/notes/`.
+Brought CLAUDE.md's Folder map in line with reality before a bridge-streaming handoff to another agent. Sidecar row now describes the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`; `sdk` default, `bridge` selectable via `AWL_DRIVER`, not yet live-verified) instead of the stale "SDK-direct; bridge swap planned." Labeled root `frontend/`+`sidecar/` as the **working MVP** (built in place) and `archive/mvp/` as the **frozen original** (do not edit). Also refreshed the Status block. This commit additionally sweeps in in-flight user edits: `dev/notes/human-notes-misc.md` and the move of `dev/notes/repo-migration.md` → `archive/dev/notes/`.
 
 Files: edited CLAUDE.md, DEVLOG.md (+ user edits: dev/notes/human-notes-misc.md, dev/notes/repo-migration.md → archive/dev/notes/)
 
 ### 2026-06-23 20:08:14 — Fixed vibe-guide plan-mode tools by removing its tools allowlist
-Diagnosed the recurring "question and plan-exit tools are disabled in this context" complaint: not the plansDirectory move (`.claude/plans` works — plans write fine), but the project default agent. `.claude/settings.json` sets `agent: vibe-guide`, and that agent's frontmatter had an explicit `tools:` allowlist that omitted `AskUserQuestion` and `ExitPlanMode` (an explicit list disables everything not named). Deleted the `tools:` line so vibe-guide inherits all tools — plan mode now has its question/exit tools. Left echo.md's restricted list intact (intentional read-only distiller, not a main agent).
-Files: .claude/agents/vibe-guide.md, DEVLOG.md
+Diagnosed the recurring "question and plan-exit tools are disabled in this context" complaint: not the plansDirectory move (`.claude/plans` works — plans write fine), but the project default agent. `.claude/settings.json` sets `agent: vibe-guide`, and that agent's frontmatter had an explicit `tools:` allowlist that omitted `AskUserQuestion` and `ExitPlanMode` (an explicit list disables everything not named). Deleted the `tools:` line so vibe-guide inherits all tools — plan mode now has its question/exit tools. Left echo.md's restricted list intact (intentional read-only distiller, not a main agent). Files: .claude/agents/vibe-guide.md, DEVLOG.md
 
 ---
 
 ### 2026-06-23 21:02:14 — Synced frozen `archive/mvp/` to behavioral parity with the working root MVP
 
-Brought the frozen reference up to date with the root `frontend/`+`sidecar/` build so it runs and
-renders the same — the archive previously carried the two known render bugs (content blocks lost
-their `type`; renderer read the wrong content path), so tool-call/text/thinking cards never appeared.
-Diffed both trees: deps (`requirements.txt`), lockfiles, and all build configs were already identical;
-the only behavioral gaps were the sidecar serialization/driver-seam and the `App.tsx` content path.
-This task authorized editing `archive/mvp/` (normally do-not-edit); nothing outside it changed.
+Brought the frozen reference up to date with the root `frontend/`+`sidecar/` build so it runs and renders the same — the archive previously carried the two known render bugs (content blocks lost their `type`; renderer read the wrong content path), so tool-call/text/thinking cards never appeared. Diffed both trees: deps (`requirements.txt`), lockfiles, and all build configs were already identical; the only behavioral gaps were the sidecar serialization/driver-seam and the `App.tsx` content path. This task authorized editing `archive/mvp/` (normally do-not-edit); nothing outside it changed.
 
-**Ported into `archive/mvp/` (verbatim from root):** `sidecar/serialize.py` (the `_BLOCK_TYPE_MAP`
-type injection) and the whole `sidecar/drivers/` package (`__init__`, `base`, `sdk`, `bridge`).
-Replaced the old monolithic SDK-coupled `sidecar/main.py` with root's driver-agnostic v0.3.0 main.
-Applied the `App.tsx` EventRenderer fix in both spots (read flattened `event.content`, fall back to
-`event.data.message.content`). **Kept the archive's port 7691** in all three spots (sidecar uvicorn,
-preload `sidecarUrl`, App.tsx fallback) — final diff vs root is *only* those three port lines; every
-other source file is byte-identical. Updated `archive/mvp/README.md`: sidecar description now reflects
-the driver seam (with a note that the `bridge` driver's repo-root `bridge` package isn't bundled in
-this frozen copy), and the "render gap" known-limitation was replaced with a "Parity with the live
-build" section.
+**Ported into `archive/mvp/` (verbatim from root):** `sidecar/serialize.py` (the `_BLOCK_TYPE_MAP` type injection) and the whole `sidecar/drivers/` package (`__init__`, `base`, `sdk`, `bridge`). Replaced the old monolithic SDK-coupled `sidecar/main.py` with root's driver-agnostic v0.3.0 main. Applied the `App.tsx` EventRenderer fix in both spots (read flattened `event.content`, fall back to `event.data.message.content`). **Kept the archive's port 7691** in all three spots (sidecar uvicorn, preload `sidecarUrl`, App.tsx fallback) — final diff vs root is *only* those three port lines; every other source file is byte-identical. Updated `archive/mvp/README.md`: sidecar description now reflects the driver seam (with a note that the `bridge` driver's repo-root `bridge` package isn't bundled in this frozen copy), and the "render gap" known-limitation was replaced with a "Parity with the live build" section.
 
-**Verified it runs (port 7691):** sidecar imports clean (`AWL Dashboard Sidecar 0.3.0`, default
-driver `sdk`); `/health` ok. End-to-end via API (opus, bypassPermissions): a Glob+Bash prompt produced
-typed content blocks — `thinking` / `tool_use` / `text` / `tool_result` — plus the result bar
-(cost/turns/duration). **UI driven via Playwright** over the built renderer (`electron-vite build` →
-served static at :5180, sidecar :7691): the feed renders session-init, Glob/Bash tool-call cards,
-thinking, tool-result, the assistant text answer, and the result bar — i.e. the previously-broken
-cards now appear. Resized to 680px (no overflow, clean wrap) and 1800px (holds); exercised the
-collapsible Session-init card and the "Show all (101 lines)" toggle (both work); did a live UI send
-("PONG") that streamed and rendered with a fresh result bar + updated session cost. Only console noise
-is the favicon 404. Note: the Playwright MCP browser's headless/headed mode is fixed at server launch
-(not switchable per call), so iteration + the final narrow/wide re-screenshot parity pass ran through
-that single configured browser. Background sidecar/static servers were torn down after; the `out/`
-build artifact is gitignored.
+**Verified it runs (port 7691):** sidecar imports clean (`AWL Dashboard Sidecar 0.3.0`, default driver `sdk`); `/health` ok. End-to-end via API (opus, bypassPermissions): a Glob+Bash prompt produced typed content blocks — `thinking` / `tool_use` / `text` / `tool_result` — plus the result bar (cost/turns/duration). **UI driven via Playwright** over the built renderer (`electron-vite build` → served static at :5180, sidecar :7691): the feed renders session-init, Glob/Bash tool-call cards, thinking, tool-result, the assistant text answer, and the result bar — i.e. the previously-broken cards now appear. Resized to 680px (no overflow, clean wrap) and 1800px (holds); exercised the collapsible Session-init card and the "Show all (101 lines)" toggle (both work); did a live UI send ("PONG") that streamed and rendered with a fresh result bar + updated session cost. Only console noise is the favicon 404. Note: the Playwright MCP browser's headless/headed mode is fixed at server launch (not switchable per call), so iteration + the final narrow/wide re-screenshot parity pass ran through that single configured browser. Background sidecar/static servers were torn down after; the `out/` build artifact is gitignored.
 
-Files: added archive/mvp/sidecar/serialize.py + archive/mvp/sidecar/drivers/{__init__,base,sdk,bridge}.py;
-rewrote archive/mvp/sidecar/main.py (driver-agnostic, port 7691); edited archive/mvp/frontend/src/renderer/App.tsx
-(event.content, ×2); edited archive/mvp/README.md; DEVLOG.md
+Files: added archive/mvp/sidecar/serialize.py + archive/mvp/sidecar/drivers/{__init__,base,sdk,bridge}.py; rewrote archive/mvp/sidecar/main.py (driver-agnostic, port 7691); edited archive/mvp/frontend/src/renderer/App.tsx (event.content, ×2); edited archive/mvp/README.md; DEVLOG.md
 
 ### 2026-06-23 21:19:41 — Moved dashboard backlog into `design/TODO.md`
 
-Ported the `# Dashboard Add / Update Notes` backlog out of `dev/notes/human-notes-misc.md` into a new
-`design/TODO.md` — same ui-concept scope, same A–E structure and items, same hand-maintained
-loose-notes→section workflow. Reformatting only: clean header labels (descriptive subtitles pulled
-into their own one-line blockquotes) and the agent-maintenance guidance rendered as a blockquote.
-One factual fix: the stale intro path `agent-dashboard/design/ui-concept-v8pN.html` → current
-authority `design/ui-concept-v9p14.html`. Left a one-line pointer where the section used to live;
-deleted the abandoned `.claude/plans/todo-structure-example.md` mock.
+Ported the `# Dashboard Add / Update Notes` backlog out of `dev/notes/human-notes-misc.md` into a new `design/TODO.md` — same ui-concept scope, same A–E structure and items, same hand-maintained loose-notes→section workflow. Reformatting only: clean header labels (descriptive subtitles pulled into their own one-line blockquotes) and the agent-maintenance guidance rendered as a blockquote. One factual fix: the stale intro path `agent-dashboard/design/ui-concept-v8pN.html` → current authority `design/ui-concept-v9p14.html`. Left a one-line pointer where the section used to live; deleted the abandoned `.claude/plans/todo-structure-example.md` mock.
 
-Files: `design/TODO.md` (new), `dev/notes/human-notes-misc.md` (section removed + pointer),
-`.claude/plans/todo-structure-example.md` (deleted), `.claude/plans/i-need-your-help-nested-island.md` (plan)
+Files: `design/TODO.md` (new), `dev/notes/human-notes-misc.md` (section removed + pointer), `.claude/plans/todo-structure-example.md` (deleted), `.claude/plans/i-need-your-help-nested-island.md` (plan)
 
 ### 2026-06-23 21:25:45 — Clarified `design/TODO.md` intent (reference-only + loose-note filing)
 
-Added a top "⚠ Reference only — do not work from this unless explicitly directed" warning so agents
-don't implement entries or treat them as confirmed/approved without the human handing over a specific
-item; reworded the "How it's used" note to spell out the capture → file → cut-into-prompt flow. Also
-clarified the Loose-notes guidance (both the maintenance rule and the section blockquote): file each
-note into the best-fit section by topic/effort, or whatever section the human names.
+Added a top "⚠ Reference only — do not work from this unless explicitly directed" warning so agents don't implement entries or treat them as confirmed/approved without the human handing over a specific item; reworded the "How it's used" note to spell out the capture → file → cut-into-prompt flow. Also clarified the Loose-notes guidance (both the maintenance rule and the section blockquote): file each note into the best-fit section by topic/effort, or whatever section the human names.
 
 Files: `design/TODO.md`
 
 ### 2026-06-23 21:29:33 — CLAUDE.md: archive/mvp now "reference MVP at parity"; committed the sync
 
-Follow-up to the parity sync below. Updated CLAUDE.md's folder map: `archive/mvp/` is now described
-as the **frozen reference MVP** "kept at behavioral parity with root — only its port differs, 7691"
-instead of the **frozen original MVP**, since its sidecar is no longer the literal pre-driver-seam
-original (the "do not edit" instruction is unchanged). Committed this session's `archive/mvp/` parity
-changes + the two doc updates as one commit on `main`; left unrelated in-flight edits
-(`.claude/plans/*`, `dev/notes/human-notes-misc.md`, `design/TODO.md`) unstaged. Not pushed.
+Follow-up to the parity sync below. Updated CLAUDE.md's folder map: `archive/mvp/` is now described as the **frozen reference MVP** "kept at behavioral parity with root — only its port differs, 7691" instead of the **frozen original MVP**, since its sidecar is no longer the literal pre-driver-seam original (the "do not edit" instruction is unchanged). Committed this session's `archive/mvp/` parity changes + the two doc updates as one commit on `main`; left unrelated in-flight edits (`.claude/plans/*`, `dev/notes/human-notes-misc.md`, `design/TODO.md`) unstaged. Not pushed.
 
 Files: CLAUDE.md, DEVLOG.md
 
 ### 2026-06-23 21:32:08 — Unwrapped hard line breaks in `design/TODO.md` blockquotes
 
-Per user preference: collapsed the mid-sentence hard-wraps in the guidance blockquotes (top warning,
-What/How-it's-used, the maintenance rules, Loose-notes note) so each logical statement is a single
-line — easier to edit. No content changed; section subtitles and numbered items were already one line.
+Per user preference: collapsed the mid-sentence hard-wraps in the guidance blockquotes (top warning, What/How-it's-used, the maintenance rules, Loose-notes note) so each logical statement is a single line — easier to edit. No content changed; section subtitles and numbered items were already one line.
 
 Files: `design/TODO.md`
 
 ### 2026-06-23 22:23:13 — DEVLOG rotation: archived the sandbox-era block; added a size-based rotation rule
 
-Stood up size-triggered log rotation so this file stops eating session context (it had reached ~2,178
-lines / ~34K tokens, and CLAUDE.md tells every agent to read it). Moved the 21 pre-2026-06-13
-`[Reconstructed]` sandbox-era entries (2026-03-26 → 06-13 04:43) **verbatim** into a new
-`archive/devlog/DEVLOG-archive-01.md`; DEVLOG.md went 2,178 → 2,012 lines. (Those entries are short,
-so this safe first cut is a modest trim — establishing the mechanism, not the size drop, is the win
-this pass; the bulk weight is the recent verbose dashboard entries.) Entry conservation verified:
-131 carried + 21 archived = the original 152. Added a **Rotation** rule to the header
-(archive oldest verbatim when >~700 lines, down to ~300) and an **Archived history** digest + index at
-the bottom; updated CLAUDE.md (Key Files row + a Behavioral rotation bullet) so agents read the recent
-window by default and open archives on demand. The file's older interleaved-ordering tangle (two
-concatenated logs) was left untouched — only the clearly-old reconstructed block was rotated.
+Stood up size-triggered log rotation so this file stops eating session context (it had reached ~2,178 lines / ~34K tokens, and CLAUDE.md tells every agent to read it). Moved the 21 pre-2026-06-13 `[Reconstructed]` sandbox-era entries (2026-03-26 → 06-13 04:43) **verbatim** into a new `archive/devlog/DEVLOG-archive-01.md`; DEVLOG.md went 2,178 → 2,012 lines. (Those entries are short, so this safe first cut is a modest trim — establishing the mechanism, not the size drop, is the win this pass; the bulk weight is the recent verbose dashboard entries.) Entry conservation verified: 131 carried + 21 archived = the original 152. Added a **Rotation** rule to the header (archive oldest verbatim when >~700 lines, down to ~300) and an **Archived history** digest + index at the bottom; updated CLAUDE.md (Key Files row + a Behavioral rotation bullet) so agents read the recent window by default and open archives on demand. The file's older interleaved-ordering tangle (two concatenated logs) was left untouched — only the clearly-old reconstructed block was rotated.
 
 Files: DEVLOG.md, archive/devlog/DEVLOG-archive-01.md (new), CLAUDE.md, .claude/plans/our-devlog-md-is-getting-merry-wirth.md
 
 ### 2026-06-23 22:36:54 — Reordered the Log to a single oldest → newest timeline
 
-Fixed the log's split ordering. The file had two stretches in opposite directions — a newest-first block
-prepended on top and the original oldest-first block below — so same-day entries sat at both ends. Sorted
-all 132 entries by timestamp into one **oldest → newest** timeline (oldest at the top, newest at the
-bottom); entry text untouched, heading multiset identical before/after (132 = 132), uniform CRLF. Lifted
-the reconstruction note to a preamble at the top of the Log. Updated the instructions to match in both
-the DEVLOG header and CLAUDE.md: the **Log** is declared oldest → newest, **new entries append at the
-bottom**, and **Rotation now cuts from the top** (the oldest end). The archive (`DEVLOG-archive-01.md`)
-was already oldest → newest and its range still sits cleanly before this file's first entry — left as-is.
+Fixed the log's split ordering. The file had two stretches in opposite directions — a newest-first block prepended on top and the original oldest-first block below — so same-day entries sat at both ends. Sorted all 132 entries by timestamp into one **oldest → newest** timeline (oldest at the top, newest at the bottom); entry text untouched, heading multiset identical before/after (132 = 132), uniform CRLF. Lifted the reconstruction note to a preamble at the top of the Log. Updated the instructions to match in both the DEVLOG header and CLAUDE.md: the **Log** is declared oldest → newest, **new entries append at the bottom**, and **Rotation now cuts from the top** (the oldest end). The archive (`DEVLOG-archive-01.md`) was already oldest → newest and its range still sits cleanly before this file's first entry — left as-is.
 
 Files: DEVLOG.md, CLAUDE.md
 
 ### 2026-06-23 22:43:37 — First real size rotation: trimmed the Log to a ~300-line recent window
 
-Ran the rotation rule for real now that the Log is a clean oldest → newest timeline. Cut from the top:
-moved the oldest 117 entries (2026-06-13 07:50 → 2026-06-21 08:20) **verbatim** into a new
-`archive/devlog/DEVLOG-archive-02.md`, keeping the 16 newest (2026-06-21 08:33 driver-seam keystone
-onward). DEVLOG.md went 2,031 → ~300 lines; entry conservation verified (117 archived + 16 kept = 133,
-and 21 + 117 + 16 across both archives + this file = every entry accounted for). Added the archive-02
-digest + index row to **Archived history**, and replaced the now-stale reconstruction preamble (its
-`[Reconstructed]` entries moved to the archives) with a one-line pointer. Both archive files are
-oldest → newest and their ranges chain cleanly (…06-13 04:43 | 06-13 07:50… | 06-21 08:20 | 06-21 08:33…).
+Ran the rotation rule for real now that the Log is a clean oldest → newest timeline. Cut from the top: moved the oldest 117 entries (2026-06-13 07:50 → 2026-06-21 08:20) **verbatim** into a new `archive/devlog/DEVLOG-archive-02.md`, keeping the 16 newest (2026-06-21 08:33 driver-seam keystone onward). DEVLOG.md went 2,031 → ~300 lines; entry conservation verified (117 archived + 16 kept = 133, and 21 + 117 + 16 across both archives + this file = every entry accounted for). Added the archive-02 digest + index row to **Archived history**, and replaced the now-stale reconstruction preamble (its `[Reconstructed]` entries moved to the archives) with a one-line pointer. Both archive files are oldest → newest and their ranges chain cleanly (…06-13 04:43 | 06-13 07:50… | 06-21 08:20 | 06-21 08:33…).
 
 Files: DEVLOG.md, archive/devlog/DEVLOG-archive-02.md (new)
 
@@ -282,52 +125,51 @@ Files: DEVLOG.md, archive/devlog/DEVLOG-archive-02.md (new)
 
 ### 2026-06-24 00:22:10 — Bridge backend foundation: trustworthy run-state, startup gates, context/turns
 
-Wired the proven bridge capabilities (from the 06-23 diagnostic) through into reliable run-state.
-Rewrote `_detect_state` to read the bottom status bar instead of the always-"idle" input line: a turn
-is **generating** when the animated spinner line is present (a sparkle-glyph line ending in an ellipsis,
-e.g. "✻ Percolating…", and/or "esc to interrupt"); **idle** when the input box is rendered (rule + ❯)
-and not generating; **permission_prompt** only when the real menu marker ("Do you want …?" + a numbered
-"1. Yes") is present — killing the old keyword false-positives. `create()` now clears the startup gates
-(folder-trust always; bypass-mode via `keys("2")`+Enter when present) and waits for genuine idle before
-returning. Added `derive_context_usage()` (pure: overall context tokens/percent over a 1M window +
-string-content turn count) to the bridge driver, wired `get_context_usage()`, and added "context" to its
-`CAPABILITIES` so the `/context` endpoint serves it. Two live findings beyond the diagnostic, both
-captured as hermetic regression tests: in normal (non-bypass) mode "esc to interrupt" is clipped so the
-spinner glyph is the real signal, and the completed-turn summary line ("✻ Cooked for 1s") reuses the
-glyph without an ellipsis — hence the ellipsis requirement. 15 hermetic unit tests (no live env) pass;
-full live `test_tmux_bridge.py` green (29 passed), including a turn streaming generating→idle and a fresh
-untrusted dir coming up to idle with the gate cleared. Permission approve/deny, model/mode switching, and
-restart recovery are deliberately left for the next pass.
+Wired the proven bridge capabilities (from the 06-23 diagnostic) through into reliable run-state. Rewrote `_detect_state` to read the bottom status bar instead of the always-"idle" input line: a turn is **generating** when the animated spinner line is present (a sparkle-glyph line ending in an ellipsis, e.g. "✻ Percolating…", and/or "esc to interrupt"); **idle** when the input box is rendered (rule + ❯) and not generating; **permission_prompt** only when the real menu marker ("Do you want …?" + a numbered "1. Yes") is present — killing the old keyword false-positives. `create()` now clears the startup gates (folder-trust always; bypass-mode via `keys("2")`+Enter when present) and waits for genuine idle before returning. Added `derive_context_usage()` (pure: overall context tokens/percent over a 1M window + string-content turn count) to the bridge driver, wired `get_context_usage()`, and added "context" to its `CAPABILITIES` so the `/context` endpoint serves it. Two live findings beyond the diagnostic, both captured as hermetic regression tests: in normal (non-bypass) mode "esc to interrupt" is clipped so the spinner glyph is the real signal, and the completed-turn summary line ("✻ Cooked for 1s") reuses the glyph without an ellipsis — hence the ellipsis requirement. 15 hermetic unit tests (no live env) pass; full live `test_tmux_bridge.py` green (29 passed), including a turn streaming generating→idle and a fresh untrusted dir coming up to idle with the gate cleared. Permission approve/deny, model/mode switching, and restart recovery are deliberately left for the next pass.
 
 Files: bridge/bridge.py, sidecar/drivers/bridge.py, tests/test_bridge_unit.py (new), tests/test_tmux_bridge.py
 
 ---
 
+### 2026-06-24 00:50:19 — Design-docs refactor prompt authored
+
+Wrote a single-pass agent prompt to refactor the `design/` docs into a maintainable, single-source structure: a new `tokens.css` (sole source of truth for all design values incl. the 16 agent colors), the mockup renamed `ui-concept-v9p14.html` → `mockup.html` (consuming `tokens.css` via `<link>`), `design-tools.js` → `mockup-toolkit.js`, and `DESIGN.md`'s design-system section reduced to rules-only with values deferred to tokens. Prompt grants the agent freedom to restructure the docs but holds `mockup.html` appearance/behavior faithful to the source (hard render-gate), and bounds scope to `design/` only (no `frontend/`/`sidecar/` token-sync — that's deferred). No refactor executed yet; this is the brief. Planning discussion captured the file-set, naming, and freedom/constraint split.
+
+Files: dev/prompts/design-docs-refactor.md, .claude/plans/i-am-trying-to-merry-blanket.md
+
+---
+
+### 2026-06-24 01:00:38 — Unwrapped hard line breaks throughout CLAUDE.md
+
+Per user preference (moving away from hard-wrapped markdown, which is painful to edit), reflowed every hard-wrapped paragraph and list item in `CLAUDE.md` to single continuous lines, letting the editor soft-wrap (`editor.wordWrap` already on). Headings, both folder-map tables, code blocks, the nested sub-bullet under the UI-verification rule, blank lines, and all wording/punctuation preserved exactly — only mid-sentence newlines removed.
+
+Files: CLAUDE.md
+
+---
+
+### 2026-06-24 01:08:32 — Unwrapped hard line breaks in DESIGN.md and DEVLOG.md
+
+Continued the move away from hard-wrapped markdown (after CLAUDE.md): reflowed every hard-wrapped paragraph, list item, and blockquote in `design/DESIGN.md` and `DEVLOG.md` to single continuous lines. Done with a one-pass unwrap script guarded by a char-stream invariant (only whitespace + blockquote-continuation `>` markers removed — verified the non-whitespace character stream was byte-identical before/after). Preserved exactly: headings, all tables (incl. the indented Trigger/Payload tables under list items), the ASCII layout diagram in its code fence, ordered/nested lists, blockquote internal blank lines, and each file's line endings (DESIGN = LF, DEVLOG = CRLF).
+
+Files: design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-24 01:12:32 — Unwrapped hard line breaks in the DEVLOG archives
+
+Extended the markdown unwrap to the rotated history: reflowed `archive/devlog/DEVLOG-archive-01.md` and `DEVLOG-archive-02.md` to single continuous lines, same char-stream-guarded one-pass script (non-whitespace bytes verified identical before/after) and CRLF endings preserved. These are immutable archives, but this is a whitespace-only reflow (no entry text touched), consistent with the now-unwrapped active `DEVLOG.md`. Committed and pushed this session's doc unwraps (CLAUDE.md, DESIGN.md, DEVLOG.md, both archives) to `main`.
+
+Files: archive/devlog/DEVLOG-archive-01.md, archive/devlog/DEVLOG-archive-02.md, DEVLOG.md
+
+---
+
 ## Archived history
 
-Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this
-file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when
-you need the detail; the digest below is enough for most context.
+Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
-**Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21
-entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from
-first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension,
-port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4**
-with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK +
-`stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React
-single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the
-early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).
+**Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21 entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension, port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4** with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK + `stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).
 
-**Digest — [`DEVLOG-archive-02.md`](archive/devlog/DEVLOG-archive-02.md) (2026-06-13 → 2026-06-21, 117
-entries):** the dashboard design push and the start of the `awl-cc-dash` migration. The bulk is the
-**UI mockup iteration** — the ui-concept lineage from the v5 wireframes through **v9p13** (3-pane layout,
-the Warm-Dark palette, the Team Graph / Team Feed / Agent panels, and the Documentation/Plan review
-system with its nav rail + comment popout and the neobrutalist badge/shadow rules), plus the
-`human-notes-misc.md` "Next up" backlog churn and the `design/DESIGN.md` syncs. It closes with the
-**migration into `awl-cc-dash`** on 06-21: fresh git history, un-nesting `frontend/`+`sidecar/` to the
-root, the `tools/ → bridge/ + dev/` split and bridge-import refactor (suite green), repo config
-(permission allowlist, cc-exports/plans routing), and the run-up to the **sidecar driver seam #1**. (Two
-06-13 entries — the v5p5–v5p9 backfills — are `[Reconstructed]`.)
+**Digest — [`DEVLOG-archive-02.md`](archive/devlog/DEVLOG-archive-02.md) (2026-06-13 → 2026-06-21, 117 entries):** the dashboard design push and the start of the `awl-cc-dash` migration. The bulk is the **UI mockup iteration** — the ui-concept lineage from the v5 wireframes through **v9p13** (3-pane layout, the Warm-Dark palette, the Team Graph / Team Feed / Agent panels, and the Documentation/Plan review system with its nav rail + comment popout and the neobrutalist badge/shadow rules), plus the `human-notes-misc.md` "Next up" backlog churn and the `design/DESIGN.md` syncs. It closes with the **migration into `awl-cc-dash`** on 06-21: fresh git history, un-nesting `frontend/`+`sidecar/` to the root, the `tools/ → bridge/ + dev/` split and bridge-import refactor (suite green), repo config (permission allowlist, cc-exports/plans routing), and the run-up to the **sidecar driver seam #1**. (Two 06-13 entries — the v5p5–v5p9 backfills — are `[Reconstructed]`.)
 
 | Archive file | Date range | Entries | Summary |
 |---|---|---|---|
