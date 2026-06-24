@@ -114,12 +114,67 @@ def test_resume_new(bridge):
     assert result["status"] == "created"
 
 
+def test_fresh_dir_comes_up_idle(bridge):
+    """A session created in a fresh, untrusted dir must clear the folder-trust
+    gate during create() and reach idle — not hang on the gate."""
+    import uuid
+
+    fresh = f"/home/lester/awl-fresh-{uuid.uuid4().hex[:8]}"
+    bridge._run(f"mkdir -p {fresh}")
+    name = "fresh-dir-session"
+    try:
+        bridge.create(name, cwd=fresh)  # create() now clears the trust gate
+        result = bridge.wait_idle(name, timeout=60)
+        log.debug("fresh-dir wait_idle: %s", result)
+        assert result["status"] == "idle"
+    finally:
+        try:
+            bridge.close(name)
+        except TmuxBridgeError:
+            pass
+        bridge._run(f"rm -rf {fresh}")
+
+
 def test_status(bridge, live_session):
     time.sleep(5)
     result = bridge.status(live_session)
     log.debug("status: %s", result)
     assert result["status"] == "ok"
     assert result["state"] in ("idle", "generating", "permission_prompt", "unknown")
+
+
+def test_turn_streams_generating_then_idle(bridge, live_session):
+    """A real turn must be observed as 'generating' while running, then 'idle'.
+
+    The old detector false-reported 'idle' throughout generation, so the loose
+    assertions elsewhere passed even with the bug. This asserts the real
+    transition: a long-enough turn is caught mid-flight as 'generating' and
+    settles to 'idle' afterwards.
+
+    The prompt deliberately asks for a long answer so generation lasts well
+    over the status() poll round-trip (~1s over WSL); a quick reply could
+    finish between polls and never be sampled as 'generating'.
+    """
+    bridge.send(
+        live_session,
+        "Write roughly 600 words explaining how tmux sessions, windows, and "
+        "panes relate to each other. Take your time and be thorough.",
+    )
+
+    saw_generating = False
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        state = bridge.status(live_session)["state"]
+        if state == "generating":
+            saw_generating = True
+            break
+        time.sleep(0.3)
+    log.debug("observed generating during turn: %s", saw_generating)
+    assert saw_generating, "never observed 'generating' state during a live turn"
+
+    result = bridge.wait_idle(live_session, timeout=90)
+    log.debug("post-turn wait_idle: %s", result)
+    assert result["status"] == "idle"
 
 
 # -----------------------------------------------------------------------------

@@ -280,6 +280,29 @@ Files: DEVLOG.md, archive/devlog/DEVLOG-archive-02.md (new)
 
 ---
 
+### 2026-06-24 00:22:10 — Bridge backend foundation: trustworthy run-state, startup gates, context/turns
+
+Wired the proven bridge capabilities (from the 06-23 diagnostic) through into reliable run-state.
+Rewrote `_detect_state` to read the bottom status bar instead of the always-"idle" input line: a turn
+is **generating** when the animated spinner line is present (a sparkle-glyph line ending in an ellipsis,
+e.g. "✻ Percolating…", and/or "esc to interrupt"); **idle** when the input box is rendered (rule + ❯)
+and not generating; **permission_prompt** only when the real menu marker ("Do you want …?" + a numbered
+"1. Yes") is present — killing the old keyword false-positives. `create()` now clears the startup gates
+(folder-trust always; bypass-mode via `keys("2")`+Enter when present) and waits for genuine idle before
+returning. Added `derive_context_usage()` (pure: overall context tokens/percent over a 1M window +
+string-content turn count) to the bridge driver, wired `get_context_usage()`, and added "context" to its
+`CAPABILITIES` so the `/context` endpoint serves it. Two live findings beyond the diagnostic, both
+captured as hermetic regression tests: in normal (non-bypass) mode "esc to interrupt" is clipped so the
+spinner glyph is the real signal, and the completed-turn summary line ("✻ Cooked for 1s") reuses the
+glyph without an ellipsis — hence the ellipsis requirement. 15 hermetic unit tests (no live env) pass;
+full live `test_tmux_bridge.py` green (29 passed), including a turn streaming generating→idle and a fresh
+untrusted dir coming up to idle with the gate cleared. Permission approve/deny, model/mode switching, and
+restart recovery are deliberately left for the next pass.
+
+Files: bridge/bridge.py, sidecar/drivers/bridge.py, tests/test_bridge_unit.py (new), tests/test_tmux_bridge.py
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this

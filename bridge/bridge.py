@@ -199,12 +199,70 @@ class TmuxBridge:
         # Open a visible Windows Terminal tab
         self._open_wt_tab(name)
 
+        # Clear any startup gates (folder-trust on a fresh/untrusted dir;
+        # bypass-mode when launched with --dangerously-skip-permissions) and
+        # wait for the genuine idle prompt before reporting ready. No flag skips
+        # these gates, and pressing Enter blindly on the bypass gate selects
+        # "No, exit" and kills the session.
+        self._clear_startup_gates(name)
+
         return {
             "status": "created",
             "name": name,
             "cwd": resolved_cwd,
             "pid": sessions[name].get("pid"),
         }
+
+    def _clear_startup_gates(self, name, timeout=45, interval=0.5):
+        """Clear the folder-trust and bypass-mode gates, then wait for idle.
+
+        Both gates appear before the first turn and no CLI flag skips them:
+
+          * Folder-trust ("… trust this folder / No, exit") — Enter accepts the
+            default highlighted option 1 ("Yes, I trust this folder").
+          * Bypass-mode ("WARNING: … Bypass Permissions mode") — the default
+            highlight is "1. No, exit", so pressing Enter blindly kills the
+            session; accept with ``keys("2")`` then ``keys("Enter")``.
+
+        Polls the screen and clears whichever gate appears (in either order,
+        each at most once) until the genuine idle prompt is reached. Returns
+        best-effort on timeout rather than raising, so the caller can still
+        probe state via ``status()``.
+        """
+        deadline = time.time() + timeout
+        bypass_cleared = False
+        trust_cleared = False
+        while time.time() < deadline:
+            content = self.read(name, lines=20)["content"]
+
+            if not bypass_cleared and \
+               re.search(r"Bypass Permissions mode", content, re.IGNORECASE):
+                self.keys(name, "2")
+                self.keys(name, "Enter")
+                bypass_cleared = True
+                time.sleep(1.0)
+                continue
+
+            if not trust_cleared and re.search(
+                r"trust this folder|trust the files in this folder|"
+                r"Is this a project you created or one you trust",
+                content, re.IGNORECASE,
+            ):
+                self.keys(name, "Enter")
+                trust_cleared = True
+                time.sleep(1.0)
+                continue
+
+            if self._detect_state(content) == "idle":
+                return
+
+            time.sleep(interval)
+
+        log.warning(
+            "Session '%s' did not reach idle within %ss while clearing startup gates "
+            "(bypass_cleared=%s, trust_cleared=%s).",
+            name, timeout, bypass_cleared, trust_cleared,
+        )
 
     def send(self, name, text, press_enter=True):
         """Type text into a session's prompt.
@@ -395,40 +453,67 @@ class TmuxBridge:
         }
 
     def _detect_state(self, content):
-        """Heuristic state detection from screen content.
+        """Detect run-state from the bottom status bar of the Claude Code TUI.
 
         Returns one of: "idle", "generating", "permission_prompt", "unknown".
+
+        A running turn renders an animated spinner status line — a sparkle
+        glyph followed by a gerund and an ELLIPSIS (e.g. "✻ Percolating…",
+        "✶ Flibbertigibbeting…") — usually with an "esc to interrupt" hint to
+        its right. The hint's wording varies ("· thinking", "· esc to
+        interrupt") and is clipped at the right edge in normal (non-bypass)
+        mode, so we key off the sparkle-glyph line; we match either it or the
+        hint. Crucially the line must contain the ellipsis: once the turn
+        finishes, Claude Code leaves a same-glyph SUMMARY line ("✻ Cooked for
+        1s") with no ellipsis — that is a completed turn, NOT generation, so
+        requiring "…" keeps it from false-firing as generating.
+
+        The empty ``❯`` prompt line is present whether idle OR generating — and
+        Claude Code 2.x fills it with ghost-suggestion text — so a lone ❯ line
+        cannot be trusted as idle. Idle is therefore "input box rendered (a
+        horizontal rule plus the ❯ marker) AND not generating", never the ❯
+        line alone.
+
+        We deliberately do NOT key idle off the "? for shortcuts" hint: that
+        hint rotates with other hints ("← for agents", "● high · /effort") and
+        is dropped at narrow widths, so it is frequently absent on a genuinely
+        idle screen.
+
+        A genuine tool-permission prompt is confirmed by the menu marker — a
+        "Do you want …?" question together with a numbered "1. Yes" option —
+        rather than loose keyword matching, which false-fired on prompt text
+        containing "permission"/"approve" and on the "fewer-permission-prompts"
+        skill name on an idle screen.
 
         Screen layout (bottom of Claude Code TUI):
           ... content ...
           ────────────────  (top rule)
-          ❯  <cursor>      (prompt line when idle)
+          ❯  <cursor>      (prompt line — present whether idle or generating)
           ────────────────  (bottom rule)
-          ? for shortcuts   ◐ medium · /effort  (status bar)
+          ← for agents      ● high · /effort   (status bar — varies by width)
         """
         if not content:
             return "unknown"
 
-        lines = content.strip().split("\n")
-
-        # The bottom 2 lines are the status bar (rule + shortcuts).
-        # Content area is everything above that.
-        content_lines = lines[:-2] if len(lines) > 2 else lines
-        tail = "\n".join(content_lines[-8:])
-
-        # Permission prompt patterns
-        if re.search(r"(Allow|Deny|Yes.*No|approve|permission|Do you want)", tail, re.IGNORECASE):
+        # Genuine tool-permission menu: require BOTH the question and a numbered
+        # "1. Yes" option. Checked first because a paused permission prompt is a
+        # specific stop-state, distinct from idle/generating.
+        if re.search(r"Do you want", content, re.IGNORECASE) and \
+           re.search(r"(?m)^\s*[❯>]?\s*1\.\s+Yes", content):
             return "permission_prompt"
 
-        # Claude Code idle prompt — ❯ followed by space/nbsp on its own line
-        for line in content_lines[-4:]:
-            stripped = line.strip()
-            if re.match(r'^[❯>][\s\xa0]*$', stripped):
-                return "idle"
-
-        # Generating — braille spinner chars in the content area (not status bar)
-        if re.search(r'[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]', tail):
+        # A running turn shows the animated spinner status line — a sparkle glyph
+        # at line start followed by a gerund and an ellipsis — and/or the "esc to
+        # interrupt" hint. The ellipsis requirement excludes the completed-turn
+        # summary line ("✻ Cooked for 1s"), which reuses the glyph but is idle.
+        if re.search(r"esc to interrupt", content, re.IGNORECASE) or \
+           re.search(r"(?m)^\s*[✶✷✸✹✺✻✼✽✢✣✤✥✦✧❋❉].*(?:…|\.\.\.)", content):
             return "generating"
+
+        # Input prompt box rendered (horizontal rule + ❯) and not generating →
+        # the TUI is ready and waiting for input.
+        if re.search(r"─{10,}", content) and "❯" in content:
+            return "idle"
 
         return "unknown"
 

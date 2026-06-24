@@ -36,6 +36,56 @@ _STATE_TO_STATUS = {
     "idle": "idle",
 }
 
+# Claude Code's overall context window. Context % is the latest assistant
+# entry's input + cache-read + cache-creation tokens over this window — no
+# `/context` call needed (proven in the bridge diagnostic).
+CONTEXT_WINDOW = 1_000_000
+
+
+def derive_context_usage(entries: list[dict]) -> dict:
+    """Derive overall context usage and turn count from transcript entries.
+
+    Pure function (no live session) so it can be unit-tested directly.
+
+      * context tokens = ``input_tokens + cache_read_input_tokens +
+        cache_creation_input_tokens`` on the LATEST assistant entry's
+        ``message.usage`` (this is the cumulative context, not a per-turn delta).
+      * turn count = number of ``user`` entries whose ``message.content`` is a
+        plain string (real prompts), excluding entries carrying tool_results
+        (whose content is a list of blocks).
+
+    Args:
+        entries: Parsed JSONL transcript entries (as from ``read_log``).
+
+    Returns:
+        dict with ``tokens``, ``window``, ``percent`` (0–100, 2dp), ``turns``.
+    """
+    tokens = 0
+    for entry in reversed(entries):
+        if entry.get("type") == "assistant":
+            usage = (entry.get("message") or {}).get("usage") or {}
+            tokens = (
+                (usage.get("input_tokens") or 0)
+                + (usage.get("cache_read_input_tokens") or 0)
+                + (usage.get("cache_creation_input_tokens") or 0)
+            )
+            break
+
+    turns = sum(
+        1
+        for e in entries
+        if e.get("type") == "user"
+        and isinstance((e.get("message") or {}).get("content"), str)
+    )
+
+    percent = round(tokens / CONTEXT_WINDOW * 100, 2) if CONTEXT_WINDOW else 0.0
+    return {
+        "tokens": tokens,
+        "window": CONTEXT_WINDOW,
+        "percent": percent,
+        "turns": turns,
+    }
+
 
 def _entry_to_event(entry: dict) -> dict | None:
     """Convert a transcript JSONL entry into a frontend event, or None to skip."""
@@ -62,7 +112,7 @@ def _entry_to_event(entry: dict) -> dict | None:
 
 class BridgeDriver(AgentDriver):
     name = "bridge"
-    CAPABILITIES = {"interrupt"}
+    CAPABILITIES = {"interrupt", "context"}
 
     def __init__(self, config: DriverConfig, on_event: EventCallback) -> None:
         super().__init__(config, on_event)
@@ -127,6 +177,19 @@ class BridgeDriver(AgentDriver):
             await asyncio.to_thread(self._bridge.interrupt, self._name)
         except Exception as e:  # pragma: no cover - best effort
             logger.warning("interrupt failed for %s: %s", self._name, e)
+
+    async def get_context_usage(self) -> Any:
+        """Derive overall context usage and turn count from the transcript.
+
+        No `/context` call needed — the math lives in ``derive_context_usage``.
+        Returns None if the transcript can't be read yet (e.g. before the first
+        turn), so the API serves an empty object rather than erroring.
+        """
+        try:
+            entries = await asyncio.to_thread(self._bridge.read_log, self._name)
+        except Exception:
+            return None
+        return derive_context_usage(entries)
 
     async def close(self) -> None:
         self._closed = True
