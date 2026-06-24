@@ -24,6 +24,89 @@ class TmuxBridgeError(Exception):
     pass
 
 
+# Lines that look like a numbered menu option, e.g. "❯ 1. Yes" or "  3. No".
+_MENU_OPTION_RE = re.compile(r"^\s*[❯>]?\s*(\d+)\.\s+(.*\S)\s*$")
+# How close to the bottom of the capture the menu's last option must sit to count
+# as the live prompt rather than an answered menu scrolled up into history. The
+# live menu is followed by at most the "Esc to cancel · Tab to amend" hint line
+# (trailing blank rows are stripped by ``read``), so a small slack is enough; a
+# stale menu sits above the idle input box + status bar (several lines), so it is
+# rejected.
+_MENU_BOTTOM_SLACK = 3
+
+
+def parse_permission_prompt(content):
+    """Parse a captured Claude Code permission menu into structured detail.
+
+    Pure function (no live session) so it is hermetically unit-testable, mirroring
+    how ``_detect_state`` is tested. Anchors on the numbered menu at the BOTTOM of
+    the capture — a numbered ``1. Yes`` option (the proven menu marker) — so a
+    "Do you want …?" line or an already-answered menu left higher in older
+    scrollback cannot false-fire.
+
+    The real edit prompt renders a multi-line diff preview above the question, so
+    the "Do you want …?" line can sit well above the menu; callers should capture
+    comfortably more than the bottom 15 lines before parsing for detail.
+
+    Args:
+        content: A captured screen block (as from ``read``/``status``).
+
+    Returns:
+        ``{"question": str, "options": [{"index": int, "label": str}, ...],
+        "raw": str}`` for a live menu, or ``None`` when no live menu is present.
+    """
+    if not content:
+        return None
+
+    lines = content.rstrip("\n").split("\n")
+    option_idxs = [i for i, ln in enumerate(lines) if _MENU_OPTION_RE.match(ln)]
+    if not option_idxs:
+        return None
+
+    # Take the trailing menu: the run of option lines ending at the last option
+    # line (small gaps — e.g. a blank line between options — are tolerated).
+    last = option_idxs[-1]
+    block = [last]
+    for i in reversed(option_idxs[:-1]):
+        if 0 < block[-1] - i <= 2:
+            block.append(i)
+        else:
+            break
+    block.sort()
+
+    # Anchor at the bottom: a live menu is at (or near) the end of the capture.
+    # An answered menu scrolled up into history sits higher and is rejected.
+    if last < len(lines) - 1 - _MENU_BOTTOM_SLACK:
+        return None
+
+    options = []
+    for i in block:
+        m = _MENU_OPTION_RE.match(lines[i])
+        options.append({"index": int(m.group(1)), "label": m.group(2).strip()})
+
+    # Proven marker: a "1. Yes" option must be present (loose keyword matching
+    # false-fired on prompt text containing "permission"/"approve").
+    if not any(o["index"] == 1 and o["label"].lower().startswith("yes")
+               for o in options):
+        return None
+
+    # Question: prefer an explicit "Do you want …?" line above the menu; else the
+    # nearest non-empty line above it.
+    question = ""
+    for i in range(block[0] - 1, -1, -1):
+        text = lines[i].strip()
+        if text:
+            question = text
+            break
+    for i in range(block[0] - 1, -1, -1):
+        if re.search(r"Do you want", lines[i], re.IGNORECASE):
+            question = lines[i].strip()
+            break
+
+    raw = "\n".join(lines[max(0, block[0] - 8): last + 2])
+    return {"question": question, "options": options, "raw": raw}
+
+
 class TmuxBridge:
     """Programmatic control of Claude Code TUI sessions in WSL2/tmux.
 
@@ -149,7 +232,7 @@ class TmuxBridge:
 
     # --- Core Operations ---
 
-    def create(self, name, cwd=None, model=None, claude_args=""):
+    def create(self, name, cwd=None, model=None, claude_args="", show=False):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Args:
@@ -157,6 +240,12 @@ class TmuxBridge:
             cwd: Working directory. Accepts Windows or WSL paths.
             model: Model to use (e.g. "sonnet", "opus"). Overrides default.
             claude_args: Additional CLI arguments for claude.
+            show: When True, open a visible Windows Terminal tab attached to the
+                new session. Defaults to False: the tmux session runs detached and
+                is fully drivable via capture-pane/send-keys without a window, so
+                callers (tests, the sidecar) get no tab and never steal desktop
+                focus. Opening a tab is opt-in — pass show=True (or use show()
+                later) only for explicit human attach.
 
         Returns:
             dict with session info: name, cwd, pid.
@@ -196,8 +285,11 @@ class TmuxBridge:
         if name not in sessions:
             raise TmuxBridgeError(f"Session '{name}' was not created. Check WSL/tmux state.")
 
-        # Open a visible Windows Terminal tab
-        self._open_wt_tab(name)
+        # Open a visible Windows Terminal tab only when explicitly requested.
+        # Auto-opening steals desktop focus and routes the user's keystrokes into
+        # the session mid-task, so the tab is opt-in (see the `show` arg).
+        if show:
+            self._open_wt_tab(name)
 
         # Clear any startup gates (folder-trust on a fresh/untrusted dir;
         # bypass-mode when launched with --dangerously-skip-permissions) and
@@ -445,12 +537,23 @@ class TmuxBridge:
 
         state = self._detect_state(content)
 
-        return {
+        result = {
             "status": "ok",
             "name": name,
             "state": state,
             "screen_tail": content[-500:] if content else "",
         }
+
+        if state == "permission_prompt":
+            # The "Do you want …?" question can sit above a multi-line diff
+            # preview, outside the 15-line state window, so re-read a larger
+            # slice for the structured detail (the menu still anchors detection).
+            detail = self.read(name, lines=40)
+            parsed = parse_permission_prompt(detail["content"])
+            if parsed:
+                result["permission"] = parsed
+
+        return result
 
     def _detect_state(self, content):
         """Detect run-state from the bottom status bar of the Claude Code TUI.
@@ -495,11 +598,13 @@ class TmuxBridge:
         if not content:
             return "unknown"
 
-        # Genuine tool-permission menu: require BOTH the question and a numbered
-        # "1. Yes" option. Checked first because a paused permission prompt is a
-        # specific stop-state, distinct from idle/generating.
-        if re.search(r"Do you want", content, re.IGNORECASE) and \
-           re.search(r"(?m)^\s*[❯>]?\s*1\.\s+Yes", content):
+        # Genuine tool-permission menu: anchored on the numbered menu at the
+        # bottom of the capture (see ``parse_permission_prompt``), not loose
+        # keyword matching. Checked first because a paused permission prompt is a
+        # specific stop-state, distinct from idle/generating. Keying off the
+        # bottom menu (rather than the "Do you want" line) means a long diff
+        # preview pushing the question off a short window cannot hide the prompt.
+        if parse_permission_prompt(content) is not None:
             return "permission_prompt"
 
         # A running turn shows the animated spinner status line — a sparkle glyph
@@ -524,7 +629,9 @@ class TmuxBridge:
 
         Args:
             agents: List of dicts, each with at minimum 'name'.
-                    Optional keys: 'cwd', 'model', 'claude_args'.
+                    Optional keys: 'cwd', 'model', 'claude_args', 'show'.
+                    'show' defaults to False (no Windows Terminal tab), matching
+                    create()'s opt-in tab behavior; set it per agent to attach.
 
         Returns:
             list of results from create(), one per agent.
@@ -538,6 +645,7 @@ class TmuxBridge:
                     cwd=agent.get("cwd"),
                     model=agent.get("model"),
                     claude_args=agent.get("claude_args", ""),
+                    show=agent.get("show", False),
                 )
                 results.append(result)
             except TmuxBridgeError as e:

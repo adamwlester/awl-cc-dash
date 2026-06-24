@@ -15,8 +15,17 @@ Contract:
   * `interrupt()`        — best-effort stop of the current turn.
   * `set_model(model)`   — best-effort; update the active model.
   * `set_mode(mode)`     — best-effort; update the permission mode.
+  * `set_effort(effort)` — best-effort; update reasoning effort.
+  * `set_fast(on)`       — best-effort; toggle fast mode.
+  * `set_thinking(on)`   — best-effort; toggle extended thinking.
+  * `answer_permission(approve)` — answer a pending tool-permission prompt.
   * `get_context_usage()`— return context usage (or None if unsupported).
   * `close()`            — tear the agent down and stop `events()`.
+
+Drivers that surface tool-permission prompts emit a `permission_request` event
+(carrying the parsed detail) when the agent pauses on one, and a
+`permission_resolved` event when it leaves that state by any means. The sidecar
+turns those into the session's `pending_permission` flag.
 
 Optional capabilities a driver may not support are advertised via `CAPABILITIES`
 so the API layer can answer gracefully instead of erroring.
@@ -71,6 +80,18 @@ class AgentDriver:
         return None
 
     async def set_mode(self, mode: str) -> None:
+        return None
+
+    async def set_effort(self, effort: str) -> None:
+        return None
+
+    async def set_fast(self, on: bool) -> None:
+        return None
+
+    async def set_thinking(self, on: bool) -> None:
+        return None
+
+    async def answer_permission(self, approve: bool) -> None:
         return None
 
     async def get_context_usage(self) -> Any:

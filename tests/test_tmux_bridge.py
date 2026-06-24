@@ -154,12 +154,33 @@ def test_turn_streams_generating_then_idle(bridge, live_session):
     The prompt deliberately asks for a long answer so generation lasts well
     over the status() poll round-trip (~1s over WSL); a quick reply could
     finish between polls and never be sampled as 'generating'.
+
+    Reliability: uses the warm shared 'test-1' deliberately. It is created once
+    at suite start and is long past the node-hook-slowed startup render by the
+    time this runs, so its sends submit reliably — unlike a freshly-created
+    session, whose splash is still up ~25s in and silently swallows the Enter.
+    Two cheap, evidence-backed guards remain:
+      * Ctrl+U first. 'test-1' is reused in declaration order and upstream tests
+        leave stray text in its input box (e.g. test_send_no_enter's "typed but
+        not sent"); without clearing, our prompt appends to that junk and never
+        submits. (Verified: Ctrl+U empties the line; Escape does NOT and can
+        recall the last message — so don't use it.)
+      * Split submit. Sending the literal text and Enter back-to-back can race so
+        the Enter lands before the text registers; type the prompt, let it
+        render, then press Enter separately.
+    The assertions are unchanged and not weakened: a broken detector would never
+    report 'generating', so these guards make the real transition observable
+    without being able to mask a detection bug.
     """
-    bridge.send(
-        live_session,
+    prompt = (
         "Write roughly 600 words explaining how tmux sessions, windows, and "
-        "panes relate to each other. Take your time and be thorough.",
+        "panes relate to each other. Take your time and be thorough."
     )
+    bridge.keys(live_session, "C-u")        # clear any leftover input
+    time.sleep(0.5)
+    bridge.send(live_session, prompt, press_enter=False)
+    time.sleep(1.0)                          # let the text render before submit
+    bridge.keys(live_session, "Enter")
 
     saw_generating = False
     deadline = time.time() + 30
@@ -256,6 +277,9 @@ def test_show(bridge, live_session):
 
 
 def test_wt_tab_attached(bridge, live_session):
+    # Runs right after test_show, which calls show() to open a WT tab attached to
+    # 'test-1'. This asserts that manual-attach path works (the session reports an
+    # attached client) — it is NOT about create()'s now-opt-in tab.
     time.sleep(2)
     sessions = [s for s in bridge.list() if s["name"] == live_session]
     assert len(sessions) == 1

@@ -99,6 +99,22 @@ class SessionState:
             self.push_event(event)
             return
 
+        if etype == "permission_request":
+            # A driver paused on a tool-permission prompt. Record the detail so
+            # `has_pending_permission` flips true, then fan the event out. The
+            # status enum is intentionally left untouched (pending reads off the
+            # flag, not a new status value).
+            self.pending_permission = event.get("data") or {}
+            self.push_event(event)
+            return
+
+        if etype == "permission_resolved":
+            # The prompt was answered (here or directly in the terminal) — drop
+            # the pending detail so it cannot linger.
+            self.pending_permission = None
+            self.push_event(event)
+            return
+
         # Preserve original ordering: push the message, then react to results.
         self.push_event(event)
 
@@ -134,6 +150,10 @@ async def start_session(session: SessionState):
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
         session.driver = driver
+        # Bridge sessions persist a runtime record keyed by the sidecar session
+        # id so a restarted sidecar can rebind to the live tmux session.
+        if hasattr(driver, "bind_session_id"):
+            driver.bind_session_id(session.session_id)  # type: ignore[attr-defined]
         await driver.start()
         session.status = "idle"
         session.listen_task = asyncio.create_task(_listen(session))
@@ -165,6 +185,83 @@ async def _listen(session: SessionState):
         })
 
 
+async def reconnect_sessions():
+    """Rebind to bridge sessions that outlived a previous sidecar process.
+
+    Bridge sessions run as real Claude Code TUIs in tmux/WSL2 and survive a
+    sidecar restart. On startup we read the runtime records, and for each whose
+    tmux session is still alive we rebuild the session state and a resumed driver
+    bound to that tmux name, then resume event pumping (the transcript replay
+    restores history). Records whose tmux session is gone are pruned.
+    """
+    try:
+        import runtime_store
+        from drivers.bridge import BridgeDriver
+    except Exception as e:  # pragma: no cover - bridge deps optional
+        logger.info("Reconnect skipped (bridge unavailable): %s", e)
+        return
+
+    records = runtime_store.all_records()
+    if not records:
+        return
+
+    # Which tmux sessions are actually still alive?
+    try:
+        from bridge import TmuxBridge  # type: ignore[import-not-found]
+        alive = {s["name"] for s in TmuxBridge().list()}
+    except Exception as e:  # pragma: no cover - environment dependent
+        logger.warning("Reconnect: could not list tmux sessions: %s", e)
+        return
+
+    for rec in records:
+        sid = rec.get("session_id")
+        tmux_name = rec.get("tmux_name")
+        if not sid or not tmux_name:
+            continue
+        if tmux_name not in alive:
+            logger.info("Pruning dead session record %s (tmux %s gone)", sid, tmux_name)
+            runtime_store.remove_record(sid)
+            continue
+        if sid in sessions:
+            continue
+
+        session = SessionState(
+            session_id=sid,
+            agent_type=None,
+            model=rec.get("model"),
+            permission_mode=rec.get("permission_mode", "acceptEdits"),
+            cwd=rec.get("cwd"),
+            system_prompt=None,
+            driver_name="bridge",
+        )
+        sessions[sid] = session
+        config = DriverConfig(
+            agent_type=None,
+            model=rec.get("model"),
+            permission_mode=rec.get("permission_mode", "acceptEdits"),
+            cwd=rec.get("cwd"),
+            system_prompt=None,
+        )
+        try:
+            driver = BridgeDriver(
+                config, session.handle_event,
+                resume_name=tmux_name, session_id=sid,
+            )
+            session.driver = driver
+            await driver.start()  # resume() path — rebinds, doesn't recreate
+            session.status = "idle"
+            session.listen_task = asyncio.create_task(_listen(session))
+            logger.info("Reconnected session %s to live tmux session %s", sid, tmux_name)
+        except Exception as e:
+            logger.error("Reconnect failed for %s: %s", sid, e)
+            session.status = "error"
+
+
+@app.on_event("startup")
+async def _on_startup():
+    await reconnect_sessions()
+
+
 # ============================================================================
 # Request Models
 # ============================================================================
@@ -185,6 +282,20 @@ class SetModelRequest(BaseModel):
 
 class SetModeRequest(BaseModel):
     mode: Literal["default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"]
+
+class AnswerPermissionRequest(BaseModel):
+    # approve = Yes (Enter); deny = No (Escape). Always-allow is unsupported
+    # (option 2 was never verified live), so the choice is binary.
+    approve: bool
+
+class SetEffortRequest(BaseModel):
+    effort: str
+
+class SetFastRequest(BaseModel):
+    on: bool
+
+class SetThinkingRequest(BaseModel):
+    on: bool
 
 
 # ============================================================================
@@ -351,6 +462,63 @@ async def set_mode(session_id: str, req: SetModeRequest):
         await session.driver.set_mode(req.mode)
     session.permission_mode = req.mode
     return {"status": "ok", "mode": req.mode}
+
+
+@app.post("/sessions/{session_id}/permission")
+async def answer_permission(session_id: str, req: AnswerPermissionRequest):
+    """Answer a pending tool-permission prompt (approve = Yes, deny = No)."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not session.driver:
+        raise HTTPException(status_code=503, detail="Session not connected yet")
+    if session.pending_permission is None:
+        raise HTTPException(status_code=409, detail="No pending permission prompt")
+    if not session.driver.supports("permission"):
+        raise HTTPException(status_code=400, detail="Driver has no permission support")
+
+    await session.driver.answer_permission(req.approve)
+    # Clear immediately; the driver's permission_resolved event is also handled
+    # when the screen state leaves the prompt, but don't depend on its timing.
+    session.pending_permission = None
+    session.push_event({
+        "type": "permission_resolved", "approve": req.approve,
+        "timestamp": datetime.now().isoformat(),
+    })
+    return {"status": "ok", "approve": req.approve}
+
+
+@app.post("/sessions/{session_id}/effort")
+async def set_effort(session_id: str, req: SetEffortRequest):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not (session.driver and session.driver.supports("set_effort")):
+        raise HTTPException(status_code=400, detail="Driver has no effort control")
+    await session.driver.set_effort(req.effort)
+    return {"status": "ok", "effort": req.effort}
+
+
+@app.post("/sessions/{session_id}/fast")
+async def set_fast(session_id: str, req: SetFastRequest):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not (session.driver and session.driver.supports("set_fast")):
+        raise HTTPException(status_code=400, detail="Driver has no fast control")
+    await session.driver.set_fast(req.on)
+    return {"status": "ok", "fast": req.on}
+
+
+@app.post("/sessions/{session_id}/thinking")
+async def set_thinking(session_id: str, req: SetThinkingRequest):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not (session.driver and session.driver.supports("set_thinking")):
+        raise HTTPException(status_code=400, detail="Driver has no thinking control")
+    await session.driver.set_thinking(req.on)
+    return {"status": "ok", "thinking": req.on}
 
 
 @app.get("/sessions/{session_id}/context")

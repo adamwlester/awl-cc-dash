@@ -66,3 +66,8 @@ __pycache__/
 # Archive bucket for things kept on disk but intentionally NOT tracked in git
 # (e.g. old personal session transcripts). The _ignored/ name signals "untracked".
 archive/_ignored/
+
+# Sidecar runtime state — live session records (tmux names + config) used to
+# rebind to surviving tmux sessions after a sidecar restart. Operational state,
+# never tracked.
+sidecar/runtime/

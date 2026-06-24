@@ -27,6 +27,10 @@ def make_parser():
     p.add_argument("--cwd", help="Working directory (Windows or WSL path)")
     p.add_argument("--model", help="Model to use (e.g. sonnet, opus)")
     p.add_argument("--claude-args", default="", help="Additional claude CLI args")
+    # CLI create is interactive human use, so it opens a WT tab by default
+    # (preserving long-standing behavior). The library default is tab-less.
+    p.add_argument("--no-show", action="store_true",
+                   help="Do not open a Windows Terminal tab for the new session")
 
     # send
     p = sub.add_parser("send", help="Send text to a session")
@@ -138,7 +142,8 @@ def main(argv=None):
 
     try:
         if args.command == "create":
-            result = bridge.create(args.name, cwd=args.cwd, model=args.model, claude_args=args.claude_args)
+            result = bridge.create(args.name, cwd=args.cwd, model=args.model,
+                                   claude_args=args.claude_args, show=not args.no_show)
             output(result)
 
         elif args.command == "send":

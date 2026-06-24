@@ -32,8 +32,10 @@ logger = logging.getLogger("awl-sidecar.bridge")
 
 _STATE_TO_STATUS = {
     "generating": "running",
-    "permission_prompt": "running",
     "idle": "idle",
+    # NOTE: "permission_prompt" is deliberately NOT mapped to a status. A paused
+    # permission prompt is surfaced as a distinct `permission_request` event (so
+    # the session's pending flag flips), not folded into "running".
 }
 
 # Claude Code's overall context window. Context % is the latest assistant
@@ -110,29 +112,92 @@ def _entry_to_event(entry: dict) -> dict | None:
     return None
 
 
+def _save_record(record: dict) -> None:
+    """Persist a session record, tolerating either import layout."""
+    try:
+        from runtime_store import save_record  # sidecar dir on sys.path (runtime)
+    except ImportError:  # pragma: no cover - import-path fallback
+        from ..runtime_store import save_record  # package import (tests)
+    save_record(record)
+
+
+def _remove_record(session_id: str) -> None:
+    try:
+        from runtime_store import remove_record
+    except ImportError:  # pragma: no cover - import-path fallback
+        from ..runtime_store import remove_record
+    remove_record(session_id)
+
+
 class BridgeDriver(AgentDriver):
     name = "bridge"
-    CAPABILITIES = {"interrupt", "context"}
+    # interrupt/context/permission/resume are proven. Of the session-control
+    # commands, only model and effort drive a live session cleanly (confirmed via
+    # the "Set model to …"/"Set effort level to …" messages); fast/thinking/mode
+    # were not wired (see set_* methods for the live findings).
+    CAPABILITIES = {
+        "interrupt", "context", "permission", "resume",
+        "set_model", "set_effort",
+    }
 
-    def __init__(self, config: DriverConfig, on_event: EventCallback) -> None:
+    def __init__(
+        self,
+        config: DriverConfig,
+        on_event: EventCallback,
+        *,
+        resume_name: str | None = None,
+        session_id: str | None = None,
+    ) -> None:
         super().__init__(config, on_event)
         from bridge import TmuxBridge  # type: ignore[import-not-found]
         self._bridge = TmuxBridge()
-        self._name = f"awl-{uuid.uuid4().hex[:8]}"
+        # When resuming, bind to the existing tmux session by name instead of
+        # generating a fresh one and creating.
+        self._name = resume_name or f"awl-{uuid.uuid4().hex[:8]}"
+        self._resuming = resume_name is not None
+        self._session_id = session_id
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
 
+    def bind_session_id(self, session_id: str) -> None:
+        """Associate the sidecar session id (used for the runtime record)."""
+        self._session_id = session_id
+
+    @property
+    def tmux_name(self) -> str:
+        return self._name
+
     async def start(self) -> None:
-        await asyncio.to_thread(
-            self._bridge.create, self._name,
-            cwd=self.config.cwd, model=self.config.model,
-        )
+        if self._resuming:
+            # Rebind to the still-alive tmux session; do not recreate.
+            await asyncio.to_thread(self._bridge.resume, self._name)
+        else:
+            await asyncio.to_thread(
+                self._bridge.create, self._name,
+                cwd=self.config.cwd, model=self.config.model,
+            )
         # Best-effort: wait for the Claude Code TUI to finish loading.
         try:
             await asyncio.to_thread(self._bridge.wait_idle, self._name, 60, 1.0)
         except Exception as e:  # pragma: no cover - environment dependent
             logger.warning("wait_idle failed for %s: %s", self._name, e)
+
+        # Persist a minimal record so a restarted sidecar can rebind to this
+        # still-alive tmux session.
+        if self._session_id:
+            try:
+                _save_record({
+                    "session_id": self._session_id,
+                    "tmux_name": self._name,
+                    "driver": "bridge",
+                    "model": self.config.model,
+                    "permission_mode": self.config.permission_mode,
+                    "cwd": self.config.cwd,
+                })
+            except Exception as e:  # pragma: no cover - best effort
+                logger.warning("could not persist runtime record: %s", e)
+
         self.on_event({
             "type": "status_change", "status": "idle",
             "timestamp": datetime.now().isoformat(),
@@ -155,20 +220,37 @@ class BridgeDriver(AgentDriver):
                         yield event
                 self._seen = len(entries)
 
-            # 2) Screen state -> status_change events.
+            # 2) Screen state -> status_change / permission events.
             try:
                 st = await asyncio.to_thread(self._bridge.status, self._name)
                 state = st.get("state")
             except Exception:
-                state = None
+                st, state = {}, None
             if state and state != self._last_state:
+                prev = self._last_state
                 self._last_state = state
-                mapped = _STATE_TO_STATUS.get(state)
-                if mapped:
+                if state == "permission_prompt":
+                    # Surface as a distinct event carrying the parsed detail so
+                    # the session's pending flag flips — never as "running".
                     yield {
-                        "type": "status_change", "status": mapped,
+                        "type": "permission_request",
+                        "data": st.get("permission") or {},
                         "timestamp": datetime.now().isoformat(),
                     }
+                else:
+                    # Left the prompt by any means (incl. the user answering in
+                    # the terminal) — clear stale pending state.
+                    if prev == "permission_prompt":
+                        yield {
+                            "type": "permission_resolved",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    mapped = _STATE_TO_STATUS.get(state)
+                    if mapped:
+                        yield {
+                            "type": "status_change", "status": mapped,
+                            "timestamp": datetime.now().isoformat(),
+                        }
 
             await asyncio.sleep(1.0)
 
@@ -177,6 +259,16 @@ class BridgeDriver(AgentDriver):
             await asyncio.to_thread(self._bridge.interrupt, self._name)
         except Exception as e:  # pragma: no cover - best effort
             logger.warning("interrupt failed for %s: %s", self._name, e)
+
+    async def answer_permission(self, approve: bool) -> None:
+        """Answer a pending tool-permission prompt with the proven keys.
+
+        Approve = Enter (selects the default option 1, "Yes"); deny = Escape
+        (yields "User rejected"). Always-allow (option 2) is intentionally NOT
+        offered — it was never verified live.
+        """
+        key = "Enter" if approve else "Escape"
+        await asyncio.to_thread(self._bridge.keys, self._name, key)
 
     async def get_context_usage(self) -> Any:
         """Derive overall context usage and turn count from the transcript.
@@ -191,8 +283,48 @@ class BridgeDriver(AgentDriver):
             return None
         return derive_context_usage(entries)
 
+    # --- Session-control commands ---------------------------------------------
+    #
+    # Findings from live discovery on Claude Code 2.1.187 (see the DEVLOG entry):
+    #   * /model <name>  + Enter  → sets directly ("Set model to …"). WIRED.
+    #   * /effort <level> + Enter → sets directly ("Set effort level to …"). WIRED.
+    #   * /fast          → opens an interactive panel (Tab to toggle, Enter to
+    #                      confirm); a reliable toggle-to-target could not be
+    #                      confirmed via screen scraping. NOT wired — reported.
+    #   * /thinking      → "No commands match" — no such command. NOT wired.
+    #   * permission mode → cycles via Shift+Tab only (relative, no absolute
+    #                      set); no clean way to jump to a specific mode. NOT wired.
+    # Only the two confirmed-clean controls are advertised via CAPABILITIES below.
+
+    async def set_model(self, model: str) -> None:
+        # Fully-typed `/model <name>` + Enter sets directly (autocomplete does
+        # not intercept a complete command).
+        await asyncio.to_thread(self._bridge.send, self._name, f"/model {model}")
+
+    async def set_effort(self, effort: str) -> None:
+        await asyncio.to_thread(self._bridge.send, self._name, f"/effort {effort}")
+
+    async def set_mode(self, mode: str) -> None:
+        # Permission mode cycles with Shift+Tab in the TUI; there is no reliable
+        # absolute-set form. Left a no-op rather than force a fragile cycle.
+        return None
+
+    async def set_fast(self, on: bool) -> None:
+        # /fast opens an interactive panel; a reliable scrape-driven toggle could
+        # not be confirmed. Left a no-op (not advertised) rather than fake it.
+        return None
+
+    async def set_thinking(self, on: bool) -> None:
+        # No /thinking command exists in this Claude Code build. Left a no-op.
+        return None
+
     async def close(self) -> None:
         self._closed = True
+        if self._session_id:
+            try:
+                _remove_record(self._session_id)
+            except Exception:  # pragma: no cover - best effort
+                pass
         try:
             await asyncio.to_thread(self._bridge.close, self._name)
         except Exception:  # pragma: no cover - best effort

@@ -15,7 +15,7 @@ Screens below are representative captures matching the layout the diagnostic
 recorded (see .scratch/bridge-diagnostic-*.md appendix A4/A5/A6).
 """
 
-from bridge.bridge import TmuxBridge
+from bridge.bridge import TmuxBridge, parse_permission_prompt
 from sidecar.drivers.bridge import derive_context_usage, CONTEXT_WINDOW
 
 
@@ -239,3 +239,143 @@ class TestDeriveContextUsage:
     def test_empty(self):
         result = derive_context_usage([])
         assert result == {"tokens": 0, "window": CONTEXT_WINDOW, "percent": 0.0, "turns": 0}
+
+
+# -----------------------------------------------------------------------------
+# parse_permission_prompt
+# -----------------------------------------------------------------------------
+
+# A real edit prompt: a multi-line diff preview renders ABOVE the question, so
+# "Do you want …?" sits well above the bottom menu. The parser must still find
+# the question and the full option list (and the menu anchors detection even when
+# the question would fall outside a short status window).
+LONG_DIFF_PERMISSION_SCREEN = """\
+● Edit(config.py)
+ Update config.py
+ config.py
+ ╌╌╌ 1   import os
+ ╌╌╌ 2 + import sys
+ ╌╌╌ 3   import json
+ ╌╌╌ 4 + import logging
+ ╌╌╌ 5   from pathlib import Path
+ ╌╌╌ 6 + from typing import Any
+ ╌╌╌ 7   DEBUG = False
+ ╌╌╌ 8 + VERBOSE = True
+ ╌╌╌ 9   TIMEOUT = 30
+ ╌╌╌ 10 + RETRIES = 3
+ Do you want to make this edit to config.py?
+ ❯ 1. Yes
+   2. Yes, allow all edits during this session (shift+tab)
+   3. No
+ Esc to cancel · Tab to amend
+"""
+
+# An ALREADY-ANSWERED menu scrolled up into history while the session is now
+# idle below it. The menu is NOT at the bottom, so it must NOT parse as a live
+# prompt (this is the stale-scrollback false-fire the bottom anchor prevents).
+STALE_MENU_IN_SCROLLBACK = """\
+ Do you want to create old.txt?
+ ❯ 1. Yes
+   2. Yes, allow all edits during this session
+   3. No
+● Created old.txt
+
+────────────────────────────────────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────────────────────────────────────
+  ← for agents                                                ● high · /effort
+"""
+
+
+class TestParsePermissionPrompt:
+    def test_basic_menu(self):
+        detail = parse_permission_prompt(PERMISSION_SCREEN)
+        assert detail is not None
+        assert detail["question"] == "Do you want to create note.txt?"
+        labels = [o["label"] for o in detail["options"]]
+        indexes = [o["index"] for o in detail["options"]]
+        assert indexes == [1, 2, 3]
+        assert labels[0] == "Yes"
+        assert "allow all edits" in labels[1]
+        assert labels[2] == "No"
+        assert "Do you want to create note.txt?" in detail["raw"]
+
+    def test_long_diff_question_above_menu(self):
+        # The "Do you want …?" line sits ~14 lines above the menu (above a long
+        # diff). It must still be captured as the question.
+        detail = parse_permission_prompt(LONG_DIFF_PERMISSION_SCREEN)
+        assert detail is not None
+        assert detail["question"] == "Do you want to make this edit to config.py?"
+        assert [o["index"] for o in detail["options"]] == [1, 2, 3]
+
+    def test_stale_menu_in_scrollback_is_not_a_live_prompt(self):
+        # An answered menu higher in scrollback with an idle prompt below must
+        # NOT be read as a live permission prompt.
+        assert parse_permission_prompt(STALE_MENU_IN_SCROLLBACK) is None
+
+    def test_idle_screen_has_no_permission(self):
+        assert parse_permission_prompt(IDLE_SCREEN) is None
+
+    def test_generating_screen_has_no_permission(self):
+        assert parse_permission_prompt(GENERATING_SCREEN) is None
+
+    def test_permission_words_without_menu_is_none(self):
+        # Prompt text mentioning "permission"/"approve" but no numbered menu.
+        assert parse_permission_prompt(GENERATING_WITH_PERMISSION_WORDS) is None
+
+    def test_empty_is_none(self):
+        assert parse_permission_prompt("") is None
+
+    def test_detect_state_uses_long_diff_menu(self):
+        # _detect_state must classify the long-diff edit prompt as a permission
+        # prompt purely off the bottom menu, even with the question far above.
+        bridge = TmuxBridge()
+        assert bridge._detect_state(LONG_DIFF_PERMISSION_SCREEN) == "permission_prompt"
+
+    def test_detect_state_ignores_stale_menu(self):
+        bridge = TmuxBridge()
+        assert bridge._detect_state(STALE_MENU_IN_SCROLLBACK) == "idle"
+
+
+# -----------------------------------------------------------------------------
+# runtime_store — restart-survival session records (pure file persistence)
+# -----------------------------------------------------------------------------
+
+class TestRuntimeStore:
+    def _store(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path))
+        import importlib
+        import sidecar.runtime_store as rs
+        return importlib.reload(rs)
+
+    def test_save_and_load_roundtrip(self, tmp_path, monkeypatch):
+        rs = self._store(tmp_path, monkeypatch)
+        rs.save_record({"session_id": "abc", "tmux_name": "awl-1", "model": "sonnet"})
+        records = rs.all_records()
+        assert len(records) == 1
+        assert records[0]["tmux_name"] == "awl-1"
+
+    def test_save_updates_existing(self, tmp_path, monkeypatch):
+        rs = self._store(tmp_path, monkeypatch)
+        rs.save_record({"session_id": "abc", "tmux_name": "awl-1"})
+        rs.save_record({"session_id": "abc", "tmux_name": "awl-2"})
+        records = rs.all_records()
+        assert len(records) == 1
+        assert records[0]["tmux_name"] == "awl-2"
+
+    def test_remove_record(self, tmp_path, monkeypatch):
+        rs = self._store(tmp_path, monkeypatch)
+        rs.save_record({"session_id": "abc", "tmux_name": "awl-1"})
+        rs.save_record({"session_id": "def", "tmux_name": "awl-2"})
+        rs.remove_record("abc")
+        ids = {r["session_id"] for r in rs.all_records()}
+        assert ids == {"def"}
+
+    def test_missing_file_is_empty(self, tmp_path, monkeypatch):
+        rs = self._store(tmp_path, monkeypatch)
+        assert rs.all_records() == []
+
+    def test_save_without_session_id_is_noop(self, tmp_path, monkeypatch):
+        rs = self._store(tmp_path, monkeypatch)
+        rs.save_record({"tmux_name": "awl-x"})
+        assert rs.all_records() == []
