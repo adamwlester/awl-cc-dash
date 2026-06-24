@@ -90,12 +90,20 @@
 
 > Loose human notes for an agent to incorporate later. Empty by design — add rough notes here; an agent folds each into the **appropriate section** above (best fit by topic/effort) unless the human names a target section, in which case use that. File with an ID + inline header, then clear it from this list.
 
+- Reverse the order of the CTX and Turns sections in the Team Graph agent cards.
+- Change panel name back to "Team Feed" from "Feed"
+- Remove "Save setup" and "Load" from the ui footer as we have this all in settings now.
+- Make the "Setup" tab the first tab in the Settings panel
+
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
-- Need to organize the workign ui concept better.
+- Need to organize the working ui concept better to separate out basic design system stuff (eg color palette) into its own html in a way that plays well with the DESIGN.md or just fully replaces it.
 - We have too many different styled badges in terms of fills and and fonts. We need to refine these down to a hand full of badge styles we use consistently.
 - I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
-- Need to add ToDo functionality back into UI.
+- Need to add ToDo functionality back into UI eventually.
+
+### Big picture
+- We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.

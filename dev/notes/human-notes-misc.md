@@ -423,9 +423,3 @@ Resources for dark UI color themes — specifically "lighter side of dark" / sla
 - **Radix Colors Slate dark** — best for granular control over each shade level. 12-step scale designed specifically for UI.
 - **Open Props dim theme** — single CSS import, lighter-dark aesthetic, minimal setup.
 - **Realtime Colors** — best for quick prototyping before committing to code.
-
-# Dashboard Add / Update Notes
-
-> Dashboard backlog moved to `design/TODO.md`. Drop rough notes under its "Loose notes" section.
-
-# General notes
