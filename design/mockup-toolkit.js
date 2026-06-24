@@ -1,6 +1,6 @@
 /**
  * AWL Design Collaboration Overlay v0.2
- * Drop into any concept HTML: <script src="design-tools.js"></script>
+ * Drop into any concept HTML: <script src="mockup-toolkit.js"></script>
  * Toggle: Ctrl+G or click the floating button
  */
 (function() {

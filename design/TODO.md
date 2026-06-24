@@ -2,7 +2,7 @@
 
 > **⚠ Reference only — do not work from this unless explicitly directed.** Agents must not implement anything here, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. This is a capture-and-triage doc. The only signal to act is the human handing you a specific item (typically by pasting it into a fresh prompt).
 >
-> **What** — Backlog of changes for the dashboard mockup, `design/ui-concept-v9p14.html` (the highest version number is the live one). Focused on the UI concept. Grouped by implementation effort.
+> **What** — Backlog of changes for the dashboard mockup, `design/mockup.html` (design values live in `design/tokens.css`). Focused on the UI concept. Grouped by implementation effort.
 >
 > **How it's used** — The human writes rough notes under **Loose notes**; an agent files each into the right section. The human then drives work by cutting an item (usually from **A — Next up**) into a prompt. Nothing here is a work order until that happens.
 
@@ -16,7 +16,11 @@
 >
 > **Group by effort** under the headings below (A Next up · B Quick wins · C Big picture · D Needs research · E Housekeeping & docs). A is the working queue (priority, mixed effort); the rest stay grouped by effort. Keep like with like, order related items next to each other, and merge overlapping ones.
 >
-> **Loose notes.** The human drops rough notes under "Loose notes" at the bottom. When asked to incorporate them, fold each into the **appropriate section** — its best fit by topic/effort, or whatever section the human specifies if they name one — with an ID + header, then delete it from Loose notes so that bucket stays empty for next time.
+> **Loose notes.** The human keeps rough notes as a bullet list (one per line) under "Loose notes" at the bottom. When asked to incorporate them, handle each note in turn:
+> 1. File it into the **appropriate section** — best fit by topic/effort, or whatever section the human names if they specify one — with an ID (section letter + number) and a concise **bold header**.
+> 2. Make **minimal edits for clarity only**: tighten the wording so it reads cleanly and complete any obvious shorthand, but never change the intent or scope, and don't add ideas of your own.
+> 3. **Disambiguate references.** If the human used the wrong term, a loose label, or shorthand, map it to the actual component/feature name as it appears in `design/mockup.html` so it's unambiguous what's being referenced. If you genuinely can't tell what's meant, keep the original wording and flag it rather than guess.
+> 4. Delete it from Loose notes once filed, so the bucket stays empty for next time.
 
 ## A — Next up
 
@@ -43,7 +47,7 @@
 5. **Voice Input:** Good microphone support via `/voice`, ideally with a small agent doing real-time correction.
 6. **Slash Commands:** Support slash commands as well-grouped clusters with clear visual signals per command.
 7. **Slash Shortcuts:** Decide which commands to surface directly in the dashboard UI (beyond full slash-command support, C6): /export, /doctor, /copy, /fast, /memory, /plan, /plugin, /rewind, /stats, /status, /tasks, /voice.
-8. **Attachments & Clipboard:** Support attachments (probably as a clipboard); sort out managing attachments and clipboard cut/paste items.
+8. **Attachments & Clipboard:** Support attachments (probably as a clipboard); sort out managing attachments and clipboard cut/paste items — including pasting an image from the clipboard straight into a prompt.
 9. **Assets Panel:** Add an assets panel to organize linked reference docs, images, etc.
 10. **Drag-in Files:** Drag files from the VS Code explorer tree into the UI to load their paths for reference.
 11. **Trigger: Interrupt / Inject:** Rename the send/link "Now" trigger to "Now: Interrupt" and add "Now: Inject" below it (reconsider wording — maybe just "Interrupt" / "Modify" or something else that is clear); Inject feeds a running agent (see C12).
@@ -63,6 +67,8 @@
 25. **System-Check Agent:** Create a system-checking agent that's easy to run.
 26. **Notes Hub:** Centralize my own notes somewhere in the dashboard.
 27. **Agent Archive:** Database of past agents with a short summary of each one's work plus timestamps (value still unclear).
+28. **Handoff Artifacts:** Generate a summary/handoff report on Handoff, rather than the plain context-carry-over (which comes first). *(Moved from the old DESIGN.md "Future directions".)*
+29. **Native Agent-Teams Messaging:** Adopt Claude Code's built-in inter-agent messaging in place of the custom sender/trigger wrapping, once the native feature matures. *(Moved from the old DESIGN.md "Future directions".)*
 
 ## D — Needs research / decisions
 
@@ -73,6 +79,9 @@
 3. **Systems-Work Docs:** Ensure agents doing systems-level work always have up-to-date docs in context.
 4. **AI-Touched Tracking:** Track what AI has touched with a local file per directory (e.g. `index.md`).
 5. **Asset Sourcing:** Check that skills and other special CC assets are pulled from the ideal source.
+6. **Transcript Payload:** Decide what an agent's "Transcript" link payload captures and from where (e.g. the raw session transcript files) — source/format isn't finalized. *(Moved from the old DESIGN.md "Open questions".)*
+7. **Inbox Attention Ramp:** Tune the reddish→copper request-type ramp, the per-card pending dot, and the Inbox-tab count badge for legibility and restraint. *(Moved from the old DESIGN.md "Open questions".)*
+8. **Dense Link Graphs:** Once links render as directed edges (see C17), decide how to keep many overlapping links readable and how to distinguish links sharing the same configuration. *(Moved from the old DESIGN.md "Open questions".)*
 
 ## E — Housekeeping & docs
 
@@ -88,12 +97,14 @@
 
 ## Loose notes
 
-> Loose human notes for an agent to incorporate later. Empty by design — add rough notes here; an agent folds each into the **appropriate section** above (best fit by topic/effort) unless the human names a target section, in which case use that. File with an ID + inline header, then clear it from this list.
+> Loose human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Loose notes** steps in "How agents maintain this list" (file with ID + header, minimal clarity edits, disambiguate references), then clears it from this list.
 
 - Reverse the order of the CTX and Turns sections in the Team Graph agent cards.
 - Change panel name back to "Team Feed" from "Feed"
 - Remove "Save setup" and "Load" from the ui footer as we have this all in settings now.
 - Make the "Setup" tab the first tab in the Settings panel
+- I want the fast mode and thinking mode 
+- Change the idle status badge from a light --surface-3 chip with --muted text to a solid --muted (slate gray) fill with white text, matching the solid-fill + white-text treatment of the active and pending badges.
 
 ## Scratch
 

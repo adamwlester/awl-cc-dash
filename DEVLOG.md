@@ -163,6 +163,60 @@ Files: archive/devlog/DEVLOG-archive-01.md, archive/devlog/DEVLOG-archive-02.md,
 
 ---
 
+### 2026-06-24 01:22:45 — Bridge backend: permission round-trip, restart survival, live-confirmed model/effort controls
+
+Finished the backend tmux path's three remaining capabilities (Prompt A had landed run-state/context/turns). Permission prompts are now a distinct stop-event: added a pure `parse_permission_prompt()` in `bridge/bridge.py` that anchors on the numbered menu at the BOTTOM of the capture (so a long diff pushing the "Do you want…?" question off a short window, or a stale answered menu in scrollback, can't fool it), rewired `_detect_state` to use it, and widened `status()` to re-read 40 lines for the question detail. The `BridgeDriver` now emits `permission_request` (carrying question+options+raw) on entering the prompt and `permission_resolved` on leaving it by any means; `answer_permission(approve)` uses the proven keys (Enter=yes, Escape=no; always-allow omitted, never verified). `main.py` sets `pending_permission` off those events (status enum untouched) and exposes POST `/permission`. Restart survival: a gitignored sidecar-owned runtime record (`sidecar/runtime/sessions.json`, via new `runtime_store.py`) persists tmux-name+config per session; the driver gained a resume-or-create start path, and the sidecar reconnects live tmux sessions (pruning dead ones) on startup. Live discovery of the 5 controls on CC 2.1.187: `/model <name>` and `/effort <level>` set directly on Enter (confirmed → WIRED + capability-flagged, with POST endpoints); `/fast` opens an interactive panel with no reliably-scrapeable toggle, `/thinking` doesn't exist, and permission mode is Shift+Tab-cycle-only (relative) — all three left unwired and reported rather than faked. Tests: +14 hermetic (permission parser incl. long-diff/stale-menu cases, runtime_store, sidecar pending-flag wiring) green with no live env; +4 live round-trips (approve→file written, deny→rejected+absent, resume-after-simulated-restart→history replays, model/effort take) all pass. Note: the pre-existing `test_turn_streams_generating_then_idle` flaked in the full-suite run from shared-`test-1` input contamination by earlier ordered tests (passes in isolation) — unrelated to these changes.
+
+Files: bridge/bridge.py, bridge/__init__.py, sidecar/drivers/bridge.py, sidecar/drivers/base.py, sidecar/main.py, sidecar/runtime_store.py (new), tests/test_bridge_unit.py, tests/test_sidecar_unit.py (new), tests/test_bridge_finisher_live.py (new), .gitignore
+
+---
+
+### 2026-06-24 01:26:01 — Restructured CLAUDE.md "Behavioral rules" into scoped subsections
+
+Reorganized the flat 8-bullet `## Behavioral rules` list (which mixed safety, working style, editing discipline, DEVLOG bookkeeping, and a UI-test procedure) into five `###` subsections: Scope & safety, Working style, Editing discipline, DEVLOG, Verifying UI changes. Pure reorganization — every rule's intent preserved, only grouping and wording tightened. The two fat DEVLOG bullets were compressed (log-trigger / format / rotation) with the ~700→~300 thresholds and verbatim-cut detail intact, still deferring fine print to the DEVLOG.md header. Section is now scannable by concern instead of a wall of uneven bullets.
+
+Files: CLAUDE.md
+
+---
+
+### 2026-06-24 01:27:30 — Design docs refactor: single-source `tokens.css`, file renames, values out of prose
+
+Restructured `design/` into a maintainable single-source layout. **Renames (via `git mv`):** `ui-concept-v9p14.html` → `mockup.html`, `design-tools.js` → `mockup-toolkit.js`. **New `tokens.css`** is now the one place every raw design value lives — the full neobrutalism `:root` token set (names unchanged: `--main`, `--secondary-background`, `--border`, `--shadow`, `--radius-base`, …) **plus** the 16 agent-identity "Jewel" colours promoted to `--ag-crimson … --ag-magenta`, which had been duplicated across a JS object, the Tailwind config, two colour pickers, the agent tiles, and the Palette Reference. `mockup.html` now links `tokens.css` (inline `:root{}` removed) and references everything via `var()`: the Tailwind `agent{}` map, the `AG` identity JS (each agent's colour reads from a `--ag-*` token), both pickers, the static tiles, and all Palette-Reference swatches — no duplicated values and zero agent-hex style literals left (verified 0). `DESIGN.md`'s Design-system section rewritten so the *rules* stay as prose (emphasis ladder, inline-vs-menu, neobrutalism conventions) while every *value* is a token-name pointer into `tokens.css` (0 hex literals remain). Added the `mockup-toolkit.js` `<script>` include so the `Ctrl+G` overlay loads. Fixed all live refs (`DESIGN.md`, `CLAUDE.md`, `design/TODO.md`); historical records (DEVLOG, `.claude/plans/`, test logs) left as-is. **Verified by rendering over http://localhost:** new `mockup.html` is pixel-identical to the pre-edit baseline at 1600 / 1100 / 1920 widths (only delta = the toolkit's floating button, the one intended addition); all tokens resolve from `tokens.css`; agent tiles resolve to the correct hexes; no real console errors; toolkit `Ctrl+G` + Pin / Measure / Grid / Clear All / Copy Notes all functional.
+
+Files: design/tokens.css (new), design/mockup.html (was ui-concept-v9p14.html), design/mockup-toolkit.js (was design-tools.js), design/DESIGN.md, design/TODO.md, CLAUDE.md
+
+---
+
+### 2026-06-24 01:54:30 — DESIGN.md: softened "no popups" into an on-screen *bias*
+
+Reframed the absolute "**Everything visible, no popups**" guiding principle (which the mockup never actually followed — it's full of anchored dropdowns, pickers, comment popouts, and split-button menus) into a soft preference: "**Bias toward on-screen, not floating** — prefer a pane or step-into view; anchored, transient bits (menus, pickers, hover popovers, quick confirms) are fine; avoid movable or stateful floating windows." Removed the peppered single-exception callouts ("the only overlay is the Link Config drawer," "not a floating dialog") so the rule no longer enumerates exemptions and stays maintainable. Realigned the Settings section's back-reference (it had restated the old "everything-visible, no-popups principle" with now-stale link text) to point at the new bias and read "not a floating window." Swept the rest of the doc: remaining `drawer` mentions are plain feature descriptions, the `#purpose--vision` anchor still resolves, and no other text references the old absolute. No mockup/behavioral change — doc intent only.
+
+Files: design/DESIGN.md
+
+### 2026-06-24 02:04:28 — `design/TODO.md`: expanded the Loose-notes handling guidance
+
+Turned the **Loose notes** maintenance rule into a 4-step list so an agent doesn't just file + ID + header a note, but also (2) makes minimal edits for clarity / completes obvious shorthand without changing intent or scope, and (3) disambiguates references — mapping a wrong term or loose label to the real component name as it appears in `design/mockup.html`, or flagging rather than guessing when unclear. Trimmed the Loose-notes section blockquote to point at that rule and confirmed the bucket stays a one-note-per-bullet list. Guidance only; no backlog items changed.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 02:22:00 — Moved DESIGN.md "Open questions" + "Future directions" into the TODO backlog
+
+Centralized the forward-looking material so it stops getting buried in the design reference: deleted both the **Open questions** and **Future directions** sections from `design/DESIGN.md` (DESIGN.md now describes only the design as it stands) and relocated their items into `design/TODO.md`. Open questions → **D — Needs research / decisions** (D6 Transcript Payload, D7 Inbox Attention Ramp, D8 Dense Link Graphs w/ xref to C17). Future directions → **C — Big picture**, deduped against existing items: Handoff Artifacts (C28) and Native Agent-Teams Messaging (C29) added new; "Scratchpad post-level interaction" dropped as already-present C18; "Image paste from clipboard" folded into the existing C8 Attachments & Clipboard. Each moved item tagged with its origin. Fixed every inbound reference: the "About this doc" bullet now points undecided/deferred ideas at `TODO.md`, and the two inline *(future direction)* links (shared scratchpad, Handoff) now read "deferred — see TODO.md". Verified zero residual `#open-questions`/`#future-directions` anchors or "future direction/open question" mentions remain in DESIGN.md, and no inbound links to those anchors exist elsewhere in the repo. Doc/backlog reorganization only — no mockup or behavioral change.
+
+Files: design/DESIGN.md, design/TODO.md
+
+---
+
+### 2026-06-24 02:59:20 — DESIGN.md: stripped version-history asides for a static, present-tense reference
+
+Made `design/DESIGN.md` read as "what the design is," not "how it got here." Removed 22 chronology bits — the "renamed from / was X before vN / removed in vN / replaces the former" asides (Requests→Inbox, Clean→Revise, Clone/Fork→Handoff, Outgoing/Incoming tabs, Activity Log, v7 upper-right pane, v9p14 grip nub, etc.) — and the two `DEVLOG.md` cross-pointers (agents already get that path from `CLAUDE.md`), which also disposed of a broken `archive/agent-dashboard/ui-plan-v2.md` link. Kept design *rationale* (de-versioned: dropped the "v9p2" tag but kept the Material 3 / Carbon grounding) and the sanctioned forward-looking flags (`(planned)` edges, the Transcript `(intent: … TBD)`). No mockup or token changes. Two known mockup-side stragglers remain parked: the `FREE!`→`Bypass` leftover at mockup.html:2500 and a few hardcoded hexes.
+
+Files: design/DESIGN.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

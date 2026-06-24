@@ -296,6 +296,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Design tokens — single source of truth for every raw value (see tokens.css / DESIGN.md). -->
+  <link rel="stylesheet" href="tokens.css">
   <script>
     tailwind.config = { theme: { extend: {
       fontFamily: { sans:['Archivo','sans-serif'], mono:['JetBrains Mono','monospace'] },
@@ -308,9 +310,9 @@
         secondary:'var(--secondary)', 'secondary-foreground':'var(--secondary-foreground)', select:'var(--select)',
         'main-dim':'var(--main-dim)', 'secondary-dim':'var(--secondary-dim)',
         success:'var(--success)', warning:'var(--warning)', danger:'var(--danger)',
-        agent: { crimson:'#aa3a61', emerald:'#008149', cobalt:'#006bbb', amber:'#aa4600', fern:'#387b12',
-          violet:'#7152b5', vermilion:'#af3c3a', cyan:'#007f91', gold:'#9d5400', citron:'#876300',
-          orchid:'#8b48a0', azure:'#0076ab', teal:'#008370', lime:'#687100', indigo:'#4d5ebe', magenta:'#9e3f84' }
+        agent: { crimson:'var(--ag-crimson)', emerald:'var(--ag-emerald)', cobalt:'var(--ag-cobalt)', amber:'var(--ag-amber)', fern:'var(--ag-fern)',
+          violet:'var(--ag-violet)', vermilion:'var(--ag-vermilion)', cyan:'var(--ag-cyan)', gold:'var(--ag-gold)', citron:'var(--ag-citron)',
+          orchid:'var(--ag-orchid)', azure:'var(--ag-azure)', teal:'var(--ag-teal)', lime:'var(--ag-lime)', indigo:'var(--ag-indigo)', magenta:'var(--ag-magenta)' }
       },
       borderRadius: { base:'var(--radius-base)' },
       boxShadow: { shadow:'var(--shadow)', shadowsm:'var(--shadow-sm)' },
@@ -318,27 +320,11 @@
     }}}
   </script>
   <style>
-    /* ============================ neobrutalism tokens (names mirror the library) ============================ */
-    :root{
-      --background:#fef6e4; --secondary-background:#ffffff; --foreground:#001858; --main-foreground:#001858;
-      --main:#f582ae; --border:#001858; --ring:#8bd3dd; --overlay:rgba(0,24,88,0.55);
-      /* Happy Hues 17 secondary (teal) — now the workhorse STATE accent (segmented/toggles/rings); --select is a light teal selection FILL (was muted pink #f9cbdf) */
-      --secondary:#8bd3dd; --secondary-foreground:#001858; --select:#a9dde7;
-      /* "dim" = the dropdown CHIP half of each split button — a LIGHTER tint of its action accent (chip recedes, action leads). Both directions now consistent: Send chip light pink + full-pink action mirrors Revise's light-teal chip + full-teal action. (was --main-dim:#ef7aa6, a darker shade — inconsistent) */
-      --main-dim:#f9b9d2; --secondary-dim:#bfe6ec;
-      --spacing-boxShadowX:4px; --spacing-boxShadowY:4px; --spacing-reverseBoxShadowX:-4px; --spacing-reverseBoxShadowY:-4px;
-      --shadow:4px 4px 0 0 var(--border); --shadow-sm:2px 2px 0 0 var(--border);
-      --radius-base:5px; --font-weight-base:500; --font-weight-heading:800;
-      /* extensions — 3 warm surfaces only: canvas (background) · cards (secondary-background, white) · chrome (surface-3) */
-      --surface-3:#f5ecd9; --muted:#5b5f86; --muted-2:#9a93b4; --rule:#d8cfb8;
-      /* v9p2: low-emphasis ACTION buttons sit on a warm cream (softer than white, lighter than chrome so they still pop on surface-3 footers); form inputs & selector fields stay white */
-      --surface-btn:#fbf5e8;
-      --success:#2f9e6f; --warning:#d98a2b; --danger:#d23b6a;
-      --req-permission:#d23b4a; --req-approval:#cf7a2c; --req-decision:#a9710f;
-      --ag-user:#7b7fa6;
-      /* glyph fill for agent tiles: white so identity reads on every colored tile. Set transparent for pure knockout. */
-      --icon-fg:#ffffff;
-    }
+    /* ============================ design tokens ============================ */
+    /* All raw token VALUES live in tokens.css (linked in <head>) — the single
+       source of truth. The names below (--main, --secondary-background,
+       --border, --shadow, --radius-base, the 16 --ag-* agent colours, …) are
+       referenced throughout this file via var(). Edit values in tokens.css. */
     *{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--surface-3); }
     ::-webkit-scrollbar{ width:9px; height:9px; }
     ::-webkit-scrollbar-track{ background:var(--surface-3); border-left:2px solid var(--border); }
@@ -857,7 +843,7 @@
     .doc-view p{ margin:0 0 9px; opacity:.94; }
     .doc-view ul{ margin:0 0 9px; padding-left:17px; } .doc-view li{ margin:2px 0; opacity:.94; }
     .doc-view code{ font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 4px; }
-    .doc-view a{ color:#0076ab; font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
+    .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
     .doc-view .doc-hr{ border:none; border-top:2px solid var(--rule); margin:12px 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.55; }
 
@@ -919,7 +905,7 @@
       user-select:none; border-right:2px solid var(--rule); background:var(--surface-3); }
     .md-line{ flex:1 1 auto; min-width:0; padding:0 9px; white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
     .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
-    .md-h2{ font-weight:800; color:#0076ab; }
+    .md-h2{ font-weight:800; color:var(--ag-azure); }
     .md-blank{ min-height:0.9em; }
     .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 3px; }
     .md-task{ color:var(--foreground); } .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
@@ -1428,7 +1414,7 @@
           <!-- ===== DETAILS ===== -->
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
             <div class="flex items-center gap-2.5">
-              <span class="agtile" style="width:40px;height:40px;color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <span class="agtile" style="width:40px;height:40px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">01 sandy</div></div>
               <button class="node-badge nb-pending" style="position:static" onclick="statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
             </div>
@@ -1477,14 +1463,14 @@
             </div>
 
             <!-- COLOR + ICON pickers (same interface; current selection always shown) -->
-            <div class="field grid grid-cols-2 gap-3" style="--cur-color:#008149">
+            <div class="field grid grid-cols-2 gap-3" style="--cur-color:var(--ag-emerald)">
               <div>
                 <div class="flex items-center justify-between mb-1.5"><label class="lbl">Color</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
                 <div class="lockable picker" data-picker>
-                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="picker-sw" style="background:#008149"></span><span class="picker-val">emerald</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="picker-sw" style="background:var(--ag-emerald)"></span><span class="picker-val">emerald</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
                   <div class="picker-pop">
                     <div class="picker-grid" data-colorgrid>
-                      <button class="sw" style="background:#aa3a61" data-name="crimson" onclick="pickColor(this)"></button><button class="sw" style="background:#af3c3a" data-name="vermilion" onclick="pickColor(this)"></button><button class="sw" style="background:#aa4600" data-name="amber" onclick="pickColor(this)"></button><button class="sw" style="background:#9d5400" data-name="gold" onclick="pickColor(this)"></button><button class="sw" style="background:#876300" data-name="citron" onclick="pickColor(this)"></button><button class="sw" style="background:#687100" data-name="lime" onclick="pickColor(this)"></button><button class="sw" style="background:#387b12" data-name="fern" onclick="pickColor(this)"></button><button class="sw on" style="background:#008149" data-name="emerald" onclick="pickColor(this)"></button><button class="sw" style="background:#008370" data-name="teal" onclick="pickColor(this)"></button><button class="sw" style="background:#007f91" data-name="cyan" onclick="pickColor(this)"></button><button class="sw" style="background:#0076ab" data-name="azure" onclick="pickColor(this)"></button><button class="sw" style="background:#006bbb" data-name="cobalt" onclick="pickColor(this)"></button><button class="sw" style="background:#4d5ebe" data-name="indigo" onclick="pickColor(this)"></button><button class="sw" style="background:#7152b5" data-name="violet" onclick="pickColor(this)"></button><button class="sw" style="background:#8b48a0" data-name="orchid" onclick="pickColor(this)"></button><button class="sw" style="background:#9e3f84" data-name="magenta" onclick="pickColor(this)"></button>
+                      <button class="sw" style="background:var(--ag-crimson)" data-name="crimson" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-vermilion)" data-name="vermilion" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-amber)" data-name="amber" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-gold)" data-name="gold" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-citron)" data-name="citron" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-lime)" data-name="lime" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-fern)" data-name="fern" onclick="pickColor(this)"></button><button class="sw on" style="background:var(--ag-emerald)" data-name="emerald" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-teal)" data-name="teal" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cyan)" data-name="cyan" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-azure)" data-name="azure" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cobalt)" data-name="cobalt" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-indigo)" data-name="indigo" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-violet)" data-name="violet" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-orchid)" data-name="orchid" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-magenta)" data-name="magenta" onclick="pickColor(this)"></button>
                     </div>
                   </div>
                 </div>
@@ -1600,14 +1586,14 @@
                 <div class="msel-pop"></div>
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-3" style="--cur-color:#4d5ebe">
+            <div class="grid grid-cols-2 gap-3" style="--cur-color:var(--ag-indigo)">
               <div>
                 <label class="lbl mb-1.5">Color</label>
                 <div class="picker" data-picker>
-                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="picker-sw" style="background:#4d5ebe"></span><span class="picker-val">indigo</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="picker-sw" style="background:var(--ag-indigo)"></span><span class="picker-val">indigo</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
                   <div class="picker-pop">
                     <div class="picker-grid" data-colorgrid>
-                      <button class="sw" style="background:#aa3a61" data-name="crimson" onclick="pickColor(this)"></button><button class="sw" style="background:#af3c3a" data-name="vermilion" onclick="pickColor(this)"></button><button class="sw" style="background:#aa4600" data-name="amber" onclick="pickColor(this)"></button><button class="sw" style="background:#9d5400" data-name="gold" onclick="pickColor(this)"></button><button class="sw" style="background:#876300" data-name="citron" onclick="pickColor(this)"></button><button class="sw" style="background:#687100" data-name="lime" onclick="pickColor(this)"></button><button class="sw" style="background:#387b12" data-name="fern" onclick="pickColor(this)"></button><button class="sw" style="background:#008149" data-name="emerald" onclick="pickColor(this)"></button><button class="sw" style="background:#008370" data-name="teal" onclick="pickColor(this)"></button><button class="sw" style="background:#007f91" data-name="cyan" onclick="pickColor(this)"></button><button class="sw" style="background:#0076ab" data-name="azure" onclick="pickColor(this)"></button><button class="sw" style="background:#006bbb" data-name="cobalt" onclick="pickColor(this)"></button><button class="sw on" style="background:#4d5ebe" data-name="indigo" onclick="pickColor(this)"></button><button class="sw" style="background:#7152b5" data-name="violet" onclick="pickColor(this)"></button><button class="sw" style="background:#8b48a0" data-name="orchid" onclick="pickColor(this)"></button><button class="sw" style="background:#9e3f84" data-name="magenta" onclick="pickColor(this)"></button>
+                      <button class="sw" style="background:var(--ag-crimson)" data-name="crimson" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-vermilion)" data-name="vermilion" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-amber)" data-name="amber" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-gold)" data-name="gold" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-citron)" data-name="citron" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-lime)" data-name="lime" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-fern)" data-name="fern" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-emerald)" data-name="emerald" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-teal)" data-name="teal" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cyan)" data-name="cyan" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-azure)" data-name="azure" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cobalt)" data-name="cobalt" onclick="pickColor(this)"></button><button class="sw on" style="background:var(--ag-indigo)" data-name="indigo" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-violet)" data-name="violet" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-orchid)" data-name="orchid" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-magenta)" data-name="magenta" onclick="pickColor(this)"></button>
                     </div>
                   </div>
                 </div>
@@ -1666,18 +1652,18 @@
 
                   <div id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)">
                     <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div>
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">62%</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:#008149" title="sub-1 (working)">1</div><div class="submini" style="color:#008149;opacity:.5" title="sub-2 (idle)">2</div></div>
+                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-emerald)" title="sub-1 (working)">1</div><div class="submini" style="color:var(--ag-emerald);opacity:.5" title="sub-2 (idle)">2</div></div>
                   </div>
 
                   <div id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#006bbb"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">synthesizer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 kai</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">synthesizer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 kai</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:24%;background:var(--success)"></i></div><span class="nbv">12/50</span></div>
@@ -1687,7 +1673,7 @@
 
                   <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#387b12"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">auditor</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">auditor</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
@@ -1697,18 +1683,18 @@
 
                   <div id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#aa4600"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">coder</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 max</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">coder</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 max</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="nbv">22/50</span></div>
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:48%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">48%</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:#aa4600" title="sub-1 (working)">1</div></div>
+                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-amber)" title="sub-1 (working)">1</div></div>
                   </div>
 
                   <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#aa3a61"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">02 rowan</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">02 rowan</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:82%;background:var(--danger)"></i></div><span class="nbv">41/50</span></div>
@@ -1718,7 +1704,7 @@
 
                   <div id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#7152b5"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">tester</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 nova</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">tester</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 nova</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:6%;background:var(--success)"></i></div><span class="nbv">3/50</span></div>
@@ -1728,7 +1714,7 @@
 
                   <div id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#007f91"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">reviewer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">reviewer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:94%;background:var(--danger)"></i></div><span class="nbv">47/50</span></div>
@@ -1738,7 +1724,7 @@
 
                   <div id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#af3c3a"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">planner</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 quinn</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">planner</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 quinn</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="nbv">9/50</span></div>
@@ -1748,7 +1734,7 @@
 
                   <div id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#876300"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">docs</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 wren</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">docs</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 wren</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i></div><span class="nbv">28/50</span></div>
@@ -1758,18 +1744,18 @@
 
                   <div id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#9e3f84"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">designer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 lex</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">designer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 lex</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:38%;background:var(--success)"></i></div><span class="nbv">19/50</span></div>
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">41%</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:#9e3f84" title="sub-1 (working)">1</div></div>
+                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-magenta)" title="sub-1 (working)">1</div></div>
                   </div>
 
                   <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#008370"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">ops</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">ops</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:72%;background:var(--warning)"></i></div><span class="nbv">36/50</span></div>
@@ -1779,7 +1765,7 @@
 
                   <div id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#4d5ebe"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">analyst</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 io</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">analyst</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 io</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:28%;background:var(--success)"></i></div><span class="nbv">14/50</span></div>
@@ -1789,7 +1775,7 @@
 
                   <div id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)">
                     <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:#9d5400"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">scribe</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 fen</div></div></div>
+                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">scribe</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 fen</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:14%;background:var(--success)"></i></div><span class="nbv">7/50</span></div>
@@ -1806,9 +1792,9 @@
               <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
               <div class="p-3 space-y-3">
                 <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-1.5 min-w-0"><span class="agtile" style="width:24px;height:24px;color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">researcher</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</span></span></div>
+                  <div class="flex items-center gap-1.5 min-w-0"><span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">researcher</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</span></span></div>
                   <button id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="dir-cyc" title="A → B">→</button>
-                  <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:#006bbb"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
+                  <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
                 </div>
                 <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
                 <div><label class="lbl mb-1.5">Payload</label><div class="seg"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
@@ -1964,19 +1950,19 @@ Full backlog: docs/human-notes-misc.md</textarea>
                 <div class="src-pop-head"><span class="sec-h" style="margin:0">Filter</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                 <div class="aglist aglist-scroll" style="max-height:300px">
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#006bbb"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#387b12"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#aa4600"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#aa3a61"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#7152b5"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><span class="ag-lab"><span class="ag-role">tester</span><span class="ag-name">01 nova</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#007f91"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#af3c3a"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#876300"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#9e3f84"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#008370"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#4d5ebe"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><span class="ag-lab"><span class="ag-role">analyst</span><span class="ag-name">01 io</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#9d5400"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><span class="ag-lab"><span class="ag-role">scribe</span><span class="ag-name">01 fen</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><span class="ag-lab"><span class="ag-role">tester</span><span class="ag-name">01 nova</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><span class="ag-lab"><span class="ag-role">analyst</span><span class="ag-name">01 io</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><span class="ag-lab"><span class="ag-role">scribe</span><span class="ag-name">01 fen</span></span><i data-lucide="check" class="ag-ck"></i></button>
                 </div>
               </div>
             </div>
@@ -2011,7 +1997,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                 <div class="rcard" style="border-left:6px solid var(--req-permission)">
                   <div class="flex items-center gap-2 mb-1.5">
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:#387b12"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
+                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">auditor</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div>
                     <span class="dbadge ml-auto" style="background:#f6dcd9;color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:38</span>
@@ -2028,7 +2014,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                 <div class="rcard" style="border-left:6px solid var(--req-approval)">
                   <div class="flex items-center gap-2 mb-1.5">
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">researcher</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div>
                     <span class="dbadge ml-auto" style="background:#f6e6cf;color:var(--req-approval);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
                     <span class="rc-time">14:41</span>
@@ -2045,7 +2031,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                 <div class="rcard" style="border-left:6px solid var(--req-decision)">
                   <div class="flex items-center gap-2 mb-1.5">
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:#007f91"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span>
+                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">reviewer</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div>
                     <span class="dbadge ml-auto" style="background:#f0e6cd;color:var(--req-decision);gap:4px;display:inline-flex;align-items:center"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
                     <span class="rc-time">14:44</span>
@@ -2065,7 +2051,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                 <div class="rcard" style="border-left:6px solid var(--req-permission)">
                   <div class="flex items-center gap-2 mb-1.5">
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:#008370"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span>
+                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">ops</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div>
                     <span class="dbadge ml-auto" style="background:#f6dcd9;color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:43</span>
@@ -2169,15 +2155,15 @@ Full backlog: docs/human-notes-misc.md</textarea>
                     <div class="src-pop" id="source-pop">
                       <div class="aglist">
                         <button class="agrow on" onclick="pickSource(this)"><span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#006bbb"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#387b12"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#aa4600"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#aa3a61"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#007f91"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#876300"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#9e3f84"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:#008370"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
                       </div>
                     </div>
                   </div>
@@ -2187,17 +2173,17 @@ Full backlog: docs/human-notes-misc.md</textarea>
                   <div class="src-pop">
                   <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                   <div class="aglist aglist-scroll" style="max-height:264px">
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile agtile--user" style="background:#0076ab"><i data-lucide="file-text" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">scratchpad</span><span class="ag-name">Scratch</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#008149"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#006bbb"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:#387b12"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#aa4600"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#aa3a61"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#007f91"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#af3c3a"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#876300"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#9e3f84"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:#008370"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile agtile--user" style="background:var(--ag-azure)"><i data-lucide="file-text" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">scratchpad</span><span class="ag-name">Scratch</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
                   </div>
                   </div>
                 </div>
@@ -2594,49 +2580,49 @@ Full backlog: docs/human-notes-misc.md</textarea>
       <div class="ref-group">
         <div class="ref-group-label">Core tokens</div>
         <div class="ref-chips">
-          <div class="ref-chip"><div class="ref-sw" style="background:#fef6e4"></div><div class="ref-meta"><span class="ref-hex">#fef6e4</span><span class="ref-name">--background (canvas)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#ffffff"></div><div class="ref-meta"><span class="ref-hex">#ffffff</span><span class="ref-name">--secondary-background (cards)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#f5ecd9"></div><div class="ref-meta"><span class="ref-hex">#f5ecd9</span><span class="ref-name">--surface-3 (chrome/headers)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#fbf5e8"></div><div class="ref-meta"><span class="ref-hex">#fbf5e8</span><span class="ref-name">--surface-btn (low-emphasis buttons)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#001858"></div><div class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">--border / --foreground</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#f582ae"></div><div class="ref-meta"><span class="ref-hex">#f582ae</span><span class="ref-name">--main (PRIMARY: main action · tab · badge · title)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#8bd3dd"></div><div class="ref-meta"><span class="ref-hex">#8bd3dd</span><span class="ref-name">--secondary (SECONDARY: tonal action · active value)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#a9dde7"></div><div class="ref-meta"><span class="ref-hex">#a9dde7</span><span class="ref-name">--select (secondary container: selection fill)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#f9b9d2"></div><div class="ref-meta"><span class="ref-hex">#f9b9d2</span><span class="ref-name">--main-dim (Send chip — light pink)</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#bfe6ec"></div><div class="ref-meta"><span class="ref-hex">#bfe6ec</span><span class="ref-name">--secondary-dim (Revise chip — light teal)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--background)"></div><div class="ref-meta"><span class="ref-hex">#fef6e4</span><span class="ref-name">--background (canvas)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary-background)"></div><div class="ref-meta"><span class="ref-hex">#ffffff</span><span class="ref-name">--secondary-background (cards)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--surface-3)"></div><div class="ref-meta"><span class="ref-hex">#f5ecd9</span><span class="ref-name">--surface-3 (chrome/headers)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--surface-btn)"></div><div class="ref-meta"><span class="ref-hex">#fbf5e8</span><span class="ref-name">--surface-btn (low-emphasis buttons)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--border)"></div><div class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">--border / --foreground</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--main)"></div><div class="ref-meta"><span class="ref-hex">#f582ae</span><span class="ref-name">--main (PRIMARY: main action · tab · badge · title)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary)"></div><div class="ref-meta"><span class="ref-hex">#8bd3dd</span><span class="ref-name">--secondary (SECONDARY: tonal action · active value)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--select)"></div><div class="ref-meta"><span class="ref-hex">#a9dde7</span><span class="ref-name">--select (secondary container: selection fill)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--main-dim)"></div><div class="ref-meta"><span class="ref-hex">#f9b9d2</span><span class="ref-name">--main-dim (Send chip — light pink)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary-dim)"></div><div class="ref-meta"><span class="ref-hex">#bfe6ec</span><span class="ref-name">--secondary-dim (Revise chip — light teal)</span></div></div>
         </div>
       </div>
       <div class="ref-group">
         <div class="ref-group-label">Semantic + signal</div>
         <div class="ref-chips">
-          <div class="ref-chip"><div class="ref-sw" style="background:#2f9e6f"></div><div class="ref-meta"><span class="ref-hex">#2f9e6f</span><span class="ref-name">success / active</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#d98a2b"></div><div class="ref-meta"><span class="ref-hex">#d98a2b</span><span class="ref-name">warning / pending</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#d23b6a"></div><div class="ref-meta"><span class="ref-hex">#d23b6a</span><span class="ref-name">danger</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#d23b4a"></div><div class="ref-meta"><span class="ref-hex">#d23b4a</span><span class="ref-name">req · permission</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#cf7a2c"></div><div class="ref-meta"><span class="ref-hex">#cf7a2c</span><span class="ref-name">req · approval</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#a9710f"></div><div class="ref-meta"><span class="ref-hex">#a9710f</span><span class="ref-name">req · decision</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#7b7fa6"></div><div class="ref-meta"><span class="ref-hex">#7b7fa6</span><span class="ref-name">--ag-user / idle</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--success)"></div><div class="ref-meta"><span class="ref-hex">#2f9e6f</span><span class="ref-name">success / active</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--warning)"></div><div class="ref-meta"><span class="ref-hex">#d98a2b</span><span class="ref-name">warning / pending</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--danger)"></div><div class="ref-meta"><span class="ref-hex">#d23b6a</span><span class="ref-name">danger</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-permission)"></div><div class="ref-meta"><span class="ref-hex">#d23b4a</span><span class="ref-name">req · permission</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-approval)"></div><div class="ref-meta"><span class="ref-hex">#cf7a2c</span><span class="ref-name">req · approval</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-decision)"></div><div class="ref-meta"><span class="ref-hex">#a9710f</span><span class="ref-name">req · decision</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-user)"></div><div class="ref-meta"><span class="ref-hex">#7b7fa6</span><span class="ref-name">--ag-user / idle</span></div></div>
         </div>
       </div>
       <div class="ref-group">
         <div class="ref-group-label">Agent identity</div>
         <div class="ref-chips">
-          <div class="ref-chip"><div class="ref-sw" style="background:#aa3a61"></div><div class="ref-meta"><span class="ref-hex">#aa3a61</span><span class="ref-name">crimson</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#af3c3a"></div><div class="ref-meta"><span class="ref-hex">#af3c3a</span><span class="ref-name">vermilion</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#aa4600"></div><div class="ref-meta"><span class="ref-hex">#aa4600</span><span class="ref-name">amber</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#9d5400"></div><div class="ref-meta"><span class="ref-hex">#9d5400</span><span class="ref-name">gold</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#876300"></div><div class="ref-meta"><span class="ref-hex">#876300</span><span class="ref-name">citron</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#687100"></div><div class="ref-meta"><span class="ref-hex">#687100</span><span class="ref-name">lime</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#387b12"></div><div class="ref-meta"><span class="ref-hex">#387b12</span><span class="ref-name">fern</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#008149"></div><div class="ref-meta"><span class="ref-hex">#008149</span><span class="ref-name">emerald</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#008370"></div><div class="ref-meta"><span class="ref-hex">#008370</span><span class="ref-name">teal</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#007f91"></div><div class="ref-meta"><span class="ref-hex">#007f91</span><span class="ref-name">cyan</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#0076ab"></div><div class="ref-meta"><span class="ref-hex">#0076ab</span><span class="ref-name">azure</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#006bbb"></div><div class="ref-meta"><span class="ref-hex">#006bbb</span><span class="ref-name">cobalt</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#4d5ebe"></div><div class="ref-meta"><span class="ref-hex">#4d5ebe</span><span class="ref-name">indigo</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#7152b5"></div><div class="ref-meta"><span class="ref-hex">#7152b5</span><span class="ref-name">violet</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#8b48a0"></div><div class="ref-meta"><span class="ref-hex">#8b48a0</span><span class="ref-name">orchid</span></div></div>
-          <div class="ref-chip"><div class="ref-sw" style="background:#9e3f84"></div><div class="ref-meta"><span class="ref-hex">#9e3f84</span><span class="ref-name">magenta</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-crimson)"></div><div class="ref-meta"><span class="ref-hex">#aa3a61</span><span class="ref-name">crimson</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-vermilion)"></div><div class="ref-meta"><span class="ref-hex">#af3c3a</span><span class="ref-name">vermilion</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-amber)"></div><div class="ref-meta"><span class="ref-hex">#aa4600</span><span class="ref-name">amber</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-gold)"></div><div class="ref-meta"><span class="ref-hex">#9d5400</span><span class="ref-name">gold</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-citron)"></div><div class="ref-meta"><span class="ref-hex">#876300</span><span class="ref-name">citron</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-lime)"></div><div class="ref-meta"><span class="ref-hex">#687100</span><span class="ref-name">lime</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-fern)"></div><div class="ref-meta"><span class="ref-hex">#387b12</span><span class="ref-name">fern</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-emerald)"></div><div class="ref-meta"><span class="ref-hex">#008149</span><span class="ref-name">emerald</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-teal)"></div><div class="ref-meta"><span class="ref-hex">#008370</span><span class="ref-name">teal</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-cyan)"></div><div class="ref-meta"><span class="ref-hex">#007f91</span><span class="ref-name">cyan</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-azure)"></div><div class="ref-meta"><span class="ref-hex">#0076ab</span><span class="ref-name">azure</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-cobalt)"></div><div class="ref-meta"><span class="ref-hex">#006bbb</span><span class="ref-name">cobalt</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-indigo)"></div><div class="ref-meta"><span class="ref-hex">#4d5ebe</span><span class="ref-name">indigo</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-violet)"></div><div class="ref-meta"><span class="ref-hex">#7152b5</span><span class="ref-name">violet</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-orchid)"></div><div class="ref-meta"><span class="ref-hex">#8b48a0</span><span class="ref-name">orchid</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-magenta)"></div><div class="ref-meta"><span class="ref-hex">#9e3f84</span><span class="ref-name">magenta</span></div></div>
         </div>
       </div>
     </div>
@@ -2981,19 +2967,19 @@ Full backlog: docs/human-notes-misc.md</textarea>
   /* shared agent model + identity badges (one source of truth for badges everywhere) */
   const AG={
     user:{role:'human',name:'User',user:true},
-    sandy:{role:'researcher',name:'01 sandy',color:'#008149',icon:'ag-wizard'},
-    kai:{role:'synthesizer',name:'01 kai',color:'#006bbb',icon:'ag-golem'},
-    drew:{role:'auditor',name:'01 drew',color:'#387b12',icon:'ag-gasmask'},
-    max:{role:'coder',name:'01 max',color:'#aa4600',icon:'ag-robot'},
-    rowan:{role:'researcher',name:'02 rowan',color:'#aa3a61',icon:'ag-fox'},
-    nova:{role:'tester',name:'01 nova',color:'#7152b5',icon:'ag-spider'},
-    vega:{role:'reviewer',name:'01 vega',color:'#007f91',icon:'ag-eagle'},
-    quinn:{role:'planner',name:'01 quinn',color:'#af3c3a',icon:'ag-centurion'},
-    wren:{role:'docs',name:'01 wren',color:'#876300',icon:'ag-parrot'},
-    lex:{role:'designer',name:'01 lex',color:'#9e3f84',icon:'ag-tribal'},
-    sage:{role:'ops',name:'01 sage',color:'#008370',icon:'ag-astronaut'},
-    io:{role:'analyst',name:'01 io',color:'#4d5ebe',icon:'ag-thirdeye'},
-    fen:{role:'scribe',name:'01 fen',color:'#9d5400',icon:'ag-cowled'}
+    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard'},
+    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem'},
+    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask'},
+    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot'},
+    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox'},
+    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider'},
+    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle'},
+    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion'},
+    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot'},
+    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal'},
+    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut'},
+    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye'},
+    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled'}
   };
   const AG_ORDER=['sandy','kai','drew','max','rowan','nova','vega','quinn','wren','lex','sage','io','fen'];
   function agtileHTML(a){return a.user
@@ -3328,5 +3314,7 @@ resize intact.`,
   /* live-reload on save (design iteration) */
   (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},500);})();
   </script>
+  <!-- Design collaboration overlay — Ctrl+G to toggle (Pin · Measure · Grid · Clear All · Copy Notes). -->
+  <script src="mockup-toolkit.js"></script>
 </body>
 </html>
