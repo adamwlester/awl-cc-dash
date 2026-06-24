@@ -33,7 +33,7 @@ A desktop application (Electron + React) presenting one window. Each agent is a 
 
 ## Layout — the three-column model
 
-A title bar on top, a status footer on the bottom, and three vertical columns between them. The **Agent** column (left) is the narrow one, full-height; the **middle** and **right** columns are the wide ones, each split top/bottom into two stacked panels — **Team Graph** over **Library** in the middle, **Team Feed** over **Prompt** on the right. Columns and their stacked sections are separated by draggable splitters. The whole frame is **full-bleed** — the header, the three-pane body, and the footer meet flush and run edge-to-edge, with no outer margin.
+A title bar on top, a status footer on the bottom, and three vertical columns between them. The **Agent** column (left) is the narrow one, full-height; the **middle** and **right** columns are the wide ones, each split top/bottom into two stacked panels — **Team Graph** over **Documentation** in the middle, **Team Feed** over **Prompt** on the right. Columns and their stacked sections are separated by draggable splitters. The whole frame is **full-bleed** — the header, the three-pane body, and the footer meet flush and run edge-to-edge, with no outer margin.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -45,21 +45,21 @@ A title bar on top, a status footer on the bottom, and three vertical columns be
 │ ├ Details          │   (agent cards)            │ ├ Messages                    │
 │ └ Create           │   + Link Config drawer     │ ├ Scratch                     │
 │                    │ ────────────────────────── │ ├ Log                         │
-│                    │ Library                    │ └ Inbox                       │
-│                    │ ├ Plan  ├ Documents        │   + shared agent filter       │
-│                    │ └ Assets                   │     (persists, Inbox incl.)   │
-│                    │   + doc switcher,          │ ───────────────────────────── │
-│                    │     line-numbered editor   │ Prompt                        │
-│                    │   + Assets thumb grid      │ ├ Compose ├ Templates         │
+│                    │ Documentation              │ └ Inbox                       │
+│                    │ ├ Plan  ├ Readme           │   + shared agent filter       │
+│                    │ └ Claude                   │     (persists, Inbox incl.)   │
+│                    │   + line-numbered          │ ───────────────────────────── │
+│                    │     editor + rail          │ Prompt                        │
+│                    │   + review / comments      │ ├ Compose ├ Library           │
 │                    │                            │ └ History                     │
 │                    │                            │   + From / To dropdowns       │
-│                    │                            │   + actions (mic·attach·Send) │
+│                    │                            │   + action row (mic · Send)   │
 ├────────────────────┴────────────────────────────┴───────────────────────────────┤
 │ Footer — agents/subagents/linked counts · active/idle/pending · session age     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> *(Layout note — the schematic above is deliberately simplified; each panel's full behavior lives in its own section under [Panels](#panels). A few cross-panel specifics worth flagging here: the always-on agent-selector columns (Prompt **From/To**, Feed **Filter**) are **header dropdowns** — the multi-selects fill with **two-line identity badges** (full-height tile + role over number·name, mirroring the list rows) and collapse to a `+N` chip, so Compose and the feed streams span the full panel width. The **Plan** tab renders the native Claude Code plan file (`~/.claude/plans/*.md`) as **line-numbered markdown** with a per-card review system — see [Library](#library-middle-bottom). Feed/History cards are **expandable** with a header **checkbox** for multi-select and a shared **Copy · Summarize · Share** footer (Summarize opens a slide-over summary; Share reuses the agent target picker). Major panels are separated by a clear **navy divider** (no grip nub; the strip is still drag-resizable). The [current mockup](mockup.html) is the visual authority.)*
+> *(Layout note — the schematic above is deliberately simplified; each panel's full behavior lives in its own section under [Panels](#panels). A few cross-panel specifics worth flagging here: the always-on agent-selector columns (Prompt **From/To**, Feed **Filter**) are **header dropdowns** — the multi-selects fill with **two-line identity badges** (full-height tile + role over number·name, mirroring the list rows) and collapse to a `+N` chip, so Compose and the feed streams span the full panel width. The **Plan** tab renders the native Claude Code plan file (`~/.claude/plans/*.md`) as **line-numbered markdown** with a per-card review system — see [Documentation](#documentation-middle-bottom). Feed/History cards are **expandable** with a header **checkbox** for multi-select and a shared **Copy · Summarize · Share** footer (Summarize opens a slide-over summary; Share reuses the agent target picker). Major panels are separated by a clear **navy divider** (no grip nub; the strip is still drag-resizable). The [current mockup](mockup.html) is the visual authority.)*
 
 The columns are tied together by **selection**: clicking an agent card in the Team Graph loads that agent into the **Agent** panel, so the graph highlight and the Agent panel always describe the same agent in focus.
 
@@ -106,7 +106,7 @@ The team-wide **approvals inbox** — the human-control surface that keeps agent
 | **Approval** | A plan/handoff to review before it proceeds | Approve · **Review** · Reject |
 | **Decision** | A question with candidate options to choose between | pick an option, then an explicit **Approve** (disabled until you've selected) |
 
-- **Review routes to the plan** *(Approval cards only)*. Between Approve and Reject, a **Review** button **hands you to the Library panel's Plan tab**, expanding and briefly highlighting the matching plan so you can read/edit the full proposal before deciding — rather than embedding a plan editor inside the card. This is the deliberate cross-link between the two surfaces: the *plan* is a document (it lives with the docs); its *approval* surfaces here in the Inbox. *(The reciprocal — a plan's own Approve routing a card back into the Inbox — is the same handoff in reverse.)*
+- **Review routes to the plan** *(Approval cards only)*. Between Approve and Reject, a **Review** button **hands you to the Documentation panel's Plan tab**, expanding and briefly highlighting the matching plan so you can read/edit the full proposal before deciding — rather than embedding a plan editor inside the card. This is the deliberate cross-link between the two surfaces: the *plan* is a document (it lives with the docs); its *approval* surfaces here in the Inbox. *(The reciprocal — a plan's own Approve routing a card back into the Inbox — is the same handoff in reverse.)*
 - **Reply routes to Prompts.** Every card has its own **Reply** button, set off to the far right of the card (separate from the approve/deny controls so it reads as its own path). It doesn't open an inline field — it **hands you to the [Prompts](#prompts-right-bottom) panel**, jumping to Compose with that agent pre-selected as the sole target, so a free-form reply is composed and sent from the one place all prompts originate.
 
 ### Agent (left pane)
@@ -130,25 +130,24 @@ The compose-first heart of the app — the bottom panel of the **right** column,
   - **To / Target** (multi-select) — who it goes *to*: a **dropdown** whose popover is the full agent **identity-row list** (recolorable tile + two-line role·name, no truncation), led by a **Scratch** row that posts to the [shared scratchpad](#the-shared-scratchpad), with a single **contextual All/None** toggle (shows *All* until everything is selected, then *None*). Picked targets fill the trigger as identity **badges** and collapse to a **+N** chip past a cap; multi-target is simply picking several — there's no separate "broadcast" mode.
 - **Tabs:**
   - **Compose** — a free-text prompt area, with **copy** / **clear** as ghost icons in its header.
-  - **Templates** — reusable prompt **templates** with fill-in-the-blank placeholders; see [the Templates flow](#the-templates-flow). *(The tab was named "Library" until that name moved to the middle-column docs panel.)*
+  - **Library** — reusable prompt **templates** with fill-in-the-blank placeholders; see [the Library template flow](#the-library-template-flow).
   - **History** — past prompts for the focused agent, attributed and timestamped. Cards are **selectable** (same style as the Team Graph cards); their actions live in a single footer strip — **Copy · Edit · Retry · Stop** — rather than per-card.
-- **Action row** (the shared Prompts footer) — leads with a **mic** button for voice dictation (moved out of the Compose header) and a **paperclip attach** button (right after the mic) that picks an image from the [Library → Assets](#library-middle-bottom) list — both directions register there, so Assets stays the source of truth — then the Revise and Response-format controls, and the Send split button at the right. Sending uses a pair of **split buttons** (a button joined to a dropdown chip), styled as a **pink primary** (Send) next to a **teal secondary** (Revise):
-  - **Send** (primary) with a **timing** chip — **Now · Inject · Next · Queue** (no "Hold"; that only makes sense for a link). The chip carries the delivery timing, reusing the same vocabulary as link [Triggers](#linking--context-sharing). **Now** interrupts and delivers immediately; **Inject** delivers to a *running* agent without stopping it (a one-shot message applied at the next safe boundary); **Next** waits for the next turn boundary; **Queue** appends to the agent's prompt queue.
+- **Action row** (the shared Prompts footer) — leads with a **mic** button for voice dictation (moved out of the Compose header), then the Revise and Response-format controls, and the Send split button at the right. Sending uses a pair of **split buttons** (a button joined to a dropdown chip), styled as a **pink primary** (Send) next to a **teal secondary** (Revise):
+  - **Send** (primary) with a **timing** chip — **Now · Next · Queue** (no "Hold"; that only makes sense for a link). The chip carries the delivery timing, reusing the same vocabulary as link [Triggers](#linking--context-sharing).
   - **Revise** with a **scope** chip — **Grammar · Language · Refactor** (default Grammar): runs an AI cleanup/rewrite pass on the prompt before you send it, scoped from a light spelling/grammar fix up to a full restructure.
-  - **Scope:** Compose offers Revise + Send; Templates offers Send only (plus mic + attach). History swaps the row for its own footer (Copy · Edit · Retry · Stop) and hides the action row.
+  - **Scope:** Compose offers Revise + Send; Library offers Send only. History swaps the row for its own footer (Copy · Edit · Retry · Stop).
 
-### Library (middle, bottom)
+### Documentation (middle, bottom)
 
-The home for **organizing and reviewing all of a project's documents and reference assets** — three tabs: **Plan · Documents · Assets**. It's the other half of the middle column, beneath the Team Graph. (The panel was named "Documentation" while it held only docs; "Library" reflects that it now also holds images.)
+The home for **organizing and reviewing all of a project's documents** — three tabs over the same line-numbered editor: **Plan · Readme · Claude**. (A **+** adds further docs to organize here.) It's the other half of the middle column, beneath the Team Graph.
 
-- **The shared doc editor.** The **Plan** and **Documents** tabs render their files as **line-numbered markdown** whose line numbers match the raw file, so "see line N" is a real reference. An **interactive left rail** indexes every line and section: click a rail cell to **select a line, a whole section, or the entire document** (so a chunk can be shared or commented on). The rail cells are **color-coded by what a click selects** — pink = the **title** (selects the whole doc), dark teal = a **section**, light teal = a **line**; the selected text highlights in **light pink**, and re-clicking the active cell clears it. Inline code is tinted so it reads apart from body text.
+- **The shared doc editor.** Every tab renders its file as **line-numbered markdown** whose line numbers match the raw file, so "see line N" is a real reference. An **interactive left rail** indexes every line and section: click a rail cell to **select a line, a whole section, or the entire document** (so a chunk can be shared or commented on). The rail cells are **color-coded by what a click selects** — pink = the **title** (selects the whole doc), dark teal = a **section**, light teal = a **line**; the selected text highlights in **light pink**, and re-clicking the active cell clears it. Inline code is tinted so it reads apart from body text.
 - **The Plan tab is the review surface.** It lists the native Claude Code plan files (`~/.claude/plans/*.md`, shown under a single directory line + a "*N plans · N awaiting review*" count) as **expandable cards**. Each card's header is **three rows**: ① owner **agent badge** · title · state (e.g. *In review*); ② the **feedback tally badges** (Approve/Revise/Block counts) · *done/total steps*; ③ filename · **Created / Edited** date-time with a relative "ago". Expanding a card reveals the line-numbered plan beside a **nav rail**, then the shared footer.
 - **The nav rail** has two modes: **Outline** (the section list, each with a worst-verdict dot + comment count) and **Feedback** (one **card per response** — the reviewer's agent badge + a thumbs **agree** toggle, a color-coded **verdict badge** (Approve/Revise/Block) + a **section badge**, and a clamped comment summary). Selecting feedback moves **three indicators together**: the **card** fills (light teal), its **section text** highlights (teal, linking card ↔ text), and the **comment popout** opens. Closing the popout or deselecting clears all three, and opening a different comment switches all three — driven from either a Feedback card or the in-text rail-gutter badge. The rail **resizes with the text column** (it grows when the popout opens, so cards aren't clipped).
 - **Comments dock under the text.** Section feedback also surfaces as a **verdict badge in the rail gutter** at that section's line; clicking it (or a Feedback card) opens a **comment popout** docked under the plan body at the same width, with a merged **verdict + section** header and, per response, the reviewer's badge · time · a thumbs agree toggle. You add your own with the **Comment** button — enabled once you select a line/section — which opens a **composer** in the same popout: your badge, a **Mark as** verdict dropdown (Approve/Revise/Block), a thumbs agree default, an optional note, and **Save**.
 - **Actions sit in the shared footer.** One footer holds, left-aligned, **Copy · Edit · Comment** (neutral) and **Share · Review** (teal; both reuse the agent target picker — Share distributes the plan, Review sends it for review), then — right-justified — the decision trio: **Revise** (send the flagged sections back to the authoring agent) · **Reject** · **Approve**. (It wraps to a second row on a narrow column.)
 - **Cross-linked with the Inbox.** A plan is a *document* (it lives here); its *approval* surfaces in the Team Feed's [Inbox](#the-inbox-tab). The Inbox's **Review** button jumps here, expanding and briefly highlighting the matching plan; a plan's **Approve/Reject** is the same handoff in reverse.
-- **The Documents tab** folds every project doc into **one** tab (it replaces the old per-file Readme / Claude tabs). A **doc-switcher rail** on the left lists each doc as **icon · name · path**; the path is load-bearing — it disambiguates same-named files (the project `CLAUDE.md` vs the user-level `~/.claude/CLAUDE.md`). Selecting a row loads that doc into the **same editor + rail** the Plan tab uses, with a top toolbar (**Comment · Edit · Copy**). Only **README**, the project **CLAUDE.md**, and the user-level **CLAUDE.md** are listed by default; a **+ Add document** affordance at the foot of the rail adds more.
-- **The Assets tab** holds **reference images**. Here the **thumbnail grid is the nav** (no separate editor): add images via **Paste** or **Upload**, and selecting a tile reveals a **preview + actions** strip (**Link to prompt**, **Remove**). Assets is the **single source of truth** for media — an image added here, *or* attached while composing via the [Prompts paperclip](#prompts-right-bottom), both register in this one grid.
+- **The other tabs** (Readme / Claude) use the same editor + rail over a single filling surface, with a top toolbar (**Comment · Edit · Copy**) and title-case labels.
 
 ### Settings (step-into view)
 
@@ -216,9 +215,9 @@ Both act on the **Timeline** in the Agent → Details tab — the list of points
 
 The project leans toward letting an agent "go as far as it can" on a task rather than babysitting it — so agents carry **auto-stop limits** (per-agent **Max turns** and **Context %**) that end a run safely when hit. These are deliberately a **different scope** from a link's [End After](#linking--context-sharing) limits: **Lifecycle bounds a single agent's run; End After bounds an inter-agent exchange.** Keep the two distinct.
 
-### The Templates flow
+### The Library template flow
 
-The Prompts **Templates** tab turns reusable prompt files into fill-in-the-blank forms:
+Library turns reusable prompt files into fill-in-the-blank forms:
 
 - A **scrollable list** of template files on the left (there may be many).
 - The selected template renders with its placeholders shown as **clickable colored pills** (the bare tag name, e.g. `focus_area`).

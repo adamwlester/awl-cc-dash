@@ -1,43 +1,48 @@
 # Dashboard TODO — ui-concept backlog
 
-> **⚠ Backlog is reference-only; "Next up" is the one actionable section.** For the lettered backlog sections (A–D), agents must not implement anything, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. The exception is **Next up**: items there are approved for work, and being directed to that section is itself the signal to build them (see its instructions). This is otherwise a capture-and-triage doc.
+> **⚠ Reference only — do not work from this unless explicitly directed.** Agents must not implement anything here, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. This is a capture-and-triage doc. The only signal to act is the human handing you a specific item (typically by pasting it into a fresh prompt).
 >
-> **What** — Backlog of changes for the dashboard mockup, `design/mockup.html` (design reference in `design/DESIGN.md`; design values in `design/tokens.css`). Focused on the UI concept. The backlog is grouped by implementation effort.
+> **What** — Backlog of changes for the dashboard mockup, `design/mockup.html` (design values live in `design/tokens.css`). Focused on the UI concept. Grouped by implementation effort.
 >
-> **How it's used** — The human writes rough notes under **Inbox**; an agent files each into the right section. Work gets driven either by promoting an item into **Next up** (then directing an agent there to implement and remove it) or by cutting any item into a fresh prompt. Nothing in the backlog is a work order until that happens.
+> **How it's used** — The human writes rough notes under **Loose notes**; an agent files each into the right section. The human then drives work by cutting an item (usually from **A — Next up**) into a prompt. Nothing here is a work order until that happens.
 
 ## How agents maintain this list
 
 > **Verify first.** Before adding or reordering, open the latest mockup and confirm the item isn't already built. Drop anything already implemented; trim partly-built items to just the remaining gap.
 >
-> **Leave empty sections empty.** When a section has no items, leave it blank beneath its heading + intro line. Never add a placeholder, an "(empty)" marker, a status line, or a changelog note (e.g. "this batch was implemented and removed on …") — the blank space *is* the signal, and that history belongs in DEVLOG, not here.
->
 > **Format.** Each item is a numbered list entry — a **bold header**, then a concise description; bold only the header. E.g. `1. **Role Dropdown:** …`.
 >
-> **Numbering.** The backlog sections are lettered A–D; items are a numbered list within each, so a backlog item's ID is its section letter + list number (e.g. B7). Cross-reference related items by that ID (e.g. "see B17"), and update those refs if you reorder. **Next up** items and **Inbox** notes stay unlettered — Next up items are transient (built, then deleted), so they don't get stable IDs.
+> **Numbering.** Sections are lettered A–E; items are a numbered list within each, so an item's ID is its section letter + list number (e.g. C7). Cross-reference related items by that ID (e.g. "see C17"), and update those refs if you reorder. Loose notes stay unnumbered.
 >
-> **Group by effort** under the headings below (A Quick wins · B Big picture · C Needs research · D Housekeeping & docs). Keep like with like, order related items next to each other, and merge overlapping ones. **Next up** is separate — the active implementation queue (priority order, mixed effort).
+> **Group by effort** under the headings below (A Next up · B Quick wins · C Big picture · D Needs research · E Housekeeping & docs). A is the working queue (priority, mixed effort); the rest stay grouped by effort. Keep like with like, order related items next to each other, and merge overlapping ones.
 >
-> **Next up — implementing items.** Items in the Next up section are approved for work; being directed to that section is itself the signal to build them. For each item:
-> 1. **Build it in `design/mockup.html`** — that's where these changes land.
-> 2. **Work from `design/DESIGN.md` and `design/tokens.css`.** DESIGN.md is the design reference (intent, patterns); tokens.css is the single source of truth for every design value. Read both first and let them inform the change — don't hardcode a value that belongs in tokens.css.
-> 3. **Keep DESIGN.md in sync.** If a change alters design intent or adds/changes a pattern, update DESIGN.md to match, and confirm DESIGN.md and the mockup agree before you call the item done. If no DESIGN.md change is needed, confirm that explicitly.
-> 4. **Remove the item** from the list once done (and log it in DEVLOG per the project rule).
->
-> **Inbox.** The human keeps rough notes as a bullet list (one per line) under "Inbox" at the bottom. When asked to incorporate them, handle each note in turn:
-> 1. File it into the **appropriate section** — best fit by topic/effort, or whatever section the human names if they specify one (e.g. "Next up") — with a concise **bold header**, plus an ID (section letter + number) for backlog sections; Next up items get no letter.
+> **Loose notes.** The human keeps rough notes as a bullet list (one per line) under "Loose notes" at the bottom. When asked to incorporate them, handle each note in turn:
+> 1. File it into the **appropriate section** — best fit by topic/effort, or whatever section the human names if they specify one — with an ID (section letter + number) and a concise **bold header**.
 > 2. Make **minimal edits for clarity only**: tighten the wording so it reads cleanly and complete any obvious shorthand, but never change the intent or scope, and don't add ideas of your own.
 > 3. **Disambiguate references.** If the human used the wrong term, a loose label, or shorthand, map it to the actual component/feature name as it appears in `design/mockup.html` so it's unambiguous what's being referenced. If you genuinely can't tell what's meant, keep the original wording and flag it rather than guess.
-> 4. Delete it from the Inbox once filed, so the bucket stays empty for next time.
+> 4. Delete it from Loose notes once filed, so the bucket stays empty for next time.
 
-## A — Quick wins
+## A — Next up
+
+> Current work queue — priority order, mixed effort.
+
+1. **Team Graph Card Order:** Reverse the order of the CTX and Turns sections in the Team Graph agent cards.
+2. **Feed Panel Rename:** Change the Feed panel name back to "Team Feed".
+3. **Remove Footer Save/Load:** Remove "Save setup" and "Load" from the UI footer, since this is now all in the Settings panel.
+4. **Setup Tab First:** Make the "Setup" tab the first tab in the Settings panel.
+5. **Inline Mode Buttons:** Make the fast mode and thinking mode buttons in the Agent panel inline, like the color and icon dropdowns.
+6. **Idle Badge Restyle:** Change the idle status badge from a light `--surface-3` chip with `--muted` text to a solid `--muted` (slate gray) fill with white text, matching the solid-fill + white-text treatment of the active and pending badges and the DESIGN.md spec.
+7. **Header Version Badge:** Change the version badge in the dashboard header to v1.1.
+8. **Remove Token Palette:** Remove the "Token Palette" design-reference legend (the bottom `.ref-section` block) from the mockup entirely, since the palette is now documented elsewhere.
+
+## B — Quick wins
 
 > Small changes to the current mockup.
 
 1. **Output Export:** Extend the existing per-card Copy into a way to select/cut/export larger spans of output.
 2. **Jump to Feed Ends:** Add quick jump-to-start / jump-to-end controls on each feed.
 
-## B — Big picture
+## C — Big picture
 
 > Larger features needing real backend/runtime.
 
@@ -47,11 +52,11 @@
 4. **Plans Tab:** Add a Plans tab (in the Agent panel, or rename Prompts → "Editor" and host it there) that surfaces Claude Code's native plans — show multiple plans, expand each to review/edit in place, and support review/edit/approval; must support the new native ultraplan functionality.
 5. **Voice Input:** Good microphone support via `/voice`, ideally with a small agent doing real-time correction.
 6. **Slash Commands:** Support slash commands as well-grouped clusters with clear visual signals per command.
-7. **Slash Shortcuts:** Decide which commands to surface directly in the dashboard UI (beyond full slash-command support, B6): /export, /doctor, /copy, /fast, /memory, /plan, /plugin, /rewind, /stats, /status, /tasks, /voice.
+7. **Slash Shortcuts:** Decide which commands to surface directly in the dashboard UI (beyond full slash-command support, C6): /export, /doctor, /copy, /fast, /memory, /plan, /plugin, /rewind, /stats, /status, /tasks, /voice.
 8. **Attachments & Clipboard:** Support attachments (probably as a clipboard); sort out managing attachments and clipboard cut/paste items — including pasting an image from the clipboard straight into a prompt.
 9. **Assets Panel:** Add an assets panel to organize linked reference docs, images, etc.
 10. **Drag-in Files:** Drag files from the VS Code explorer tree into the UI to load their paths for reference.
-11. **Trigger: Interrupt / Inject:** Rename the send/link "Now" trigger to "Now: Interrupt" and add "Now: Inject" below it (reconsider wording — maybe just "Interrupt" / "Modify" or something else that is clear); Inject feeds a running agent (see B12).
+11. **Trigger: Interrupt / Inject:** Rename the send/link "Now" trigger to "Now: Interrupt" and add "Now: Inject" below it (reconsider wording — maybe just "Interrupt" / "Modify" or something else that is clear); Inject feeds a running agent (see C12).
 12. **Interactive Comms:** Incorporate interactive, dynamic agent↔me communication via a shared "dynamic doc" the agent periodically references during each run.
 13. **Reviewer Link:** Build a one-button reviewer setup on top of existing linking — one agent reviews another's work.
 14. **Queue Awareness:** For >2 linked agents, share in message front matter that another agent's message is queued, so an agent can decide whether to wait.
@@ -71,7 +76,7 @@
 28. **Handoff Artifacts:** Generate a summary/handoff report on Handoff, rather than the plain context-carry-over (which comes first). *(Moved from the old DESIGN.md "Future directions".)*
 29. **Native Agent-Teams Messaging:** Adopt Claude Code's built-in inter-agent messaging in place of the custom sender/trigger wrapping, once the native feature matures. *(Moved from the old DESIGN.md "Future directions".)*
 
-## C — Needs research / decisions
+## D — Needs research / decisions
 
 > Open questions to resolve before they become build items.
 
@@ -82,9 +87,9 @@
 5. **Asset Sourcing:** Check that skills and other special CC assets are pulled from the ideal source.
 6. **Transcript Payload:** Decide what an agent's "Transcript" link payload captures and from where (e.g. the raw session transcript files) — source/format isn't finalized. *(Moved from the old DESIGN.md "Open questions".)*
 7. **Inbox Attention Ramp:** Tune the reddish→copper request-type ramp, the per-card pending dot, and the Inbox-tab count badge for legibility and restraint. *(Moved from the old DESIGN.md "Open questions".)*
-8. **Dense Link Graphs:** Once links render as directed edges (see B17), decide how to keep many overlapping links readable and how to distinguish links sharing the same configuration. *(Moved from the old DESIGN.md "Open questions".)*
+8. **Dense Link Graphs:** Once links render as directed edges (see C17), decide how to keep many overlapping links readable and how to distinguish links sharing the same configuration. *(Moved from the old DESIGN.md "Open questions".)*
 
-## D — Housekeeping & docs
+## E — Housekeeping & docs
 
 > Maintenance, config, and documentation chores.
 
@@ -96,13 +101,13 @@
 6. **System Details Doc:** Document and maintain my system details — OS, Claude install, plugins, etc.
 7. **Config SOPs:** Write SOPs for all major system-config activities (agent, hook, skills setup).
 
-## Next up
+## Loose notes
 
-> Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement and remove each item per the **Next up** steps in "How agents maintain this list." Empty by design when nothing is queued.
+> Loose human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Loose notes** steps in "How agents maintain this list" (file with ID + header, minimal clarity edits, disambiguate references), then clears it from this list.
 
-## Inbox
-
-> Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
+- Remove the Todo tab from the Documentation panel
+- Rename the Readme tab to "README.md"
+- Rename the Claude tab to "CLAUDE.md"
 
 ## Scratch
 
@@ -114,10 +119,7 @@
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 - Need to add ToDo functionality back into UI eventually.
 - Need to integrate a prompt send option like "side note" or "interject" that will allow us to send a correction to an ongoing run.
-- Consider adding a Assets tab or Images tab to Documentation.
-- Consider if documentation should be called Assets instead and we just have one tab for documents and one for images, keeping the "Plan" tab as is.
-- Images should have a paste and upload option.
-- Documents should have an add option and a nav bar with the doc names and path. Only the Readme and the project and user level CLAUDE.md should be included by default.
+- Consider adding a Assets 
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.

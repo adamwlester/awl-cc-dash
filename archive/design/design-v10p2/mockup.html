@@ -846,47 +846,6 @@
     .doc-view .doc-hr{ border:none; border-top:2px solid var(--rule); margin:12px 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.55; }
 
-    /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
-    .docdoc{ display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
-    .docdoc.on{ display:flex; }
-    .docmain{ min-width:0; }
-    /* doc-switcher: icon · name · path (path disambiguates project vs user CLAUDE.md) */
-    .docnav{ flex:0 0 162px; display:flex; flex-direction:column; gap:4px; overflow-y:auto;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:5px; }
-    .docnav-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; cursor:pointer;
-      padding:6px 7px; border:2px solid transparent; border-radius:var(--radius-base); background:transparent; }
-    .docnav-row:hover{ background:var(--surface-3); }
-    .docnav-row.on{ background:var(--select); border-color:var(--border); }
-    .docnav-ic{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); }
-    .docnav-row.on .docnav-ic{ color:var(--foreground); }
-    .docnav-lab{ display:flex; flex-direction:column; gap:1px; min-width:0; }
-    .docnav-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .docnav-path{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .docnav-add{ display:flex; align-items:center; gap:5px; margin-top:auto; padding:6px 7px; font-size:10px; font-weight:800;
-      color:var(--muted); cursor:pointer; border:2px dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; }
-    .docnav-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--surface-3); }
-    .docnav-add svg{ width:13px; height:13px; }
-
-    /* ---- Library: Assets tab — thumbnail grid IS the nav, + selected-asset detail strip ---- */
-    .asset-grid{ flex:1 1 auto; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:9px; align-content:start; padding:2px; }
-    .asset-tile{ display:flex; flex-direction:column; gap:5px; cursor:pointer; text-align:left;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:5px;
-      transition:transform .07s, box-shadow .07s; }
-    .asset-tile:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .asset-tile.on{ outline:3px solid var(--ring); outline-offset:1px; }
-    .asset-thumb{ display:flex; align-items:center; justify-content:center; aspect-ratio:4/3; border:2px solid var(--border); border-radius:3px; color:var(--icon-fg); }
-    .asset-thumb svg{ width:22px; height:22px; opacity:.85; }
-    .asset-name{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .asset-detail{ flex:0 0 auto; display:none; align-items:center; gap:11px; margin-top:9px; padding:9px;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); }
-    .asset-detail.on{ display:flex; }
-    .asset-detail-thumb{ display:flex; align-items:center; justify-content:center; width:64px; height:48px; flex:0 0 auto; border:2px solid var(--border); border-radius:3px; color:var(--icon-fg); }
-    .asset-detail-thumb svg{ width:20px; height:20px; opacity:.85; }
-    .asset-detail-info{ min-width:0; display:flex; flex-direction:column; gap:3px; }
-    .asset-detail-name{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:800; color:var(--foreground); }
-    .asset-detail-meta{ font-size:9.5px; font-weight:600; color:var(--muted); }
-    .asset-detail-actions{ display:flex; gap:6px; margin-top:2px; }
-
     /* ============================ v8p7 — Source dropdown (single-select, shows active selection) ============================ */
     .src-dd{ position:relative; }
     .src-trig{ width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; text-align:left; cursor:pointer;
@@ -1856,11 +1815,12 @@
           <!-- DOCUMENTATION (v9p7 A3) -->
           <section class="rz-panel" id="pDocs" style="flex:1 1 44%; min-height:150px">
             <div class="pcard-head">
-              <h3>Library</h3>
+              <h3>Documentation</h3>
               <div class="tabset">
                 <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plan</button>
-                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents</button>
-                <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
+                <button data-tab-group="doc" data-tab="readme" onclick="switchTab('doc','readme')" class="tab-btn">Readme</button>
+                <button data-tab-group="doc" data-tab="claude" onclick="switchTab('doc','claude')" class="tab-btn">Claude</button>
+                <button class="doc-add" title="Add a document to organize here" onclick="docAdd()"><i data-lucide="plus"></i></button>
               </div>
             </div>
             <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
@@ -1875,42 +1835,17 @@
                 <div id="plan-list" class="flex flex-col gap-2"></div>
               </div>
 
-              <!-- DOCUMENTS — all project docs in one tab, switched via the left doc-nav.
-                   Reuses the shared doc editor (toolbar + line-numbered view + rail); the nav lists
-                   each doc as icon · name · path (path disambiguates project vs user CLAUDE.md). -->
-              <div id="doc-documents" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
-
-                <!-- doc-switcher rail -->
-                <nav class="docnav">
-                  <button class="docnav-row on" data-doc="readme" onclick="docPick(this,'readme')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">README.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claude" onclick="docPick(this,'claude')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claudeuser" onclick="docPick(this,'claudeuser')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">~/.claude/</span></span>
-                  </button>
-                  <button class="docnav-add" title="Add a document to organize here" onclick="docAdd()"><i data-lucide="plus"></i>Add document</button>
-                </nav>
-
-                <!-- editor host — one doc visible at a time -->
-                <div class="docmain flex-1 min-h-0 flex flex-col">
-
-                  <!-- README.md -->
-                  <div class="docdoc on" data-doc="readme">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/README.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-readme"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'readme')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-readme-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
+              <!-- README.md -->
+              <div id="doc-readme" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
+                <div class="doc-toolbar">
+                  <span class="doc-path">agent-dashboard/README.md</span>
+                  <span class="flex-1"></span>
+                  <span class="doc-cmt-slot" data-cmtfor="doc-readme"></span>
+                  <button class="btn doc-edit-btn" onclick="docEdit(this,'readme')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
+                  <button class="ghost-ic" title="Copy" onclick="copyField('doc-readme-edit')"><i data-lucide="copy"></i></button>
+                </div>
+                <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
+                <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
 
 A control surface for running and supervising a team of Claude Code agents
 from one window. Watch the team, steer each agent, and review their work
@@ -1919,26 +1854,26 @@ without leaving the dashboard.
 ## The five panels
 - **Agent** — inspect & configure the selected agent.
 - **Team Graph** — every agent as a live card.
-- **Library** — plans + project docs (README, CLAUDE) and reference assets.
+- **Documentation** — plans + project docs (README, CLAUDE, TODO).
 - **Feed** — messages, scratchpad, log, inbox.
 - **Prompts** — compose and dispatch prompts.
 
 ## Design system
 Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
 single pink-to-teal emphasis ladder.</textarea>
-                  </div>
+              </div>
 
-                  <!-- CLAUDE.md (project) -->
-                  <div class="docdoc" data-doc="claude">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claude"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claude')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claude-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
+              <!-- CLAUDE.md -->
+              <div id="doc-claude" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
+                <div class="doc-toolbar">
+                  <span class="doc-path">CLAUDE.md</span>
+                  <span class="flex-1"></span>
+                  <span class="doc-cmt-slot" data-cmtfor="doc-claude"></span>
+                  <button class="btn doc-edit-btn" onclick="docEdit(this,'claude')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
+                  <button class="ghost-ic" title="Copy" onclick="copyField('doc-claude-edit')"><i data-lucide="copy"></i></button>
+                </div>
+                <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
+                <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
 
 Project instructions loaded into every agent's context. Keep it short — it is
 spent context on every turn.
@@ -1952,78 +1887,7 @@ the AWL multi-agent dashboard.
 - Keep DEVLOG.md current — an unlogged change never happened.
 - Write transient artifacts into .scratch/, never the repo root.
 - Preserve everything you weren't asked to change.</textarea>
-                  </div>
-
-                  <!-- CLAUDE.md (user-level) -->
-                  <div class="docdoc" data-doc="claudeuser">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">~/.claude/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claudeuser"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claudeuser')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claudeuser-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-claudeuser-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claudeuser-edit" style="display:none"># CLAUDE.md
-
-User-level instructions loaded into every project's context, on top of the
-project CLAUDE.md. Global defaults that travel with you.
-
-## Working style
-- Be direct, practical, low-ceremony. Lead with action.
-- Prefer dedicated tools over ad-hoc shell for file search and edits.
-- Write generated artifacts outside any repo, under a scratch path.
-
-## Conventions
-- Use markdown links for file references, not bare paths.
-- Match the project's existing patterns before introducing new ones.</textarea>
-                  </div>
-
-                </div><!-- /docmain -->
-              </div><!-- /doc-documents -->
-
-              <!-- ASSETS — reference images; the thumbnail grid IS the nav. Paste + upload to add;
-                   selecting a tile reveals a preview + per-asset actions (link-to-prompt, remove). -->
-              <div id="doc-assets" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
-                <div class="doc-toolbar">
-                  <span class="doc-path">project assets · 4 images</span>
-                  <span class="flex-1"></span>
-                  <button class="btn doc-edit-btn" onclick="assetPaste()"><i data-lucide="clipboard" class="w-3.5 h-3.5"></i>Paste</button>
-                  <button class="btn doc-edit-btn" onclick="assetUpload()"><i data-lucide="upload" class="w-3.5 h-3.5"></i>Upload</button>
-                </div>
-
-                <div class="asset-grid" id="asset-grid">
-                  <button class="asset-tile on" data-name="mockup-v9.png" data-meta="PNG · 1840×1120 · 412 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">mockup-v9.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="palette-ref.png" data-meta="PNG · 1200×800 · 188 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-violet),var(--ag-azure))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">palette-ref.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="graph-sketch.jpg" data-meta="JPG · 1024×768 · 96 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-amber),var(--ag-gold))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">graph-sketch.jpg</span>
-                  </button>
-                  <button class="asset-tile" data-name="inbox-flow.png" data-meta="PNG · 1600×900 · 274 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">inbox-flow.png</span>
-                  </button>
-                </div>
-
-                <!-- selected-asset preview + actions -->
-                <div class="asset-detail on" id="asset-detail">
-                  <span class="asset-detail-thumb" id="asset-detail-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                  <div class="asset-detail-info">
-                    <div class="asset-detail-name" id="asset-detail-name">mockup-v9.png</div>
-                    <div class="asset-detail-meta" id="asset-detail-meta">PNG · 1840×1120 · 412 KB</div>
-                    <div class="asset-detail-actions">
-                      <button class="btn-secondary btn-sm" onclick="assetLink()"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>
-                      <button class="btn btn-sm" onclick="assetRemove()"><i data-lucide="trash-2" class="w-3 h-3"></i>Remove</button>
-                    </div>
-                  </div>
-                </div>
-              </div><!-- /doc-assets -->
+              </div>
 
             </div><!-- /pcard-body -->
           </section>
@@ -2246,7 +2110,7 @@ project CLAUDE.md. Global defaults that travel with you.
               <h3>Prompt</h3>
               <div class="tabset">
                 <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
-                <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Templates</button>
+                <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Library</button>
                 <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
               </div>
             </div>
@@ -2341,7 +2205,6 @@ project CLAUDE.md. Global defaults that travel with you.
             <div class="pcard-foot px-2 py-2.5" id="prompt-actions">
               <div class="flex items-center gap-2">
                 <button class="mic-btn" id="compose-mic" title="Dictate (voice → text)" onclick="toggleMic(this)"><i data-lucide="mic"></i></button>
-                <button class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button>
                 <div class="split split--outline" id="revise-split">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
                   <button class="split-act" title="Revise the draft"><i data-lucide="wand-sparkles"></i></button>
@@ -2360,8 +2223,7 @@ project CLAUDE.md. Global defaults that travel with you.
                   <div class="split-menu split-menu--right">
                     <div class="split-menu-h">When to deliver</div>
                     <button class="split-mi sel" data-short="Now" onclick="pickSplit(this)"><span class="lead"><b>Now</b><span class="sub">Interrupt &amp; deliver immediately</span></span><span class="ck">✓</span></button>
-                    <button class="split-mi" data-short="Inject" onclick="pickSplit(this)"><span class="lead"><b>Inject</b><span class="sub">Deliver to the running agent without stopping it</span></span><span class="ck">✓</span></button>
-                    <button class="split-mi" data-short="Next" onclick="pickSplit(this)"><span class="lead"><b>Next</b><span class="sub">Deliver at the next turn boundary</span></span><span class="ck">✓</span></button>
+                    <button class="split-mi" data-short="Next" onclick="pickSplit(this)"><span class="lead"><b>Next turn</b><span class="sub">Deliver at the next turn boundary</span></span><span class="ck">✓</span></button>
                     <button class="split-mi" data-short="Queue" onclick="pickSplit(this)"><span class="lead"><b>Queue</b><span class="sub">Add to the agent's prompt queue</span></span><span class="ck">✓</span></button>
                   </div>
                 </div>
@@ -2687,8 +2549,6 @@ project CLAUDE.md. Global defaults that travel with you.
 
   /* ===== tabs ===== */
   function switchTab(g,t){
-    /* v1.2: remap stale stored doc tabs (the old Readme/Claude/Todo tabs folded into "Documents") */
-    if(g==='doc'&&!document.getElementById('doc-'+t)){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     document.querySelectorAll('[data-group="'+g+'"]').forEach(p=>p.classList.add('hidden'));
     const pane=document.getElementById(g+'-'+t); if(pane)pane.classList.remove('hidden');
     document.querySelectorAll('[data-tab-group="'+g+'"]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -2753,25 +2613,8 @@ project CLAUDE.md. Global defaults that travel with you.
     if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit';}
     else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check" class="w-3.5 h-3.5"></i>Save';edit.focus();}
     LU();}
-  function docAdd(){/* opens a picker to add another doc to the switcher list — wired in the real build (mock) */}
+  function docAdd(){/* opens a picker to add another doc to organize here — wired in the real build (mock) */}
   function planAct(a){/* edit / approve / reject the selected plan — wired to the runtime in the real build (mock) */}
-
-  /* v1.2: Documents tab — doc-switcher selects which doc fills the shared editor host */
-  function docPick(btn,name){const pane=document.getElementById('doc-documents');if(!pane)return;
-    pane.querySelectorAll('.docnav-row').forEach(r=>r.classList.toggle('on',r===btn));
-    pane.querySelectorAll('.docdoc').forEach(d=>d.classList.toggle('on',d.dataset.doc===name));LU();}
-
-  /* v1.2: Assets tab — thumbnail grid is the nav; a tile drives the preview/action strip.
-     Assets is the single source of truth for media (added here, or attached from a prompt). */
-  function assetPick(tile){const grid=document.getElementById('asset-grid');if(grid)grid.querySelectorAll('.asset-tile').forEach(t=>t.classList.toggle('on',t===tile));
-    const det=document.getElementById('asset-detail');if(det)det.classList.add('on');
-    const nm=document.getElementById('asset-detail-name'),mt=document.getElementById('asset-detail-meta'),th=document.getElementById('asset-detail-thumb');
-    if(nm)nm.textContent=tile.dataset.name||'';if(mt)mt.textContent=tile.dataset.meta||'';
-    const src=tile.querySelector('.asset-thumb');if(th&&src)th.style.background=src.style.background;}
-  function assetPaste(){/* paste an image from the clipboard into the Assets grid — wired in the real build (mock) */}
-  function assetUpload(){/* upload image file(s) into the Assets grid — wired in the real build (mock) */}
-  function assetLink(){/* attach the selected asset to a prompt (reuses the agent target picker) — wired in the real build (mock) */}
-  function assetRemove(){/* remove the selected asset from the library — wired in the real build (mock) */}
 
   function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open').forEach(x=>x.classList.remove('open'));}
 
@@ -2934,9 +2777,6 @@ project CLAUDE.md. Global defaults that travel with you.
 
   /* ===== v8p6: Compose mic (voice dictation, mock) ===== */
   function toggleMic(b){b.classList.toggle('rec');const on=b.classList.contains('rec');b.title=on?'Listening… click to stop':'Dictate (voice → text)';}
-  /* v1.2: attach an asset to the prompt — opens the Library → Assets picker; a newly attached image
-     also registers in the Assets grid (Assets stays the single source of truth). Wired in the real build (mock). */
-  function composeAttach(b){/* mock */}
 
   /* ===== v8p6: Role combobox — options from user/project agent.md files; create-side prefills from front matter ===== */
   const ROLE_DEFS=[
@@ -3106,7 +2946,7 @@ project CLAUDE.md. Global defaults that travel with you.
     else{row.classList.add('rsel');SELby[host]={kind:'line',ref:n,label:'Line '+n};}
     setCmtCtl(host,true);}
   function renderDocView(name){const ta=document.getElementById('doc-'+name+'-edit'),view=document.getElementById('doc-'+name+'-view');if(ta&&view)view.innerHTML=mdEditorHTML('doc-'+name,ta.value);}
-  function renderDocs(){['readme','claude','claudeuser'].forEach(renderDocView);
+  function renderDocs(){['readme','claude'].forEach(renderDocView);
     document.querySelectorAll('[data-cmtfor]').forEach(s=>{s.innerHTML=commentCtlHTML(s.dataset.cmtfor);});LU();}
 
   /* 3-state verdicts (stroke icons, verdict-colored): Approve / Revise / Block */
@@ -3117,9 +2957,8 @@ project CLAUDE.md. Global defaults that travel with you.
   function thumbPick(b){const w=b.closest('.thumbs');if(!w)return;w.querySelectorAll('.thumb').forEach(t=>t.classList.remove('on'));b.classList.add('on');}
   /* a little seeded doc-tab feedback so the rail badges + Feedback flow demo on the file tabs too */
   const DOC_FB={
-    'doc-readme':[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
-    'doc-claude':[],
-    'doc-claudeuser':[]
+    'doc-readme':[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Documentation before Feed so the doc order matches the new reading order.'}],
+    'doc-claude':[]
   };
   function popFor(host){const ed=document.querySelector('[data-edhost="'+host+'"]');return ed?ed.querySelector('.plan-cmt-pop'):null;}
   /* v9p14c: the THREE comment indicators move together — the selected feedback card (teal fill), its

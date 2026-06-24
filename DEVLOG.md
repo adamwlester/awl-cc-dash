@@ -245,6 +245,54 @@ Follow-up to the entry above. Ran one full-suite pass with the user keyboard-idl
 
 Files: (none — verification only)
 
+### 2026-06-24 03:55:00 — design/TODO.md: filed one new Loose note into section A
+
+Filed the new Loose note into **A — Next up** as A9 (**Remove Doc Todo Tab** — remove the "Todo" tab from the Documentation panel, leaving Plan · Readme · Claude); disambiguated "Todo tab" to the `data-tab="todo"` button in `mockup.html`, then cleared the Loose-notes bucket.
+
+Files: design/TODO.md
+
+### 2026-06-24 04:05:00 — design/TODO.md: restructured — "Next up" is now an unlettered action queue
+
+Reworked how the doc operates. **Next up** moved out of the A–E effort scheme to its own unlettered section placed right above the capture bucket, and given an instruction block: agents directed there implement each item and delete it once done — building in `mockup.html`, working from `DESIGN.md` + `tokens.css`, keeping `DESIGN.md` in sync (or confirming no change needed). Relettered the backlog Quick wins/Big picture/Needs-research/Housekeeping B–E → **A–D** and updated the cross-refs (C6→B6, C12→B12, C17→B17). Renamed **Loose notes → Inbox**. Updated the intro warning (backlog reference-only; Next up is the actionable exception) and the "How agents maintain this list" Numbering/Group-by-effort/Inbox guidance to match. The 9 queued items and all backlog/Scratch content carried over verbatim.
+
+Files: design/TODO.md
+
+### 2026-06-24 11:30:00 — design/mockup.html: v1.1 — implemented the 9 "Next up" items + DESIGN.md sync
+
+Built all nine queued items in the mockup (now **v1.1**, version scheme reset from v9p14): (1) graph-card status bars reordered to **Ctx over Turns**; (2) right panel renamed back to **Team Feed**; (3) **Save setup / Load removed from the footer** (that flow lives in Settings → Setups; token pill + clock remain); (4) **Setups** is now the first and default-shown Settings tab; (5) the **Opus fast-mode / Thinking-mode toggles are inline** (side-by-side 2-col grid like the Color/Icon pickers, in Details + Create) with a new `.tog-cell` rule (ellipsis on narrow); (6) the **idle status badge** is now a solid `--muted` slate fill with white text, matching active/pending; (7) the **title-bar version badge reads v1.1**; (8) the bottom **"Token Palette" reference legend removed** (`.ref-section` block + its CSS — values live in `tokens.css`); (9) the Documentation **"Todo" tab removed** (Plan · Readme · Claude remain; pruned its pane, the `renderDocs` loop, and `DOC_FB` entry). Synced **DESIGN.md** for items 1, 3, 4, 5, 6, 8, 9 (the layout schematic, panel/Settings/doc-tab prose, status-badge spec, and the Palette-Reference mentions). Removed the nine items from TODO.md → Next up. Verified in the rendered browser (served over http): 0 JS errors, all 13 cards read Ctx→Turns with correctly-paired values, Settings opens to Setups, toggles fit at default and ellipsis-truncate without spill at a 240px narrow extreme, idle badge computed `rgb(91,95,134)`/white, doc tabs switch cleanly with no Todo remnants. (Caught and repaired a malformed first-pass regex swap that had crossed the card bar values.)
+
+Files: design/mockup.html, design/DESIGN.md, design/TODO.md
+
+### 2026-06-24 11:45:00 — design/TODO.md: moved Next-up instructions into the maintenance section + anti-placeholder rule
+
+Relocated the long **Next up** implementation steps (build in `mockup.html`; work from `DESIGN.md`+`tokens.css`; keep `DESIGN.md` in sync; remove + DEVLOG when done) into "How agents maintain this list" as a numbered **Next up — implementing items** block, leaving the Next up section itself a one-line helper that points back to it. Added a **"Leave empty sections empty"** rule forbidding placeholder/"(empty)"/status/changelog notes in empty sections — and removed the stray `_(Empty — the v1.1 batch …)_` line a prior pass had left in Next up (that history lives here in DEVLOG).
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 04:57:37 — design/TODO.md: queued send-trigger "Inject" + "Next turn"→"Next" rename in Next up
+
+Promoted two approved send-trigger changes into the **Next up** action queue: add an **Inject** option directly after "Now" in the split menu (one-shot steering message that feeds a running agent without stopping it — established model only, not the B12 dynamic-doc approach), and rename **"Next turn" → "Next"** to match the sibling `.seg` control. Filed and cleared the matching Inbox note ("Change the send option from 'Next turn' to…"). Nothing built yet — these are queued items, not mockup changes.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 04:59:15 — design/TODO.md: queued Documentation→Library panel rework in Next up
+
+Added four coordinated **Next up** items (3–6) for the Documentation-panel rework agreed in discussion: rename the panel **Documentation → Library** with tabs **Plan · Documents · Assets**; collapse Readme + Claude into one **Documents** tab that reuses the existing doc editor plus a doc-switcher (icon · name · path; defaults README + project & user `CLAUDE.md`); a new **Assets** tab (thumbnail-grid nav, paste/upload, link-to-prompt) as the single source of truth for media; and in Prompts, rename the **Library** tab → **Templates** and add a paperclip **attach** button after the mic on Compose + Templates. Nothing built yet — queued items only. Left the originating rough notes in TODO's Scratch section untouched (human's space).
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 05:20:13 — Library panel rework + send-trigger Inject: built all 6 "Next up" items
+
+Implemented the queued Documentation→Library rework in `design/mockup.html` and synced `design/DESIGN.md`. **Send menu:** added **Inject** after Now and renamed **Next turn → Next**. **Panel:** Documentation → **Library**, tabs now **Plan · Documents · Assets**. **Documents tab** folds the old Readme/Claude tabs into one, driven by a new left **doc-switcher** (icon · name · path; defaults README + project & user `CLAUDE.md`) that swaps docs through the *existing* shared editor — added a user-level `CLAUDE.md` and a `docPick()` handler; `renderDocs()` now covers `claudeuser`; `switchTab` remaps stale stored `readme`/`claude` tabs so returning users don't hit a blank pane. **Assets tab** is new: a thumbnail grid (gradient placeholders) with Paste/Upload + a selected-tile preview/action strip (Link to prompt · Remove), via `assetPick()`/mock handlers. **Prompts:** the **Library** tab is renamed **Templates** and a paperclip **attach** button sits after the mic (Compose + Templates, hidden on History). Verified in-browser at wide (1600) + narrow (1120) extremes — tab switches, doc-switcher, asset selection, send menu (Now·Inject·Next·Queue), and attach visibility all correct; grid reflows 4→3 cols; console clean. Removed all 6 items from TODO's Next up (now empty).
+
+Files: design/mockup.html, design/DESIGN.md, design/TODO.md
+
 ---
 
 ## Archived history

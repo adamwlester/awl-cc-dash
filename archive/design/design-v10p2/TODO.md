@@ -100,6 +100,9 @@
 
 > Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement and remove each item per the **Next up** steps in "How agents maintain this list." Empty by design when nothing is queued.
 
+1. **Send Trigger "Inject":** Add an **Inject** option to the send-trigger split menu (`design/mockup.html`, the `.split-mi` list around line 2225), positioned directly **after "Now"**. Inject feeds a *running* agent without stopping it — a one-shot message applied at the next safe boundary (between tool calls / steering), distinct from "Now" which interrupts. Sub-label along the lines of "Deliver to the running agent without stopping it." Go with the established one-shot injected-message model only — not the shared dynamic-doc approach (that's the separate B12). Related backlog: B11.
+2. **Rename "Next turn" → "Next":** In the same send-trigger split menu, change the **"Next turn"** label to just **"Next"** (keep its sub-label). Note the sibling `.seg` control around line 1798 already uses "Next", so this aligns the two.
+
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.

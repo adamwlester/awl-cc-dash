@@ -3,20 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AWL Multi-Agent Dashboard — v1.1 (neobrutalism)</title>
+  <title>AWL Multi-Agent Dashboard — v9p14 (neobrutalism)</title>
   <!--
-    v1.1 — TODO.md "Next up" batch (9 items); version scheme reset to v1.1:
-      • GRAPH CARDS: the two status bars now read Ctx (top) then Turns (below) — order reversed.
-      • PANELS/LABELS: the right-column panel is "Team Feed" again; the title-bar version badge reads v1.1.
-      • FOOTER: the Save setup / Load buttons are removed (that flow lives in Settings → Setups); the token
-        pill + clock remain.
-      • SETTINGS: the Setups tab is now first and the default-shown tab (Setups · Usage · MCP · Plugins · Config).
-      • AGENT PANEL: the Opus fast-mode / Thinking-mode toggles sit INLINE (side by side, one 2-col grid)
-        like the Color/Icon pickers, in both Details and Create.
-      • IDLE BADGE: the graph-card idle status badge is now a solid --muted (slate) fill with white text,
-        matching the active/pending badges.
-      • REMOVED: the bottom "Token Palette" reference legend (.ref-section + its CSS) — values live in tokens.css.
-      • DOCS: the Documentation panel's "Todo" tab is removed (Plan · Readme · Claude remain).
     v9p14 — Plan-card layout/resize fixes, agent-card + panel turns bars, labels, badges, panel delineation:
       • PLAN NAV (A1+A6): the nav is now a flex column that STRETCHES to the text column's height, so when
         the comment interface opens the nav grows with it (cards no longer clipped — verified 358→487px);
@@ -718,6 +706,22 @@
     .plan-card.plan-flash{ animation:planFlash 1s ease; }
     @keyframes planFlash{ 0%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} 25%{ box-shadow:0 0 0 4px var(--secondary);} 100%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} }
 
+    /* ============================ palette reference (NOT part of UI) ============================ */
+    .ref-section{ background:var(--secondary-background); color:var(--foreground); margin:22px; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:18px 24px 24px; }
+    .ref-disclaimer{ display:flex; align-items:center; justify-content:center; gap:8px; max-width:1200px; margin:0 auto 14px; padding:8px 14px; border:2px dashed var(--danger); border-radius:var(--radius-base); background:var(--danger-soft); color:var(--danger); font-size:11px; font-weight:800; text-align:center; }
+    .ref-heading{ display:flex; align-items:center; justify-content:center; gap:12px; font-size:11px; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+    .ref-heading .rule{ width:48px; height:2px; background:var(--border); }
+    .ref-grid{ max-width:1200px; margin:0 auto; }
+    .ref-group{ display:grid; grid-template-columns:130px 1fr; gap:16px; align-items:start; padding:11px 0; border-bottom:2px solid var(--rule); }
+    .ref-group:last-child{ border-bottom:none; }
+    .ref-group-label{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--foreground); padding-top:4px; }
+    .ref-chips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px 14px; }
+    .ref-chip{ display:flex; align-items:center; gap:9px; }
+    .ref-sw{ width:28px; height:28px; border:2px solid var(--border); border-radius:3px; flex:0 0 auto; }
+    .ref-meta{ display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+    .ref-hex{ font-size:10.5px; font-family:'JetBrains Mono',monospace; font-weight:600; }
+    .ref-name{ font-size:9.5px; color:var(--muted); font-weight:700; }
+
     /* ============================ v8p6 — thinking toggle (inline, trailing the Mode group) ============================ */
     .think-tog{ display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; height:30px; padding:0 10px; font-size:9.5px; font-weight:800;
       text-transform:uppercase; letter-spacing:0.03em; border:2px solid var(--border); border-radius:var(--radius-base);
@@ -726,11 +730,8 @@
     .think-tog:hover{ transform:translate(2px,2px); box-shadow:none; }
     .think-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }
     .think-tog svg{ width:12px; height:12px; }
-    /* v1.1: the two mode toggles sit inline (side by side, one 2-col grid) like the Color/Icon pickers.
-       Each fills its cell; the long state label shrinks to fit the narrow Agent-panel half-width. */
-    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:5px; padding:0 6px; min-width:0; }
-    .think-tog.tog-cell .tt-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
-    .think-tog.tog-cell svg{ flex:0 0 auto; }
+    /* v9p14: full-width stacked toggles so the longer "Opus fast-mode" / "Thinking mode" labels fit in the narrow Agent panel */
+    .think-tog.tog-wide{ width:100%; flex:0 0 auto; justify-content:flex-start; gap:7px; }
 
     /* ============================ v8p6 — Team Graph status badge (replaces .node-dot) ============================ */
     .node-badge{ position:absolute; top:-8px; right:-8px; z-index:3; display:inline-flex; align-items:center;
@@ -740,7 +741,7 @@
     .node-badge:hover{ transform:translate(1px,1px); box-shadow:none; }
     .nb-pending{ background:var(--warning); color:#fff; }
     .nb-active{ background:var(--success); color:#fff; }
-    .nb-idle{ background:var(--muted); color:#fff; }   /* v1.1: solid slate-gray fill + white text, matching the active/pending badges */
+    .nb-idle{ background:var(--surface-3); color:var(--muted); }
     .node-think{ font-weight:800; } /* thinking on/off chip inside node-meta */
 
     /* ============================ v8p6 — combobox (single-select + custom text) — Role ============================ */
@@ -845,47 +846,6 @@
     .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
     .doc-view .doc-hr{ border:none; border-top:2px solid var(--rule); margin:12px 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.55; }
-
-    /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
-    .docdoc{ display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
-    .docdoc.on{ display:flex; }
-    .docmain{ min-width:0; }
-    /* doc-switcher: icon · name · path (path disambiguates project vs user CLAUDE.md) */
-    .docnav{ flex:0 0 162px; display:flex; flex-direction:column; gap:4px; overflow-y:auto;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:5px; }
-    .docnav-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; cursor:pointer;
-      padding:6px 7px; border:2px solid transparent; border-radius:var(--radius-base); background:transparent; }
-    .docnav-row:hover{ background:var(--surface-3); }
-    .docnav-row.on{ background:var(--select); border-color:var(--border); }
-    .docnav-ic{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); }
-    .docnav-row.on .docnav-ic{ color:var(--foreground); }
-    .docnav-lab{ display:flex; flex-direction:column; gap:1px; min-width:0; }
-    .docnav-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .docnav-path{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .docnav-add{ display:flex; align-items:center; gap:5px; margin-top:auto; padding:6px 7px; font-size:10px; font-weight:800;
-      color:var(--muted); cursor:pointer; border:2px dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; }
-    .docnav-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--surface-3); }
-    .docnav-add svg{ width:13px; height:13px; }
-
-    /* ---- Library: Assets tab — thumbnail grid IS the nav, + selected-asset detail strip ---- */
-    .asset-grid{ flex:1 1 auto; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:9px; align-content:start; padding:2px; }
-    .asset-tile{ display:flex; flex-direction:column; gap:5px; cursor:pointer; text-align:left;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:5px;
-      transition:transform .07s, box-shadow .07s; }
-    .asset-tile:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .asset-tile.on{ outline:3px solid var(--ring); outline-offset:1px; }
-    .asset-thumb{ display:flex; align-items:center; justify-content:center; aspect-ratio:4/3; border:2px solid var(--border); border-radius:3px; color:var(--icon-fg); }
-    .asset-thumb svg{ width:22px; height:22px; opacity:.85; }
-    .asset-name{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .asset-detail{ flex:0 0 auto; display:none; align-items:center; gap:11px; margin-top:9px; padding:9px;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); }
-    .asset-detail.on{ display:flex; }
-    .asset-detail-thumb{ display:flex; align-items:center; justify-content:center; width:64px; height:48px; flex:0 0 auto; border:2px solid var(--border); border-radius:3px; color:var(--icon-fg); }
-    .asset-detail-thumb svg{ width:20px; height:20px; opacity:.85; }
-    .asset-detail-info{ min-width:0; display:flex; flex-direction:column; gap:3px; }
-    .asset-detail-name{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:800; color:var(--foreground); }
-    .asset-detail-meta{ font-size:9.5px; font-weight:600; color:var(--muted); }
-    .asset-detail-actions{ display:flex; gap:6px; margin-top:2px; }
 
     /* ============================ v8p7 — Source dropdown (single-select, shows active selection) ============================ */
     .src-dd{ position:relative; }
@@ -1424,7 +1384,7 @@
   <header class="topbar">
     <div class="flex items-center gap-3 min-w-0">
       <span class="text-[13px] font-heading text-main-foreground tracking-tight" style="font-weight:900">AWL Multi-Agent Dashboard</span>
-      <span class="chip" style="font-family:'JetBrains Mono',monospace">v1.1</span>
+      <span class="chip" style="font-family:'JetBrains Mono',monospace">v8.5</span>
       <span class="text-[11px] font-bold text-main-foreground/80">13 agents</span>
     </div>
     <div class="flex items-center gap-2">
@@ -1546,9 +1506,9 @@
             <div>
               <label class="ro-label block mb-1.5">Mode</label>
               <div class="seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
-              <div class="grid grid-cols-2 gap-2 mt-2">
-                <button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button>
-                <button class="think-tog tog-cell on" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode on</span></button>
+              <div class="flex flex-col gap-2 mt-2">
+                <button class="think-tog tog-wide" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button>
+                <button class="think-tog tog-wide on" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode on</span></button>
               </div>
             </div>
 
@@ -1655,7 +1615,7 @@
               <div class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode off</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="flex flex-col gap-2 mt-2"><button class="think-tog tog-wide" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button><button class="think-tog tog-wide" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode off</span></button></div></div>
             <div><label class="ro-label block mb-1.5">Effort</label><div class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
@@ -1695,8 +1655,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">62%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">62%</span></div>
                     </div>
                     <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-emerald)" title="sub-1 (working)">1</div><div class="submini" style="color:var(--ag-emerald);opacity:.5" title="sub-2 (idle)">2</div></div>
                   </div>
@@ -1706,8 +1666,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">synthesizer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 kai</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:34%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">34%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:24%;background:var(--success)"></i></div><span class="nbv">12/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:34%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">34%</span></div>
                     </div>
                   </div>
 
@@ -1716,8 +1676,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">auditor</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:12%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">12%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:12%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">12%</span></div>
                     </div>
                   </div>
 
@@ -1726,8 +1686,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">coder</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 max</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:48%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">48%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="nbv">22/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:48%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">48%</span></div>
                     </div>
                     <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-amber)" title="sub-1 (working)">1</div></div>
                   </div>
@@ -1737,8 +1697,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">02 rowan</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:71%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">71%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:82%;background:var(--danger)"></i></div><span class="nbv">41/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:71%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">71%</span></div>
                     </div>
                   </div>
 
@@ -1747,8 +1707,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">tester</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 nova</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:5%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">5%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:6%;background:var(--success)"></i></div><span class="nbv">3/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:5%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">5%</span></div>
                     </div>
                   </div>
 
@@ -1757,8 +1717,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">reviewer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:88%;background:var(--danger)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">88%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:94%;background:var(--danger)"></i></div><span class="nbv">47/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:88%;background:var(--danger)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">88%</span></div>
                     </div>
                   </div>
 
@@ -1767,8 +1727,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">planner</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 quinn</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:22%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">22%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="nbv">9/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:22%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">22%</span></div>
                     </div>
                   </div>
 
@@ -1777,8 +1737,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">docs</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 wren</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">56%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i></div><span class="nbv">28/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">56%</span></div>
                     </div>
                   </div>
 
@@ -1787,8 +1747,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">designer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 lex</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">41%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:38%;background:var(--success)"></i></div><span class="nbv">19/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">41%</span></div>
                     </div>
                     <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-magenta)" title="sub-1 (working)">1</div></div>
                   </div>
@@ -1798,8 +1758,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">ops</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:67%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">67%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:72%;background:var(--warning)"></i></div><span class="nbv">36/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:67%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">67%</span></div>
                     </div>
                   </div>
 
@@ -1808,8 +1768,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">analyst</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 io</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:29%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">29%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:28%;background:var(--success)"></i></div><span class="nbv">14/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:29%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">29%</span></div>
                     </div>
                   </div>
 
@@ -1818,8 +1778,8 @@
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">scribe</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 fen</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
-                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:14%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">14%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:14%;background:var(--success)"></i></div><span class="nbv">7/50</span></div>
+                      <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:14%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">14%</span></div>
                     </div>
                   </div>
 
@@ -1856,11 +1816,13 @@
           <!-- DOCUMENTATION (v9p7 A3) -->
           <section class="rz-panel" id="pDocs" style="flex:1 1 44%; min-height:150px">
             <div class="pcard-head">
-              <h3>Library</h3>
+              <h3>Documentation</h3>
               <div class="tabset">
                 <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plan</button>
-                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents</button>
-                <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
+                <button data-tab-group="doc" data-tab="todo" onclick="switchTab('doc','todo')" class="tab-btn">Todo</button>
+                <button data-tab-group="doc" data-tab="readme" onclick="switchTab('doc','readme')" class="tab-btn">Readme</button>
+                <button data-tab-group="doc" data-tab="claude" onclick="switchTab('doc','claude')" class="tab-btn">Claude</button>
+                <button class="doc-add" title="Add a document to organize here" onclick="docAdd()"><i data-lucide="plus"></i></button>
               </div>
             </div>
             <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
@@ -1875,42 +1837,17 @@
                 <div id="plan-list" class="flex flex-col gap-2"></div>
               </div>
 
-              <!-- DOCUMENTS — all project docs in one tab, switched via the left doc-nav.
-                   Reuses the shared doc editor (toolbar + line-numbered view + rail); the nav lists
-                   each doc as icon · name · path (path disambiguates project vs user CLAUDE.md). -->
-              <div id="doc-documents" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
-
-                <!-- doc-switcher rail -->
-                <nav class="docnav">
-                  <button class="docnav-row on" data-doc="readme" onclick="docPick(this,'readme')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">README.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claude" onclick="docPick(this,'claude')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claudeuser" onclick="docPick(this,'claudeuser')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">~/.claude/</span></span>
-                  </button>
-                  <button class="docnav-add" title="Add a document to organize here" onclick="docAdd()"><i data-lucide="plus"></i>Add document</button>
-                </nav>
-
-                <!-- editor host — one doc visible at a time -->
-                <div class="docmain flex-1 min-h-0 flex flex-col">
-
-                  <!-- README.md -->
-                  <div class="docdoc on" data-doc="readme">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/README.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-readme"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'readme')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-readme-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
+              <!-- README.md -->
+              <div id="doc-readme" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
+                <div class="doc-toolbar">
+                  <span class="doc-path">agent-dashboard/README.md</span>
+                  <span class="flex-1"></span>
+                  <span class="doc-cmt-slot" data-cmtfor="doc-readme"></span>
+                  <button class="btn doc-edit-btn" onclick="docEdit(this,'readme')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
+                  <button class="ghost-ic" title="Copy" onclick="copyField('doc-readme-edit')"><i data-lucide="copy"></i></button>
+                </div>
+                <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
+                <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
 
 A control surface for running and supervising a team of Claude Code agents
 from one window. Watch the team, steer each agent, and review their work
@@ -1919,26 +1856,26 @@ without leaving the dashboard.
 ## The five panels
 - **Agent** — inspect & configure the selected agent.
 - **Team Graph** — every agent as a live card.
-- **Library** — plans + project docs (README, CLAUDE) and reference assets.
+- **Documentation** — plans + project docs (README, CLAUDE, TODO).
 - **Feed** — messages, scratchpad, log, inbox.
 - **Prompts** — compose and dispatch prompts.
 
 ## Design system
 Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
 single pink-to-teal emphasis ladder.</textarea>
-                  </div>
+              </div>
 
-                  <!-- CLAUDE.md (project) -->
-                  <div class="docdoc" data-doc="claude">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claude"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claude')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claude-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
+              <!-- CLAUDE.md -->
+              <div id="doc-claude" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
+                <div class="doc-toolbar">
+                  <span class="doc-path">CLAUDE.md</span>
+                  <span class="flex-1"></span>
+                  <span class="doc-cmt-slot" data-cmtfor="doc-claude"></span>
+                  <button class="btn doc-edit-btn" onclick="docEdit(this,'claude')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
+                  <button class="ghost-ic" title="Copy" onclick="copyField('doc-claude-edit')"><i data-lucide="copy"></i></button>
+                </div>
+                <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
+                <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
 
 Project instructions loaded into every agent's context. Keep it short — it is
 spent context on every turn.
@@ -1952,78 +1889,32 @@ the AWL multi-agent dashboard.
 - Keep DEVLOG.md current — an unlogged change never happened.
 - Write transient artifacts into .scratch/, never the repo root.
 - Preserve everything you weren't asked to change.</textarea>
-                  </div>
+              </div>
 
-                  <!-- CLAUDE.md (user-level) -->
-                  <div class="docdoc" data-doc="claudeuser">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">~/.claude/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claudeuser"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claudeuser')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claudeuser-edit')"><i data-lucide="copy"></i></button>
-                    </div>
-                    <div class="doc-view-host" id="doc-claudeuser-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claudeuser-edit" style="display:none"># CLAUDE.md
-
-User-level instructions loaded into every project's context, on top of the
-project CLAUDE.md. Global defaults that travel with you.
-
-## Working style
-- Be direct, practical, low-ceremony. Lead with action.
-- Prefer dedicated tools over ad-hoc shell for file search and edits.
-- Write generated artifacts outside any repo, under a scratch path.
-
-## Conventions
-- Use markdown links for file references, not bare paths.
-- Match the project's existing patterns before introducing new ones.</textarea>
-                  </div>
-
-                </div><!-- /docmain -->
-              </div><!-- /doc-documents -->
-
-              <!-- ASSETS — reference images; the thumbnail grid IS the nav. Paste + upload to add;
-                   selecting a tile reveals a preview + per-asset actions (link-to-prompt, remove). -->
-              <div id="doc-assets" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
+              <!-- TODO.md -->
+              <div id="doc-todo" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
                 <div class="doc-toolbar">
-                  <span class="doc-path">project assets · 4 images</span>
+                  <span class="doc-path">TODO.md</span>
                   <span class="flex-1"></span>
-                  <button class="btn doc-edit-btn" onclick="assetPaste()"><i data-lucide="clipboard" class="w-3.5 h-3.5"></i>Paste</button>
-                  <button class="btn doc-edit-btn" onclick="assetUpload()"><i data-lucide="upload" class="w-3.5 h-3.5"></i>Upload</button>
+                  <span class="doc-cmt-slot" data-cmtfor="doc-todo"></span>
+                  <button class="btn doc-edit-btn" onclick="docEdit(this,'todo')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
+                  <button class="ghost-ic" title="Copy" onclick="copyField('doc-todo-edit')"><i data-lucide="copy"></i></button>
                 </div>
+                <div class="doc-view-host" id="doc-todo-view" style="flex:1 1 auto;min-height:0"></div>
+                <textarea class="doc-edit in" id="doc-todo-edit" style="display:none"># TODO.md
 
-                <div class="asset-grid" id="asset-grid">
-                  <button class="asset-tile on" data-name="mockup-v9.png" data-meta="PNG · 1840×1120 · 412 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">mockup-v9.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="palette-ref.png" data-meta="PNG · 1200×800 · 188 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-violet),var(--ag-azure))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">palette-ref.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="graph-sketch.jpg" data-meta="JPG · 1024×768 · 96 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-amber),var(--ag-gold))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">graph-sketch.jpg</span>
-                  </button>
-                  <button class="asset-tile" data-name="inbox-flow.png" data-meta="PNG · 1600×900 · 274 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">inbox-flow.png</span>
-                  </button>
-                </div>
+## Next up
+- [ ] Context-cutoff shading on the usage bars
+- [ ] Turns on its own line in the Team Graph card
+- [ ] Documentation panel (Plan + README/CLAUDE/TODO)
+- [ ] Layout reflow: Agent / Team Graph / Documentation / Feed / Prompts
 
-                <!-- selected-asset preview + actions -->
-                <div class="asset-detail on" id="asset-detail">
-                  <span class="asset-detail-thumb" id="asset-detail-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                  <div class="asset-detail-info">
-                    <div class="asset-detail-name" id="asset-detail-name">mockup-v9.png</div>
-                    <div class="asset-detail-meta" id="asset-detail-meta">PNG · 1840×1120 · 412 KB</div>
-                    <div class="asset-detail-actions">
-                      <button class="btn-secondary btn-sm" onclick="assetLink()"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>
-                      <button class="btn btn-sm" onclick="assetRemove()"><i data-lucide="trash-2" class="w-3 h-3"></i>Remove</button>
-                    </div>
-                  </div>
-                </div>
-              </div><!-- /doc-assets -->
+## Quick wins
+- [ ] Output export beyond per-card copy
+- [ ] Jump-to-start / jump-to-end on each feed
+
+Full backlog: docs/human-notes-misc.md</textarea>
+              </div>
 
             </div><!-- /pcard-body -->
           </section>
@@ -2040,7 +1931,7 @@ project CLAUDE.md. Global defaults that travel with you.
           <!-- FEED -->
           <section class="rz-panel" id="pFeed" style="flex:1 1 52%; min-height:160px">
         <div class="pcard-head">
-          <h3>Team Feed</h3>
+          <h3>Feed</h3>
           <div class="tabset">
             <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
@@ -2246,7 +2137,7 @@ project CLAUDE.md. Global defaults that travel with you.
               <h3>Prompt</h3>
               <div class="tabset">
                 <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
-                <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Templates</button>
+                <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Library</button>
                 <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
               </div>
             </div>
@@ -2341,7 +2232,6 @@ project CLAUDE.md. Global defaults that travel with you.
             <div class="pcard-foot px-2 py-2.5" id="prompt-actions">
               <div class="flex items-center gap-2">
                 <button class="mic-btn" id="compose-mic" title="Dictate (voice → text)" onclick="toggleMic(this)"><i data-lucide="mic"></i></button>
-                <button class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button>
                 <div class="split split--outline" id="revise-split">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
                   <button class="split-act" title="Revise the draft"><i data-lucide="wand-sparkles"></i></button>
@@ -2360,8 +2250,7 @@ project CLAUDE.md. Global defaults that travel with you.
                   <div class="split-menu split-menu--right">
                     <div class="split-menu-h">When to deliver</div>
                     <button class="split-mi sel" data-short="Now" onclick="pickSplit(this)"><span class="lead"><b>Now</b><span class="sub">Interrupt &amp; deliver immediately</span></span><span class="ck">✓</span></button>
-                    <button class="split-mi" data-short="Inject" onclick="pickSplit(this)"><span class="lead"><b>Inject</b><span class="sub">Deliver to the running agent without stopping it</span></span><span class="ck">✓</span></button>
-                    <button class="split-mi" data-short="Next" onclick="pickSplit(this)"><span class="lead"><b>Next</b><span class="sub">Deliver at the next turn boundary</span></span><span class="ck">✓</span></button>
+                    <button class="split-mi" data-short="Next" onclick="pickSplit(this)"><span class="lead"><b>Next turn</b><span class="sub">Deliver at the next turn boundary</span></span><span class="ck">✓</span></button>
                     <button class="split-mi" data-short="Queue" onclick="pickSplit(this)"><span class="lead"><b>Queue</b><span class="sub">Add to the agent's prompt queue</span></span><span class="ck">✓</span></button>
                   </div>
                 </div>
@@ -2397,6 +2286,8 @@ project CLAUDE.md. Global defaults that travel with you.
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warning);border:2px solid var(--border)"></span>4 pending</span>
     </div>
     <div class="flex items-center gap-2">
+      <button class="btn btn-sm" title="Save this session's agents &amp; links — full detail in Settings → Setups" onclick="openSettings('setups')"><i data-lucide="download" class="w-3 h-3"></i>Save setup</button>
+      <button class="btn btn-sm" title="Load a saved session — full detail in Settings → Setups" onclick="openSettings('setups')"><i data-lucide="inbox" class="w-3 h-3"></i>Load</button>
       <span class="tok-pill" title="Token usage — full detail in Settings → Usage" style="cursor:pointer" onclick="openSettings('usage')">Σ 1.42M tokens</span>
       <span class="text-[10px] font-mono font-semibold text-muted">02:14:08</span>
     </div>
@@ -2407,11 +2298,11 @@ project CLAUDE.md. Global defaults that travel with you.
     <div class="set-head">
       <span class="set-title"><i data-lucide="settings"></i>Settings</span>
       <div class="set-tabs">
-        <button class="tab-btn active" data-set-tab="setups" onclick="settingsTab('setups')">Setups</button>
-        <button class="tab-btn" data-set-tab="usage" onclick="settingsTab('usage')">Usage</button>
+        <button class="tab-btn active" data-set-tab="usage" onclick="settingsTab('usage')">Usage</button>
         <button class="tab-btn" data-set-tab="mcp" onclick="settingsTab('mcp')">MCP</button>
         <button class="tab-btn" data-set-tab="plugins" onclick="settingsTab('plugins')">Plugins</button>
         <button class="tab-btn" data-set-tab="config" onclick="settingsTab('config')">Config</button>
+        <button class="tab-btn" data-set-tab="setups" onclick="settingsTab('setups')">Setups</button>
       </div>
       <button class="btn set-close" onclick="closeSettings()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
     </div>
@@ -2419,7 +2310,7 @@ project CLAUDE.md. Global defaults that travel with you.
       <div class="set-wrap">
 
         <!-- ========== USAGE ========== -->
-        <div class="set-pane" id="set-usage">
+        <div class="set-pane active" id="set-usage">
           <div class="set-note"><i data-lucide="info"></i><span>Plan, limits, and token consumption — the <b>/stats</b> · <b>/status</b> surface. Usage only; per-agent cost/dollar spend is deliberately out of scope.</span></div>
 
           <div class="set-sec">
@@ -2655,8 +2546,8 @@ project CLAUDE.md. Global defaults that travel with you.
         </div>
 
         <!-- ========== SETUPS ========== -->
-        <div class="set-pane active" id="set-setups">
-          <div class="set-note"><i data-lucide="info"></i><span>Save &amp; load a full dashboard setup — its agents and the links between them. The full list lives here.</span></div>
+        <div class="set-pane" id="set-setups">
+          <div class="set-note"><i data-lucide="info"></i><span>Save &amp; load a full dashboard setup — its agents and the links between them. The footer keeps a glanceable Save/Load shortcut; the full list lives here.</span></div>
 
           <div class="set-sec">
             <div class="set-sec-h"><span class="nm"><i data-lucide="download"></i>Save current setup</span><span class="set-kind edit">Editable</span></div>
@@ -2681,14 +2572,68 @@ project CLAUDE.md. Global defaults that travel with you.
   </div>
   </div><!-- /.app -->
 
+  <!-- ===================== PALETTE REFERENCE (design legend — NOT part of the UI) ===================== -->
+  <div class="ref-section">
+    <div class="ref-heading"><span class="rule"></span>Token Palette<span class="rule"></span></div>
+    <div class="ref-disclaimer">⚠ Design reference only — this legend is NOT part of the dashboard UI. Do not render it inside the app.</div>
+    <div class="ref-grid">
+      <div class="ref-group">
+        <div class="ref-group-label">Core tokens</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--background)"></div><div class="ref-meta"><span class="ref-hex">#fef6e4</span><span class="ref-name">--background (canvas)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary-background)"></div><div class="ref-meta"><span class="ref-hex">#ffffff</span><span class="ref-name">--secondary-background (cards)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--surface-3)"></div><div class="ref-meta"><span class="ref-hex">#f5ecd9</span><span class="ref-name">--surface-3 (chrome/headers)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--surface-btn)"></div><div class="ref-meta"><span class="ref-hex">#fbf5e8</span><span class="ref-name">--surface-btn (low-emphasis buttons)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--border)"></div><div class="ref-meta"><span class="ref-hex">#001858</span><span class="ref-name">--border / --foreground</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--main)"></div><div class="ref-meta"><span class="ref-hex">#f582ae</span><span class="ref-name">--main (PRIMARY: main action · tab · badge · title)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary)"></div><div class="ref-meta"><span class="ref-hex">#8bd3dd</span><span class="ref-name">--secondary (SECONDARY: tonal action · active value)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--select)"></div><div class="ref-meta"><span class="ref-hex">#a9dde7</span><span class="ref-name">--select (secondary container: selection fill)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--main-dim)"></div><div class="ref-meta"><span class="ref-hex">#f9b9d2</span><span class="ref-name">--main-dim (Send chip — light pink)</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--secondary-dim)"></div><div class="ref-meta"><span class="ref-hex">#bfe6ec</span><span class="ref-name">--secondary-dim (Revise chip — light teal)</span></div></div>
+        </div>
+      </div>
+      <div class="ref-group">
+        <div class="ref-group-label">Semantic + signal</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--success)"></div><div class="ref-meta"><span class="ref-hex">#2f9e6f</span><span class="ref-name">success / active</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--warning)"></div><div class="ref-meta"><span class="ref-hex">#d98a2b</span><span class="ref-name">warning / pending</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--danger)"></div><div class="ref-meta"><span class="ref-hex">#d23b6a</span><span class="ref-name">danger</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-permission)"></div><div class="ref-meta"><span class="ref-hex">#d23b4a</span><span class="ref-name">req · permission</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-approval)"></div><div class="ref-meta"><span class="ref-hex">#cf7a2c</span><span class="ref-name">req · approval</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--req-decision)"></div><div class="ref-meta"><span class="ref-hex">#a9710f</span><span class="ref-name">req · decision</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-user)"></div><div class="ref-meta"><span class="ref-hex">#7b7fa6</span><span class="ref-name">--ag-user / idle</span></div></div>
+        </div>
+      </div>
+      <div class="ref-group">
+        <div class="ref-group-label">Agent identity</div>
+        <div class="ref-chips">
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-crimson)"></div><div class="ref-meta"><span class="ref-hex">#aa3a61</span><span class="ref-name">crimson</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-vermilion)"></div><div class="ref-meta"><span class="ref-hex">#af3c3a</span><span class="ref-name">vermilion</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-amber)"></div><div class="ref-meta"><span class="ref-hex">#aa4600</span><span class="ref-name">amber</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-gold)"></div><div class="ref-meta"><span class="ref-hex">#9d5400</span><span class="ref-name">gold</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-citron)"></div><div class="ref-meta"><span class="ref-hex">#876300</span><span class="ref-name">citron</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-lime)"></div><div class="ref-meta"><span class="ref-hex">#687100</span><span class="ref-name">lime</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-fern)"></div><div class="ref-meta"><span class="ref-hex">#387b12</span><span class="ref-name">fern</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-emerald)"></div><div class="ref-meta"><span class="ref-hex">#008149</span><span class="ref-name">emerald</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-teal)"></div><div class="ref-meta"><span class="ref-hex">#008370</span><span class="ref-name">teal</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-cyan)"></div><div class="ref-meta"><span class="ref-hex">#007f91</span><span class="ref-name">cyan</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-azure)"></div><div class="ref-meta"><span class="ref-hex">#0076ab</span><span class="ref-name">azure</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-cobalt)"></div><div class="ref-meta"><span class="ref-hex">#006bbb</span><span class="ref-name">cobalt</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-indigo)"></div><div class="ref-meta"><span class="ref-hex">#4d5ebe</span><span class="ref-name">indigo</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-violet)"></div><div class="ref-meta"><span class="ref-hex">#7152b5</span><span class="ref-name">violet</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-orchid)"></div><div class="ref-meta"><span class="ref-hex">#8b48a0</span><span class="ref-name">orchid</span></div></div>
+          <div class="ref-chip"><div class="ref-sw" style="background:var(--ag-magenta)"></div><div class="ref-meta"><span class="ref-hex">#9e3f84</span><span class="ref-name">magenta</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
   /* ===== Lucide render helper (UI icons) ===== */
   function LU(){ if(window.lucide&&lucide.createIcons) lucide.createIcons({attrs:{'stroke-width':2.25}}); }
 
   /* ===== tabs ===== */
   function switchTab(g,t){
-    /* v1.2: remap stale stored doc tabs (the old Readme/Claude/Todo tabs folded into "Documents") */
-    if(g==='doc'&&!document.getElementById('doc-'+t)){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     document.querySelectorAll('[data-group="'+g+'"]').forEach(p=>p.classList.add('hidden'));
     const pane=document.getElementById(g+'-'+t); if(pane)pane.classList.remove('hidden');
     document.querySelectorAll('[data-tab-group="'+g+'"]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -2753,25 +2698,8 @@ project CLAUDE.md. Global defaults that travel with you.
     if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit';}
     else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check" class="w-3.5 h-3.5"></i>Save';edit.focus();}
     LU();}
-  function docAdd(){/* opens a picker to add another doc to the switcher list — wired in the real build (mock) */}
+  function docAdd(){/* opens a picker to add another doc to organize here — wired in the real build (mock) */}
   function planAct(a){/* edit / approve / reject the selected plan — wired to the runtime in the real build (mock) */}
-
-  /* v1.2: Documents tab — doc-switcher selects which doc fills the shared editor host */
-  function docPick(btn,name){const pane=document.getElementById('doc-documents');if(!pane)return;
-    pane.querySelectorAll('.docnav-row').forEach(r=>r.classList.toggle('on',r===btn));
-    pane.querySelectorAll('.docdoc').forEach(d=>d.classList.toggle('on',d.dataset.doc===name));LU();}
-
-  /* v1.2: Assets tab — thumbnail grid is the nav; a tile drives the preview/action strip.
-     Assets is the single source of truth for media (added here, or attached from a prompt). */
-  function assetPick(tile){const grid=document.getElementById('asset-grid');if(grid)grid.querySelectorAll('.asset-tile').forEach(t=>t.classList.toggle('on',t===tile));
-    const det=document.getElementById('asset-detail');if(det)det.classList.add('on');
-    const nm=document.getElementById('asset-detail-name'),mt=document.getElementById('asset-detail-meta'),th=document.getElementById('asset-detail-thumb');
-    if(nm)nm.textContent=tile.dataset.name||'';if(mt)mt.textContent=tile.dataset.meta||'';
-    const src=tile.querySelector('.asset-thumb');if(th&&src)th.style.background=src.style.background;}
-  function assetPaste(){/* paste an image from the clipboard into the Assets grid — wired in the real build (mock) */}
-  function assetUpload(){/* upload image file(s) into the Assets grid — wired in the real build (mock) */}
-  function assetLink(){/* attach the selected asset to a prompt (reuses the agent target picker) — wired in the real build (mock) */}
-  function assetRemove(){/* remove the selected asset from the library — wired in the real build (mock) */}
 
   function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open').forEach(x=>x.classList.remove('open'));}
 
@@ -2934,9 +2862,6 @@ project CLAUDE.md. Global defaults that travel with you.
 
   /* ===== v8p6: Compose mic (voice dictation, mock) ===== */
   function toggleMic(b){b.classList.toggle('rec');const on=b.classList.contains('rec');b.title=on?'Listening… click to stop':'Dictate (voice → text)';}
-  /* v1.2: attach an asset to the prompt — opens the Library → Assets picker; a newly attached image
-     also registers in the Assets grid (Assets stays the single source of truth). Wired in the real build (mock). */
-  function composeAttach(b){/* mock */}
 
   /* ===== v8p6: Role combobox — options from user/project agent.md files; create-side prefills from front matter ===== */
   const ROLE_DEFS=[
@@ -3106,7 +3031,7 @@ project CLAUDE.md. Global defaults that travel with you.
     else{row.classList.add('rsel');SELby[host]={kind:'line',ref:n,label:'Line '+n};}
     setCmtCtl(host,true);}
   function renderDocView(name){const ta=document.getElementById('doc-'+name+'-edit'),view=document.getElementById('doc-'+name+'-view');if(ta&&view)view.innerHTML=mdEditorHTML('doc-'+name,ta.value);}
-  function renderDocs(){['readme','claude','claudeuser'].forEach(renderDocView);
+  function renderDocs(){['readme','claude','todo'].forEach(renderDocView);
     document.querySelectorAll('[data-cmtfor]').forEach(s=>{s.innerHTML=commentCtlHTML(s.dataset.cmtfor);});LU();}
 
   /* 3-state verdicts (stroke icons, verdict-colored): Approve / Revise / Block */
@@ -3117,9 +3042,9 @@ project CLAUDE.md. Global defaults that travel with you.
   function thumbPick(b){const w=b.closest('.thumbs');if(!w)return;w.querySelectorAll('.thumb').forEach(t=>t.classList.remove('on'));b.classList.add('on');}
   /* a little seeded doc-tab feedback so the rail badges + Feedback flow demo on the file tabs too */
   const DOC_FB={
-    'doc-readme':[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
+    'doc-readme':[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Documentation before Feed so the doc order matches the new reading order.'}],
     'doc-claude':[],
-    'doc-claudeuser':[]
+    'doc-todo':[{sec:'Next up',ag:'lex',verdict:'approve',time:'Jun 20',comment:'Context-cutoff shading shipped in v9p11 — this line can be checked off.'}]
   };
   function popFor(host){const ed=document.querySelector('[data-edhost="'+host+'"]');return ed?ed.querySelector('.plan-cmt-pop'):null;}
   /* v9p14c: the THREE comment indicators move together — the selected feedback card (teal fill), its
