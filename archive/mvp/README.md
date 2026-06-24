@@ -10,10 +10,16 @@ while the real app is rebuilt in the repo-root `frontend/` and `sidecar/`.
 It runs on **port 7691** (the live build uses 7690) so the two never collide.
 
 - **`frontend/`** — Electron + React (electron-vite). The entire UI is one `src/renderer/App.tsx`.
-- **`sidecar/`** — FastAPI service (`sidecar/main.py`), **SDK-direct**: it drives the
-  `claude_agent_sdk` `ClaudeSDKClient` directly (it does **not** use the tmux bridge).
+- **`sidecar/`** — FastAPI service (`sidecar/main.py`) behind a pluggable **driver seam**
+  (`drivers/` + shared `serialize.py`), mirroring the repo-root build. The default `sdk` driver
+  drives the `claude_agent_sdk` `ClaudeSDKClient` in-process; a `bridge` driver (real Claude Code
+  TUI via tmux/WSL2) is selectable with `AWL_DRIVER=bridge` or the per-session `driver` field.
   Endpoints: `/health`, `/sessions` CRUD, `/send`, `/history`, `/sessions/{id}/events` (SSE),
   `/interrupt`, `/model`, `/mode`, `/context`.
+  > Note: the `bridge` driver imports the repo-root `bridge` package, which is **not bundled
+  > inside this frozen copy** — selecting it here won't resolve. The verified path is the default
+  > `sdk` driver. (Same caveat as the live build, where the bridge path is implemented but not
+  > yet live-verified.)
 
 ## Prerequisites
 
@@ -70,14 +76,21 @@ when it's not running inside Electron. Useful for headless UI testing.
 > Electron binary run as plain Node. Launch from a clean shell, or clear that variable first.
 > (`start-mvp.bat` clears it for you, so launching via the `.bat` avoids this entirely.)
 
+## Parity with the live build
+
+This copy is kept **behaviorally in sync** with the repo-root `frontend/` + `sidecar/`: the only
+intended difference is the port (7691 vs 7690). The earlier render gap — assistant text and
+tool-call cards not appearing in the feed — has been **fixed here** to match the live build, via
+the same two fixes:
+
+- **Sidecar:** content blocks are serialized through `serialize.py`, which injects the `type`
+  field (`TextBlock→text`, `ToolUseBlock→tool_use`, etc.) the renderer keys off — so text,
+  tool-call, tool-result, and thinking blocks now render.
+- **Frontend:** `App.tsx` reads assistant/user content from the flattened `event.content`
+  (with the older `event.data.message.content` shape kept as a fallback).
+
 ## Known limitations (current SDK)
 
-- **Text and tool-call cards don't render in the feed under the current
-  `claude-agent-sdk` (0.2.106).** The feed renders session-init cards, the rate-limit banner,
-  and the cost/turns/duration result bar; assistant text, tool-call cards, and thinking blocks
-  do not. Cause: the sidecar serializes the SDK's content blocks via `__dict__`, which yields
-  e.g. `{"text": "..."}` with no `type` field, while `App.tsx` keys rendering off `block.type`.
-  This is **frozen MVP behavior left intentionally unchanged** (no logic edits in this reference)
-  — flagged here so the gap is expected, not a surprise.
 - The **"Rate limit — Claude is waiting before retrying"** banner shows on every turn even when
-  the account is not throttled (it ignores the `allowed` status). Also frozen as-is.
+  the account is not throttled (it ignores the `allowed` status). This matches the live build's
+  current behavior (unchanged).

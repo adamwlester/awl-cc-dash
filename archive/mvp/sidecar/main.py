@@ -1,8 +1,13 @@
 """
 AWL Dashboard — FastAPI Sidecar (v2)
 =====================================
-Multi-turn sessions via ClaudeSDKClient.
-Each session maintains a persistent Claude subprocess.
+Multi-turn agent sessions behind a pluggable driver seam.
+
+Each session is backed by an `AgentDriver` (see `drivers/`): the default `sdk`
+driver runs an in-process Claude Agent SDK subprocess; the `bridge` driver runs a
+real Claude Code TUI session in tmux/WSL2. Select with the `AWL_DRIVER` env var
+(`sdk` | `bridge`) or per-session via the create request's `driver` field.
+The sidecar itself is driver-agnostic.
 """
 
 import asyncio
@@ -17,12 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
 
-app = FastAPI(title="AWL Dashboard Sidecar", version="0.2.0")
+app = FastAPI(title="AWL Dashboard Sidecar", version="0.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,13 +42,15 @@ app.add_middleware(
 
 class SessionState:
     def __init__(self, session_id: str, agent_type: str | None, model: str | None,
-                 permission_mode: str, cwd: str | None, system_prompt: str | None):
+                 permission_mode: str, cwd: str | None, system_prompt: str | None,
+                 driver_name: str | None = None):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
         self.permission_mode = permission_mode
         self.cwd = cwd
         self.system_prompt = system_prompt
+        self.driver_name = driver_name
         self.status: Literal["connecting", "idle", "running", "error", "closed"] = "connecting"
         self.created_at = datetime.now().isoformat()
         self.events: list[dict[str, Any]] = []
@@ -51,8 +58,8 @@ class SessionState:
         self.pending_permission: dict[str, Any] | None = None
         self.total_cost_usd: float = 0.0
         self.total_turns: int = 0
-        self.client: ClaudeSDKClient | None = None
-        self.message_task: asyncio.Task | None = None
+        self.driver: AgentDriver | None = None
+        self.listen_task: asyncio.Task | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -60,6 +67,7 @@ class SessionState:
             "agent_type": self.agent_type,
             "model": self.model,
             "permission_mode": self.permission_mode,
+            "driver": self.driver.name if self.driver else (self.driver_name or default_driver_name()),
             "status": self.status,
             "created_at": self.created_at,
             "total_cost_usd": round(self.total_cost_usd, 6),
@@ -76,90 +84,60 @@ class SessionState:
             except asyncio.QueueFull:
                 pass  # subscriber too slow, skip
 
+    def handle_event(self, event: dict[str, Any]):
+        """Driver event callback: update session bookkeeping, then fan out.
+
+        Drivers emit already-serialized event dicts. The session owns the
+        cross-event bookkeeping (status, cost, turns) so drivers stay simple.
+        """
+        etype = event.get("type")
+
+        if etype == "status_change":
+            st = event.get("status")
+            if st in ("connecting", "idle", "running", "error", "closed"):
+                self.status = st  # type: ignore[assignment]
+            self.push_event(event)
+            return
+
+        # Preserve original ordering: push the message, then react to results.
+        self.push_event(event)
+
+        if etype == "result":
+            data = event.get("data", event)
+            cost = data.get("total_cost_usd") or event.get("total_cost_usd")
+            if cost:
+                self.total_cost_usd = float(cost)
+            turns = data.get("num_turns") or event.get("num_turns")
+            if turns:
+                self.total_turns = int(turns)
+            self.status = "idle"
+            self.push_event({
+                "type": "status_change", "status": "idle",
+                "timestamp": datetime.now().isoformat(),
+            })
+
 sessions: dict[str, SessionState] = {}
-
-# ============================================================================
-# Serialization
-# ============================================================================
-
-def serialize_message(message: Any) -> dict[str, Any]:
-    """Convert SDK message to JSON-serializable dict with stable type field."""
-    result: dict[str, Any] = {"timestamp": datetime.now().isoformat()}
-    msg_type = type(message).__name__
-    result["sdk_type"] = msg_type
-
-    # Map to frontend event types
-    type_map = {
-        "AssistantMessage": "assistant",
-        "UserMessage": "user",
-        "SystemMessage": "system",
-        "ResultMessage": "result",
-        "StreamEvent": "stream_event",
-        "RateLimitEvent": "rate_limit",
-    }
-    result["type"] = type_map.get(msg_type, msg_type.lower())
-
-    # Serialize all public attributes
-    for key, value in getattr(message, '__dict__', {}).items():
-        if key.startswith('_'):
-            continue
-        result[key] = _safe_serialize(value)
-
-    return result
-
-
-def _safe_serialize(value: Any, depth: int = 0) -> Any:
-    if depth > 5:
-        return str(value)
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {k: _safe_serialize(v, depth + 1) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_safe_serialize(v, depth + 1) for v in value]
-    if hasattr(value, '__dict__'):
-        return {k: _safe_serialize(v, depth + 1) for k, v in value.__dict__.items()
-                if not k.startswith('_')}
-    try:
-        json.dumps(value)
-        return value
-    except (TypeError, ValueError):
-        return str(value)
-
 
 # ============================================================================
 # Session Lifecycle
 # ============================================================================
 
 async def start_session(session: SessionState):
-    """Connect the ClaudeSDKClient and start listening for messages."""
-    extra = {}
-    if session.agent_type:
-        extra["--agent"] = session.agent_type
-
-    options = ClaudeAgentOptions(
-        permission_mode=session.permission_mode,  # type: ignore[arg-type]
+    """Create the driver, start it, and pump its events into the session."""
+    config = DriverConfig(
+        agent_type=session.agent_type,
         model=session.model,
+        permission_mode=session.permission_mode,
         cwd=session.cwd,
         system_prompt=session.system_prompt,
-        extra_args=extra,
     )
-
     try:
-        client = ClaudeSDKClient(options=options)
-        await client.connect()
-        session.client = client
+        driver = create_driver(config, session.handle_event, session.driver_name)
+        session.driver = driver
+        await driver.start()
         session.status = "idle"
-        session.push_event({
-            "type": "status_change", "status": "idle",
-            "timestamp": datetime.now().isoformat(),
-        })
-        logger.info(f"Session {session.session_id} connected")
-
-        # Start background message listener
-        session.message_task = asyncio.create_task(
-            _listen_messages(session)
-        )
+        session.listen_task = asyncio.create_task(_listen(session))
+        logger.info(f"Session {session.session_id} connected via {driver.name} driver")
     except Exception as e:
         logger.error(f"Session {session.session_id} connect failed: {e}")
         session.status = "error"
@@ -169,34 +147,17 @@ async def start_session(session: SessionState):
         })
 
 
-async def _listen_messages(session: SessionState):
-    """Continuously read messages from the SDK client and push to event stream."""
-    if not session.client:
+async def _listen(session: SessionState):
+    """Pump the driver's event stream into the session until cancelled."""
+    if not session.driver:
         return
     try:
-        async for message in session.client.receive_messages():
-            event = serialize_message(message)
-            session.push_event(event)
-
-            # Track cost and turns from result messages
-            if event.get("type") == "result":
-                data = event.get("data", event)
-                cost = data.get("total_cost_usd") or event.get("total_cost_usd")
-                if cost:
-                    session.total_cost_usd = float(cost)
-                turns = data.get("num_turns") or event.get("num_turns")
-                if turns:
-                    session.total_turns = int(turns)
-                session.status = "idle"
-                session.push_event({
-                    "type": "status_change", "status": "idle",
-                    "timestamp": datetime.now().isoformat(),
-                })
-
+        async for event in session.driver.events():
+            session.handle_event(event)
     except asyncio.CancelledError:
-        logger.info(f"Session {session.session_id} message listener cancelled")
+        logger.info(f"Session {session.session_id} listener cancelled")
     except Exception as e:
-        logger.error(f"Session {session.session_id} message listener error: {e}")
+        logger.error(f"Session {session.session_id} listener error: {e}")
         session.status = "error"
         session.push_event({
             "type": "error", "error": str(e),
@@ -214,6 +175,7 @@ class CreateSessionRequest(BaseModel):
     permission_mode: str = "acceptEdits"
     cwd: str | None = None
     system_prompt: str | None = None
+    driver: str | None = None  # "sdk" | "bridge"; None -> AWL_DRIVER / default
 
 class SendPromptRequest(BaseModel):
     prompt: str
@@ -234,7 +196,8 @@ async def health():
     return {
         "status": "ok",
         "active_sessions": len(sessions),
-        "version": "0.2.0",
+        "driver": default_driver_name(),
+        "version": "0.3.0",
     }
 
 
@@ -248,14 +211,13 @@ async def create_session(req: CreateSessionRequest):
         permission_mode=req.permission_mode,
         cwd=req.cwd,
         system_prompt=req.system_prompt,
+        driver_name=req.driver,
     )
     sessions[session_id] = session
     logger.info(f"Created session {session_id}")
 
-    # Start the SDK client and wait for it to connect
+    # Start the driver and wait for it to connect (or timeout).
     asyncio.create_task(start_session(session))
-
-    # Poll until connected or timeout (15s)
     for _ in range(30):
         await asyncio.sleep(0.5)
         if session.status != "connecting":
@@ -282,12 +244,11 @@ async def close_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
 
-    # Cancel listener and disconnect client
-    if session.message_task and not session.message_task.done():
-        session.message_task.cancel()
-    if session.client:
+    if session.listen_task and not session.listen_task.done():
+        session.listen_task.cancel()
+    if session.driver:
         try:
-            await session.client.disconnect()
+            await session.driver.close()
         except Exception:
             pass
 
@@ -304,7 +265,7 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     session = sessions[session_id]
     if session.status == "running":
         raise HTTPException(status_code=409, detail="Session is busy")
-    if not session.client:
+    if not session.driver:
         raise HTTPException(status_code=503, detail="Session not connected yet")
 
     session.status = "running"
@@ -313,9 +274,8 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
         "timestamp": datetime.now().isoformat(),
     })
 
-    # Send the query — receive_messages() will pick up the response
     try:
-        await session.client.query(req.prompt)
+        await session.driver.send(req.prompt)
     except Exception as e:
         session.status = "error"
         session.push_event({
@@ -339,11 +299,8 @@ async def stream_events(session_id: str):
 
     async def generator():
         try:
-            # Replay history
             for event in list(session.events):
                 yield {"event": "message", "data": json.dumps(event)}
-
-            # Stream live
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
@@ -369,8 +326,8 @@ async def interrupt_session(session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if session.client:
-        session.client.interrupt()
+    if session.driver:
+        await session.driver.interrupt()
     return {"status": "interrupted"}
 
 
@@ -379,9 +336,9 @@ async def set_model(session_id: str, req: SetModelRequest):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if session.client:
-        await session.client.set_model(req.model)
-        session.model = req.model
+    if session.driver and session.driver.supports("set_model"):
+        await session.driver.set_model(req.model)
+    session.model = req.model
     return {"status": "ok", "model": req.model}
 
 
@@ -390,9 +347,9 @@ async def set_mode(session_id: str, req: SetModeRequest):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if session.client:
-        await session.client.set_permission_mode(req.mode)
-        session.permission_mode = req.mode
+    if session.driver and session.driver.supports("set_mode"):
+        await session.driver.set_mode(req.mode)
+    session.permission_mode = req.mode
     return {"status": "ok", "mode": req.mode}
 
 
@@ -401,11 +358,13 @@ async def get_context_usage(session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if not session.client:
+    if not session.driver:
         raise HTTPException(status_code=503, detail="Not connected")
+    if not session.driver.supports("context"):
+        return {}
     try:
-        usage = await session.client.get_context_usage()
-        return _safe_serialize(usage)
+        usage = await session.driver.get_context_usage()
+        return usage or {}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

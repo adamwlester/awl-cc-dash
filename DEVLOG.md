@@ -27,14 +27,15 @@
 
 ## Status
 
-**Last updated:** 2026-06-23 18:11:14
+**Last updated:** 2026-06-23 21:29:33
 
 **Current state:** Migrated into `awl-cc-dash` (clean history, pushed to `origin/main`). Root
 `frontend/`+`sidecar/` = the **working MVP**, built in place; `archive/mvp/` = the frozen original
-reference (port 7691, untouched). The sidecar now has a **driver seam** (`drivers/` base/sdk/bridge
-+ `serialize.py`): `sdk` is the default and is **verified live** (tool-call + text cards render in
-the feed); the `bridge` driver (real Claude Code TUI via tmux/WSL2) is implemented but **not yet
-live-verified**, selectable via `AWL_DRIVER=bridge`. Design authority = `design/ui-concept-v9p14.html`.
+reference, now **synced to behavioral parity with root** (only difference is its port, 7691). Both
+sidecars share the **driver seam** (`drivers/` base/sdk/bridge + `serialize.py`): `sdk` is the
+default and is **verified live** in both (tool-call + text cards render in the feed); the `bridge`
+driver (real Claude Code TUI via tmux/WSL2) is implemented but **not yet live-verified**, selectable
+via `AWL_DRIVER=bridge`. Design authority = `design/ui-concept-v9p14.html`.
 
 **Next step:** Get the `bridge` (tmux streaming) path working end-to-end as a confident MVP —
 to be done with a separate agent.
@@ -42,6 +43,78 @@ to be done with a separate agent.
 ---
 
 ## Log
+
+### 2026-06-23 21:29:33 — CLAUDE.md: archive/mvp now "reference MVP at parity"; committed the sync
+
+Follow-up to the parity sync below. Updated CLAUDE.md's folder map: `archive/mvp/` is now described
+as the **frozen reference MVP** "kept at behavioral parity with root — only its port differs, 7691"
+instead of the **frozen original MVP**, since its sidecar is no longer the literal pre-driver-seam
+original (the "do not edit" instruction is unchanged). Committed this session's `archive/mvp/` parity
+changes + the two doc updates as one commit on `main`; left unrelated in-flight edits
+(`.claude/plans/*`, `dev/notes/human-notes-misc.md`, `design/TODO.md`) unstaged. Not pushed.
+
+Files: CLAUDE.md, DEVLOG.md
+
+### 2026-06-23 21:25:45 — Clarified `design/TODO.md` intent (reference-only + loose-note filing)
+
+Added a top "⚠ Reference only — do not work from this unless explicitly directed" warning so agents
+don't implement entries or treat them as confirmed/approved without the human handing over a specific
+item; reworded the "How it's used" note to spell out the capture → file → cut-into-prompt flow. Also
+clarified the Loose-notes guidance (both the maintenance rule and the section blockquote): file each
+note into the best-fit section by topic/effort, or whatever section the human names.
+
+Files: `design/TODO.md`
+
+### 2026-06-23 21:19:41 — Moved dashboard backlog into `design/TODO.md`
+
+Ported the `# Dashboard Add / Update Notes` backlog out of `dev/notes/human-notes-misc.md` into a new
+`design/TODO.md` — same ui-concept scope, same A–E structure and items, same hand-maintained
+loose-notes→section workflow. Reformatting only: clean header labels (descriptive subtitles pulled
+into their own one-line blockquotes) and the agent-maintenance guidance rendered as a blockquote.
+One factual fix: the stale intro path `agent-dashboard/design/ui-concept-v8pN.html` → current
+authority `design/ui-concept-v9p14.html`. Left a one-line pointer where the section used to live;
+deleted the abandoned `.claude/plans/todo-structure-example.md` mock.
+
+Files: `design/TODO.md` (new), `dev/notes/human-notes-misc.md` (section removed + pointer),
+`.claude/plans/todo-structure-example.md` (deleted), `.claude/plans/i-need-your-help-nested-island.md` (plan)
+
+### 2026-06-23 21:02:14 — Synced frozen `archive/mvp/` to behavioral parity with the working root MVP
+
+Brought the frozen reference up to date with the root `frontend/`+`sidecar/` build so it runs and
+renders the same — the archive previously carried the two known render bugs (content blocks lost
+their `type`; renderer read the wrong content path), so tool-call/text/thinking cards never appeared.
+Diffed both trees: deps (`requirements.txt`), lockfiles, and all build configs were already identical;
+the only behavioral gaps were the sidecar serialization/driver-seam and the `App.tsx` content path.
+This task authorized editing `archive/mvp/` (normally do-not-edit); nothing outside it changed.
+
+**Ported into `archive/mvp/` (verbatim from root):** `sidecar/serialize.py` (the `_BLOCK_TYPE_MAP`
+type injection) and the whole `sidecar/drivers/` package (`__init__`, `base`, `sdk`, `bridge`).
+Replaced the old monolithic SDK-coupled `sidecar/main.py` with root's driver-agnostic v0.3.0 main.
+Applied the `App.tsx` EventRenderer fix in both spots (read flattened `event.content`, fall back to
+`event.data.message.content`). **Kept the archive's port 7691** in all three spots (sidecar uvicorn,
+preload `sidecarUrl`, App.tsx fallback) — final diff vs root is *only* those three port lines; every
+other source file is byte-identical. Updated `archive/mvp/README.md`: sidecar description now reflects
+the driver seam (with a note that the `bridge` driver's repo-root `bridge` package isn't bundled in
+this frozen copy), and the "render gap" known-limitation was replaced with a "Parity with the live
+build" section.
+
+**Verified it runs (port 7691):** sidecar imports clean (`AWL Dashboard Sidecar 0.3.0`, default
+driver `sdk`); `/health` ok. End-to-end via API (opus, bypassPermissions): a Glob+Bash prompt produced
+typed content blocks — `thinking` / `tool_use` / `text` / `tool_result` — plus the result bar
+(cost/turns/duration). **UI driven via Playwright** over the built renderer (`electron-vite build` →
+served static at :5180, sidecar :7691): the feed renders session-init, Glob/Bash tool-call cards,
+thinking, tool-result, the assistant text answer, and the result bar — i.e. the previously-broken
+cards now appear. Resized to 680px (no overflow, clean wrap) and 1800px (holds); exercised the
+collapsible Session-init card and the "Show all (101 lines)" toggle (both work); did a live UI send
+("PONG") that streamed and rendered with a fresh result bar + updated session cost. Only console noise
+is the favicon 404. Note: the Playwright MCP browser's headless/headed mode is fixed at server launch
+(not switchable per call), so iteration + the final narrow/wide re-screenshot parity pass ran through
+that single configured browser. Background sidecar/static servers were torn down after; the `out/`
+build artifact is gitignored.
+
+Files: added archive/mvp/sidecar/serialize.py + archive/mvp/sidecar/drivers/{__init__,base,sdk,bridge}.py;
+rewrote archive/mvp/sidecar/main.py (driver-agnostic, port 7691); edited archive/mvp/frontend/src/renderer/App.tsx
+(event.content, ×2); edited archive/mvp/README.md; DEVLOG.md
 
 ### 2026-06-23 18:11:14 — CLAUDE.md currency: driver seam + working-MVP labeling
 
