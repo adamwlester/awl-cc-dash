@@ -728,9 +728,12 @@
     .think-tog svg{ width:12px; height:12px; }
     /* v1.1: the two mode toggles sit inline (side by side, one 2-col grid) like the Color/Icon pickers.
        Each fills its cell; the long state label shrinks to fit the narrow Agent-panel half-width. */
-    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:5px; padding:0 6px; min-width:0; }
+    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:4px; padding:0 4px; min-width:0; }
     .think-tog.tog-cell .tt-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
     .think-tog.tog-cell svg{ flex:0 0 auto; }
+    /* v1.2: Ultraplan toggle is gated to Plan mode — dimmed + inert unless the Mode seg = Plan */
+    .think-tog.gated{ opacity:.4; cursor:not-allowed; }
+    .think-tog.gated:hover{ transform:none; box-shadow:var(--shadow-sm); background:var(--secondary-background); }
 
     /* ============================ v8p6 — Team Graph status badge (replaces .node-dot) ============================ */
     .node-badge{ position:absolute; top:-8px; right:-8px; z-index:3; display:inline-flex; align-items:center;
@@ -1037,6 +1040,21 @@
     .fcard.open .fcard-body{ display:block; }
     .fcard.open .fcard-prev{ display:none; }
     .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
+    /* v1.2: History attachment chip (count) in the card header + click-to-open popover (History only) */
+    .att-chip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:3px; height:18px; padding:0 5px; border:2px solid var(--border); border-radius:3px; background:var(--surface-3); color:var(--muted); cursor:pointer; }
+    .att-chip:hover{ color:var(--foreground); background:var(--secondary-background); }
+    .att-chip svg{ width:11px; height:11px; }
+    .att-n{ font-size:9px; font-weight:900; font-family:'JetBrains Mono',monospace; }
+    .fcard.att-open{ overflow:visible; z-index:20; }
+    .att-pop{ display:none; position:absolute; top:36px; right:8px; z-index:40; min-width:188px; max-width:252px;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:5px; }
+    .att-pop.open{ display:block; }
+    .att-pop-head{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); padding:2px 5px 5px; }
+    .att-item{ width:100%; display:flex; align-items:center; gap:7px; padding:5px 6px; background:transparent; border:none; border-radius:4px; cursor:pointer; text-align:left; }
+    .att-item:hover{ background:var(--surface-3); }
+    .att-ic{ width:13px; height:13px; flex:0 0 auto; color:var(--muted); }
+    .att-name{ flex:1 1 auto; min-width:0; font-size:10px; font-weight:600; color:var(--foreground); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .att-go{ width:12px; height:12px; flex:0 0 auto; color:var(--muted); }
     .fcard-log{ font-family:'JetBrains Mono',monospace; font-size:10px; }
 
     /* Summarize slide-over overlay (covers just the message list, toggled by the footer button) */
@@ -1545,10 +1563,11 @@
             <!-- MODE (permission modes + Fast / Think toggles) -->
             <div>
               <label class="ro-label block mb-1.5">Mode</label>
-              <div class="seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
-              <div class="grid grid-cols-2 gap-2 mt-2">
-                <button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button>
-                <button class="think-tog tog-cell on" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode on</span></button>
+              <div class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
+              <div class="grid grid-cols-3 gap-2 mt-2">
+                <button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span></button>
+                <button class="think-tog tog-cell on" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button>
+                <button class="think-tog tog-cell ultra-tog gated" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span></button>
               </div>
             </div>
 
@@ -1655,7 +1674,7 @@
               <div class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus fast-mode Off</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking mode off</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-3 gap-2 mt-2"><button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button><button class="think-tog tog-cell ultra-tog" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span></button></div></div>
             <div><label class="ro-label block mb-1.5">Effort</label><div class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
@@ -1836,7 +1855,7 @@
                   <button id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="dir-cyc" title="A → B">→</button>
                   <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
                 </div>
-                <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
+                <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Inject</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
                 <div><label class="lbl mb-1.5">Payload</label><div class="seg"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
                 <div>
                   <label class="lbl mb-1.5">End After <span class="text-muted-2 font-semibold normal-case">— no limit unless set</span></label>
@@ -1858,7 +1877,7 @@
             <div class="pcard-head">
               <h3>Library</h3>
               <div class="tabset">
-                <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plan</button>
+                <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plans<span class="req-badge ml-1" id="plans-badge">2</span></button>
                 <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents</button>
                 <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
               </div>
@@ -2722,7 +2741,7 @@ project CLAUDE.md. Global defaults that travel with you.
     wrap.innerHTML=html;LU();}
   function pickAgRow(el){const w=el.closest('.aglist')||el.parentElement;w.querySelectorAll('.agrow').forEach(c=>c.classList.remove('on'));el.classList.add('on');} /* single-select (Source) */
   function agAllNone(btn){const s=btn.closest('[data-agscope]');if(!s)return;const on=btn.dataset.act!=='none';s.querySelectorAll('.agrow').forEach(r=>r.classList.toggle('on',on));agSync(s);updateAgBadges(s);updateSendCount(s);}  /* contextual All / None toggle */
-  function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
+  function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(g.classList.contains('mode-seg'))syncUltraGate(g);}
   function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
   function pickDecision(el){const c=el.closest('.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
   function miniToggle(el){el.classList.toggle('on');}
@@ -2773,7 +2792,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function assetLink(){/* attach the selected asset to a prompt (reuses the agent target picker) — wired in the real build (mock) */}
   function assetRemove(){/* remove the selected asset from the library — wired in the real build (mock) */}
 
-  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open').forEach(x=>x.classList.remove('open'));}
+  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
 
   /* ===== library placeholders ===== */
   let phSel=null;
@@ -2922,8 +2941,12 @@ project CLAUDE.md. Global defaults that travel with you.
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});});}
 
   /* ===== v8p6: per-agent thinking toggle (inline with Mode) ===== */
-  function toggleThink(b){b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Thinking mode '+(on?'on':'off');}
-  function toggleFast(b){b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Opus fast-mode '+(on?'On':'Off');}
+  function toggleThink(b){b.classList.toggle('on');}
+  function toggleFast(b){b.classList.toggle('on');}
+  /* v1.2: Ultraplan toggle — gated to Plan mode; the gate syncs whenever the Mode seg changes */
+  function toggleUltra(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');}
+  function syncUltraGate(seg){if(!seg)return;const active=seg.querySelector('button.active');const isPlan=!!active&&active.textContent.trim()==='Plan';
+    const ultra=seg.parentElement.querySelector('.ultra-tog');if(ultra){ultra.classList.toggle('gated',!isPlan);if(!isPlan)ultra.classList.remove('on');}}
 
   /* ===== v8p6: graph status badge → jump to the relevant surface ===== */
   function statusJump(status){
@@ -3286,7 +3309,8 @@ resize intact.`,
       +'<div class="plan-body"><div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
       +'<div class="plan-main">'+mdEditorHTML(p.id,p.md)+'</div></div>'
       +planFootHTML(p)+'</div></div>';}
-  function renderPlans(){const el=document.getElementById('plan-list');if(el)el.innerHTML=PLANS.map(planCardHTML).join('');}
+  function renderPlans(){const el=document.getElementById('plan-list');if(el)el.innerHTML=PLANS.map(planCardHTML).join('');
+    const b=document.getElementById('plans-badge');if(b){const n=PLANS.filter(p=>p.status==='review'||p.status==='draft').length;b.textContent=n;b.style.display=n?'':'none';}}
   function planNavMode(id,mode){const p=PLANS.find(x=>x.id===id);const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav||!p)return;nav.innerHTML=planNavHTML(p,fbBySection(p),mode);LU();}
   function planJump(id,btn){const card=document.getElementById(id);if(!card)return;const sec=btn.dataset.olsec;
     const nav=card.querySelector('[data-plannav]');if(nav)nav.querySelectorAll('.ol-item').forEach(o=>o.classList.toggle('on',o===btn));
@@ -3311,8 +3335,21 @@ resize intact.`,
     +'<div class="fcard-head"><button class="fcard-exp" onclick="selectHistCard(this)">'
     +'<span class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,true)
     +'<i data-lucide="arrow-right" style="width:12px;height:12px;color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
-    +'<span class="fcard-time" style="margin-left:auto">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+    +'<span class="flex-1"></span>'+attTrigHTML(o)
+    +'<span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+    +attPopHTML(o)
     +'<div class="fcard-body"><div class="fcard-full">'+o.body+'</div></div></div>';}
+  /* v1.2: attachments on History cards — a count chip in the header opens a popover; each entry opens the
+     item in the Library (images → Assets, docs → Documents). History-only for now; built to reuse later. */
+  function attTrigHTML(o){if(!o.att||!o.att.length)return '';const n=o.att.length;
+    return '<span class="att-chip" onclick="event.stopPropagation();toggleAttPop(this)" title="'+n+' attachment'+(n>1?'s':'')+'"><i data-lucide="paperclip"></i><span class="att-n">'+n+'</span></span>';}
+  function attPopHTML(o){if(!o.att||!o.att.length)return '';const n=o.att.length;
+    const items=o.att.map(at=>{const asset=at.type==='asset';const tab=asset?'assets':'documents';const ic=asset?'image':'file-text';
+      return '<button type="button" class="att-item" onclick="openAttachment(event,\''+tab+'\')"><i data-lucide="'+ic+'" class="att-ic"></i><span class="att-name">'+esc(at.name)+'</span><i data-lucide="arrow-up-right" class="att-go"></i></button>';}).join('');
+    return '<div class="att-pop"><div class="att-pop-head">'+n+' attachment'+(n>1?'s':'')+'</div>'+items+'</div>';}
+  function toggleAttPop(trig){const card=trig.closest('.fcard');if(!card)return;const pop=card.querySelector('.att-pop');if(!pop)return;
+    const open=pop.classList.contains('open');closeAllPopups();if(!open){pop.classList.add('open');card.classList.add('att-open');LU();}}
+  function openAttachment(e,tab){e.stopPropagation();closeAllPopups();switchTab('doc',tab);toast('Opening attachment in Library → '+(tab==='assets'?'Assets':'Documents'));}
   const MSGS=[
     {ag:'sandy',dir:'in',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`},
     {ag:'user',dir:'out',time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
@@ -3339,11 +3376,11 @@ resize intact.`,
     {time:'14:43:33',ag:'sage',txt:'deploy gate held'}
   ];
   const HIST=[
-    {badge:'db-active',status:'Active',from:'user',to:['kai','drew'],time:'14:41',sel:true,body:`Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse.`},
+    {badge:'db-active',status:'Active',from:'user',to:['kai','drew'],time:'14:41',sel:true,att:[{name:'jwt-expiry-trace.png',type:'asset'},{name:'CLAUDE.md',type:'doc'}],body:`Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse.`},
     {badge:'db-queued',status:'Queued',from:'user',to:['max'],time:'14:39',body:`Once the rotation patch lands, open a PR with the changelog entry and request review from reviewer-01.`},
     {badge:'db-next',status:'Next',from:'user',to:['drew'],time:'14:38',body:`After the audit confirms, write up each finding with CVSS scores and a suggested fix owner.`},
     {badge:'db-held',status:'Held',from:'user',to:['sage'],time:'14:36',body:`Hold the production deploy until the expiry fix is merged and the smoke tests pass on staging.`},
-    {badge:'db-complete',status:'Complete',from:'kai',to:['max'],time:'14:30',body:`Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.`}
+    {badge:'db-complete',status:'Complete',from:'kai',to:['max'],time:'14:30',att:[{name:'auth-token-rotation-shimmering-falcon.md',type:'doc'}],body:`Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.`}
   ];
   function renderFeed(){
     const m=document.getElementById('msg-list');if(m)m.innerHTML=MSGS.map(fcardHTML).join('');
@@ -3373,7 +3410,7 @@ resize intact.`,
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
-    renderDocs();renderPlans();renderFeed();fillAgLists();
+    renderDocs();renderPlans();renderFeed();fillAgLists();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
     const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();
     if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);}

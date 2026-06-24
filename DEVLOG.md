@@ -295,6 +295,22 @@ Files: design/mockup.html, design/DESIGN.md, design/TODO.md
 
 ---
 
+### 2026-06-24 05:36:58 — design/TODO.md: queued 5 new Next-up items (Plans tab, History attachments, Ultraplan toggle, Trigger Inject)
+
+Filed five approved changes from discussion into the (now-empty) **Next up** queue: (1) rename the Library **Plan** tab → **Plans** (label only, keep `data-tab="plan"`); (2) add a "new plans" count badge to that tab, mirroring the Inbox `req-badge` (new = unreviewed plans); (3) a **History-only** attachment chip + popover on `histCardHTML` cards (paperclip + count, click → popover list → opens item in Library Assets/Documents by type via the `reviewPlan` cross-link pattern; `stopPropagation` since the header is an expand button) built as a reusable component for later Messages reuse; (4) add an **Ultraplan** toggle to the agent-panel Mode block — go to a 3-col grid and shorten labels (drop "Opus" + the redundant Off/On words → Fast · Thinking · Ultraplan), gate it to Plan mode, mind the Effort-seg "Ultra" name collision; (5) add **Inject** after "Now" in the Link Config **Trigger** seg (the compose send split menu already has it). Verified against the modified mockup first — the send-menu Inject/Next rename was already built, so not re-queued. Nothing built this turn; queue only.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 05:56:09 — Built all 6 Next-up items in mockup.html (+ a 7th: History timestamp fix) + DESIGN.md sync
+
+Implemented the whole Next-up queue in `design/mockup.html` and synced `design/DESIGN.md`. **Plans tab:** Library "Plan" → **Plans** with a `req-badge` count of unreviewed plans (review/draft → 2; hides at 0), populated in `renderPlans()`; `data-tab="plan"` kept so cross-links survive. **History attachments:** new `attTrigHTML`/`attPopHTML` render a paperclip+count chip in `histCardHTML` headers (only when `o.att` present) and a popover (rendered as a `.fcard` sibling so its buttons aren't nested in the header's expand `<button>`; card gets `att-open` → `overflow:visible` so it isn't clipped); clicking an entry calls `openAttachment()` → `switchTab('doc', assets|documents)` by type; added `att` arrays to 2 HIST rows; chip uses `event.stopPropagation()`; `closeAllPopups()` now also clears `.att-pop`/`att-open`. **History timestamp:** added a `flex-1` spacer + dropped the time's `margin-left:auto` so it pins flush-right like Messages (was floating mid-row from two competing auto-margins). **Ultraplan toggle:** Mode toggles went 2-col → **3-col**, labels shortened to **Fast · Thinking · Ultraplan** (state now reads from the `.on` fill, not words; `toggleFast/Think` no longer rewrite labels); new `toggleUltra` + `syncUltraGate` gate Ultraplan to **Plan mode** (dimmed/inert otherwise). Applied to **both** Mode instances (Details + Create) via a shared `.mode-seg` class — caught the second (Create) instance that still had the old labels; gating is per-instance (`seg.parentElement`). **Trigger seg:** added **Inject** after Now in Link Config → `Now / Inject / Next / Queue / Hold`. Tightened `.tog-cell` padding/gap to reduce label clipping at narrow widths. **Verified in-browser** (served on :8777) at wide (1500/1600) and narrow (980/1024): 0 console errors; Plans badge, 3-col toggles + gating (both tabs), attachment chip→popover→Library routing (Assets + Documents), right-aligned times, and the 5-segment Trigger all correct. Known: at extreme-narrow (~1024px window) "Thinking"/"Ultraplan" ellipsis-truncate — graceful (icons + tooltips disambiguate) and better than the prior long labels; full labels show at normal widths. Cleared all items from TODO Next up.
+
+Files: design/mockup.html, design/DESIGN.md, design/TODO.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
