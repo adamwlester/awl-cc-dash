@@ -58,6 +58,34 @@
      Set transparent for a pure knockout. */
   --icon-fg:#ffffff;
 
+  /* ---- Soft status containers & badge tints ------------------------------ */
+  /* Material-3-style "container" roles: a soft background paired with its
+     on-color text, used by status/lifecycle/health badges, inline confirms,
+     and warning banners. Values preserved from the mockup's prior inline hexes
+     (a few near-identical greens are kept distinct on purpose, not unified, so
+     the rendering is byte-for-byte the same). */
+  --success-soft:#e7f5ee;  --success-text:#1f6f4d;   /* live · connected · confirm */
+  --warning-soft:#f6e6cf;  --warning-text:#9a6710;   /* pending · review · session · warn */
+  --warning-soft-pale:#fff6e9;                       /* global-edit warning banner bg */
+  --danger-soft:#fbe7ee;                             /* danger banner/confirm bg (text uses --danger) */
+
+  /* History / Plan status badges (the .db-* family) */
+  --status-active:#178a55;                           /* in-flight — solid green (text = --icon-fg) */
+  --status-done-soft:#dcf0e6;                        /* sent · complete · approved (text = --success-text) */
+  --status-next-soft:#eef0d8;  --status-next-text:#5f6f1c;
+  --status-held-soft:#f6e0d6;  --status-held-text:#a04b27;
+
+  /* doc rail: section-select indicator (dark teal) */
+  --rail-section:#2f97a6;
+
+  /* Inbox request soft tints (paired with the --req-* text tokens above) */
+  --req-permission-soft:#f6dcd9;
+  --req-approval-soft:var(--warning-soft);           /* same value as --warning-soft, named for the Inbox context */
+  --req-decision-soft:#f0e6cd;
+
+  /* link hover (utility text links) */
+  --link-hover:#b06d20;
+
   /* ---- Type -------------------------------------------------------------- */
   --font-weight-base:500;
   --font-weight-heading:800;

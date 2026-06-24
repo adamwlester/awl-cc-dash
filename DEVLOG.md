@@ -215,6 +215,26 @@ Made `design/DESIGN.md` read as "what the design is," not "how it got here." Rem
 
 Files: design/DESIGN.md
 
+### 2026-06-24 03:17:15 — design/TODO.md: filed Loose notes into section A
+
+Per the human's direction, moved all 7 Loose notes into **A — Next up** as A1–A7 (Team Graph card order, Feed→"Team Feed" rename, remove footer Save/Load, Setup tab first, inline fast/thinking-mode buttons, idle-badge restyle, header version badge v1.1) with bold headers + minimal clarity edits, then cleared the Loose-notes bucket.
+
+Files: design/TODO.md
+
+### 2026-06-24 03:20:00 — design/TODO.md: filed one new Loose note into section B
+
+Filed the new Loose note into **B — Quick wins** as B3 (**Remove Token Palette** — drop the bottom `.ref-section` "Token Palette" design-reference legend from the mockup, now documented elsewhere); disambiguated "token palette section" to the actual `mockup.html` component name, then cleared the Loose-notes bucket.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-24 03:25:15 — mockup.html: tokenised stray status-tint hexes + fixed FREE!→Bypass
+
+Closed out the two parked mockup-side stragglers. Added a **soft-container / status-tint** token group to `tokens.css` (Material-3-style container roles the design already cites): `--success/warning/danger-soft` + on-text, `--warning-soft-pale`, the `--status-*` History/Plan badge family, `--rail-section`, `--req-*-soft`, `--link-hover`. Replaced 25 hardcoded hexes across `mockup.html` with `var()` — the status/lifecycle/health badges, inline confirms/banners, Inbox request tints, and the context-donut chart colours (which were duplicating agent/semantic tokens) — and fixed the stale `FREE!` → `Bypass` in the Settings permission-mode row. All values preserved exactly. Verified in-browser over http: every new token resolves to its prior hex, affected elements compute identical colours, no broken vars, render unchanged at wide (1840) + narrow (720), and the Config tab shows `…Auto · Bypass`. Remaining hexes are intentional (the Palette Reference legend labels — slated for removal per TODO B3 — changelog comments, and vestigial unused template `data-color`s).
+
+Files: design/tokens.css, design/mockup.html
+
 ---
 
 ## Archived history

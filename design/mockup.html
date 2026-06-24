@@ -374,14 +374,14 @@
     .btn-main{ background:var(--main); color:var(--main-foreground); }
     .btn-secondary{ background:var(--secondary); color:var(--secondary-foreground); }
     .btn-danger{ color:var(--danger); }
-    .btn-danger:hover{ background:#fbe7ee; }
+    .btn-danger:hover{ background:var(--danger-soft); }
     .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; height:auto; padding:4px 6px; }
     .btn-ghost:hover{ background:rgba(0,24,88,0.06); }
     .btn-sm{ height:25px; padding:0 9px; font-size:10px; }
     .btn:disabled,.btn-main:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
     /* link-style text button (amber utility action) */
     .link-act{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:4px; }
-    .link-act:hover{ color:#b06d20; }
+    .link-act:hover{ color:var(--link-hover); }
 
     /* ghost icon button (faint at rest, emphasized on hover) */
     .ghost-ic{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:20px; padding:0;
@@ -569,7 +569,7 @@
     .tl-ic:hover{ transform:translate(2px,2px); box-shadow:none; }
     .tl-ic svg{ width:14px; height:14px; }
     .tl-phead{ padding:7px 10px; border-bottom:2px solid var(--border); background:var(--surface-3); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
-    .tl-confirm{ display:none; align-items:center; gap:7px; margin:8px; padding:7px 9px; border-radius:var(--radius-base); background:#e7f5ee; border:2px solid var(--success); color:#1f6f4d; font-size:10px; font-weight:700; }
+    .tl-confirm{ display:none; align-items:center; gap:7px; margin:8px; padding:7px 9px; border-radius:var(--radius-base); background:var(--success-soft); border:2px solid var(--success); color:var(--success-text); font-size:10px; font-weight:700; }
     .tri-tabs{ display:flex; flex-shrink:0; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; timeline opens as a separate popout below */
     .tri-tab{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:800; padding:6px 0; color:var(--muted); background:transparent; border:none; border-right:2px solid var(--border); cursor:pointer; }
     .tri-tab:last-child{ border-right:none; }
@@ -636,7 +636,7 @@
     .ag-ck{ width:14px; height:14px; color:var(--main-foreground); opacity:0; flex:0 0 auto; }
     .agrow.on .ag-ck{ opacity:1; }
     .mini-link{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; }
-    .mini-link:hover{ color:#b06d20; }
+    .mini-link:hover{ color:var(--link-hover); }
 
     /* ============================ readout cards (feed/history/scratch/requests) ============================ */
     .rcard{ position:relative; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); padding:8px 10px; }
@@ -649,8 +649,8 @@
     .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:3px; border:2px solid var(--border); background:transparent; color:var(--muted); }
     .dir-out,.dir-in{ background:transparent; color:var(--muted); }   /* direction is conveyed by the label alone — no special tint */
     .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:3px; border:2px solid var(--border); }
-    .db-sent{ background:#dcf0e6; color:#1f6f4d; } .db-next{ background:#eef0d8; color:#5f6f1c; }
-    .db-queued{ background:#f6e6cf; color:#9a6710; } .db-held{ background:#f6e0d6; color:#a04b27; }
+    .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
+    .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
     .hist-acts{ display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:2px solid var(--rule); }
     .opt{ display:block; width:100%; text-align:left; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:6px 9px; cursor:pointer; transition:transform .06s, box-shadow .06s; }
     .opt:hover:not(.on){ box-shadow:var(--shadow-sm); transform:translate(-1px,-1px); }
@@ -708,7 +708,7 @@
 
     /* ============================ palette reference (NOT part of UI) ============================ */
     .ref-section{ background:var(--secondary-background); color:var(--foreground); margin:22px; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:18px 24px 24px; }
-    .ref-disclaimer{ display:flex; align-items:center; justify-content:center; gap:8px; max-width:1200px; margin:0 auto 14px; padding:8px 14px; border:2px dashed var(--danger); border-radius:var(--radius-base); background:#fbe7ee; color:var(--danger); font-size:11px; font-weight:800; text-align:center; }
+    .ref-disclaimer{ display:flex; align-items:center; justify-content:center; gap:8px; max-width:1200px; margin:0 auto 14px; padding:8px 14px; border:2px dashed var(--danger); border-radius:var(--radius-base); background:var(--danger-soft); color:var(--danger); font-size:11px; font-weight:800; text-align:center; }
     .ref-heading{ display:flex; align-items:center; justify-content:center; gap:12px; font-size:11px; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
     .ref-heading .rule{ width:48px; height:2px; background:var(--border); }
     .ref-grid{ max-width:1200px; margin:0 auto; }
@@ -799,14 +799,14 @@
     .mic-btn svg{ width:14px; height:14px; }
 
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
-    .db-active{ background:#178a55; color:#ffffff; }   /* darker green = in-flight */
-    .db-complete{ background:#dcf0e6; color:#1f6f4d; }  /* lighter green = finished */
+    .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
+    .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
 
     /* ============================ v9p7 (A3) — Documentation panel (Plan + doc viewers) ============================ */
     /* plan-status badges (reuse the .dbadge shell) */
     .db-draft{ background:var(--surface-3); color:var(--muted); }
-    .db-review{ background:#f6e6cf; color:#9a6710; }     /* amber = awaiting review */
-    .db-approved{ background:#dcf0e6; color:#1f6f4d; }   /* green = approved */
+    .db-review{ background:var(--warning-soft); color:var(--warning-text); }     /* amber = awaiting review */
+    .db-approved{ background:var(--status-done-soft); color:var(--success-text); }   /* green = approved */
     /* "+" add-doc affordance in the tabset */
     .doc-add{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex:0 0 auto;
       border:2px dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; color:var(--muted); cursor:pointer; }
@@ -1114,7 +1114,7 @@
     .md-rail{ flex:0 0 auto; width:60px; display:flex; align-items:center; justify-content:flex-end; gap:4px; padding:0 6px 0 4px;
       border:none; border-left:3px solid var(--select); border-right:2px solid var(--rule); background:var(--surface-3); color:var(--muted-2); cursor:pointer; font-family:'JetBrains Mono',monospace; }
     .md-rail:hover{ background:var(--main-dim); color:var(--foreground); }
-    .md-rail.is-sec{ border-left-color:#2f97a6; }   /* dark teal = section select */
+    .md-rail.is-sec{ border-left-color:var(--rail-section); }   /* dark teal = section select */
     .md-rail.is-title{ border-left-color:var(--main); }   /* pink = title → select all */
     .md-rail .rn{ font-size:9.5px; }
     /* v9p14 (A4): selected text highlight is light PINK (was light teal — blue/teal was overused for the render's styled text) */
@@ -1290,8 +1290,8 @@
 
     /* lifecycle badges (Config: LIVE vs NEW SESSION, per the CLI lifecycle map) */
     .lc-badge{ font-size:7.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.04em; padding:2px 7px; border:2px solid var(--border); border-radius:3px; white-space:nowrap; }
-    .lc-live{ background:#e7f5ee; color:#1f6f4d; }
-    .lc-session{ background:#f6e6cf; color:#9a6710; }
+    .lc-live{ background:var(--success-soft); color:var(--success-text); }
+    .lc-session{ background:var(--warning-soft); color:var(--warning-text); }
 
     /* usage limit bars (health-colored: success -> warning -> danger) */
     .use-row{ padding:11px 1px; } .use-row + .use-row{ border-top:1px solid var(--rule); }
@@ -1317,10 +1317,10 @@
     /* health badge */
     .hbadge{ font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.04em; padding:2px 8px; border:2px solid var(--border); border-radius:3px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
     .hbadge .hd{ width:7px; height:7px; border-radius:50%; border:1.5px solid var(--border); }
-    .hb-conn{ background:#e7f5ee; color:#1f6f4d; }
+    .hb-conn{ background:var(--success-soft); color:var(--success-text); }
     .hb-oauth{ background:var(--select); color:var(--main-foreground); }
     .hb-parked{ background:var(--surface-3); color:var(--muted); }
-    .hb-warn{ background:#f6e6cf; color:#9a6710; }
+    .hb-warn{ background:var(--warning-soft); color:var(--warning-text); }
 
     /* compact on/off switch (enable/disable · plugins) — teal when on (active-value semantics) */
     .swh{ position:relative; width:40px; height:21px; border:2px solid var(--border); border-radius:11px; background:var(--surface-3); cursor:pointer; flex:0 0 auto; padding:0; transition:background .12s; }
@@ -1333,9 +1333,9 @@
     .pl-chip .pd{ width:6px; height:6px; border-radius:50%; background:var(--muted-2); flex:0 0 auto; }
 
     /* global-edit warning banner + explicit confirm gate */
-    .set-warn{ display:flex; align-items:center; gap:9px; padding:8px 12px; border:2px dashed var(--warning); border-radius:var(--radius-base); background:#fff6e9; color:#9a6710; font-size:10px; font-weight:800; margin-bottom:14px; }
+    .set-warn{ display:flex; align-items:center; gap:9px; padding:8px 12px; border:2px dashed var(--warning); border-radius:var(--radius-base); background:var(--warning-soft-pale); color:var(--warning-text); font-size:10px; font-weight:800; margin-bottom:14px; }
     .set-warn svg{ width:14px; height:14px; flex:0 0 auto; }
-    .set-confirm{ display:none; align-items:center; gap:10px; margin-top:12px; padding:9px 12px; border:2px solid var(--danger); border-radius:var(--radius-base); background:#fbe7ee; color:var(--danger); font-size:10px; font-weight:800; }
+    .set-confirm{ display:none; align-items:center; gap:10px; margin-top:12px; padding:9px 12px; border:2px solid var(--danger); border-radius:var(--radius-base); background:var(--danger-soft); color:var(--danger); font-size:10px; font-weight:800; }
     .set-confirm.show{ display:flex; }
 
     /* search field (plugins) */
@@ -1999,7 +1999,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">auditor</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div>
-                    <span class="dbadge ml-auto" style="background:#f6dcd9;color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
+                    <span class="dbadge ml-auto" style="background:var(--req-permission-soft);color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:38</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
@@ -2016,7 +2016,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">researcher</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div>
-                    <span class="dbadge ml-auto" style="background:#f6e6cf;color:var(--req-approval);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
+                    <span class="dbadge ml-auto" style="background:var(--req-approval-soft);color:var(--req-approval);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
                     <span class="rc-time">14:41</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Merge remediation plan to main</div>
@@ -2033,7 +2033,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">reviewer</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div>
-                    <span class="dbadge ml-auto" style="background:#f0e6cd;color:var(--req-decision);gap:4px;display:inline-flex;align-items:center"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
+                    <span class="dbadge ml-auto" style="background:var(--req-decision-soft);color:var(--req-decision);gap:4px;display:inline-flex;align-items:center"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
                     <span class="rc-time">14:44</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground mb-1.5" style="font-weight:800">Choose token rotation strategy</div>
@@ -2053,7 +2053,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">ops</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div>
-                    <span class="dbadge ml-auto" style="background:#f6dcd9;color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
+                    <span class="dbadge ml-auto" style="background:var(--req-permission-soft);color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:43</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
@@ -2497,7 +2497,7 @@ Full backlog: docs/human-notes-misc.md</textarea>
             <div class="set-sec">
               <div class="set-sec-h"><span class="nm"><i data-lucide="shield"></i>Permissions &amp; sandbox</span><span class="set-kind edit">Editable · confirm</span></div>
               <div class="set-sec-b">
-                <div class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:'JetBrains Mono',monospace">(Plan · Ask · Edit · Auto · FREE!)</span></span><span class="rt"><span class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:'JetBrains Mono',monospace">(Plan · Ask · Edit · Auto · Bypass)</span></span><span class="rt"><span class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
                 <div class="set-row"><span class="rk">Sandbox</span><span class="rv">disabled</span><span class="rt"><span class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
               </div>
             </div>
@@ -2771,10 +2771,10 @@ Full backlog: docs/human-notes-misc.md</textarea>
 
   /* ===== CONTEXT breakdown ===== */
   const CTX={model:'claude-opus-4-8',used:'399.1k',total:'1.0M',pct:40,cats:[
-    {nm:'System prompt',tk:'1.5k',pc:'0.2%',c:'#0076ab'},{nm:'System tools',tk:'5.1k',pc:'0.5%',c:'#007f91'},
-    {nm:'MCP tools',tk:'27.5k',pc:'2.8%',c:'#387b12'},{nm:'Custom agents',tk:'1.8k',pc:'0.2%',c:'#d98a2b'},
-    {nm:'Memory files',tk:'10.8k',pc:'1.1%',c:'#7152b5'},{nm:'Messages',tk:'352.4k',pc:'35.2%',c:'#f582ae'},
-    {nm:'Free space',tk:'600.9k',pc:'60.0%',c:'#d8cfb8'}]};
+    {nm:'System prompt',tk:'1.5k',pc:'0.2%',c:'var(--ag-azure)'},{nm:'System tools',tk:'5.1k',pc:'0.5%',c:'var(--ag-cyan)'},
+    {nm:'MCP tools',tk:'27.5k',pc:'2.8%',c:'var(--ag-fern)'},{nm:'Custom agents',tk:'1.8k',pc:'0.2%',c:'var(--warning)'},
+    {nm:'Memory files',tk:'10.8k',pc:'1.1%',c:'var(--ag-violet)'},{nm:'Messages',tk:'352.4k',pc:'35.2%',c:'var(--main)'},
+    {nm:'Free space',tk:'600.9k',pc:'60.0%',c:'var(--rule)'}]};
   const MEMF=[{p:'~\\.claude\\CLAUDE.md',t:'8.8k'},{p:'~\\MeDocuments\\…\\CLAUDE.md',t:'2.1k'}];
   const ACTX=[{n:'superpowers:code-reviewer',t:'348'},{n:'vibe-guide',t:'93'},{n:'gsd-ui-researcher',t:'86'}];
   /* v9p7 (A1): context cutoff — the per-agent Context% auto-stop default. Bars gray out everything above it. */
