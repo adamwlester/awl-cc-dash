@@ -104,6 +104,7 @@
 - I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 - Need to add ToDo functionality back into UI eventually.
+- Need to integrate a prompt send option like "side note" or "interject" that will allow us to send a correction to an ongoing run.
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
