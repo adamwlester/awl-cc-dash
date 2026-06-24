@@ -44,6 +44,14 @@ to be done with a separate agent.
 
 ## Log
 
+### 2026-06-23 21:32:08 — Unwrapped hard line breaks in `design/TODO.md` blockquotes
+
+Per user preference: collapsed the mid-sentence hard-wraps in the guidance blockquotes (top warning,
+What/How-it's-used, the maintenance rules, Loose-notes note) so each logical statement is a single
+line — easier to edit. No content changed; section subtitles and numbered items were already one line.
+
+Files: `design/TODO.md`
+
 ### 2026-06-23 21:29:33 — CLAUDE.md: archive/mvp now "reference MVP at parity"; committed the sync
 
 Follow-up to the parity sync below. Updated CLAUDE.md's folder map: `archive/mvp/` is now described
