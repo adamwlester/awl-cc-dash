@@ -43,7 +43,7 @@ Cross-cutting docs every session should know about — read the relevant one bef
 
 | File | What it is |
 |------|------------|
-| `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling). **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. |
+| `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling) — the **recent window**. **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. Older entries are rotated into `archive/devlog/` and summarized in the file's **Archived history** index; read those archives **on demand** only when a task needs older history, not by default. |
 | `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the mockups in `design/` (authority: `ui-concept-v9p14.html`) own the exact visuals. |
 | `dev/notes/repo-migration.md` | Loose, possibly-stale notes from the sandbox→awl-cc-dash migration (target layout, what moved where). Background only — trust the actual files over it. |
 
@@ -136,11 +136,18 @@ No `testpaths` is configured — pass the path you want to run.
 - **Keep `DEVLOG.md` current — not optional.** It is the project's memory; an unlogged change is,
   to the next session, a change that never happened. **Trigger:** before you end any turn in which
   you created, deleted, moved, or meaningfully edited a file (code, config, docs, or design) — and
-  before you tell the user you're "done" — append a new entry. **Default to logging:** the bar is
+  before you tell the user you're "done" — append a new entry **at the bottom** (the Log runs oldest →
+  newest). **Default to logging:** the bar is
   "did the repo change?", not "was it significant?" — if you're unsure, it qualifies. **Format**
   (append-only; never edit or delete past entries): a `### YYYY-MM-DD HH:MM:SS — short title`
   heading, 1–4 lines on what changed and the observable outcome, then a `Files:` line. Full rules
   live in the DEVLOG header.
+- **Rotate `DEVLOG.md` when it gets long — keep it small.** When the file grows past **~700 lines**,
+  archive the oldest entries to keep agent context light. The Log runs oldest → newest, so the oldest
+  entries are at the **top**: move them **verbatim** (cut only at `### ` headings, never mid-entry) from
+  the top into the newest `archive/devlog/DEVLOG-archive-NN.md` (appending in order) until `DEVLOG.md`
+  is back under **~300 lines**, then refresh the digest + index row in the **Archived history** section
+  at the bottom. Never edit archived entries. Full procedure lives in the DEVLOG header.
 - When touching global config (`~/.claude/`, etc.), explain the change before making it.
 - Be direct, practical, low-ceremony. Lead with action, follow with a brief explanation.
 - Write all transient artifacts (screenshots, scratch HTML, debug dumps, ad-hoc server
