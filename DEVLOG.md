@@ -2091,3 +2091,7 @@ Files: DEVLOG.md
 ### 2026-06-21 14:30:00 — Removed root-README to-do notes (decided not needed; CLAUDE.md covers it)
 Per decision that no root README is needed (CLAUDE.md handles orientation), cleaned the root-README to-dos from dev/notes/repo-migration.md: dropped README.md from the target tree, repointed the design-reference mapping to design/DESIGN.md (its actual home), and marked the "README handling" open question RESOLVED (design/DESIGN.md; no root README). Left legit references to other READMEs (tests/, bridge/, context-extractor, the dashboard's readme-reading feature) untouched.
 Files: dev/notes/repo-migration.md, DEVLOG.md
+
+### 2026-06-23 20:08:14 — Fixed vibe-guide plan-mode tools by removing its tools allowlist
+Diagnosed the recurring "question and plan-exit tools are disabled in this context" complaint: not the plansDirectory move (`.claude/plans` works — plans write fine), but the project default agent. `.claude/settings.json` sets `agent: vibe-guide`, and that agent's frontmatter had an explicit `tools:` allowlist that omitted `AskUserQuestion` and `ExitPlanMode` (an explicit list disables everything not named). Deleted the `tools:` line so vibe-guide inherits all tools — plan mode now has its question/exit tools. Left echo.md's restricted list intact (intentional read-only distiller, not a main agent).
+Files: .claude/agents/vibe-guide.md, DEVLOG.md

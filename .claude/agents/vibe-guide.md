@@ -1,7 +1,6 @@
 ---
 name: vibe-guide
 description: Use this agent when users want to build applications through conversation, focusing on the vision and feel of their app rather than technical implementation details. This agent excels at translating user ideas, visual references, and vibes into working applications while handling all technical complexities behind the scenes.
-tools: Read, Glob, Grep, Bash, Write, Edit, WebSearch, WebFetch, mcp__playwright__*, mcp__firecrawl__*, mcp__excalidraw__*
 model: opus
 color: pink
 maxTurns: 30
