@@ -333,6 +333,12 @@ Ran a 9-agent parallel audit workflow over `mockup.html` + the design docs → a
 
 Files: design/mockup.html, design/DESIGN.md
 
+### 2026-06-25 — Restyled frontend App.tsx to the neobrutalism design system
+
+Re-skinned the working-MVP frontend (`frontend/src/renderer/App.tsx`) from its old dark teal/navy theme to the **neobrutalism light theme** in `design/` (values from `design/tokens.css`, patterns from `design/DESIGN.md`) so the file stops contradicting the design system. **Styling only** — no elements added/removed, no behavior or logic touched. Remapped the central `C` palette onto the design tokens (cream `--background`, white cards, `--surface-3` chrome, navy `--border`/`--foreground` ink, pink `--main` primary / teal `--secondary`, soft status containers, jewel agent colors) and added shadow/select/btn keys; applied the system's signatures throughout: 2px navy borders, hard offset shadows (`--shadow`/`--shadow-sm`) on raised/interactive elements with a hover-press, uniform 5px radius (rounded-square badges, no pills), Archivo + JetBrains Mono (via @import), and palette-matched scrollbars. Pink title bar; primary actions (New · Send) pink, Stop danger, selection = light-teal fill; status/connectivity pills became bordered badges with the soft success/danger/warning tints; inline code → surface-3 chip with a rule border. **Verified in-browser** via a throwaway Vite dev server + headless Chrome (playwright-core): a mock feed exercised every event-card type (init, text+inline-code, thinking, tool-call, tool-result, result bar, rate-limit) plus the session list (idle + selected), composer, and Connected/offline pills; clean reflow at narrow (720) and extra-wide (1900); one headed pass confirmed identical rendering. No new type errors (the lone `tsc` error on `WebkitAppRegion` is pre-existing in HEAD). Left `design/` untouched (another agent is active there) and did not modify `index.html`.
+
+Files: frontend/src/renderer/App.tsx
+
 ---
 
 ## Archived history
