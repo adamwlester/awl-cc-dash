@@ -309,6 +309,24 @@ Implemented the whole Next-up queue in `design/mockup.html` and synced `design/D
 
 Files: design/mockup.html, design/DESIGN.md, design/TODO.md
 
+### 2026-06-24 — Queued "Agent Console Tab" in TODO Next up
+
+Filed an approved design item into `design/TODO.md` → **Next up** after a design discussion: a new **Console** tab in the Agent panel (Details · Create · Console), scoped to the focused agent. Holds the agent's **raw Claude Code terminal feed** + a grouped, filterable **slash-command catalog** (all commands in one place; runs on the focused agent via a bottom run bar) and an **Expand → step-into** full-window view for width (Settings-gear pattern). Cross-referenced B6 (Slash Commands) / B7 (Slash Shortcuts); flagged that building the feed reverses the DESIGN.md "Out of scope" live-CLI/terminal note, to be updated during implementation. No mockup/code changes yet — capture only.
+
+Files: design/TODO.md
+
+### 2026-06-24 — Built the Agent Console tab in mockup.html (v1.2) + DESIGN.md sync
+
+Implemented the "Agent Console Tab" Next-up item in `design/mockup.html` (version bumped v1.1 → v1.2, title-bar badge too) and cleared it from TODO Next up. **New tab:** Agent panel is now Details · Create · **Console**, scoped to the focused agent (static = researcher · 01 sandy, matching Details). **Raw feed:** white bordered monospace terminal surface filling the tab body, color-coded line classes (l-cmd/l-tool/l-out/l-think/l-asst/l-sys) built by `renderConsole()` from `CON_FEED`. **Command catalog:** `CON_CMDS` → grouped, filterable list (6 clusters, 26 commands), each row = command + one-line description; `/model`→Details, `/mcp`/`/config`/`/stats`/`/plugin`→Settings carry a teal "⤴ also-in-X" tag. Picking stages into the run bar (`pickCmd`); Run/Enter appends to the feed (`runConsoleCmd`, mock). **Width via Expand:** `openConsole()` pops a step-into full-window view (`#console-view`, mirrors `.settings-view`) — catalog as a slide-up panel in-column (`toggleCmdPanel`), as a persistent left rail when expanded; run bar lives in `#mid-foot-console` (reuses the existing tab+footer machinery). Esc closes it after Settings. This **supersedes** the v9p14 A9 "slash commands in Prompt → Compose" proposal (multi-select To made the target ambiguous) and **reverses** the DESIGN.md out-of-scope "no dedicated live-CLI/terminal pane" note — now an on-demand surface, not always-on. **DESIGN.md synced:** layout schematic (Details·Create·Console), out-of-scope reversal, new Console subsection under Agent (left pane), and a Core-components entry. **Verified in-browser** (served :8777) headless at narrow (1040) + wide (1700): 0 console errors (only favicon 404); confirmed tab switch, in-column feed, catalog slide-up, pick→stage→close, Expand step-into reflow, rail filter (compact→1 row), Run append (in-column Enter + full-view button), and Close. Fixed one defect found mid-verify: the step-into header agent badge had `width/height:100%` on the `.agtile`, breaking the badge — removed so `.badge-c .agtile` sizes it (28px).
+
+Files: design/mockup.html, design/DESIGN.md, design/TODO.md
+
+### 2026-06-24 — Console command-catalog formatting cleanup (scannability)
+
+Reworked the slash-command catalog rows in `design/mockup.html` after feedback that they were sloppy — the "also-in" badges dwarfed the text and command/description didn't segregate when scanning. Now each row is **two lines**: the command in **bold mono** (11px, the scan anchor) over its description in **muted body text** (9.5px, weight 500) — strong type hierarchy so the eye tracks the mono command column. Group headers are sticky uppercase labels (muted-2) with a **trailing hairline rule** (`--rule`) to band the clusters. The **also-in-X tag** is now faint, flat metadata (8px, `--muted-2`, no border/background/chrome, right-aligned) instead of a heavy bordered teal chip. Row hover is the light-teal select fill (`--select`) with no border/shadow jump. Updated `renderConsole()` to emit `.cmd-row-top` (name + tag) over `.cmd-desc`. **Verified in-browser** (:8777) at narrow (1060, in-column slide-up) + wide (1680, expanded rail): 0 console errors (favicon only); computed styles confirm the hierarchy (mono/800 command, muted/500 desc, borderless 8px tag). Synced the v1.2 changelog bullet + DESIGN.md Core-components entry. (Aside: cleared a stale locked MCP-chrome profile mid-task to relaunch the browser.)
+
+Files: design/mockup.html, design/DESIGN.md
+
 ---
 
 ## Archived history

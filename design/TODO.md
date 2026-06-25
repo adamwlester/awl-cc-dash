@@ -104,6 +104,10 @@
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
+- Make the Team Feed_>Inbox cards collapsible and utilize the checkbox that is already there but not functional to select the card. The collapsed card should show everything down to the title (eg "Run bash command" in the first card).
+- Have the "Pending" badge click that currently opens the Inbox window also select/highlight the relevant card.
+- Have the Link Agents drawer open right if that is easy to implement so that we can see all the cards in the Team Graph when it is open.
+
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
@@ -118,6 +122,7 @@
 - Consider if documentation should be called Assets instead and we just have one tab for documents and one for images, keeping the "Plan" tab as is.
 - Images should have a paste and upload option.
 - Documents should have an add option and a nav bar with the doc names and path. Only the Readme and the project and user level CLAUDE.md should be included by default.
+- Find a way to to support highlighting words and terms in text and having it defined in context.
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.

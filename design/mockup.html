@@ -3,8 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AWL Multi-Agent Dashboard — v1.1 (neobrutalism)</title>
+  <title>AWL Multi-Agent Dashboard — v1.2 (neobrutalism)</title>
   <!--
+    v1.2 — Agent CONSOLE tab (TODO.md "Next up" — raw terminal feed + slash-command catalog):
+      • NEW TAB: the Agent panel gains a third tab — Details · Create · CONSOLE — scoped to the
+        focused agent (so a command's target is one unambiguous agent; no multi-select). It pairs the
+        agent's RAW Claude Code terminal feed with a slash-command catalog and a run bar.
+      • RAW FEED (#con-feed-col / #con-feed-full): a white, bordered, monospace terminal surface filling
+        the tab body — color-coded line classes (l-cmd / l-tool / l-out / l-think / l-asst / l-sys),
+        rendered by renderConsole() from CON_FEED. This REVERSES the prior "no dedicated live-CLI/
+        terminal pane" out-of-scope call (DESIGN.md updated): it's an on-demand surface, not an
+        always-on pane.
+      • COMMAND CATALOG (CON_CMDS → [data-cmdlist]): a scrollable, filterable list grouped into
+        conceptual clusters (Session & context · Model & behavior · Info & status · Tools &
+        integrations · Project & custom · System). Each row is TWO lines for clean scanning — the
+        command in bold mono (the scan anchor) over its one-line description in muted body text — under
+        a sticky group header with a trailing hairline rule; row hover is the light-teal select fill. All
+        commands in ONE place — agent-specificity is just "runs on the focused agent." Commands that
+        already have a home (e.g. /model → Details, /mcp → Settings) carry a faint, flat "⤴ also-in-X"
+        tag (small · muted · no chrome) so it never dwarfs the command.
+        Picking a row stages it into the run bar (pickCmd); Run/Enter appends to the feed (runConsoleCmd,
+        mock). This SUPERSEDES the v9p14 A9 proposal to run slash commands from Prompt → Compose (the
+        multi-select To target made the command target ambiguous; see TODO B6/B7).
+      • WIDTH via EXPAND → STEP-INTO: the Console carries an "Expand" control (openConsole) that pops it
+        into a full-window view (#console-view) mirroring the Settings step-into pattern — covers the
+        3-pane body, returns on Close / Esc. The pieces REFLOW: in-column the feed gets priority and the
+        catalog rides as a slide-up panel over the feed (toggleCmdPanel); expanded, the catalog is a
+        persistent LEFT RAIL (.con-rail) beside a wide feed with the run bar across the bottom — the
+        rail-beside-body shape Library's doc-switcher / Templates already use.
+      • Wiring: switchTab('mid','console') reuses the existing tab + footer machinery (run bar lives in
+        #mid-foot-console); Esc closes the Console view (after Settings); renderConsole() runs at boot.
+        The focused agent is shown statically as researcher · 01 sandy, matching the Details pane (which
+        likewise doesn't react to graph selection in this static mockup).
     v1.1 — TODO.md "Next up" batch (9 items); version scheme reset to v1.1:
       • GRAPH CARDS: the two status bars now read Ctx (top) then Turns (below) — order reversed.
       • PANELS/LABELS: the right-column panel is "Team Feed" again; the title-bar version badge reads v1.1.
@@ -1302,6 +1332,83 @@
     .topbar-gear.on{ background:var(--select); }
     .topbar-gear svg{ width:15px; height:15px; }
 
+    /* ============================ v1.2 — Console: raw terminal feed + slash-command catalog (Agent panel tab + step-into) ============================ */
+    /* --- shared bits (used in-column AND in the step-into view) --- */
+    .con-feed{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); border:2px solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px 11px; margin:0;
+      font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.6; color:var(--foreground); }
+    .con-line{ white-space:pre-wrap; word-break:break-word; padding:0.5px 0; }
+    .con-line.l-cmd{ color:var(--main-foreground); background:var(--main-dim); border-radius:3px; padding:1px 5px; margin:2px 0; font-weight:700; }
+    .con-line.l-tool{ color:var(--foreground); font-weight:700; }
+    .con-line.l-tool .con-mk{ color:var(--secondary-foreground); }
+    .con-line.l-out{ color:var(--muted); }
+    .con-line.l-think{ color:var(--muted-2); font-style:italic; }
+    .con-line.l-asst{ color:var(--foreground); }
+    .con-line.l-sys{ color:var(--success-text); }
+    .con-line .con-mk{ display:inline-block; width:1.1em; }
+
+    /* run bar (footer in-column — .pcard-foot pads it · bottom strip in the step-into view) */
+    .con-run{ align-items:center; gap:6px; }
+    .con-cmds-btn{ display:inline-flex; align-items:center; gap:3px; flex:0 0 auto; height:30px; padding:0 8px; font-family:'JetBrains Mono',monospace;
+      font-size:12px; font-weight:800; color:var(--foreground); background:var(--surface-btn); border:2px solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s, background .12s; }
+    .con-cmds-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .con-cmds-btn.on{ background:var(--select); }
+    .con-cmds-btn svg{ width:13px; height:13px; }
+    .con-input{ flex:1 1 auto; min-width:0; height:30px; padding:0 9px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+      color:var(--foreground); background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); }
+    .con-input::placeholder{ color:var(--muted-2); font-style:italic; }
+    .con-run-btn{ flex:0 0 auto; }
+
+    /* command catalog — grouped, scrollable, described (shared list markup; rendered by JS into [data-cmdlist]) */
+    .con-cat-head{ display:flex; align-items:center; gap:8px; flex-shrink:0; padding:7px 9px; background:var(--surface-3); border-bottom:2px solid var(--border); }
+    .con-cat-title{ font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:0.06em; color:var(--foreground); white-space:nowrap; }
+    .con-search{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:6px; height:26px; padding:0 8px; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); }
+    .con-search svg{ width:12px; height:12px; color:var(--muted-2); flex:0 0 auto; }
+    .con-search input{ flex:1 1 auto; min-width:0; border:none; background:transparent; font-size:10.5px; font-weight:600; color:var(--foreground); }
+    .con-cat-list{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); padding:4px 6px 8px; }
+    /* group: an uppercase label with a trailing hairline rule, so clusters read as distinct bands while scrolling */
+    .cmd-group + .cmd-group{ margin-top:3px; }
+    .cmd-group-h{ position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px; padding:8px 4px 5px;
+      font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted-2); background:var(--secondary-background); }
+    .cmd-group-h::after{ content:""; flex:1 1 auto; height:2px; border-radius:2px; background:var(--rule); }
+    /* row: TWO lines — command (mono, bold) over its description (sans, muted) — so the eye tracks the mono command column and the helper text reads as clearly subordinate */
+    .cmd-row{ display:block; width:100%; text-align:left; padding:5px 7px; border:none; border-radius:var(--radius-base);
+      background:transparent; cursor:pointer; font-family:inherit; transition:background .1s; }
+    .cmd-row:hover, .cmd-row:focus-visible{ background:var(--select); outline:none; }
+    .cmd-row-top{ display:flex; align-items:center; gap:8px; }
+    .cmd-name{ flex:0 1 auto; min-width:0; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:800; color:var(--foreground); letter-spacing:-0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* "also-in-X" tag: deliberately faint metadata (small · muted · flat · no chrome) so it never competes with the command */
+    .cmd-also{ flex:0 0 auto; margin-left:auto; display:inline-flex; align-items:center; gap:2px; font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted-2); white-space:nowrap; }
+    .cmd-also svg{ width:9px; height:9px; }
+    .cmd-desc{ display:block; margin-top:1px; font-size:9.5px; font-weight:500; color:var(--muted); line-height:1.4; }
+
+    /* --- in-column placement: pane fills the body; catalog slides up over the feed --- */
+    .console-pane{ position:relative; flex:1 1 auto; min-height:0; padding:9px; gap:8px; }
+    .con-agentbar{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .con-live{ display:inline-flex; align-items:center; gap:5px; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    .con-dot{ width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 0 2px var(--border); }
+    .con-expand{ flex:0 0 auto; }
+    .console-pane .con-catalog{ position:absolute; left:9px; right:9px; bottom:9px; max-height:62%; z-index:5; display:none; flex-direction:column;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); overflow:hidden; }
+    .console-pane .con-catalog.open{ display:flex; }
+
+    /* --- step-into full-window view (mirrors .settings-view) --- */
+    .console-view{ position:absolute; left:0; right:0; top:36px; bottom:34px; z-index:40; display:none; flex-direction:column; background:var(--background); }
+    .console-view.open{ display:flex; }
+    .con-head{ flex-shrink:0; display:flex; align-items:center; gap:12px; height:42px; padding:0 14px; background:var(--surface-3); border-bottom:2px solid var(--border); }
+    .con-title{ font-size:13px; font-weight:900; letter-spacing:0.01em; display:flex; align-items:center; gap:8px; white-space:nowrap; }
+    .con-title svg{ width:16px; height:16px; }
+    .con-head-agent{ flex:0 0 auto; }
+    .con-head .con-live{ margin-left:2px; }
+    .con-close{ margin-left:auto; flex:0 0 auto; }
+    .con-body{ flex:1 1 auto; min-height:0; display:flex; }
+    .con-rail{ flex:0 0 270px; min-width:0; display:flex; flex-direction:column; border-right:2px solid var(--border); background:var(--background); }
+    .con-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; padding:14px; gap:10px; }
+    .con-main .con-feed{ font-size:11.5px; }
+    .con-run--full{ padding:0; }
+    @media (max-width:720px){ .con-rail{ flex-basis:200px; } }
+
     /* ============================ v9p4 — Settings: step-into full-window view (covers the 3-pane body; NOT a floating popup) ============================ */
     .settings-view{ position:absolute; left:0; right:0; top:36px; bottom:34px; z-index:40; display:none; flex-direction:column; background:var(--background); }
     .settings-view.open{ display:flex; }
@@ -1442,7 +1549,7 @@
   <header class="topbar">
     <div class="flex items-center gap-3 min-w-0">
       <span class="text-[13px] font-heading text-main-foreground tracking-tight" style="font-weight:900">AWL Multi-Agent Dashboard</span>
-      <span class="chip" style="font-family:'JetBrains Mono',monospace">v1.1</span>
+      <span class="chip" style="font-family:'JetBrains Mono',monospace">v1.2</span>
       <span class="text-[11px] font-bold text-main-foreground/80">13 agents</span>
     </div>
     <div class="flex items-center gap-2">
@@ -1465,6 +1572,7 @@
           <div class="tabset">
             <button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="tab-btn active">Details</button>
             <button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="tab-btn">Create</button>
+            <button data-tab-group="mid" data-tab="console" onclick="switchTab('mid','console')" class="tab-btn">Console</button>
           </div>
         </div>
         <div class="pcard-body flex flex-col overflow-y-auto" style="background:var(--background)">
@@ -1684,11 +1792,32 @@
               </div>
             </div>
           </div>
+
+          <!-- ===== CONSOLE (v1.2: raw terminal feed + slash-command catalog, scoped to the focused agent) ===== -->
+          <div id="mid-console" data-group="mid" class="hidden flex flex-col console-pane">
+            <div class="con-agentbar">
+              <span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <div class="min-w-0 flex-1 leading-tight"><div class="text-[8px] text-muted font-bold uppercase tracking-wide">researcher</div><div class="text-[11px] font-heading text-foreground" style="font-weight:900">01 sandy</div></div>
+              <span class="con-live"><i class="con-dot"></i>raw feed</span>
+              <button class="btn btn-sm con-expand" onclick="openConsole()" title="Expand the Console to a full-window view"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>Expand</button>
+            </div>
+            <div class="con-feed" id="con-feed-col"></div>
+            <!-- catalog: collapsed by default in-column; slides up over the feed (full panel width) -->
+            <div class="con-catalog" id="con-catalog-col">
+              <div class="con-cat-head"><span class="con-cat-title">Commands</span><div class="con-search"><i data-lucide="search"></i><input placeholder="Filter commands…" oninput="filterCmds(this)"></div><button class="ghost-ic" onclick="toggleCmdPanel(this)" title="Close"><i data-lucide="x"></i></button></div>
+              <div class="con-cat-list" data-cmdlist></div>
+            </div>
+          </div>
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
           <div data-group="mid-foot" id="mid-foot-details" class="flex"><button class="btn-danger w-full"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button></div>
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main">Create agent</button><button class="btn px-3">Reset</button><button class="btn px-3">Cancel</button></div>
+          <div data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
+            <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
+            <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)">
+            <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
+          </div>
         </div>
       </section>
 
@@ -2698,6 +2827,30 @@ project CLAUDE.md. Global defaults that travel with you.
       </div>
     </div>
   </div>
+
+  <!-- ===================== CONSOLE — step-into full-window view (v1.2) ===================== -->
+  <div class="console-view" id="console-view" aria-hidden="true">
+    <div class="con-head">
+      <span class="con-title"><i data-lucide="terminal"></i>Console</span>
+      <span class="badge badge-c con-head-agent"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span>
+      <span class="con-live"><i class="con-dot"></i>raw feed</span>
+      <button class="btn con-close" onclick="closeConsole()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
+    </div>
+    <div class="con-body">
+      <aside class="con-rail">
+        <div class="con-cat-head"><span class="con-cat-title">Commands</span><div class="con-search"><i data-lucide="search"></i><input placeholder="Filter commands…" oninput="filterCmds(this)"></div></div>
+        <div class="con-cat-list" data-cmdlist></div>
+      </aside>
+      <main class="con-main">
+        <div class="con-feed" id="con-feed-full"></div>
+        <div class="con-run con-run--full">
+          <button class="con-cmds-btn" onclick="filterFocus(this)" title="Jump to the command filter"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
+          <input class="con-input" id="con-input-full" placeholder="Type a command, or pick one from the list…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)">
+          <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
+        </div>
+      </main>
+    </div>
+  </div>
   </div><!-- /.app -->
 
   <script>
@@ -3405,12 +3558,111 @@ resize intact.`,
     toast((kind==='review'?'Sent for review to ':'Shared with ')+sel.join(', '));
     const sentEl=grp.parentElement.querySelector('[data-sent]');if(sentEl){sentEl.style.display='inline';sentEl.textContent='✓ sent to '+sel.length+' agent'+(sel.length>1?'s':'');}}
 
+  /* ===== v1.2: Console — raw feed + slash-command catalog (scoped to the focused agent) ===== */
+  const CON_FEED=[
+    {c:'l-out', t:'researcher · 01 sandy — claude code (opus 4.8) · auto · think on'},
+    {c:'l-cmd', t:'> audit the session + token-refresh path in src/auth for fixation risks'},
+    {c:'l-tool',t:'● Bash  grep -rn "refreshToken" src/auth'},
+    {c:'l-out', t:'  ⎿ 6 matches across session.ts, tokens.ts'},
+    {c:'l-tool',t:'● Read  src/auth/session.ts (212 lines)'},
+    {c:'l-think',t:"✻ Thinking… the cookie is reissued on refresh but the CSRF secret carries over — a privilege-boundary smell."},
+    {c:'l-asst',t:'I found a session-fixation risk in refreshToken(): the session cookie is'},
+    {c:'l-asst',t:'reissued but the CSRF token is preserved across a privilege change, so a'},
+    {c:'l-asst',t:'pre-auth token stays valid after login. Recommend rotating both together.'},
+    {c:'l-tool',t:'● Write  .scratch/findings-auth.md (+24)'},
+    {c:'l-cmd', t:'> /compact'},
+    {c:'l-sys', t:'⎿ Compacted context · 399.1k → 142.0k tokens'},
+  ];
+  const CON_CMDS=[
+    {g:'Session & context', items:[
+      ['/clear',"Wipe this agent's context and start fresh"],
+      ['/compact','Summarize and shrink the context window'],
+      ['/rewind','Roll this agent back to an earlier point'],
+      ['/resume','Resume a previous session'],
+      ['/export','Save this conversation to a file'],
+    ]},
+    {g:'Model & behavior', items:[
+      ['/model',"Switch this agent's model",'Details'],
+      ['/config','Open configuration','Settings'],
+      ['/fast','Toggle Opus fast-mode','Details'],
+      ['/think','Toggle extended thinking','Details'],
+      ['/permissions','Review tool permissions'],
+    ]},
+    {g:'Info & status', items:[
+      ['/cost','Token spend this session'],
+      ['/context','Context-window breakdown'],
+      ['/status','Health and connection'],
+      ['/stats','Project statistics','Settings'],
+    ]},
+    {g:'Tools & integrations', items:[
+      ['/mcp','MCP servers','Settings'],
+      ['/agents','Subagents'],
+      ['/hooks','Lifecycle hooks'],
+      ['/plugin','Plugins and marketplaces','Settings'],
+    ]},
+    {g:'Project & custom', items:[
+      ['/gsd:next','Advance to the next GSD step'],
+      ['/gsd:progress','Check project progress'],
+      ['/review','Request a code review'],
+      ['/init','Generate a CLAUDE.md'],
+    ]},
+    {g:'System', items:[
+      ['/help','List every command'],
+      ['/doctor','Diagnose the install'],
+      ['/login','Switch account'],
+      ['/memory','Edit memory files'],
+    ]},
+  ];
+  function renderConsole(){
+    const feed=CON_FEED.map(l=>'<div class="con-line '+l.c+'">'+esc(l.t)+'</div>').join('');
+    document.querySelectorAll('#con-feed-col,#con-feed-full').forEach(el=>{el.innerHTML=feed;el.scrollTop=el.scrollHeight;});
+    const list=CON_CMDS.map(grp=>'<div class="cmd-group"><div class="cmd-group-h">'+esc(grp.g)+'</div>'+
+      grp.items.map(it=>'<button class="cmd-row" onclick="pickCmd(this)" data-cmd="'+it[0]+'">'+
+        '<span class="cmd-row-top"><span class="cmd-name">'+esc(it[0])+'</span>'+
+        (it[2]?'<span class="cmd-also" title="Also available in '+it[2]+'"><i data-lucide="corner-up-right"></i>'+esc(it[2])+'</span>':'')+'</span>'+
+        '<span class="cmd-desc">'+esc(it[1])+'</span></button>').join('')+
+      '</div>').join('');
+    document.querySelectorAll('[data-cmdlist]').forEach(el=>el.innerHTML=list);
+    LU();
+  }
+  function conInput(ctx){ return (ctx&&ctx.closest&&ctx.closest('.console-view'))?document.getElementById('con-input-full'):document.getElementById('con-input-col'); }
+  function pickCmd(el){
+    const inp=conInput(el); if(inp){inp.value=el.dataset.cmd+' ';inp.focus();}
+    if(!el.closest('.console-view')){const cat=document.getElementById('con-catalog-col');if(cat)cat.classList.remove('open');document.querySelectorAll('#mid-foot-console .con-cmds-btn').forEach(b=>b.classList.remove('on'));}
+  }
+  function toggleCmdPanel(btn){
+    const cat=document.getElementById('con-catalog-col');if(!cat)return;
+    const open=cat.classList.toggle('open');
+    document.querySelectorAll('#mid-foot-console .con-cmds-btn').forEach(b=>b.classList.toggle('on',open));
+    if(open){const s=cat.querySelector('.con-search input');if(s){s.value='';filterCmds(s);setTimeout(()=>s.focus({preventScroll:true}),0);}}
+  }
+  function filterCmds(inp){
+    const scope=inp.closest('.con-catalog,.con-rail');if(!scope)return;const q=inp.value.trim().toLowerCase();
+    scope.querySelectorAll('.cmd-row').forEach(r=>{r.style.display=(!q||r.textContent.toLowerCase().includes(q))?'':'none';});
+    scope.querySelectorAll('.cmd-group').forEach(g=>{const any=[...g.querySelectorAll('.cmd-row')].some(r=>r.style.display!=='none');g.style.display=any?'':'none';});
+  }
+  function filterFocus(btn){const r=btn.closest('.console-view');const s=r?r.querySelector('.con-search input'):null;if(s)s.focus();}
+  function runConsoleCmd(el){
+    const inp=conInput(el);if(!inp)return;const v=inp.value.trim();if(!v){inp.focus();return;}
+    CON_FEED.push({c:'l-cmd',t:'> '+v});
+    CON_FEED.push({c:'l-sys',t:'⎿ '+(v[0]==='/'?'Ran '+v.split(/\s+/)[0]+' on researcher · 01 sandy':'Sent to researcher · 01 sandy')+' (mock)'});
+    renderConsole();inp.value='';inp.focus();
+    toast('Console: '+v+' → researcher · 01 sandy');
+  }
+  function openConsole(){
+    const v=document.getElementById('console-view');if(!v)return;
+    v.classList.add('open');v.setAttribute('aria-hidden','false');renderConsole();
+    const s=v.querySelector('.con-search input');if(s){s.value='';filterCmds(s);}
+    LU();
+  }
+  function closeConsole(){const v=document.getElementById('console-view');if(!v)return;v.classList.remove('open');v.setAttribute('aria-hidden','true');}
+
   /* ===== boot ===== */
   function boot(){
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
-    renderDocs();renderPlans();renderFeed();fillAgLists();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
+    renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
     const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();
     if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);}
@@ -3421,7 +3673,7 @@ resize intact.`,
   window.addEventListener('load',()=>{autosizeAll();drawEdgesSoon();LU();});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{autosizeAll();drawEdgesSoon();});
   document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.vtally'))closeAllPopups();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const v=document.getElementById('settings-view');if(v&&v.classList.contains('open')){closeSettings();}else{closeAllPopups();}}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){closeSettings();}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();}}});
   setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
   /* live-reload on save (design iteration) */
   (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},500);})();
