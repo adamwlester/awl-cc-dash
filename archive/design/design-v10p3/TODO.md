@@ -117,6 +117,11 @@
 - I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 - Need to add ToDo functionality back into UI eventually.
+- Need to integrate a prompt send option like "side note" or "interject" that will allow us to send a correction to an ongoing run.
+- Consider adding a Assets tab or Images tab to Documentation.
+- Consider if documentation should be called Assets instead and we just have one tab for documents and one for images, keeping the "Plan" tab as is.
+- Images should have a paste and upload option.
+- Documents should have an add option and a nav bar with the doc names and path. Only the Readme and the project and user level CLAUDE.md should be included by default.
 - Find a way to to support highlighting words and terms in text and having it defined in context.
 
 ### Big picture
