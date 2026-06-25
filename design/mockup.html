@@ -838,6 +838,26 @@
     /* plan-status badges (reuse the .dbadge shell) */
     .db-draft{ background:var(--surface-3); color:var(--muted); }
     .db-review{ background:var(--warning-soft); color:var(--warning-text); }     /* amber = awaiting review */
+    /* Inbox request-type badges — the reddish→copper attention ramp (tokens from tokens.css) */
+    .db-permission{ background:var(--req-permission-soft); color:var(--req-permission); display:inline-flex; align-items:center; gap:4px; }
+    .db-approval{ background:var(--req-approval-soft); color:var(--req-approval); display:inline-flex; align-items:center; gap:4px; }
+    .db-decision{ background:var(--req-decision-soft); color:var(--req-decision); display:inline-flex; align-items:center; gap:4px; }
+    /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
+    .msg-blocks{ display:flex; flex-direction:column; gap:3px; margin-top:7px; }
+    .msg-blk{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10px; line-height:1.5; padding:4px 7px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
+    .msg-blk-lbl{ display:inline-block; font-weight:800; text-transform:uppercase; font-size:7.5px; letter-spacing:.05em; color:var(--muted); margin-right:6px; }
+    .msg-blk.blk-think{ background:var(--secondary-background); color:var(--muted); font-style:italic; }
+    .msg-blk.blk-meta{ background:var(--secondary-background); color:var(--muted-2); }
+    .msg-blk.blk-diff .blk-add{ color:var(--success); } .msg-blk.blk-diff .blk-del{ color:var(--danger); }
+    /* ===== hover cards — documentation-through-design popovers (anchored + transient, not floating windows) ===== */
+    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:6px; border:2px solid var(--border); border-radius:999px; background:var(--surface-btn); color:var(--muted); cursor:help; flex:0 0 auto; padding:0; }
+    .hc-glyph svg{ width:9px; height:9px; stroke-width:2.5; }
+    .hc-glyph:hover,.hc-glyph:focus-visible{ background:var(--main); color:var(--icon-fg); outline:none; }
+    [data-hc]:not(.hc-glyph){ cursor:help; }
+    #hcpop{ position:fixed; z-index:9999; max-width:264px; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:8px 10px; pointer-events:none; opacity:0; transform:translateY(-3px); transition:opacity .1s ease; }
+    #hcpop.open{ opacity:1; transform:none; }
+    #hcpop .hc-title{ font-weight:800; font-size:10.5px; letter-spacing:.01em; color:var(--foreground); margin-bottom:3px; }
+    #hcpop .hc-body{ font-size:10.5px; line-height:1.5; color:var(--muted); }
     .db-approved{ background:var(--status-done-soft); color:var(--success-text); }   /* green = approved */
     /* "+" add-doc affordance in the tabset */
     .doc-add{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex:0 0 auto;
@@ -1580,9 +1600,9 @@
           <!-- ===== DETAILS ===== -->
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
             <div class="flex items-center gap-2.5">
-              <span class="agtile" style="width:40px;height:40px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
-              <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">01 sandy</div></div>
-              <button class="node-badge nb-pending" style="position:static" onclick="statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
+              <span class="agtile" id="det-tile" style="width:40px;height:40px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900" id="det-name">01 sandy</div></div>
+              <button class="node-badge nb-pending det-badge" id="det-badge" style="position:static" onclick="statusJump('pending')" data-hc-title="Status badge" data-hc="Also a shortcut — Active jumps to Prompts → History, Idle to Prompts → Compose, Pending to the Inbox. Deliberately binary (not a count): an agent is blocked on one thing at a time; the fleet total lives on the Inbox tab badge." title="Pending — awaiting your input · open Inbox">Pending</button>
             </div>
 
             <div class="grp-div"></div>
@@ -1670,11 +1690,11 @@
 
             <!-- MODE (permission modes + Fast / Think toggles) -->
             <div>
-              <label class="ro-label block mb-1.5">Mode</label>
+              <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Fast = /fast · Thinking = extended thinking · Ultraplan = deeper native plan mode, gated to Plan mode.">Mode</label>
               <div class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
               <div class="grid grid-cols-3 gap-2 mt-2">
                 <button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span></button>
-                <button class="think-tog tog-cell on" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button>
+                <button class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button>
                 <button class="think-tog tog-cell ultra-tog gated" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span></button>
               </div>
             </div>
@@ -1682,7 +1702,7 @@
             <!-- EFFORT -->
             <div>
               <label class="ro-label block mb-1.5">Effort</label>
-              <div class="seg"><button onclick="segPick(this)">Low</button><button onclick="segPick(this)">Med</button><button class="active" onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div>
+              <div class="seg" id="effort-seg"><button onclick="segPick(this)">Low</button><button onclick="segPick(this)">Med</button><button class="active" onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div>
             </div>
 
             <!-- LIFECYCLE -->
@@ -1700,15 +1720,15 @@
             <div>
               <div class="ro-head"><span class="ro-label">Context</span><button id="ctx-compact" class="link-act ml-auto">Compact</button><span class="ml-2 text-[10px] font-bold text-muted font-mono">399.1k / 1.0M</span></div>
               <button class="ctx-trigger" id="ctx-btn" type="button">
-                <div class="summary-row"><div class="ctxbar" id="ctx-bar"></div><span class="text-[10px] font-bold text-muted font-mono">40%</span><i data-lucide="chevron-down" class="chev" id="ctx-chev"></i></div>
+                <div class="summary-row"><div class="ctxbar" id="ctx-bar"></div><span class="text-[10px] font-bold text-muted font-mono" id="det-ctx-pct">40%</span><i data-lucide="chevron-down" class="chev" id="ctx-chev"></i></div>
               </button>
               <div class="acc" id="ctx-panel"></div>
             </div>
 
             <!-- TURNS (v9p14 A12: renamed from History — count inline like Context, then a health bar + %, then the Rewind/Handoff timeline) -->
             <div class="flex flex-col">
-              <div class="ro-head"><span class="ro-label">Turns</span><span class="ml-2 text-[10px] font-bold text-muted font-mono">34/50</span></div>
-              <div class="flex items-center gap-2 mb-2.5"><div class="ctxbar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono">68%</span></div>
+              <div class="ro-head"><span class="ro-label">Turns</span><span class="ml-2 text-[10px] font-bold text-muted font-mono" id="det-turns">34/50</span></div>
+              <div class="flex items-center gap-2 mb-2.5"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span></div>
               <div class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
@@ -1738,7 +1758,7 @@
             </div>
             <div>
               <label class="lbl mb-1">Name</label>
-              <div class="flex items-center gap-2"><input class="in flex-1" placeholder="auto-generated if blank" value="vale"><button class="btn btn-sm shrink-0" title="Randomize name"><i data-lucide="dices" class="w-3.5 h-3.5"></i>Random</button></div>
+              <div class="flex items-center gap-2"><input class="in flex-1" placeholder="auto-generated if blank" value="vale"><button class="btn btn-sm shrink-0" title="Randomize name" onclick="randomizeCreateName(this)"><i data-lucide="dices" class="w-3.5 h-3.5"></i>Random</button></div>
             </div>
             <div><label class="lbl mb-1">Description</label><textarea class="in autosize" placeholder="What is this agent responsible for?"></textarea></div>
             <div><label class="lbl mb-1">Skills</label>
@@ -1797,7 +1817,7 @@
           <div id="mid-console" data-group="mid" class="hidden flex flex-col console-pane">
             <div class="con-agentbar">
               <span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
-              <div class="min-w-0 flex-1 leading-tight"><div class="text-[8px] text-muted font-bold uppercase tracking-wide">researcher</div><div class="text-[11px] font-heading text-foreground" style="font-weight:900">01 sandy</div></div>
+              <div class="min-w-0 flex-1 leading-tight"><div class="text-[8px] text-muted font-bold uppercase tracking-wide" data-con-role>researcher</div><div class="text-[11px] font-heading text-foreground" style="font-weight:900" data-con-name>01 sandy</div></div>
               <span class="con-live"><i class="con-dot"></i>raw feed</span>
               <button class="btn btn-sm con-expand" onclick="openConsole()" title="Expand the Console to a full-window view"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>Expand</button>
             </div>
@@ -1811,8 +1831,8 @@
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
-          <div data-group="mid-foot" id="mid-foot-details" class="flex"><button class="btn-danger w-full"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button></div>
-          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main">Create agent</button><button class="btn px-3">Reset</button><button class="btn px-3">Cancel</button></div>
+          <div data-group="mid-foot" id="mid-foot-details" class="flex"><button class="btn-danger w-full" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button></div>
+          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main" onclick="createAgent()">Create agent</button><button class="btn px-3" onclick="resetCreate()">Reset</button><button class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
             <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)">
@@ -1839,7 +1859,7 @@
                 <div class="graph-grid" id="graph-grid">
 
                   <div id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
+                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1850,7 +1870,7 @@
                   </div>
 
                   <div id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
+                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">synthesizer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 kai</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1860,7 +1880,7 @@
                   </div>
 
                   <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
+                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">auditor</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1870,7 +1890,7 @@
                   </div>
 
                   <div id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
+                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">coder</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 max</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1881,7 +1901,7 @@
                   </div>
 
                   <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
+                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">02 rowan</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1891,7 +1911,7 @@
                   </div>
 
                   <div id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
+                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">tester</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 nova</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1901,7 +1921,7 @@
                   </div>
 
                   <div id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
+                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">reviewer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1911,7 +1931,7 @@
                   </div>
 
                   <div id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
+                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">planner</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 quinn</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1921,7 +1941,7 @@
                   </div>
 
                   <div id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
+                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">docs</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 wren</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1931,7 +1951,7 @@
                   </div>
 
                   <div id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
+                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">designer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 lex</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1942,7 +1962,7 @@
                   </div>
 
                   <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending')" title="Pending — awaiting your input · open Inbox">Pending</button>
+                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">ops</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div></div>
                     <div class="node-meta mb-1.5">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1952,7 +1972,7 @@
                   </div>
 
                   <div id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle')" title="Idle — open Prompts → Compose">Idle</button>
+                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">analyst</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 io</div></div></div>
                     <div class="node-meta mb-1.5">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
                     <div class="node-bars mb-1">
@@ -1962,7 +1982,7 @@
                   </div>
 
                   <div id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active')" title="Active — open Prompts → History">Active</button>
+                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
                     <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">scribe</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 fen</div></div></div>
                     <div class="node-meta mb-1.5">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-bars mb-1">
@@ -1994,14 +2014,14 @@
                     <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
                   </div>
                 </div>
-                <div class="flex gap-2 pt-1"><button class="btn-main flex-1">Save</button><button class="btn-danger flex-1">Delete</button></div>
+                <div class="flex gap-2 pt-1"><button class="btn-main flex-1" onclick="linkSave()">Save</button><button class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div>
               </div>
             </div>
           </section>
 
           <div class="rz-handle hstyle" data-orient="v"><span class="rz-grip"><i data-lucide="grip-vertical" class="w-2.5 h-2.5"></i></span></div>
 
-          <!-- DOCUMENTATION (v9p7 A3) -->
+          <!-- LIBRARY (v9p7 A3) — Plans · Documents · Assets -->
           <section class="rz-panel" id="pDocs" style="flex:1 1 44%; min-height:150px">
             <div class="pcard-head">
               <h3>Library</h3>
@@ -2193,7 +2213,7 @@ project CLAUDE.md. Global defaults that travel with you.
             <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
             <button data-tab-group="feed" data-tab="log" onclick="switchTab('feed','log')" class="tab-btn">Log</button>
-            <button data-tab-group="feed" data-tab="requests" onclick="switchTab('feed','requests')" class="tab-btn">Inbox<span class="req-badge ml-1">4</span></button>
+            <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span class="req-badge ml-1" id="inbox-badge">4</span></button>
           </div>
         </div>
         <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
@@ -2246,9 +2266,9 @@ project CLAUDE.md. Global defaults that travel with you.
               <div id="msg-list" class="flex flex-col gap-2 mt-2"></div>
                         </div>
 
-            <!-- REQUESTS -->
-            <div id="feed-requests" data-group="feed" class="hidden flex-1 overflow-y-auto px-3 py-3" style="background:var(--background)">
-              <div class="text-[9px] text-muted font-mono mb-2">4 agents awaiting your input — one open request each</div>
+            <!-- INBOX (approvals you owe — its badge is the fleet total) -->
+            <div id="feed-inbox" data-group="feed" class="hidden flex-1 overflow-y-auto px-3 py-3" style="background:var(--background)">
+              <div class="text-[9px] text-muted font-mono mb-2" id="inbox-await">4 agents awaiting your input — one open request each</div>
               <div class="flex flex-col gap-2.5">
 
                 <div class="rcard" style="border-left:6px solid var(--req-permission)">
@@ -2256,13 +2276,13 @@ project CLAUDE.md. Global defaults that travel with you.
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">auditor</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div>
-                    <span class="dbadge ml-auto" style="background:var(--req-permission-soft);color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
+                    <span class="dbadge db-permission ml-auto"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:38</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
                   <div class="rc-body" style="font-family:'JetBrains Mono',monospace;margin-top:1px">rm -rf node_modules &amp;&amp; pnpm install</div>
                   <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm">Approve</button><button class="btn btn-sm">Deny</button><button class="btn btn-sm">Always allow</button>
+                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="inboxResolve(this,'Denied')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,'Always allowed')">Always allow</button>
                     <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
                     <button class="btn btn-sm" onclick="replyTo('01 drew')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
                   </div>
@@ -2273,13 +2293,13 @@ project CLAUDE.md. Global defaults that travel with you.
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">researcher</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div>
-                    <span class="dbadge ml-auto" style="background:var(--req-approval-soft);color:var(--req-approval);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
+                    <span class="dbadge db-approval ml-auto"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
                     <span class="rc-time">14:41</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Merge remediation plan to main</div>
                   <div class="rc-body" style="margin-top:1px">Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test</div>
                   <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm">Approve</button><button class="btn btn-sm" onclick="reviewPlan('plan-1')" title="Review the full plan in Documentation → Plan"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn btn-sm">Reject</button>
+                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="reviewPlan('plan-1')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn btn-sm" onclick="inboxResolve(this,'Rejected')">Reject</button>
                     <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
                     <button class="btn btn-sm" onclick="replyTo('01 sandy')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
                   </div>
@@ -2290,7 +2310,7 @@ project CLAUDE.md. Global defaults that travel with you.
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">reviewer</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div>
-                    <span class="dbadge ml-auto" style="background:var(--req-decision-soft);color:var(--req-decision);gap:4px;display:inline-flex;align-items:center"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
+                    <span class="dbadge db-decision ml-auto"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
                     <span class="rc-time">14:44</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground mb-1.5" style="font-weight:800">Choose token rotation strategy</div>
@@ -2299,7 +2319,7 @@ project CLAUDE.md. Global defaults that travel with you.
                     <button class="opt" onclick="pickDecision(this)"><span class="opt-nm">B · One-time rotation</span><span class="opt-desc">Each refresh invalidates the prior token; strongest, more churn.</span></button>
                   </div>
                   <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm dec-approve" disabled title="Select an option first">Approve</button>
+                    <button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>
                     <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
                     <button class="btn btn-sm" onclick="replyTo('01 vega')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
                   </div>
@@ -2310,13 +2330,13 @@ project CLAUDE.md. Global defaults that travel with you.
                     <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
                     <span class="agtile" style="width:26px;height:26px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span>
                     <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">ops</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div>
-                    <span class="dbadge ml-auto" style="background:var(--req-permission-soft);color:var(--req-permission);gap:4px;display:inline-flex;align-items:center"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
+                    <span class="dbadge db-permission ml-auto"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
                     <span class="rc-time">14:43</span>
                   </div>
                   <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
                   <div class="rc-body" style="font-family:'JetBrains Mono',monospace;margin-top:1px">kubectl apply -f deploy/prod.yaml</div>
                   <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm">Approve</button><button class="btn btn-sm">Deny</button><button class="btn btn-sm">Always allow</button>
+                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="inboxResolve(this,'Denied')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,'Always allowed')">Always allow</button>
                     <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
                     <button class="btn btn-sm" onclick="replyTo('01 sage')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
                   </div>
@@ -2394,7 +2414,7 @@ project CLAUDE.md. Global defaults that travel with you.
               <h3>Prompt</h3>
               <div class="tabset">
                 <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
-                <button data-tab-group="prompt" data-tab="library" onclick="switchTab('prompt','library')" class="tab-btn">Templates</button>
+                <button data-tab-group="prompt" data-tab="templates" onclick="switchTab('prompt','templates')" class="tab-btn">Templates</button>
                 <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
               </div>
             </div>
@@ -2455,8 +2475,8 @@ project CLAUDE.md. Global defaults that travel with you.
                   <textarea id="compose-field" class="in ta-resize flex-1 min-h-[90px] text-[12px] leading-relaxed">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</textarea>
                 </div>
 
-                <!-- LIBRARY -->
-                <div id="prompt-library" data-group="prompt" class="hidden flex-1 flex flex-col min-h-0">
+                <!-- TEMPLATES -->
+                <div id="prompt-templates" data-group="prompt" class="hidden flex-1 flex flex-col min-h-0">
                   <div class="sec-h">Templates <span class="text-muted-2 font-semibold normal-case">12 saved</span></div>
                   <div class="lib-list shrink-0" style="max-height:118px;overflow-y:auto">
                     <button class="lib-row on" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Security audit request</button>
@@ -2492,7 +2512,7 @@ project CLAUDE.md. Global defaults that travel with you.
                 <button class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button>
                 <div class="split split--outline" id="revise-split">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
-                  <button class="split-act" title="Revise the draft"><i data-lucide="wand-sparkles"></i></button>
+                  <button class="split-act" title="Revise the draft" onclick="reviseDraft()"><i data-lucide="wand-sparkles"></i></button>
                   <div class="split-menu">
                     <div class="split-menu-h">Revise scope</div>
                     <button class="split-mi sel" data-short="Grammar" onclick="pickSplit(this)"><span class="lead"><b>Grammar</b><span class="sub">Fix spelling &amp; grammar only</span></span><span class="ck">✓</span></button>
@@ -2504,7 +2524,7 @@ project CLAUDE.md. Global defaults that travel with you.
                 <div class="flex-1"></div>
                 <div class="split split--primary">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Now</span></button>
-                  <button class="split-act" title="Send to target agents"><i data-lucide="send-horizontal"></i></button>
+                  <button class="split-act" title="Send to target agents" onclick="sendPrompt()"><i data-lucide="send-horizontal"></i></button>
                   <div class="split-menu split-menu--right">
                     <div class="split-menu-h">When to deliver</div>
                     <button class="split-mi sel" data-short="Now" onclick="pickSplit(this)"><span class="lead"><b>Now</b><span class="sub">Interrupt &amp; deliver immediately</span></span><span class="ck">✓</span></button>
@@ -2861,6 +2881,9 @@ project CLAUDE.md. Global defaults that travel with you.
   function switchTab(g,t){
     /* v1.2: remap stale stored doc tabs (the old Readme/Claude/Todo tabs folded into "Documents") */
     if(g==='doc'&&!document.getElementById('doc-'+t)){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
+    /* remap stale internal tab keys to the user-facing names (requests→inbox, library→templates) */
+    if(g==='feed'&&t==='requests')t='inbox';
+    if(g==='prompt'&&t==='library')t='templates';
     document.querySelectorAll('[data-group="'+g+'"]').forEach(p=>p.classList.add('hidden'));
     const pane=document.getElementById(g+'-'+t); if(pane)pane.classList.remove('hidden');
     document.querySelectorAll('[data-tab-group="'+g+'"]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -2897,7 +2920,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(g.classList.contains('mode-seg'))syncUltraGate(g);}
   function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
   function pickDecision(el){const c=el.closest('.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
-  function miniToggle(el){el.classList.toggle('on');}
+  function miniToggle(el){el.classList.toggle('on');applyMsgFilters();}
   function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllPopups();if(!open)m.classList.add('open');}
   function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const l=menu.closest('.split').querySelector('.split-lbl');if(l){const base=mi.dataset.short||mi.querySelector('b').textContent;l.textContent=(l.dataset.prefix||'')+base;}menu.classList.remove('open');}
   function clearField(id){const el=document.getElementById(id);if(el){el.value='';if(el.classList.contains('autosize'))autosize(el);el.focus();}}
@@ -2925,8 +2948,17 @@ project CLAUDE.md. Global defaults that travel with you.
     if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit';}
     else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check" class="w-3.5 h-3.5"></i>Save';edit.focus();}
     LU();}
-  function docAdd(){/* opens a picker to add another doc to the switcher list — wired in the real build (mock) */}
-  function planAct(a){/* edit / approve / reject the selected plan — wired to the runtime in the real build (mock) */}
+  function docAdd(){/* appends a doc-nav row + editor pane — wired below once the doc markup is known (mock) */
+    toast('Add a document — choose a file to add to the Library');}
+  /* plan decision/edit/copy (scripted demo): mutate PLANS state + re-render so the card, badges + count update */
+  function reopenPlan(id){const c=document.getElementById(id);if(c){c.classList.add('open');c.scrollIntoView({block:'nearest'});}LU();}
+  function planCopy(id){const p=PLANS.find(x=>x.id===id);if(p&&navigator.clipboard)navigator.clipboard.writeText(p.md).catch(()=>{});toast('Plan copied to clipboard');}
+  function planAct(a,id){const p=PLANS.find(x=>x.id===id)||PLANS.find(x=>x.open);if(!p)return;const own=AG[p.owner]?AG[p.owner].name:p.owner;
+    if(a==='edit'){toast('Editing '+p.file+' — line-numbered editor');return;}
+    if(a==='revise'){toast('Flagged sections sent back to '+own+' to revise');return;}
+    if(a==='reject'){p.status='draft';toast('Plan rejected — returned to draft');renderPlans();reopenPlan(p.id);return;}
+    if(a==='approve'){p.status='approved';toast('Plan approved — '+own+' may proceed');renderPlans();reopenPlan(p.id);
+      if(typeof pushApprovalToInbox==='function')pushApprovalToInbox(p);return;}}
 
   /* v1.2: Documents tab — doc-switcher selects which doc fills the shared editor host */
   function docPick(btn,name){const pane=document.getElementById('doc-documents');if(!pane)return;
@@ -2953,10 +2985,51 @@ project CLAUDE.md. Global defaults that travel with you.
   function fillPlaceholder(){if(!phSel)return;const ta=document.getElementById('tpl-fill-input');const v=ta.value.trim();phSel.dataset.value=v;if(v){phSel.classList.add('filled');phSel.textContent=v;}else{phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;}phSel.classList.add('sel');}
   function resetPlaceholder(){if(!phSel)return;phSel.dataset.value='';phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;const ta=document.getElementById('tpl-fill-input');if(ta){ta.value='';autosize(ta);ta.focus();}}
 
-  /* ===== node selection ===== */
+  /* ===== node selection — SELECTION DRIVES THE APP: clicking a card repaints the whole Agent panel
+     (identity, config readouts, Ctx/Turns) + the Console from that focused agent. (scripted demo) ===== */
+  let FOCUS='sandy';
+  function agKeyFromNode(n){const d=(n&&n.dataset&&n.dataset.agent)||'';return d.split('-').pop();}
+  function setSegActive(id,label){if(!label)return;const seg=document.getElementById(id);if(!seg)return;
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.textContent.trim().toLowerCase()===label.toLowerCase()));
+    if(seg.classList.contains('mode-seg'))syncUltraGate(seg);}
+  function nodeBarRaw(n,label){const rows=[...n.querySelectorAll('.nbar-row')];const r=rows.find(x=>{const l=x.querySelector('.nbl');return l&&l.textContent.trim()===label;});
+    if(!r)return null;const i=r.querySelector('.pbar i');const pct=i?parseFloat(i.style.width):null;const val=(r.querySelector('.nbv')||{}).textContent||'';return{pct:pct,val:val};}
+  function repaintConsoleIdentity(a){document.querySelectorAll('.con-agentbar').forEach(bar=>{const t=bar.querySelector('.agtile');if(t){t.style.color=a.color;const u=t.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
+    const r=bar.querySelector('[data-con-role]');if(r)r.textContent=a.role;const nm=bar.querySelector('[data-con-name]');if(nm)nm.textContent=a.name;});
+    if(CON_FEED&&CON_FEED.length)CON_FEED[0].t=a.role+' · '+a.name+' — claude code (opus 4.8) · auto · think on';}
+  function repaintAgentPanel(n,key){const a=AG[key];if(!a)return;
+    const tile=document.getElementById('det-tile');if(tile){tile.style.color=a.color;const u=tile.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
+    const role=document.getElementById('det-role');if(role)role.textContent=a.role;
+    const name=document.getElementById('det-name');if(name)name.textContent=a.name;
+    const nb=n.querySelector('.node-badge');const db=document.getElementById('det-badge');
+    if(nb&&db){const cl=[...nb.classList].find(c=>/^nb-/.test(c))||'nb-idle';db.className='node-badge '+cl+' det-badge';db.textContent=nb.textContent;
+      const st=cl==='nb-pending'?'pending':(cl==='nb-active'?'active':'idle');db.setAttribute('onclick','statusJump(\''+st+'\')');db.title=nb.title;}
+    const meta=((n.querySelector('.node-meta')||{}).textContent||'').replace(/\s+/g,' ').trim();const parts=meta.split('·').map(s=>s.trim());
+    const mc=document.getElementById('model-current');if(mc&&parts[0])mc.textContent=parts[0];
+    setSegActive('mode-seg',parts[1]);setSegActive('effort-seg',parts[2]);
+    const tt=document.getElementById('det-think');if(tt)tt.classList.toggle('on',/think on/i.test(meta));
+    const ctx=nodeBarRaw(n,'Ctx');if(ctx&&ctx.pct!=null){const cb=document.getElementById('ctx-bar');if(cb)cb.innerHTML='<i style="width:'+ctx.pct+'%;background:'+ctxColor(ctx.pct)+'"></i>'+cutHTML();
+      const cp=document.getElementById('det-ctx-pct');if(cp)cp.textContent=Math.round(ctx.pct)+'%';}
+    const tr=nodeBarRaw(n,'Turns');if(tr){const th=document.getElementById('det-turns');if(th&&tr.val)th.textContent=tr.val;
+      const tb=document.getElementById('det-turns-bar');if(tb&&tr.pct!=null)tb.innerHTML='<i style="width:'+tr.pct+'%;background:'+ctxColor(tr.pct)+'"></i>';
+      const tp=document.getElementById('det-turns-pct');if(tp&&tr.pct!=null)tp.textContent=Math.round(tr.pct)+'%';}
+    /* keep the editable identity config fields coherent with the focused agent (role/no/name/color/icon) */
+    const det=document.getElementById('mid-details');
+    if(det){const mm=a.name.match(/^(\d+)\s+(.+)$/);const no=mm?mm[1]:'';const nm=mm?mm[2]:a.name;
+      const roleIn=det.querySelector('.combo-in');if(roleIn)roleIn.value=a.role;
+      const noIn=det.querySelector('input.in.text-center');if(noIn)noIn.value=no;
+      const nameIn=[...det.querySelectorAll('input.in')].find(i=>!i.classList.contains('text-center'));if(nameIn)nameIn.value=nm;
+      const cf=det.querySelector('[style*="--cur-color"]');if(cf)cf.style.setProperty('--cur-color',a.color);
+      const sw=det.querySelector('[data-picker]:not([data-icopicker]) .picker-sw');if(sw)sw.style.background=a.color;
+      const colNm=(a.color.match(/--ag-([a-z]+)/)||[])[1];const colVal=det.querySelector('[data-picker]:not([data-icopicker]) .picker-val');if(colVal&&colNm)colVal.textContent=colNm;
+      const icoUse=det.querySelector('[data-icopicker] .picker-ico use');if(icoUse)icoUse.setAttribute('href','#'+a.icon);
+      const icoNm=(AGENT_ICONS.find(p=>p[0]===a.icon)||[])[1];const icoVal=det.querySelector('[data-icopicker] .picker-val');if(icoVal&&icoNm)icoVal.textContent=icoNm;}
+    repaintConsoleIdentity(a);}
   function selectNode(n){
     document.querySelectorAll('.node').forEach(x=>x.classList.remove('selected'));
     n.classList.add('selected');
+    const key=agKeyFromNode(n);if(AG[key])FOCUS=key;
+    repaintAgentPanel(n,key);LU();
   }
 
   /* ===== pickers (Color = Select · Icon = Combobox) ===== */
@@ -2971,6 +3044,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function buildIconGrids(){
     const html=AGENT_ICONS.map(([id,nm])=>'<button class="icotile" data-name="'+nm+'" title="'+nm+'" onclick="pickIconChoice(this)"><span class="agtile" style="color:var(--cur-color)"><svg class="ag-svg"><use href="#'+id+'"/></svg></span></button>').join('');
     document.querySelectorAll('[data-icogrid]').forEach(g=>g.innerHTML=html);
+    document.querySelectorAll('[data-icopicker] .picker-search input').forEach(s=>s.setAttribute('placeholder','Search '+AGENT_ICONS.length+' icons…'));   /* honest count from the embedded sprite set */
   }
   function curColorHost(el){let p=el;while(p&&p!==document.body){if(p.style&&p.style.getPropertyValue('--cur-color'))return p;p=p.parentElement;}return null;}
   function togglePicker(btn){
@@ -3033,18 +3107,54 @@ project CLAUDE.md. Global defaults that travel with you.
     const btn=document.getElementById('ctx-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('ctx-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('ctx-chev');if(ch)ch.classList.toggle('up',open);});})();
 
   /* ===== HISTORY timeline ===== */
-  const TOTAL=60;const TURNS=[
-    {n:53,time:'14:21',ctx:54,desc:'Posted CRITICAL finding to scratchpad'},{n:54,time:'14:28',ctx:61,desc:'Cross-checked with auditor-01 to confirm'},
-    {n:55,time:'14:33',ctx:67,desc:'Demoted rate-limit finding to medium'},{n:56,time:'14:39',ctx:72,desc:'Reviewed coder-01 patch diff'},
-    {n:57,time:'14:44',ctx:78,desc:'Requested regression test for rotation'},{n:58,time:'14:48',ctx:83,desc:'Re-checked expiry path under reuse'},
-    {n:59,time:'14:52',ctx:88,desc:'Approved remediation plan ordering'},{n:60,time:'14:56',ctx:91,desc:'Awaiting deploy gate decision',cur:true}];
+  /* timeline of the focused agent's run — TOTAL = its Max-turns, current turn matches the Turns readout (34/50) */
+  const TOTAL=50;const TURNS=[
+    {n:27,time:'14:21',ctx:54,desc:'Posted CRITICAL finding to scratchpad'},{n:28,time:'14:28',ctx:58,desc:'Cross-checked with auditor-01 to confirm'},
+    {n:29,time:'14:33',ctx:61,desc:'Demoted rate-limit finding to medium'},{n:30,time:'14:39',ctx:62,desc:'Reviewed coder-01 patch diff'},
+    {n:31,time:'14:44',ctx:62,desc:'Requested regression test for rotation'},{n:32,time:'14:48',ctx:62,desc:'Re-checked expiry path under reuse'},
+    {n:33,time:'14:52',ctx:62,desc:'Approved remediation plan ordering'},{n:34,time:'14:56',ctx:62,desc:'Awaiting deploy gate decision',cur:true}];
   function ctxColor(p){return p<50?'var(--success)':(p<=75?'var(--warning)':'var(--danger)');}
   function renderHist(mode){const panel=document.getElementById('hist-panel');if(!panel)return;const icon=mode==='handoff'?'git-branch':'undo-2';const tip=mode==='handoff'?'Hand off from here':'Rewind to here';
     panel.innerHTML=TURNS.map(t=>'<div class="tl-row'+(t.cur?' current':'')+'"><div class="tl-main"><div class="tl-top"><span class="tl-turn">Turn '+t.n+'/'+TOTAL+'</span>'+(t.cur?'<span class="tl-now">now</span>':'')+'<span class="tl-time">'+t.time+'</span><span class="tl-ctx" style="color:'+ctxColor(t.ctx)+'">'+t.ctx+'%</span></div><div class="tl-desc">'+t.desc+'</div></div><button class="tl-ic" title="'+tip+'" onclick="confirmPick('+t.n+",'"+mode+"')\"><i data-lucide=\""+icon+'"></i></button></div>').join('');
     LU();const cur=panel.querySelector('.tl-row.current');if(cur)panel.scrollTop=Math.max(0,cur.offsetTop-8);}
   function confirmPick(n,mode){const c=document.getElementById('hist-confirm');if(!c)return;c.style.display='flex';
     c.innerHTML='<span>'+(mode==='handoff'?'Hand off a new agent seeded through Turn '+n+'?':'Rewind this agent to the end of Turn '+n+'?')+'</span>';
-    const b=document.createElement('button');b.className='btn btn-sm ml-auto';b.textContent='Cancel';b.onclick=()=>{c.style.display='none';};c.appendChild(b);}
+    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.style.display='none';};c.appendChild(cancel);
+    const go=document.createElement('button');go.className='btn-main btn-sm';
+    go.innerHTML=mode==='handoff'?'<i data-lucide="git-branch" class="w-3.5 h-3.5"></i>Hand off':'<i data-lucide="undo-2" class="w-3.5 h-3.5"></i>Rewind';
+    go.onclick=()=>{c.style.display='none';const a=AG[FOCUS]||{name:'agent'};
+      if(mode==='handoff'){switchTab('mid','create');prefillFromFocus();toast('Handed off from Turn '+n+' → new agent (seeded from '+a.name+')');}
+      else{toast('Rewound '+a.name+' to the end of Turn '+n);trimTimeline(n);}};
+    c.appendChild(go);LU();}
+  function trimTimeline(n){const panel=document.getElementById('hist-panel');if(!panel)return;
+    [...panel.querySelectorAll('.tl-row')].forEach(r=>{const t=r.querySelector('.tl-turn');const m=t&&t.textContent.match(/Turn (\d+)/);if(m&&parseInt(m[1],10)>n)r.style.display='none';});}
+  /* ===== Create-wizard + Retire handlers (scripted demos) ===== */
+  const NAME_POOL=['kai','drew','rowan','vale','wren','sage','nova','ash','juno','remy','sol','bex','indi','koa'];
+  function rosterNames(){return new Set([...document.querySelectorAll('#graph-grid .node .text-foreground.truncate')].map(e=>e.textContent.replace(/^\d+\s+/,'').trim()));}
+  function randomizeName(input){if(!input)return;const used=rosterNames();const free=NAME_POOL.filter(n=>!used.has(n));const pool=free.length?free:NAME_POOL;
+    const idx=(input.value.length+used.size)%pool.length;input.value=pool[idx];}   /* deterministic pick (no Math.random in this env) */
+  function randomizeCreateName(btn){const root=document.getElementById('mid-create');randomizeName(root&&root.querySelector('input[placeholder="auto-generated if blank"]'));}
+  function prefillFromFocus(){const a=AG[FOCUS];if(!a)return;const root=document.getElementById('mid-create');if(!root)return;
+    const roleIn=root.querySelector('.combo-in');if(roleIn)roleIn.value=a.role;
+    const nameIn=root.querySelector('input[placeholder="auto-generated if blank"]');if(nameIn){nameIn.value='';randomizeName(nameIn);}}
+  function createAgent(){const root=document.getElementById('mid-create');if(!root)return;
+    const role=(root.querySelector('.combo-in')||{}).value||'agent';
+    const name=(root.querySelector('input[placeholder="auto-generated if blank"]')||{}).value||'new';
+    const no=(root.querySelector('input[placeholder="02"]')||{}).value||'02';
+    toast('Created '+role+' · '+no+' '+name);switchTab('mid','details');}
+  function resetCreate(){const root=document.getElementById('mid-create');if(!root)return;
+    root.querySelectorAll('input').forEach(i=>{if(i.placeholder!=='02')i.value='';});
+    const desc=root.querySelector('textarea');if(desc){desc.value='';if(desc.classList.contains('autosize'))autosize(desc);}
+    root.querySelectorAll('[data-msel]').forEach(m=>{m._sel=new Set();buildMsel(m);});toast('Create form reset');}
+  function cancelCreate(){switchTab('mid','details');}
+  function retireAgent(btn){const foot=document.getElementById('mid-foot-details');if(!foot)return;const a=AG[FOCUS]||{name:'this agent',role:''};
+    if(foot.querySelector('.retire-confirm'))return;btn.style.display='none';
+    const c=document.createElement('div');c.className='tl-confirm retire-confirm';c.style.display='flex';c.style.width='100%';c.style.alignItems='center';
+    c.innerHTML='<span>Retire '+a.role+' · '+a.name+'? This ends the session.</span>';
+    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.remove();btn.style.display='';};
+    const go=document.createElement('button');go.className='btn-danger btn-sm';go.innerHTML='<i data-lucide="power" class="w-3.5 h-3.5"></i>Retire';
+    go.onclick=()=>{c.remove();btn.style.display='';toast('Retired '+a.name);const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node){node.style.opacity='.4';node.style.filter='grayscale(1)';}};
+    c.appendChild(cancel);c.appendChild(go);foot.appendChild(c);LU();}
   (function(){const acc=document.getElementById('hist-acc');
     function setMode(m){ // m = 'rewind' | 'handoff' | null (null = nothing selected → hide the panel)
       document.querySelectorAll('#hist-tabs .tri-tab').forEach(x=>x.classList.toggle('active',x.dataset.tri===m));
@@ -3101,18 +3211,34 @@ project CLAUDE.md. Global defaults that travel with you.
   function syncUltraGate(seg){if(!seg)return;const active=seg.querySelector('button.active');const isPlan=!!active&&active.textContent.trim()==='Plan';
     const ultra=seg.parentElement.querySelector('.ultra-tog');if(ultra){ultra.classList.toggle('gated',!isPlan);if(!isPlan)ultra.classList.remove('on');}}
 
-  /* ===== v8p6: graph status badge → jump to the relevant surface ===== */
-  function statusJump(status){
-    if(status==='pending'){switchTab('feed','requests');}        /* needs your input */
-    else if(status==='active'){switchTab('prompt','history');}    /* in-flight → see what's been sent */
-    else{switchTab('prompt','compose');}                          /* idle → start a prompt */
+  /* ===== v8p6: graph status badge → jump to the relevant surface, scoped to the focused agent ===== */
+  function statusJump(status,el){
+    const key=el?agKeyFromNode(el.closest('.node')):FOCUS;const a=AG[key];
+    if(status==='pending'){switchTab('feed','inbox');                       /* needs your input → that agent's Inbox card */
+      const card=key&&document.querySelector('#feed-inbox .rcard[data-agent="'+key+'"]');
+      if(card){card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);}}
+    else if(status==='active'){switchTab('prompt','history');}              /* in-flight → see what's been sent */
+    else{switchTab('prompt','compose');if(a&&!a.user)replyTo(a.name);}      /* idle → start a prompt, pre-targeted */
   }
 
   /* ===== v8p6: Compose mic (voice dictation, mock) ===== */
   function toggleMic(b){b.classList.toggle('rec');const on=b.classList.contains('rec');b.title=on?'Listening… click to stop':'Dictate (voice → text)';}
   /* v1.2: attach an asset to the prompt — opens the Library → Assets picker; a newly attached image
      also registers in the Assets grid (Assets stays the single source of truth). Wired in the real build (mock). */
-  function composeAttach(b){/* mock */}
+  function composeAttach(b){switchTab('doc','assets');toast('Pick an asset to attach — Library → Assets (the single source of truth for media)');}
+  /* ===== Prompts Send / Revise (scripted demos) ===== */
+  function sendPrompt(){const tgt=[...document.querySelectorAll('#prompt-targets .agrow.on')].map(r=>(r.querySelector('.ag-name')||{}).textContent).filter(Boolean);
+    if(!tgt.length){toast('Pick at least one target (To)');return;}
+    const timing=((document.querySelector('#prompt-actions .split--primary .split-lbl')||{}).textContent||'Now').trim();
+    toast('Sent ('+timing+') to '+tgt.join(', '));}
+  function reviseDraft(){const scope=((document.querySelector('#revise-split .split-lbl')||{}).textContent||'Grammar').trim();toast('Revising draft ('+scope+')…');}
+  /* ===== Link Config Save / Delete (scripted demos) ===== */
+  function bumpLinks(d){const el=document.getElementById('foot-links');if(el){el.textContent=Math.max(0,(parseInt(el.textContent,10)||0)+d);}}
+  function linkSave(){const dir=((document.getElementById('link-dir')||{}).title||'A → B');
+    const trig=((document.querySelector('#link-drawer .seg button.active')||{}).textContent||'Queue').trim();
+    const pay=((document.querySelectorAll('#link-drawer .seg')[1]||document.createElement('div')).querySelector('button.active')||{}).textContent||'Message';
+    toast('Link saved — '+dir+' · '+trig+' · '+pay);toggleDrawer();bumpLinks(1);}
+  function linkDelete(){toast('Link removed');toggleDrawer();bumpLinks(-1);}
 
   /* ===== v8p6: Role combobox — options from user/project agent.md files; create-side prefills from front matter ===== */
   const ROLE_DEFS=[
@@ -3172,7 +3298,10 @@ project CLAUDE.md. Global defaults that travel with you.
   function histAct(a){const sel=document.querySelector('#hist-list .fcard.sel');
     if(a==='edit'){switchTab('prompt','compose');return;}
     if(a==='copy'&&sel){const b=sel.querySelector('.fcard-full');if(b&&navigator.clipboard)navigator.clipboard.writeText(b.textContent||'').catch(()=>{});return;}
-    /* retry / stop — wired to the runtime in the real build (mock here) */}
+    if(!sel){toast('Select a prompt first');return;}
+    const to=[...sel.querySelectorAll('.fcard-head .badge .b-name')].map(e=>e.textContent).join(', ')||'agent';
+    if(a==='retry'){toast('Retrying prompt to '+to+'…');}
+    else if(a==='stop'){toast('Stopping run on '+to);const db=sel.querySelector('.dbadge');if(db){db.className='dbadge db-held';db.textContent='Held';}}}
 
   /* ===== v8p8: Messages — multi-select cards + footer actions ===== */
   function selectMsgCard(el){el.classList.toggle('sel');}
@@ -3209,7 +3338,10 @@ project CLAUDE.md. Global defaults that travel with you.
     if(grp==='config')setGlobalConfirm(false);
     LU();
   }
-  function setSwitch(el){el.classList.toggle('on');el.title=el.classList.contains('on')?'Enabled':'Disabled';}   /* MCP / plugin enable-disable */
+  function setSwitch(el){if(el.classList.contains('sw-locked')){toast('Blocked — resolve the connection/OAuth issue first');return;}
+    el.classList.toggle('on');const on=el.classList.contains('on');el.title=on?'Enabled':'Disabled';
+    const row=el.closest('.reg-row');const nm=row?((row.querySelector('.reg-nm,.reg-name,b')||{}).textContent||'').trim():'';
+    toast((on?'Enabled ':'Disabled ')+(nm||'server')+(on?'':' — parked'));}   /* MCP / plugin enable-disable (scripted demo) */
   function pickPlain(btn){const g=btn.closest('.set-scope');if(g)g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));}
   function setGlobalConfirm(show){const c=document.getElementById('config-confirm');if(c)c.classList.toggle('show',!!show);}
   function askGlobalEdit(){setGlobalConfirm(true);const c=document.getElementById('config-confirm');if(c)c.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -3335,7 +3467,15 @@ project CLAUDE.md. Global defaults that travel with you.
       +'<div class="cmt-foot"><span class="flex-1"></span><button class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button class="btn-main btn-sm" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
     pop.classList.add('open');LU();pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   function openComposerFromCtl(btn){const ctl=btn.closest('[data-cmthost]');if(!ctl)return;if(ctl.classList.contains('is-off')){toast('Select a line or section first');return;}openComposer(ctl.dataset.cmthost,ctl.dataset.verdict||'approve');}
-  function saveComment(host){const pop=popFor(host);const vdd=pop?pop.querySelector('[data-vdd]'):null;const v=vdd?vdd.dataset.verdict:'approve';toast('Comment saved — marked '+VERDICT[v].lab);closeCmtPop(host);}
+  function saveComment(host){const pop=popFor(host);const vdd=pop?pop.querySelector('[data-vdd]'):null;const v=vdd?vdd.dataset.verdict:'approve';
+    const ta=pop?pop.querySelector('.cmt-ta'):null;const txt=ta?ta.value.trim():'';const sel=SELby[host];
+    /* Q3=B: append to feedback + re-render so tally/outline dot/rail badge/Feedback count update (thumbs stay cosmetic) */
+    const list=host.indexOf('doc-')===0?(DOC_FB[host]=DOC_FB[host]||[]):((PLANS.find(x=>x.id===host)||{}).feedback);
+    if(list&&sel&&sel.kind==='sec')list.push({sec:sel.ref,ag:'user',verdict:v,time:'now',comment:txt});
+    closeCmtPop(host);
+    if(host.indexOf('doc-')===0)renderDocView(host.replace('doc-',''));
+    else{renderPlans();reopenPlan(host);planNavMode(host,'feedback');}
+    toast('Comment saved — marked '+VERDICT[v].lab);}
   /* v9p14c: the Comment control is a plain icon button (the upload action + verdict split are gone — the
      verdict is chosen in the composer's "Mark as" dropdown); enabled once a line/section is selected */
   function commentCtlHTML(host){return '<button class="btn cmt-btn is-off" data-cmthost="'+host+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus" class="w-3.5 h-3.5"></i>Comment</button>';}
@@ -3439,10 +3579,10 @@ resize intact.`,
      then the decision trio (Revise · Reject · Approve) right-justified. (The separate upper strip is gone.) */
   function planFootHTML(p){let right;
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
-    else right='<button class="btn" onclick="planAct(\'revise\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
+    else right='<button class="btn" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
     return '<div class="plan-foot">'
-      +'<button class="btn" onclick="toast(\'Plan copied to clipboard\')" title="Copy the plan text"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy</button>'
-      +'<button class="btn" onclick="planAct(\'edit\')" title="Edit the plan"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>'
+      +'<button class="btn" onclick="planCopy(\''+p.id+'\')" title="Copy the plan text"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy</button>'
+      +'<button class="btn" onclick="planAct(\'edit\',\''+p.id+'\')" title="Edit the plan"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>'
       +commentCtlHTML(p.id)
       +sendGrpHTML('share','Share','share-'+p.id)+sendGrpHTML('review','Review','rev-'+p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
@@ -3472,12 +3612,26 @@ resize intact.`,
 
   /* FEED + HISTORY — expandable cards (Plan-style) with two-line agent badges; checkbox = multi-select */
   function dirTag(d){return d==='out'?'<span class="dir-tag dir-out">sent</span>':'<span class="dir-tag dir-in">recv</span>';}
+  /* typed message content blocks — rendered in the expanded card; the Include toggles show/hide them by kind */
+  const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
+  function msgBlockHTML(b){
+    if(b.k==='diff'){const lines=b.t.split('\n').map(l=>{const c=l[0]==='+'?'blk-add':(l[0]==='-'?'blk-del':'');return '<span class="'+c+'">'+esc(l)+'</span>';}).join('\n');
+      return '<div class="msg-blk blk-diff" data-blk="diff"><span class="msg-blk-lbl">diff</span>'+lines+'</div>';}
+    return '<div class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'"><span class="msg-blk-lbl">'+(MSG_KIND_LBL[b.k]||b.k)+'</span>'+esc(b.t)+'</div>';}
+  function msgBlocksHTML(o){return (o.blocks&&o.blocks.length)?'<div class="msg-blocks">'+o.blocks.map(msgBlockHTML).join('')+'</div>':'';}
+  /* apply the Messages minibar: Sent/Received hide whole cards by direction; Include hides blocks by kind */
+  function applyMsgFilters(){const bar=document.querySelector('#feed-messages .minibar');if(!bar)return;
+    const tog=lbl=>{const b=[...bar.querySelectorAll('.minitog')].find(x=>x.textContent.trim()===lbl);return b?b.classList.contains('on'):true;};
+    const dirOn={out:tog('Sent'),in:tog('Received')};
+    const km={Thoughts:'think',Read:'read',Write:'write',Bash:'bash',Diffs:'diff',Meta:'meta'};const kind={};Object.keys(km).forEach(l=>kind[km[l]]=tog(l));
+    document.querySelectorAll('#msg-list .fcard').forEach((c,i)=>{const o=MSGS[i];if(o&&o.dir)c.style.display=dirOn[o.dir]?'':'none';});
+    document.querySelectorAll('#msg-list .msg-blk').forEach(b=>{b.style.display=(kind[b.dataset.blk]!==false)?'':'none';});}
   function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
     +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
-    +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';}
+    +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div>'+msgBlocksHTML(o)+'</div></div>';}
   function logCardHTML(o){const a=AG[o.ag]||AG.user;return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
     +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
@@ -3503,14 +3657,33 @@ resize intact.`,
   function toggleAttPop(trig){const card=trig.closest('.fcard');if(!card)return;const pop=card.querySelector('.att-pop');if(!pop)return;
     const open=pop.classList.contains('open');closeAllPopups();if(!open){pop.classList.add('open');card.classList.add('att-open');LU();}}
   function openAttachment(e,tab){e.stopPropagation();closeAllPopups();switchTab('doc',tab);toast('Opening attachment in Library → '+(tab==='assets'?'Assets':'Documents'));}
+  /* Messages carry typed content blocks keyed to the six Include toggles (Thoughts/Read/Write/Bash/Diffs/Meta),
+     so the toggles have real content to filter. A block's data-blk = its kind; one card is an agent→agent relay. */
   const MSGS=[
-    {ag:'sandy',dir:'in',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`},
+    {ag:'sandy',dir:'in',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
+     blocks:[
+       {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
+       {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
+       {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
     {ag:'user',dir:'out',time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
-    {ag:'drew',dir:'in',time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`},
-    {ag:'vega',dir:'in',time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`},
-    {ag:'kai',dir:'in',time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`},
-    {ag:'sandy',dir:'in',time:'14:46',body:`From coder-01-max: patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`},
-    {ag:'max',dir:'in',time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`}
+    {ag:'drew',dir:'in',time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
+     blocks:[
+       {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
+       {k:'think',t:'The rate-limit finding is already covered by the gateway throttle — demote it to medium and keep the focus on the expiry bypass.'}]},
+    {ag:'vega',dir:'in',time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`,
+     blocks:[
+       {k:'diff',t:'  function validateToken(token) {\n-   return decode(token)\n+   const c = decode(token)\n+   if (c.exp < now()) throw new TokenExpired()\n+   return c\n  }'}]},
+    {ag:'kai',dir:'in',time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
+     blocks:[
+       {k:'write',t:'● Write  ~/.claude/shared/scratchpad.md (+18 −0)'}]},
+    {ag:'sandy',dir:'in',time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
+     blocks:[
+       {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
+    {ag:'max',dir:'in',time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
+     blocks:[
+       {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
+       {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
+       {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]}
   ];
   const SCRATCH=[
     {ag:'sandy',time:'14:33:07',body:`Posted finding: <b class="text-foreground">Token Expiry Bypass (CRITICAL)</b> — validateToken() accepts expired tokens; refresh issues new tokens indefinitely.`},
@@ -3536,17 +3709,29 @@ resize intact.`,
     {badge:'db-complete',status:'Complete',from:'kai',to:['max'],time:'14:30',att:[{name:'auth-token-rotation-shimmering-falcon.md',type:'doc'}],body:`Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.`}
   ];
   function renderFeed(){
-    const m=document.getElementById('msg-list');if(m)m.innerHTML=MSGS.map(fcardHTML).join('');
+    const m=document.getElementById('msg-list');if(m){m.innerHTML=MSGS.map(fcardHTML).join('');applyMsgFilters();}
     const s=document.getElementById('scratch-list');if(s)s.innerHTML=SCRATCH.map(fcardHTML).join('');
     const l=document.getElementById('log-list');if(l)l.innerHTML=LOG.map(logCardHTML).join('');
     const h=document.getElementById('hist-list');if(h)h.innerHTML=HIST.map(histCardHTML).join('');}
   function toggleFcard(btn){const c=btn.closest('.fcard');if(c)c.classList.toggle('open');LU();}
   function toggleCardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard,.rcard');if(c)c.classList.toggle('sel');}
-  function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel, #feed-requests .rcard.sel')];
+  function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel, #feed-inbox .rcard.sel')];
     if(sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full,.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
     toast(sel.length?('Copied '+sel.length+' card'+(sel.length>1?'s':'')):'Select cards first');}}
   function toggleSummary(){const ov=document.getElementById('feed-summary');if(!ov)return;const open=ov.classList.toggle('open');const btn=document.getElementById('summary-btn');if(btn)btn.classList.toggle('active',open);
-    if(open){const sel=document.querySelectorAll('#msg-list .fcard.sel').length;const c=document.getElementById('fo-count');if(c)c.textContent=(sel||7)+' messages';}LU();}
+    if(open){const sel=document.querySelectorAll('#msg-list .fcard.sel').length;const c=document.getElementById('fo-count');if(c)c.textContent=(sel?sel+' selected messages':'all '+MSGS.length+' messages');}LU();}
+
+  /* ===== Inbox (approvals) — resolve a card → toast, remove it, decrement the live badge (badge = fleet total) ===== */
+  function refreshInbox(){const n=document.querySelectorAll('#feed-inbox .rcard').length;
+    const b=document.getElementById('inbox-badge');if(b){b.textContent=n;b.style.display=n?'':'none';}
+    const aw=document.getElementById('inbox-await');if(aw)aw.textContent=n+' agent'+(n===1?'':'s')+' awaiting your input — one open request each';}
+  function inboxResolve(btn,verb){const card=btn.closest('.rcard');if(!card)return;const nm=((card.querySelector('.text-foreground.truncate')||{}).textContent||'agent').trim();
+    toast(verb+' — '+nm+' unblocked');card.style.transition='opacity .2s,transform .2s';card.style.opacity='0';card.style.transform='translateX(8px)';
+    setTimeout(()=>{card.remove();refreshInbox();},200);}
+  function inboxDecision(btn){const card=btn.closest('.rcard');const opt=card&&card.querySelector('.opt.on');if(!opt){toast('Select an option first');return;}
+    const nm=((card.querySelector('.text-foreground.truncate')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
+    toast('Approved '+lab+' — '+nm+' unblocked');card.style.transition='opacity .2s';card.style.opacity='0';
+    setTimeout(()=>{card.remove();refreshInbox();},200);}
 
   /* shared send-to-agents control (Share on the feed · Review on a plan) */
   let _tt=null;
@@ -3657,16 +3842,43 @@ resize intact.`,
   }
   function closeConsole(){const v=document.getElementById('console-view');if(!v)return;v.classList.remove('open');v.setAttribute('aria-hidden','true');}
 
+  /* ===== hover-card primitive: data-hc (+ optional data-hc-title) on any element; info-glyph on panel headers ===== */
+  function hcEl(){let p=document.getElementById('hcpop');if(!p){p=document.createElement('div');p.id='hcpop';p.innerHTML='<div class="hc-title"></div><div class="hc-body"></div>';document.body.appendChild(p);}return p;}
+  function showHC(t){const txt=t.getAttribute('data-hc');if(!txt)return;const p=hcEl();const title=t.getAttribute('data-hc-title')||'';
+    const tEl=p.querySelector('.hc-title');tEl.textContent=title;tEl.style.display=title?'':'none';p.querySelector('.hc-body').textContent=txt;
+    const r=t.getBoundingClientRect();p.style.left=Math.max(8,Math.min(r.left,window.innerWidth-276))+'px';p.classList.add('open');
+    let top=r.bottom+6;const ph=p.offsetHeight;if(top+ph>window.innerHeight-8)top=Math.max(8,r.top-ph-6);p.style.top=top+'px';}
+  function hideHC(){const p=document.getElementById('hcpop');if(p)p.classList.remove('open');}
+  document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('[data-hc]');if(t)showHC(t);});
+  document.addEventListener('mouseout',e=>{const t=e.target.closest&&e.target.closest('[data-hc]');if(t&&!(e.relatedTarget&&t.contains&&t.contains(e.relatedTarget)))hideHC();});
+  document.addEventListener('focusin',e=>{const t=e.target.closest&&e.target.closest('[data-hc]');if(t)showHC(t);});
+  document.addEventListener('focusout',hideHC);
+  /* pure-documentation content (no clickable links inside — routing stays on the real controls) */
+  const HC={
+    'Agent':"The selected agent — its identity, config, and live run state. Details (config + Context/Turns + Rewind/Handoff timeline) · Create (new-agent wizard) · Console (raw CLI feed + slash-command runner).",
+    'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending), subagent dots, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
+    'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
+    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent Filter (persists across all four tabs). Messages (team traffic; toggle direction + tool detail) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (approvals you owe — its badge is the fleet total).",
+    'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. From (single) sets who it's sent as; To (multi, led by the Scratch row) sets who receives it. Compose · Templates · History, with From/To persisting across all three.",
+    'Link Config':"Forwards context from one agent to another. Direction A→B / B→A / A↔B. Trigger (when it delivers): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue drains the queue (polite default) · Hold stages for your approval. Payload (what is sent): Message · Transcript · Manual. End After bounds this exchange — distinct from an agent's own Lifecycle limits."
+  };
+  function seedHoverCards(){document.querySelectorAll('.pcard-head h3').forEach(h=>{const k=h.textContent.trim();const d=HC[k];if(!d)return;
+    if(h.parentElement.querySelector('.hc-glyph'))return;
+    const g=document.createElement('button');g.type='button';g.className='hc-glyph';g.tabIndex=0;g.setAttribute('data-hc',d);g.setAttribute('data-hc-title',k);g.setAttribute('aria-label',k+' — what this panel does');g.innerHTML='<i data-lucide="info"></i>';
+    h.insertAdjacentElement('afterend',g);});LU();}
+
   /* ===== boot ===== */
   function boot(){
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
     renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
+    const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
     const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();
     if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);}
     document.querySelectorAll('[data-agscope]').forEach(s=>{agSync(s);updateAgBadges(s);updateSendCount(s);});
+    seedHoverCards();
     initResizers();updateFmt('fmt');LU();drawEdgesSoon();
   }
   if(document.readyState!=='loading')boot();else window.addEventListener('DOMContentLoaded',boot);
