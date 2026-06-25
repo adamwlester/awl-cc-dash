@@ -4,7 +4,7 @@
 >
 > **What** — Backlog of changes for the dashboard mockup, `design/mockup.html` (design reference in `design/DESIGN.md`; design values in `design/tokens.css`). Focused on the UI concept. The backlog is grouped by implementation effort.
 >
-> **How it's used** — The human writes rough notes under **Inbox**; an agent files each into the right section. Work gets driven either by promoting an item into **Next up** (then directing an agent there to implement and remove it) or by cutting any item into a fresh prompt. Nothing in the backlog is a work order until that happens.
+> **How it's used** — The human writes rough notes under **Inbox**; an agent files each into the right section. Work gets driven either by promoting an item into **Next up** (then directing an agent there to implement it; the human removes it after reviewing) or by cutting any item into a fresh prompt. Nothing in the backlog is a work order until that happens.
 
 ## How agents maintain this list
 
@@ -14,7 +14,7 @@
 >
 > **Format.** Each item is a numbered list entry — a **bold header**, then a concise description; bold only the header. E.g. `1. **Role Dropdown:** …`.
 >
-> **Numbering.** The backlog sections are lettered A–D; items are a numbered list within each, so a backlog item's ID is its section letter + list number (e.g. B7). Cross-reference related items by that ID (e.g. "see B17"), and update those refs if you reorder. **Next up** items and **Inbox** notes stay unlettered — Next up items are transient (built, then deleted), so they don't get stable IDs.
+> **Numbering.** The backlog sections are lettered A–D; items are a numbered list within each, so a backlog item's ID is its section letter + list number (e.g. B7). Cross-reference related items by that ID (e.g. "see B17"), and update those refs if you reorder. **Next up** items and **Inbox** notes stay unlettered — Next up items are transient (the human deletes each after reviewing the build), so they don't get stable IDs.
 >
 > **Group by effort** under the headings below (A Quick wins · B Big picture · C Needs research · D Housekeeping & docs). Keep like with like, order related items next to each other, and merge overlapping ones. **Next up** is separate — the active implementation queue (priority order, mixed effort).
 >
@@ -22,7 +22,7 @@
 > 1. **Build it in `design/mockup.html`** — that's where these changes land.
 > 2. **Work from `design/DESIGN.md` and `design/tokens.css`.** DESIGN.md is the design reference (intent, patterns); tokens.css is the single source of truth for every design value. Read both first and let them inform the change — don't hardcode a value that belongs in tokens.css.
 > 3. **Keep DESIGN.md in sync.** If a change alters design intent or adds/changes a pattern, update DESIGN.md to match, and confirm DESIGN.md and the mockup agree before you call the item done. If no DESIGN.md change is needed, confirm that explicitly.
-> 4. **Remove the item** from the list once done (and log it in DEVLOG per the project rule).
+> 4. **Leave the item in place when done — do not delete it.** Log the work in DEVLOG per the project rule and report what you changed; the human reviews the build and removes the item manually once satisfied.
 >
 > **Inbox.** The human keeps rough notes as a bullet list (one per line) under "Inbox" at the bottom. When asked to incorporate them, handle each note in turn:
 > 1. File it into the **appropriate section** — best fit by topic/effort, or whatever section the human names if they specify one (e.g. "Next up") — with a concise **bold header**, plus an ID (section letter + number) for backlog sections; Next up items get no letter.
@@ -98,15 +98,15 @@
 
 ## Next up
 
-> Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement and remove each item per the **Next up** steps in "How agents maintain this list." Empty by design when nothing is queued.
+> Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
+
+1. **Collapsible Inbox Cards:** Make the Team Feed → Inbox cards (`.inbox-card`) collapsible, and wire up the existing (currently non-functional) checkbox to select the card. Collapsed, a card should show down to its title (`.inbox-title`, e.g. "Run bash command" on the first card).
+2. **Pending Badge Selects Card:** Have the "Pending" status badge — which currently opens the Inbox — also select/highlight the relevant Inbox card.
+3. **Link Agents Drawer Right:** Open the Link Agents drawer (`#link-drawer`) on the right, if that's easy to implement, so the Team Graph cards stay visible while it's open.
 
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
-
-- Make the Team Feed_>Inbox cards collapsible and utilize the checkbox that is already there but not functional to select the card. The collapsed card should show everything down to the title (eg "Run bash command" in the first card).
-- Have the "Pending" badge click that currently opens the Inbox window also select/highlight the relevant card.
-- Have the Link Agents drawer open right if that is easy to implement so that we can see all the cards in the Team Graph when it is open.
 
 ## Scratch
 

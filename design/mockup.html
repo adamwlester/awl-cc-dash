@@ -5,6 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWL Multi-Agent Dashboard — v1.2 (neobrutalism)</title>
   <!--
+    v10p1 — TODO.md "A — Next up" batch (14 items 9–22; version badge unchanged at v1.2):
+      • INFO GLYPH (#9): the panel-header hover-card glyph is now a no-chrome muted `info` mark beside the
+        label (brightens on hover) — the old bordered circle broke the rounded-squares rule + mis-centered.
+      • ICON-ONLY ACTIONS (#10): Copy / Edit / Comment / Retry are mic-button-style icon-only buttons
+        everywhere (Plans footer, Team Feed strip, History strip, Documents/Assets footers); labeled
+        buttons (Summarize, Share, Review, Revise, Reject, Approve, Stop, Link to prompt) keep text.
+      • INBOX DANGER (#11): Deny + Reject use --danger; Approve stays pink, Always allow neutral.
+      • EXPANDED TIMESTAMP (#12): .fcard-time gets margin-left:auto so it stays right-pinned when expanded.
+      • CONSOLE PARTIAL EXPAND (#13): the Console step-into now stops at the left edge of #pRight (covers
+        left+middle only, right column stays visible); positionConsoleView() recomputes on resize/splitter.
+        Settings keeps its full-window step-into (deliberate difference).
+      • NATIVE TERMINAL FEED (#14): the Console feed faithfully mimics a real Claude Code CLI — dark surface,
+        native markers (> input · ●/⎿ tool+result · ✻ thinking · model/status line · +/− diff block ·
+        permission box) via a self-contained --term-* palette (a documented token-rule exception). Feed
+        only; agent bar / catalog / run bar / Expand stay neobrutalism.
+      • INBOX CARDS (#15): rebuilt data-driven from REQS — collapsible (identity+type badge+title) +
+        selectable like Log; data-agent lets a Pending badge jump-expand-highlight the card.
+      • MESSAGE STATUS BADGES (#16): received Messages lead with an Active/Complete badge (from msg data);
+        user-sent keep just the Sent tag.
+      • HISTORY CARDS (#17): adopt the Team Feed checkbox(multi-select)+expand-chevron split; footer stays
+        Copy/Edit/Retry(icon)+Stop, now multi-select.
+      • LIBRARY (#18–21): Assets rebuilt as a rail+preview (from ASSETS) like Documents; Documents+Assets
+        share a header (path + Created/Edited) + footer (Copy·Edit·Comment icons + Link to prompt + danger
+        Remove; Assets Edit greyed); nav rows are divs with ghost rename/trash; an Add menu (Add file /
+        Paste) replaces the Assets Paste/Upload toolbar.
+      • COMPOSE MERGE (#22): Templates folded into Compose (tabs = Compose · History). A Templates
+        sub-header (single-select dropdown None + saved + a greyed-until-active fill input) sits above a
+        contenteditable compose box; selecting a template inserts its body at the cursor (placeholders stay
+        clickable pills), None clears + re-greys.
     v1.2 — Agent CONSOLE tab (TODO.md "Next up" — raw terminal feed + slash-command catalog):
       • NEW TAB: the Agent panel gains a third tab — Details · Create · CONSOLE — scoped to the
         focused agent (so a command's target is one unambiguous agent; no multi-select). It pairs the
@@ -730,6 +759,14 @@
     .fill-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .fill-btn svg{ width:14px; height:14px; }
     .fill-btn--go{ background:var(--main); color:var(--main-foreground); }   /* Apply = primary commit */
+    .fill-btn:disabled{ opacity:.45; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
+    .tpl-fill textarea:disabled{ opacity:.5; background:var(--surface-3); cursor:not-allowed; }
+    /* v10p1 #22: the merged Compose box is a contenteditable rich field (so it can hold clickable
+       placeholder pills inline alongside free text); placeholders are contenteditable=false atoms. */
+    .compose-rich{ overflow-y:auto; resize:none; outline:none; white-space:pre-wrap; word-break:break-word; }
+    .compose-rich:focus{ box-shadow:var(--shadow-sm); }
+    .compose-rich .ph-text{ font-size:inherit; }
+    select.tpl-select{ cursor:pointer; height:32px; padding:0 9px; }
 
     /* ============================ link drawer (Sheet) ============================ */
     .drawer{ position:absolute; top:0; right:0; width:266px; height:100%; z-index:30; background:var(--secondary-background); border-left:2px solid var(--border); box-shadow:-6px 0 0 0 rgba(0,24,88,0.08); overflow-y:auto; animation:slideIn .15s ease; }
@@ -829,6 +866,19 @@
     .mic-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .mic-btn.rec{ background:var(--danger); color:#fff; }
     .mic-btn svg{ width:14px; height:14px; }
+    /* v10p1 #10: icon-only action button (mic-button style + hover tooltip via title) — used for the
+       Copy / Edit / Comment / Retry actions wherever they appear (Plans footer, Team Feed strip, History
+       strip, Documents/Assets footers). Labeled buttons (Summarize, Share, Review, Revise, Reject,
+       Approve, Stop, Link to prompt) keep their text. */
+    .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:0 0 auto; padding:0;
+      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground);
+      cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
+    .icon-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .icon-btn svg{ width:14px; height:14px; }
+    .icon-btn.is-off{ opacity:.5; cursor:not-allowed; }
+    .icon-btn.is-off:hover{ transform:none; box-shadow:var(--shadow-sm); }
+    .icon-btn--danger{ color:var(--danger); }
+    .icon-btn--danger:hover{ background:var(--danger-soft); }
 
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
     .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
@@ -842,6 +892,13 @@
     .db-permission{ background:var(--req-permission-soft); color:var(--req-permission); display:inline-flex; align-items:center; gap:4px; }
     .db-approval{ background:var(--req-approval-soft); color:var(--req-approval); display:inline-flex; align-items:center; gap:4px; }
     .db-decision{ background:var(--req-decision-soft); color:var(--req-decision); display:inline-flex; align-items:center; gap:4px; }
+    /* v10p1 #15: Inbox cards reuse the expandable .fcard shell — collapsed = identity + type badge +
+       title; expanded reveals the request detail + action row. */
+    .inbox-card .inbox-title{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .inbox-card .inbox-detail{ margin-top:2px; }
+    .inbox-card .inbox-acts{ display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap; }
+    .inbox-card .fcard-body{ padding-top:9px; }
+    .inbox-card .dbadge{ flex:0 0 auto; }
     /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
     .msg-blocks{ display:flex; flex-direction:column; gap:3px; margin-top:7px; }
     .msg-blk{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10px; line-height:1.5; padding:4px 7px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
@@ -850,9 +907,12 @@
     .msg-blk.blk-meta{ background:var(--secondary-background); color:var(--muted-2); }
     .msg-blk.blk-diff .blk-add{ color:var(--success); } .msg-blk.blk-diff .blk-del{ color:var(--danger); }
     /* ===== hover cards — documentation-through-design popovers (anchored + transient, not floating windows) ===== */
-    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:6px; border:2px solid var(--border); border-radius:999px; background:var(--surface-btn); color:var(--muted); cursor:help; flex:0 0 auto; padding:0; }
-    .hc-glyph svg{ width:9px; height:9px; stroke-width:2.5; }
-    .hc-glyph:hover,.hc-glyph:focus-visible{ background:var(--main); color:var(--icon-fg); outline:none; }
+    /* v10p1 #9: a no-chrome muted info glyph beside the panel label (no circle/border/fill — the circle
+       broke the "rounded squares" rule and mis-centered the icon); vertically centered to the title, it
+       just brightens on hover. The data-hc hover-card behavior is unchanged. */
+    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; margin-left:5px; border:none; border-radius:0; background:transparent; color:var(--muted-2); cursor:help; flex:0 0 auto; padding:0; vertical-align:middle; transition:color .12s; }
+    .hc-glyph svg{ width:13px; height:13px; stroke-width:2.5; }
+    .hc-glyph:hover,.hc-glyph:focus-visible{ background:transparent; color:var(--foreground); outline:none; }
     [data-hc]:not(.hc-glyph){ cursor:help; }
     #hcpop{ position:fixed; z-index:9999; max-width:264px; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:8px 10px; pointer-events:none; opacity:0; transform:translateY(-3px); transition:opacity .1s ease; }
     #hcpop.open{ opacity:1; transform:none; }
@@ -939,6 +999,41 @@
     .asset-detail-name{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:800; color:var(--foreground); }
     .asset-detail-meta{ font-size:9.5px; font-weight:600; color:var(--muted); }
     .asset-detail-actions{ display:flex; gap:6px; margin-top:2px; }
+
+    /* ============================ v10p1 #18-21 — Library: unified Documents/Assets cards, Assets rail+preview, nav rename/delete + Add menu ============================ */
+    /* shared header — file path + Created/Edited dates (a simplified Plans header; no owner/title/tally/steps) */
+    .doc-header{ display:flex; align-items:center; gap:8px 14px; flex-wrap:wrap; flex:0 0 auto; margin-bottom:8px; padding:7px 10px;
+      background:var(--surface-3); border:2px solid var(--border); border-radius:var(--radius-base); }
+    .doc-header .dh-path{ font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .doc-header .dh-dates{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
+    .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
+    /* shared footer — Copy · Edit · Comment (icon-only) + Link to prompt · Remove (danger, right) */
+    .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--rule); }
+    .doc-foot-l{ display:flex; align-items:center; gap:7px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
+    /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
+    .docnav-row{ position:relative; }
+    .docnav-acts{ display:flex; align-items:center; gap:1px; margin-left:auto; flex:0 0 auto; opacity:0; transition:opacity .12s; }
+    .docnav-row:hover .docnav-acts,.docnav-row.on .docnav-acts,.docnav-row:focus-within .docnav-acts{ opacity:1; }
+    .docnav-name-edit{ font-size:11px; font-weight:800; color:var(--foreground); background:var(--secondary-background); border:2px solid var(--border); border-radius:3px; padding:0 3px; width:100%; outline:none; font-family:inherit; }
+    /* Add menu (#20) — Add file / Paste, replacing the Assets Paste/Upload toolbar */
+    .docnav-addwrap{ position:relative; margin-top:auto; }
+    .docnav-addwrap .docnav-add{ width:100%; margin-top:0; }
+    .add-menu{ display:none; position:absolute; bottom:calc(100% + 5px); left:0; right:0; z-index:60; flex-direction:column; gap:2px;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:5px; }
+    .add-menu.open{ display:flex; }
+    .add-mi{ display:flex; flex-direction:column; gap:1px; width:100%; text-align:left; padding:6px 8px; border:2px solid transparent; border-radius:3px; background:transparent; cursor:pointer; }
+    .add-mi:hover{ background:var(--surface-3); }
+    .add-mi b{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:var(--foreground); }
+    .add-mi b svg{ width:13px; height:13px; color:var(--muted); }
+    .add-mi .add-sub{ font-size:9px; color:var(--muted); font-weight:600; padding-left:19px; }
+    /* Assets rail + preview (#18) — mirrors Documents (a rail of thumbnail + name, the selected asset's preview on the right) */
+    .assetnav-row .assetnav-thumb{ width:30px; height:24px; flex:0 0 auto; border:2px solid var(--border); border-radius:3px; display:flex; align-items:center; justify-content:center; color:var(--icon-fg); }
+    .assetnav-row .assetnav-thumb svg{ width:13px; height:13px; opacity:.9; }
+    .assetdoc{ display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
+    .assetdoc.on{ display:flex; }
+    .asset-preview{ flex:1 1 auto; min-height:0; overflow:hidden; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+    .asset-preview .ap-img{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--icon-fg); }
+    .asset-preview .ap-img svg{ width:54px; height:54px; opacity:.85; }
 
     /* ============================ v8p7 — Source dropdown (single-select, shows active selection) ============================ */
     .src-dd{ position:relative; }
@@ -1084,7 +1179,10 @@
     .fcard-chev{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); transition:transform .15s; margin-left:auto; }
     .fcard.open .fcard-chev{ transform:rotate(90deg); }
     .fcard-dir{ flex:0 0 auto; }
-    .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; }
+    /* v10p1 #12: the timestamp stays pinned to the card's right edge in BOTH states. Collapsed, the
+       grow-prev already pushes it right; expanded (prev hidden), margin-left:auto keeps it right instead
+       of collapsing left next to the badge. Applies to Messages / Scratch / Log / Inbox / History. */
+    .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; margin-left:auto; }
     .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--rule); }
     .fcard.open .fcard-body{ display:block; }
@@ -1354,18 +1452,46 @@
 
     /* ============================ v1.2 — Console: raw terminal feed + slash-command catalog (Agent panel tab + step-into) ============================ */
     /* --- shared bits (used in-column AND in the step-into view) --- */
-    .con-feed{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); border:2px solid var(--border);
-      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px 11px; margin:0;
-      font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.6; color:var(--foreground); }
+    /* v10p1 #14: the feed faithfully mimics a real Claude Code CLI on a dark terminal — a self-contained
+       --term-* palette (a DOCUMENTED EXCEPTION to the design-token rule, since a native terminal is not the
+       dashboard's neobrutalism surface). FEED ONLY: the agent bar, command catalog, run bar + Expand
+       control stay neobrutalism. Markers are rendered natively: `>` input · `●` tool calls with `⎿`
+       results · `✻ Thinking…` · a model/status line · `+`/`−` diffs · a permission-prompt box. */
+    .con-feed{ flex:1 1 auto; min-height:0; overflow-y:auto; border:2px solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:10px 12px; margin:0;
+      font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10.5px; line-height:1.65; letter-spacing:-0.01em;
+      --term-bg:#0e0e10; --term-fg:#d7d7d9; --term-dim:#7d7d82; --term-prompt:#8db1e6; --term-user:#eaeaec;
+      --term-bullet:#d18f6a; --term-tool:#eaeaec; --term-result:#9a9aa0; --term-think:#b89bd9; --term-asst:#d7d7d9;
+      --term-add:#7fc08a; --term-del:#e0828f; --term-success:#7fc08a; --term-accent:#d18f6a; --term-warn:#d9a05b;
+      --term-border:#34343a; --term-sel:#161620;
+      background:var(--term-bg); color:var(--term-fg); }
     .con-line{ white-space:pre-wrap; word-break:break-word; padding:0.5px 0; }
-    .con-line.l-cmd{ color:var(--main-foreground); background:var(--main-dim); border-radius:3px; padding:1px 5px; margin:2px 0; font-weight:700; }
-    .con-line.l-tool{ color:var(--foreground); font-weight:700; }
-    .con-line.l-tool .con-mk{ color:var(--secondary-foreground); }
-    .con-line.l-out{ color:var(--muted); }
-    .con-line.l-think{ color:var(--muted-2); font-style:italic; }
-    .con-line.l-asst{ color:var(--foreground); }
-    .con-line.l-sys{ color:var(--success-text); }
-    .con-line .con-mk{ display:inline-block; width:1.1em; }
+    .con-line .cmk-bullet{ color:var(--term-bullet); font-weight:800; }
+    .con-line .cmk-pipe{ color:var(--term-dim); }
+    .con-line .cmk-think{ color:var(--term-think); }
+    .con-line .cmk-prompt{ color:var(--term-prompt); font-weight:800; }
+    .con-line.l-cmd{ color:var(--term-user); background:transparent; border:none; padding:1px 0; margin:4px 0 1px; font-weight:600; }
+    .con-line.l-tool{ color:var(--term-tool); font-weight:600; margin-top:2px; }
+    .con-line.l-out,.con-line.l-result{ color:var(--term-result); }
+    .con-line.l-think{ color:var(--term-think); font-style:italic; }
+    .con-line.l-asst{ color:var(--term-asst); }
+    .con-line.l-sys{ color:var(--term-dim); }
+    .con-line.l-status{ color:var(--term-dim); border-bottom:1px solid var(--term-border); padding-bottom:5px; margin-bottom:4px; }
+    .con-line.l-ok{ color:var(--term-success); }
+    /* native +/− diff block */
+    .con-diff{ margin:1px 0 3px 1.5em; border-left:2px solid var(--term-border); }
+    .con-diff-ln{ white-space:pre-wrap; word-break:break-word; padding:0 9px; }
+    .con-diff-ln.cdiff-add{ color:var(--term-add); background:rgba(127,192,138,0.10); }
+    .con-diff-ln.cdiff-del{ color:var(--term-del); background:rgba(224,130,143,0.10); }
+    .con-diff-ln.cdiff-ctx{ color:var(--term-dim); }
+    /* native permission-prompt box */
+    .con-perm{ margin:7px 0 7px 1.5em; max-width:560px; border:1px solid var(--term-accent); border-radius:6px; background:var(--term-sel); padding:9px 12px; }
+    .con-perm-h{ font-weight:800; color:var(--term-tool); margin-bottom:2px; }
+    .con-perm-cmd{ color:var(--term-warn); margin-bottom:7px; white-space:pre-wrap; word-break:break-word; }
+    .con-perm-q{ color:var(--term-fg); margin-bottom:6px; }
+    .con-perm-opts{ display:flex; flex-direction:column; gap:2px; }
+    .con-perm-opt{ color:var(--term-dim); white-space:pre-wrap; }
+    .con-perm-opt.sel{ color:var(--term-accent); font-weight:700; }
 
     /* run bar (footer in-column — .pcard-foot pads it · bottom strip in the step-into view) */
     .con-run{ align-items:center; gap:6px; }
@@ -2048,21 +2174,31 @@
                    each doc as icon · name · path (path disambiguates project vs user CLAUDE.md). -->
               <div id="doc-documents" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
 
-                <!-- doc-switcher rail -->
+                <!-- doc-switcher rail — rows are <div role=button> so the ghost rename/delete icons nest legally (#21) -->
                 <nav class="docnav">
-                  <button class="docnav-row on" data-doc="readme" onclick="docPick(this,'readme')">
+                  <div class="docnav-row on" role="button" tabindex="0" data-doc="readme" onclick="docPick(this,'readme')">
                     <i data-lucide="file-text" class="docnav-ic"></i>
                     <span class="docnav-lab"><span class="docnav-name">README.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claude" onclick="docPick(this,'claude')">
+                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button><button class="ghost-ic ghost-ic--danger" title="Delete" onclick="navDelete(event,this)"><i data-lucide="trash-2"></i></button></span>
+                  </div>
+                  <div class="docnav-row" role="button" tabindex="0" data-doc="claude" onclick="docPick(this,'claude')">
                     <i data-lucide="file-text" class="docnav-ic"></i>
                     <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                  </button>
-                  <button class="docnav-row" data-doc="claudeuser" onclick="docPick(this,'claudeuser')">
+                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button><button class="ghost-ic ghost-ic--danger" title="Delete" onclick="navDelete(event,this)"><i data-lucide="trash-2"></i></button></span>
+                  </div>
+                  <div class="docnav-row" role="button" tabindex="0" data-doc="claudeuser" onclick="docPick(this,'claudeuser')">
                     <i data-lucide="file-text" class="docnav-ic"></i>
                     <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">~/.claude/</span></span>
-                  </button>
-                  <button class="docnav-add" title="Add a document to organize here" onclick="docAdd()"><i data-lucide="plus"></i>Add document</button>
+                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button><button class="ghost-ic ghost-ic--danger" title="Delete" onclick="navDelete(event,this)"><i data-lucide="trash-2"></i></button></span>
+                  </div>
+                  <!-- Add menu (#20): Add file (explorer) / Paste (clipboard, auto-named) -->
+                  <div class="docnav-addwrap">
+                    <button class="docnav-add" onclick="toggleAddMenu(event,this)"><i data-lucide="plus"></i>Add document</button>
+                    <div class="add-menu">
+                      <button class="add-mi" onclick="addDoc(event,'documents','file')"><b><i data-lucide="folder-open"></i>Add file</b><span class="add-sub">Open the explorer</span></button>
+                      <button class="add-mi" onclick="addDoc(event,'documents','paste')"><b><i data-lucide="clipboard"></i>Paste</b><span class="add-sub">From the clipboard, auto-named</span></button>
+                    </div>
+                  </div>
                 </nav>
 
                 <!-- editor host — one doc visible at a time -->
@@ -2070,13 +2206,7 @@
 
                   <!-- README.md -->
                   <div class="docdoc on" data-doc="readme">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/README.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-readme"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'readme')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-readme-edit')"><i data-lucide="copy"></i></button>
-                    </div>
+                    <div class="doc-header"><span class="dh-path">agent-dashboard/README.md</span><span class="dh-dates"><b>Created</b> Jun 17 · 7d ago&nbsp;&nbsp;<b>Edited</b> Jun 20 · 17h ago</span></div>
                     <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
 
@@ -2094,17 +2224,12 @@ without leaving the dashboard.
 ## Design system
 Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
 single pink-to-teal emphasis ladder.</textarea>
+                    <div class="doc-foot" data-libfoot="doc-readme" data-libkind="doc"></div>
                   </div>
 
                   <!-- CLAUDE.md (project) -->
                   <div class="docdoc" data-doc="claude">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">agent-dashboard/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claude"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claude')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claude-edit')"><i data-lucide="copy"></i></button>
-                    </div>
+                    <div class="doc-header"><span class="dh-path">agent-dashboard/CLAUDE.md</span><span class="dh-dates"><b>Created</b> Jun 16 · 8d ago&nbsp;&nbsp;<b>Edited</b> Jun 21 · 9h ago</span></div>
                     <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
 
@@ -2120,17 +2245,12 @@ the AWL multi-agent dashboard.
 - Keep DEVLOG.md current — an unlogged change never happened.
 - Write transient artifacts into .scratch/, never the repo root.
 - Preserve everything you weren't asked to change.</textarea>
+                    <div class="doc-foot" data-libfoot="doc-claude" data-libkind="doc"></div>
                   </div>
 
                   <!-- CLAUDE.md (user-level) -->
                   <div class="docdoc" data-doc="claudeuser">
-                    <div class="doc-toolbar">
-                      <span class="doc-path">~/.claude/CLAUDE.md</span>
-                      <span class="flex-1"></span>
-                      <span class="doc-cmt-slot" data-cmtfor="doc-claudeuser"></span>
-                      <button class="btn doc-edit-btn" onclick="docEdit(this,'claudeuser')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                      <button class="ghost-ic" title="Copy" onclick="copyField('doc-claudeuser-edit')"><i data-lucide="copy"></i></button>
-                    </div>
+                    <div class="doc-header"><span class="dh-path">~/.claude/CLAUDE.md</span><span class="dh-dates"><b>Created</b> May 28 · 27d ago&nbsp;&nbsp;<b>Edited</b> Jun 22 · 2d ago</span></div>
                     <div class="doc-view-host" id="doc-claudeuser-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-claudeuser-edit" style="display:none"># CLAUDE.md
 
@@ -2145,52 +2265,18 @@ project CLAUDE.md. Global defaults that travel with you.
 ## Conventions
 - Use markdown links for file references, not bare paths.
 - Match the project's existing patterns before introducing new ones.</textarea>
+                    <div class="doc-foot" data-libfoot="doc-claudeuser" data-libkind="doc"></div>
                   </div>
 
                 </div><!-- /docmain -->
               </div><!-- /doc-documents -->
 
-              <!-- ASSETS — reference images; the thumbnail grid IS the nav. Paste + upload to add;
-                   selecting a tile reveals a preview + per-asset actions (link-to-prompt, remove). -->
-              <div id="doc-assets" data-group="doc" class="hidden flex-1 min-h-0 flex flex-col p-2.5">
-                <div class="doc-toolbar">
-                  <span class="doc-path">project assets · 4 images</span>
-                  <span class="flex-1"></span>
-                  <button class="btn doc-edit-btn" onclick="assetPaste()"><i data-lucide="clipboard" class="w-3.5 h-3.5"></i>Paste</button>
-                  <button class="btn doc-edit-btn" onclick="assetUpload()"><i data-lucide="upload" class="w-3.5 h-3.5"></i>Upload</button>
-                </div>
-
-                <div class="asset-grid" id="asset-grid">
-                  <button class="asset-tile on" data-name="mockup-v9.png" data-meta="PNG · 1840×1120 · 412 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">mockup-v9.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="palette-ref.png" data-meta="PNG · 1200×800 · 188 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-violet),var(--ag-azure))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">palette-ref.png</span>
-                  </button>
-                  <button class="asset-tile" data-name="graph-sketch.jpg" data-meta="JPG · 1024×768 · 96 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-amber),var(--ag-gold))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">graph-sketch.jpg</span>
-                  </button>
-                  <button class="asset-tile" data-name="inbox-flow.png" data-meta="PNG · 1600×900 · 274 KB" onclick="assetPick(this)">
-                    <span class="asset-thumb" style="background:linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))"><i data-lucide="image"></i></span>
-                    <span class="asset-name">inbox-flow.png</span>
-                  </button>
-                </div>
-
-                <!-- selected-asset preview + actions -->
-                <div class="asset-detail on" id="asset-detail">
-                  <span class="asset-detail-thumb" id="asset-detail-thumb" style="background:linear-gradient(135deg,var(--main),var(--secondary))"><i data-lucide="image"></i></span>
-                  <div class="asset-detail-info">
-                    <div class="asset-detail-name" id="asset-detail-name">mockup-v9.png</div>
-                    <div class="asset-detail-meta" id="asset-detail-meta">PNG · 1840×1120 · 412 KB</div>
-                    <div class="asset-detail-actions">
-                      <button class="btn-secondary btn-sm" onclick="assetLink()"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>
-                      <button class="btn btn-sm" onclick="assetRemove()"><i data-lucide="trash-2" class="w-3 h-3"></i>Remove</button>
-                    </div>
-                  </div>
-                </div>
+              <!-- ASSETS (#18) — rebuilt as a rail + preview like Documents: a left list of thumbnail + name,
+                   the selected asset's preview on the right, with the shared header (#19) + footer (#19).
+                   The rail + preview + footer are rendered from the ASSETS array by renderAssets(). -->
+              <div id="doc-assets" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
+                <nav class="docnav assetnav" id="asset-nav"></nav>
+                <div class="docmain assetmain flex-1 min-h-0 flex flex-col" id="asset-main"></div>
               </div><!-- /doc-assets -->
 
             </div><!-- /pcard-body -->
@@ -2269,80 +2355,10 @@ project CLAUDE.md. Global defaults that travel with you.
             <!-- INBOX (approvals you owe — its badge is the fleet total) -->
             <div id="feed-inbox" data-group="feed" class="hidden flex-1 overflow-y-auto px-3 py-3" style="background:var(--background)">
               <div class="text-[9px] text-muted font-mono mb-2" id="inbox-await">4 agents awaiting your input — one open request each</div>
-              <div class="flex flex-col gap-2.5">
-
-                <div class="rcard" style="border-left:6px solid var(--req-permission)">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
-                    <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">auditor</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div>
-                    <span class="dbadge db-permission ml-auto"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
-                    <span class="rc-time">14:38</span>
-                  </div>
-                  <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
-                  <div class="rc-body" style="font-family:'JetBrains Mono',monospace;margin-top:1px">rm -rf node_modules &amp;&amp; pnpm install</div>
-                  <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="inboxResolve(this,'Denied')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,'Always allowed')">Always allow</button>
-                    <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
-                    <button class="btn btn-sm" onclick="replyTo('01 drew')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
-                  </div>
-                </div>
-
-                <div class="rcard" style="border-left:6px solid var(--req-approval)">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
-                    <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">researcher</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div>
-                    <span class="dbadge db-approval ml-auto"><i data-lucide="circle-check" style="width:10px;height:10px"></i>Approval</span>
-                    <span class="rc-time">14:41</span>
-                  </div>
-                  <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Merge remediation plan to main</div>
-                  <div class="rc-body" style="margin-top:1px">Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test</div>
-                  <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="reviewPlan('plan-1')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn btn-sm" onclick="inboxResolve(this,'Rejected')">Reject</button>
-                    <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
-                    <button class="btn btn-sm" onclick="replyTo('01 sandy')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
-                  </div>
-                </div>
-
-                <div class="rcard" style="border-left:6px solid var(--req-decision)">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span>
-                    <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">reviewer</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div>
-                    <span class="dbadge db-decision ml-auto"><i data-lucide="git-branch" style="width:10px;height:10px"></i>Decision</span>
-                    <span class="rc-time">14:44</span>
-                  </div>
-                  <div class="text-[11px] font-heading text-foreground mb-1.5" style="font-weight:800">Choose token rotation strategy</div>
-                  <div class="space-y-1.5">
-                    <button class="opt" onclick="pickDecision(this)"><span class="opt-nm">A · Sliding window</span><span class="opt-desc">Refresh extends expiry; simplest, slightly weaker on replay.</span></button>
-                    <button class="opt" onclick="pickDecision(this)"><span class="opt-nm">B · One-time rotation</span><span class="opt-desc">Each refresh invalidates the prior token; strongest, more churn.</span></button>
-                  </div>
-                  <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>
-                    <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
-                    <button class="btn btn-sm" onclick="replyTo('01 vega')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
-                  </div>
-                </div>
-
-                <div class="rcard" style="border-left:6px solid var(--req-permission)">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>
-                    <span class="agtile" style="width:26px;height:26px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span>
-                    <div class="min-w-0 leading-tight"><div class="text-[8px] text-muted font-bold uppercase">ops</div><div class="text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div>
-                    <span class="dbadge db-permission ml-auto"><i data-lucide="circle-alert" style="width:10px;height:10px"></i>Permission</span>
-                    <span class="rc-time">14:43</span>
-                  </div>
-                  <div class="text-[11px] font-heading text-foreground" style="font-weight:800">Run bash command</div>
-                  <div class="rc-body" style="font-family:'JetBrains Mono',monospace;margin-top:1px">kubectl apply -f deploy/prod.yaml</div>
-                  <div class="flex items-center gap-2 mt-2.5">
-                    <button class="btn-main btn-sm" onclick="inboxResolve(this,'Approved')">Approve</button><button class="btn btn-sm" onclick="inboxResolve(this,'Denied')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,'Always allowed')">Always allow</button>
-                    <span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>
-                    <button class="btn btn-sm" onclick="replyTo('01 sage')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>
-                  </div>
-                </div>
-
-              </div>
+              <!-- v10p1 #15: data-driven (from REQS), like Log — each card collapses to identity + type
+                   badge + title and expands to the request detail + actions; the checkbox multi-selects
+                   into the shared Copy/Share strip. data-agent lets a Pending badge jump expand + highlight. -->
+              <div id="inbox-list" class="flex flex-col gap-2.5"></div>
             </div>
 
             <!-- SCRATCH -->
@@ -2388,7 +2404,7 @@ project CLAUDE.md. Global defaults that travel with you.
         <!-- SHARED FEED ACTION STRIP (acts on selected cards across Messages/Scratch/Log/Inbox) -->
         <div class="pcard-foot px-2 py-2.5" id="feed-messages-actions">
           <div class="flex items-center gap-2">
-            <button class="btn" title="Copy selected cards" onclick="feedAct('copy')"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy</button>
+            <button class="icon-btn" title="Copy selected cards" onclick="feedAct('copy')"><i data-lucide="copy"></i></button>
             <button class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
             <!-- Share = shared send-to-agents control (item 13): agent target list + Send, styled like the Revise group -->
@@ -2414,7 +2430,6 @@ project CLAUDE.md. Global defaults that travel with you.
               <h3>Prompt</h3>
               <div class="tabset">
                 <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
-                <button data-tab-group="prompt" data-tab="templates" onclick="switchTab('prompt','templates')" class="tab-btn">Templates</button>
                 <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
               </div>
             </div>
@@ -2469,32 +2484,23 @@ project CLAUDE.md. Global defaults that travel with you.
               <!-- tab content -->
               <div class="flex-1 min-w-0 flex flex-col p-2.5 overflow-hidden">
 
-                <!-- COMPOSE -->
+                <!-- COMPOSE (v10p1 #22) — Templates + Compose merged into one tab. A "Templates" sub-header
+                     (single-select dropdown + a fill input, greyed until a template is active) sits above
+                     the main contenteditable compose box. Selecting a template inserts its body at the
+                     cursor (or appends) without wiping existing text; inserted placeholders stay clickable
+                     pills that target the fill input. -->
                 <div id="prompt-compose" data-group="prompt" class="flex-1 flex flex-col min-h-0">
-                  <div class="flex items-center gap-1.5 mb-1.5"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Compose</span><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyField('compose-field')"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearField('compose-field')"><i data-lucide="trash-2"></i></button></div>
-                  <textarea id="compose-field" class="in ta-resize flex-1 min-h-[90px] text-[12px] leading-relaxed">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</textarea>
-                </div>
-
-                <!-- TEMPLATES -->
-                <div id="prompt-templates" data-group="prompt" class="hidden flex-1 flex flex-col min-h-0">
-                  <div class="sec-h">Templates <span class="text-muted-2 font-semibold normal-case">12 saved</span></div>
-                  <div class="lib-list shrink-0" style="max-height:118px;overflow-y:auto">
-                    <button class="lib-row on" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Security audit request</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Code review request</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Refactor proposal</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Test coverage report</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Bug triage &amp; severity</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Architecture decision record</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Release notes draft</button>
-                    <button class="lib-row" onclick="selectLibRow(this)"><i data-lucide="file-text"></i>Incident postmortem</button>
-                  </div>
-                  <div class="sec-h mt-3">Preview <span class="text-muted-2 font-semibold normal-case">— tap a placeholder to fill it</span></div>
-                  <div class="tpl-view flex-1 min-h-[70px]">Run a focused security audit of <span class="ph-text filled" data-tag="{target_module}" data-value="src/auth/*" data-color="#008149" onclick="pickPlaceholder(this)">src/auth/*</span>. Flag anything at or above <span class="ph-text" data-tag="{severity_threshold}" data-color="#af3c3a" onclick="pickPlaceholder(this)">{severity_threshold}</span> severity, with a concrete exploit path for each finding. Post results to <span class="ph-text filled" data-tag="{destination}" data-value="the shared scratchpad" data-color="#7152b5" onclick="pickPlaceholder(this)">the shared scratchpad</span> grouped by severity, and notify <span class="ph-text" data-tag="{notify_agent}" data-color="#007f91" onclick="pickPlaceholder(this)">{notify_agent}</span> when the <span class="ph-text" data-tag="{format}" data-color="#aa4600" onclick="pickPlaceholder(this)">{format}</span> summary is ready.</div>
+                  <div class="sec-h">Templates <span class="text-muted-2 font-semibold normal-case">insert a saved template at the cursor</span></div>
+                  <select id="tpl-select" class="in tpl-select shrink-0" onchange="applyTemplate(this.value)">
+                    <option value="">None</option>
+                  </select>
                   <div class="tpl-fill mt-2 shrink-0">
-                    <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Select a placeholder above to fill it…"></textarea>
-                    <button class="fill-btn" title="Reset placeholder" onclick="resetPlaceholder()"><i data-lucide="rotate-ccw"></i></button>
-                    <button class="fill-btn fill-btn--go" title="Apply value" onclick="fillPlaceholder()"><i data-lucide="corner-down-left"></i></button>
+                    <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Select a template, then tap a placeholder…" disabled></textarea>
+                    <button class="fill-btn" title="Reset placeholder" onclick="resetPlaceholder()" disabled><i data-lucide="rotate-ccw"></i></button>
+                    <button class="fill-btn fill-btn--go" title="Apply value" onclick="fillPlaceholder()" disabled><i data-lucide="corner-down-left"></i></button>
                   </div>
+                  <div class="flex items-center gap-1.5 mb-1.5 mt-3"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Compose</span><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
+                  <div id="compose-field" class="in compose-rich flex-1 min-h-[90px] text-[12px] leading-relaxed" contenteditable="true">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</div>
                 </div>
 
                 <!-- HISTORY -->
@@ -2539,9 +2545,9 @@ project CLAUDE.md. Global defaults that travel with you.
             <!-- HISTORY ACTION STRIP (acts on the selected card) -->
             <div class="pcard-foot px-2 py-2.5 hidden" id="prompt-history-actions">
               <div class="flex items-center gap-2">
-                <button class="btn" title="Copy prompt" onclick="histAct('copy')"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy</button>
-                <button class="btn" title="Edit in Compose" onclick="histAct('edit')"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>
-                <button class="btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>Retry</button>
+                <button class="icon-btn" title="Copy prompt" onclick="histAct('copy')"><i data-lucide="copy"></i></button>
+                <button class="icon-btn" title="Edit in Compose" onclick="histAct('edit')"><i data-lucide="square-pen"></i></button>
+                <button class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
                 <div class="flex-1"></div>
                 <button class="btn-danger" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square" class="w-3.5 h-3.5"></i>Stop</button>
               </div>
@@ -2883,7 +2889,7 @@ project CLAUDE.md. Global defaults that travel with you.
     if(g==='doc'&&!document.getElementById('doc-'+t)){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     /* remap stale internal tab keys to the user-facing names (requests→inbox, library→templates) */
     if(g==='feed'&&t==='requests')t='inbox';
-    if(g==='prompt'&&t==='library')t='templates';
+    if(g==='prompt'&&(t==='templates'||t==='library'))t='compose';   /* v10p1 #22: Templates folded into Compose */
     document.querySelectorAll('[data-group="'+g+'"]').forEach(p=>p.classList.add('hidden'));
     const pane=document.getElementById(g+'-'+t); if(pane)pane.classList.remove('hidden');
     document.querySelectorAll('[data-tab-group="'+g+'"]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -2919,7 +2925,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function agAllNone(btn){const s=btn.closest('[data-agscope]');if(!s)return;const on=btn.dataset.act!=='none';s.querySelectorAll('.agrow').forEach(r=>r.classList.toggle('on',on));agSync(s);updateAgBadges(s);updateSendCount(s);}  /* contextual All / None toggle */
   function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(g.classList.contains('mode-seg'))syncUltraGate(g);}
   function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
-  function pickDecision(el){const c=el.closest('.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
+  function pickDecision(el){const c=el.closest('.fcard,.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
   function miniToggle(el){el.classList.toggle('on');applyMsgFilters();}
   function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllPopups();if(!open)m.classList.add('open');}
   function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const l=menu.closest('.split').querySelector('.split-lbl');if(l){const base=mi.dataset.short||mi.querySelector('b').textContent;l.textContent=(l.dataset.prefix||'')+base;}menu.classList.remove('open');}
@@ -2965,25 +2971,109 @@ project CLAUDE.md. Global defaults that travel with you.
     pane.querySelectorAll('.docnav-row').forEach(r=>r.classList.toggle('on',r===btn));
     pane.querySelectorAll('.docdoc').forEach(d=>d.classList.toggle('on',d.dataset.doc===name));LU();}
 
-  /* v1.2: Assets tab — thumbnail grid is the nav; a tile drives the preview/action strip.
-     Assets is the single source of truth for media (added here, or attached from a prompt). */
-  function assetPick(tile){const grid=document.getElementById('asset-grid');if(grid)grid.querySelectorAll('.asset-tile').forEach(t=>t.classList.toggle('on',t===tile));
-    const det=document.getElementById('asset-detail');if(det)det.classList.add('on');
-    const nm=document.getElementById('asset-detail-name'),mt=document.getElementById('asset-detail-meta'),th=document.getElementById('asset-detail-thumb');
-    if(nm)nm.textContent=tile.dataset.name||'';if(mt)mt.textContent=tile.dataset.meta||'';
-    const src=tile.querySelector('.asset-thumb');if(th&&src)th.style.background=src.style.background;}
-  function assetPaste(){/* paste an image from the clipboard into the Assets grid — wired in the real build (mock) */}
-  function assetUpload(){/* upload image file(s) into the Assets grid — wired in the real build (mock) */}
-  function assetLink(){/* attach the selected asset to a prompt (reuses the agent target picker) — wired in the real build (mock) */}
-  function assetRemove(){/* remove the selected asset from the library — wired in the real build (mock) */}
+  /* ===== v10p1 #18-21: Assets as a rail + preview (like Documents) + the shared Documents/Assets
+     header & footer + Add menu + nav-row rename/delete. Assets is the single source of truth for media. ===== */
+  const ASSETS=[
+    {id:'mockup-v9',name:'mockup-v9.png',path:'design/mockup-v9.png',meta:'PNG · 1840×1120 · 412 KB',created:'Jun 18 · 6d ago',edited:'Jun 20 · 18h ago',grad:'linear-gradient(135deg,var(--main),var(--secondary))'},
+    {id:'palette-ref',name:'palette-ref.png',path:'design/palette-ref.png',meta:'PNG · 1200×800 · 188 KB',created:'Jun 12 · 12d ago',edited:'Jun 12 · 12d ago',grad:'linear-gradient(135deg,var(--ag-violet),var(--ag-azure))'},
+    {id:'graph-sketch',name:'graph-sketch.jpg',path:'design/graph-sketch.jpg',meta:'JPG · 1024×768 · 96 KB',created:'Jun 10 · 14d ago',edited:'Jun 10 · 14d ago',grad:'linear-gradient(135deg,var(--ag-amber),var(--ag-gold))'},
+    {id:'inbox-flow',name:'inbox-flow.png',path:'design/inbox-flow.png',meta:'PNG · 1600×900 · 274 KB',created:'Jun 19 · 5d ago',edited:'Jun 19 · 5d ago',grad:'linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))'}
+  ];
+  let assetSel='mockup-v9';
+  function navActsHTML(){return '<span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button><button class="ghost-ic ghost-ic--danger" title="Delete" onclick="navDelete(event,this)"><i data-lucide="trash-2"></i></button></span>';}
+  function addMenuHTML(group){return '<div class="docnav-addwrap"><button class="docnav-add" onclick="toggleAddMenu(event,this)"><i data-lucide="plus"></i>Add '+(group==='assets'?'asset':'document')+'</button>'
+    +'<div class="add-menu"><button class="add-mi" onclick="addDoc(event,\''+group+'\',\'file\')"><b><i data-lucide="folder-open"></i>Add file</b><span class="add-sub">Open the explorer</span></button>'
+    +'<button class="add-mi" onclick="addDoc(event,\''+group+'\',\'paste\')"><b><i data-lucide="clipboard"></i>Paste</b><span class="add-sub">From the clipboard, auto-named</span></button></div></div>';}
+  function renderAssets(){const nav=document.getElementById('asset-nav'),main=document.getElementById('asset-main');if(!nav||!main)return;
+    if(ASSETS.length&&!ASSETS.find(a=>a.id===assetSel))assetSel=ASSETS[0].id;
+    nav.innerHTML=ASSETS.map(a=>'<div class="docnav-row assetnav-row'+(a.id===assetSel?' on':'')+'" role="button" tabindex="0" data-asset="'+a.id+'" onclick="assetPick(this)">'
+      +'<span class="assetnav-thumb" style="background:'+a.grad+'"><i data-lucide="image"></i></span>'
+      +'<span class="docnav-lab"><span class="docnav-name">'+esc(a.name)+'</span><span class="docnav-path">'+esc(a.meta.split(' · ').pop())+'</span></span>'
+      +navActsHTML()+'</div>').join('')+addMenuHTML('assets');
+    main.innerHTML=ASSETS.map(a=>'<div class="assetdoc'+(a.id===assetSel?' on':'')+'" data-asset="'+a.id+'">'
+      +'<div class="doc-header"><span class="dh-path">'+esc(a.path)+'</span><span class="dh-dates"><b>Created</b> '+a.created+'&nbsp;&nbsp;<b>Edited</b> '+a.edited+'</span></div>'
+      +'<div class="asset-preview"><span class="ap-img" style="background:'+a.grad+'"><i data-lucide="image"></i></span></div>'
+      +'<div class="doc-foot" data-libfoot="asset-'+a.id+'" data-libkind="asset"></div></div>').join('');
+    main.querySelectorAll('[data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});
+    LU();}
+  function assetPick(row){const id=row.dataset.asset;assetSel=id;
+    const nav=document.getElementById('asset-nav'),main=document.getElementById('asset-main');
+    if(nav)nav.querySelectorAll('.assetnav-row').forEach(r=>r.classList.toggle('on',r===row));
+    if(main)main.querySelectorAll('.assetdoc').forEach(d=>d.classList.toggle('on',d.dataset.asset===id));LU();}
+  /* shared Documents/Assets footer (#19): Copy · Edit · Comment (icon-only) + Link to prompt · Remove (danger, right).
+     Assets' Edit is present but greyed/disabled. */
+  function libFootHTML(host,kind){const isAsset=kind==='asset';
+    const edit=isAsset
+      ?'<button class="icon-btn is-off" disabled title="Images can\'t be edited"><i data-lucide="square-pen"></i></button>'
+      :'<button class="icon-btn doc-edit-btn" onclick="docEdit(this,\''+host.replace('doc-','')+'\')" title="Edit"><i data-lucide="square-pen"></i></button>';
+    const comment=isAsset
+      ?'<button class="icon-btn" onclick="libComment(\''+host+'\')" title="Comment on this asset"><i data-lucide="message-square-plus"></i></button>'
+      :commentCtlHTML(host);
+    return '<div class="doc-foot-l">'
+      +'<button class="icon-btn" onclick="libCopy(\''+host+'\',\''+kind+'\')" title="Copy"><i data-lucide="copy"></i></button>'
+      +edit+comment
+      +'<button class="btn-secondary btn-sm" onclick="libLink(\''+host+'\')" title="Attach to a prompt"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>'
+      +'</div>'
+      +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
+  function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
+  function libComment(host){toast('Comment on '+host.replace('asset-','')+' — mock');}
+  function libLink(host){switchTab('prompt','compose');toast('Linked '+host.replace(/^(doc|asset)-/,'')+' to a prompt');}
+  function libRemove(host,kind){if(kind==='asset'){const id=host.replace('asset-','');const i=ASSETS.findIndex(x=>x.id===id);if(i<0)return;const nm=ASSETS[i].name;ASSETS.splice(i,1);if(assetSel===id)assetSel=ASSETS.length?ASSETS[0].id:'';renderAssets();toast('Removed '+nm);return;}
+    const name=host.replace('doc-','');const pane=document.getElementById('doc-documents');if(!pane)return;
+    const row=pane.querySelector('.docnav-row[data-doc="'+name+'"]');const dd=pane.querySelector('.docdoc[data-doc="'+name+'"]');
+    if(row)row.remove();if(dd)dd.remove();const first=pane.querySelector('.docnav-row');if(first)docPick(first,first.dataset.doc);toast('Removed '+name+'.md');}
+  /* Add menu (#20) + nav-row rename/delete (#21), shared by Documents + Assets */
+  function toggleAddMenu(e,btn){e.stopPropagation();const w=btn.closest('.docnav-addwrap');const m=w.querySelector('.add-menu');const open=m.classList.contains('open');
+    document.querySelectorAll('.add-menu.open').forEach(x=>x.classList.remove('open'));if(!open)m.classList.add('open');}
+  function addDoc(e,group,how){if(e)e.stopPropagation();document.querySelectorAll('.add-menu.open').forEach(x=>x.classList.remove('open'));
+    if(how==='file'){toast((group==='assets'?'Add asset':'Add document')+' — choose a file in the explorer');return;}
+    if(group==='assets'){const n=ASSETS.filter(a=>/^pasted-/.test(a.id)).length+1;const id='pasted-'+n;
+      ASSETS.push({id:id,name:'pasted-'+n+'.png',path:'.scratch/pasted-'+n+'.png',meta:'PNG · clipboard · 64 KB',created:'now',edited:'now',grad:'linear-gradient(135deg,var(--ag-teal),var(--ag-citron))'});
+      assetSel=id;renderAssets();toast('Pasted image → pasted-'+n+'.png');}
+    else toast('Pasted clipboard → new document');}
+  function navRename(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');const lab=row.querySelector('.docnav-name');if(!lab||row.querySelector('.docnav-name-edit'))return;
+    const cur=lab.textContent;const inp=document.createElement('input');inp.className='docnav-name-edit';inp.value=cur;
+    lab.style.display='none';lab.parentElement.insertBefore(inp,lab);inp.focus();inp.select();inp.onclick=ev=>ev.stopPropagation();
+    const commit=()=>{const v=(inp.value.trim()||cur);lab.textContent=v;lab.style.display='';inp.remove();const a=ASSETS.find(x=>x.id===row.dataset.asset);if(a)a.name=v;toast('Renamed → '+v);};
+    inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();inp.blur();}else if(ev.key==='Escape'){inp.value=cur;inp.blur();}};inp.onblur=commit;}
+  function navDelete(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');if(!row)return;
+    if(row.classList.contains('assetnav-row'))libRemove('asset-'+row.dataset.asset,'asset');else libRemove('doc-'+row.dataset.doc,'doc');}
 
-  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
+  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open,.add-menu.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
 
-  /* ===== library placeholders ===== */
+  /* ===== Compose placeholders + merged Templates (v10p1 #22) ===== */
   let phSel=null;
-  function pickPlaceholder(el){document.querySelectorAll('.ph-text').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');phSel=el;const ta=document.getElementById('tpl-fill-input');if(!ta)return;ta.setAttribute('placeholder',el.dataset.tag||'');ta.value=el.dataset.value||'';autosize(ta);ta.focus();}
-  function fillPlaceholder(){if(!phSel)return;const ta=document.getElementById('tpl-fill-input');const v=ta.value.trim();phSel.dataset.value=v;if(v){phSel.classList.add('filled');phSel.textContent=v;}else{phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;}phSel.classList.add('sel');}
+  function setFillEnabled(on){const ta=document.getElementById('tpl-fill-input');const r=document.querySelector('#prompt-compose .fill-btn:not(.fill-btn--go)');const g=document.querySelector('#prompt-compose .fill-btn--go');
+    [ta,r,g].forEach(e=>{if(e)e.disabled=!on;});if(!on&&ta){ta.value='';}}
+  function pickPlaceholder(el){const f=document.getElementById('compose-field')||document;f.querySelectorAll('.ph-text').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');phSel=el;
+    setFillEnabled(true);const ta=document.getElementById('tpl-fill-input');if(!ta)return;ta.setAttribute('placeholder',el.dataset.tag||'');ta.value=el.dataset.value||'';autosize(ta);ta.focus();}
+  function fillPlaceholder(){if(!phSel){toast('Tap a placeholder pill first');return;}const ta=document.getElementById('tpl-fill-input');const v=ta.value.trim();phSel.dataset.value=v;if(v){phSel.classList.add('filled');phSel.textContent=v;}else{phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;}phSel.classList.add('sel');}
   function resetPlaceholder(){if(!phSel)return;phSel.dataset.value='';phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;const ta=document.getElementById('tpl-fill-input');if(ta){ta.value='';autosize(ta);ta.focus();}}
+  /* a placeholder pill — contenteditable=false so it stays an atomic, clickable token inside the box */
+  function phSpan(tag,value){const filled=value!=null&&value!=='';
+    return '<span class="ph-text'+(filled?' filled':'')+'" data-tag="'+esc(tag)+'"'+(filled?' data-value="'+esc(value)+'"':'')+' contenteditable="false" onclick="pickPlaceholder(this)">'+esc(filled?value:tag)+'</span>';}
+  const TEMPLATES=[
+    {name:'Security audit request',body:()=>'Run a focused security audit of '+phSpan('{target_module}','src/auth/*')+'. Flag anything at or above '+phSpan('{severity_threshold}')+' severity, with a concrete exploit path for each finding. Post results to '+phSpan('{destination}','the shared scratchpad')+' grouped by severity, and notify '+phSpan('{notify_agent}')+' when the '+phSpan('{format}')+' summary is ready.'},
+    {name:'Code review request',body:()=>'Review the diff on '+phSpan('{branch}','feature/*')+' for '+phSpan('{focus}','correctness & security')+'. Call out blocking issues first, then nits, and confirm the '+phSpan('{test_scope}')+' tests cover the change before approving.'},
+    {name:'Refactor proposal',body:()=>'Propose a refactor of '+phSpan('{module}')+' to improve '+phSpan('{goal}','readability')+'. Keep behavior identical, lay the steps out as a checklist, and flag any risky '+phSpan('{risk_area}')+' touchpoints.'},
+    {name:'Bug triage & severity',body:()=>'Triage '+phSpan('{issue}')+': reproduce it, assign a severity ('+phSpan('{severity}')+'), identify the root cause, and suggest an owner. Post the writeup to '+phSpan('{destination}','the scratchpad')+'.'}
+  ];
+  function buildTemplateOptions(){const sel=document.getElementById('tpl-select');if(!sel)return;
+    sel.innerHTML='<option value="">None</option>'+TEMPLATES.map((t,i)=>'<option value="'+i+'">'+esc(t.name)+'</option>').join('');}
+  let composeRange=null;
+  function composeField(){return document.getElementById('compose-field');}
+  function saveComposeRange(){const f=composeField();if(!f)return;const sel=window.getSelection();if(sel&&sel.rangeCount){const r=sel.getRangeAt(0);if(f.contains(r.commonAncestorContainer))composeRange=r.cloneRange();}}
+  /* select a template → insert its body at the cursor (or append if the box isn't focused) without wiping
+     existing text; None clears the active template + re-greys the fill input. The box stays fully editable. */
+  function applyTemplate(idx){const f=composeField();if(!f)return;
+    if(idx===''){phSel=null;setFillEnabled(false);f.querySelectorAll('.ph-text.sel').forEach(p=>p.classList.remove('sel'));return;}
+    const t=TEMPLATES[parseInt(idx,10)];if(!t)return;
+    const frag=document.createRange().createContextualFragment(' '+t.body()+' ');
+    if(composeRange&&f.contains(composeRange.commonAncestorContainer)){composeRange.collapse(false);composeRange.insertNode(frag);}
+    else f.appendChild(frag);
+    setFillEnabled(true);LU();}
+  function copyCompose(){const f=composeField();if(f&&navigator.clipboard)navigator.clipboard.writeText(f.innerText||f.textContent||'').catch(()=>{});toast('Compose copied');}
+  function clearCompose(){const f=composeField();if(f){f.innerHTML='';composeRange=null;f.focus();}}
 
   /* ===== node selection — SELECTION DRIVES THE APP: clicking a card repaints the whole Agent panel
      (identity, config readouts, Ctx/Turns) + the Console from that focused agent. (scripted demo) ===== */
@@ -2996,7 +3086,7 @@ project CLAUDE.md. Global defaults that travel with you.
     if(!r)return null;const i=r.querySelector('.pbar i');const pct=i?parseFloat(i.style.width):null;const val=(r.querySelector('.nbv')||{}).textContent||'';return{pct:pct,val:val};}
   function repaintConsoleIdentity(a){document.querySelectorAll('.con-agentbar').forEach(bar=>{const t=bar.querySelector('.agtile');if(t){t.style.color=a.color;const u=t.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
     const r=bar.querySelector('[data-con-role]');if(r)r.textContent=a.role;const nm=bar.querySelector('[data-con-name]');if(nm)nm.textContent=a.name;});
-    if(CON_FEED&&CON_FEED.length)CON_FEED[0].t=a.role+' · '+a.name+' — claude code (opus 4.8) · auto · think on';}
+    if(CON_FEED&&CON_FEED.length)CON_FEED[0].t=a.role+' · '+a.name+' — claude-code v2.0.14 · model: opus 4.8 · cwd: ~/agent-dashboard';}
   function repaintAgentPanel(n,key){const a=AG[key];if(!a)return;
     const tile=document.getElementById('det-tile');if(tile){tile.style.color=a.color;const u=tile.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
     const role=document.getElementById('det-role');if(role)role.textContent=a.role;
@@ -3215,8 +3305,8 @@ project CLAUDE.md. Global defaults that travel with you.
   function statusJump(status,el){
     const key=el?agKeyFromNode(el.closest('.node')):FOCUS;const a=AG[key];
     if(status==='pending'){switchTab('feed','inbox');                       /* needs your input → that agent's Inbox card */
-      const card=key&&document.querySelector('#feed-inbox .rcard[data-agent="'+key+'"]');
-      if(card){card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);}}
+      const card=key&&document.querySelector('#feed-inbox .fcard[data-agent="'+key+'"]');
+      if(card){card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);LU();}}   /* v10p1 #15: expand + highlight the agent's card, not just switch tabs */
     else if(status==='active'){switchTab('prompt','history');}              /* in-flight → see what's been sent */
     else{switchTab('prompt','compose');if(a&&!a.user)replyTo(a.name);}      /* idle → start a prompt, pre-targeted */
   }
@@ -3295,13 +3385,12 @@ project CLAUDE.md. Global defaults that travel with you.
     const wasOpen=card.classList.contains('open');
     if(root)root.querySelectorAll('.fcard').forEach(c=>{c.classList.remove('sel');c.classList.remove('open');});
     card.classList.add('sel');card.classList.toggle('open',!wasOpen);LU();}
-  function histAct(a){const sel=document.querySelector('#hist-list .fcard.sel');
+  function histAct(a){const sel=[...document.querySelectorAll('#hist-list .fcard.sel')];
     if(a==='edit'){switchTab('prompt','compose');return;}
-    if(a==='copy'&&sel){const b=sel.querySelector('.fcard-full');if(b&&navigator.clipboard)navigator.clipboard.writeText(b.textContent||'').catch(()=>{});return;}
-    if(!sel){toast('Select a prompt first');return;}
-    const to=[...sel.querySelectorAll('.fcard-head .badge .b-name')].map(e=>e.textContent).join(', ')||'agent';
-    if(a==='retry'){toast('Retrying prompt to '+to+'…');}
-    else if(a==='stop'){toast('Stopping run on '+to);const db=sel.querySelector('.dbadge');if(db){db.className='dbadge db-held';db.textContent='Held';}}}
+    if(!sel.length){toast('Select a prompt first');return;}
+    if(a==='copy'){if(navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}toast('Copied '+sel.length+' prompt'+(sel.length>1?'s':''));return;}
+    if(a==='retry'){toast('Retrying '+sel.length+' prompt'+(sel.length>1?'s':'')+'…');return;}
+    if(a==='stop'){toast('Stopping '+sel.length+' run'+(sel.length>1?'s':''));sel.forEach(s=>{const db=s.querySelector('.dbadge');if(db){db.className='dbadge db-held';db.textContent='Held';}});}}
 
   /* ===== v8p8: Messages — multi-select cards + footer actions ===== */
   function selectMsgCard(el){el.classList.toggle('sel');}
@@ -3415,7 +3504,7 @@ project CLAUDE.md. Global defaults that travel with you.
     setCmtCtl(host,true);}
   function renderDocView(name){const ta=document.getElementById('doc-'+name+'-edit'),view=document.getElementById('doc-'+name+'-view');if(ta&&view)view.innerHTML=mdEditorHTML('doc-'+name,ta.value);}
   function renderDocs(){['readme','claude','claudeuser'].forEach(renderDocView);
-    document.querySelectorAll('[data-cmtfor]').forEach(s=>{s.innerHTML=commentCtlHTML(s.dataset.cmtfor);});LU();}
+    document.querySelectorAll('#doc-documents [data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});LU();}   /* v10p1 #19: each doc gets the shared header (static) + footer (Copy·Edit·Comment·Link·Remove) */
 
   /* 3-state verdicts (stroke icons, verdict-colored): Approve / Revise / Block */
   const VERDICT={approve:{ic:'circle-check',cls:'v-approve',lab:'Approve'},revise:{ic:'triangle-alert',cls:'v-revise',lab:'Revise'},block:{ic:'circle-x',cls:'v-block',lab:'Block'}};
@@ -3478,7 +3567,7 @@ project CLAUDE.md. Global defaults that travel with you.
     toast('Comment saved — marked '+VERDICT[v].lab);}
   /* v9p14c: the Comment control is a plain icon button (the upload action + verdict split are gone — the
      verdict is chosen in the composer's "Mark as" dropdown); enabled once a line/section is selected */
-  function commentCtlHTML(host){return '<button class="btn cmt-btn is-off" data-cmthost="'+host+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus" class="w-3.5 h-3.5"></i>Comment</button>';}
+  function commentCtlHTML(host){return '<button class="icon-btn cmt-btn is-off" data-cmthost="'+host+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button>';}
   function openFeedback(host){if(document.getElementById(host))planNavMode(host,'feedback');}
 
   /* PLANS — seeded from real ~/.claude/plans/*.md markdown (rendered verbatim, line-numbered) */
@@ -3581,8 +3670,8 @@ resize intact.`,
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
     else right='<button class="btn" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
     return '<div class="plan-foot">'
-      +'<button class="btn" onclick="planCopy(\''+p.id+'\')" title="Copy the plan text"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy</button>'
-      +'<button class="btn" onclick="planAct(\'edit\',\''+p.id+'\')" title="Edit the plan"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit</button>'
+      +'<button class="icon-btn" onclick="planCopy(\''+p.id+'\')" title="Copy the plan text"><i data-lucide="copy"></i></button>'
+      +'<button class="icon-btn" onclick="planAct(\'edit\',\''+p.id+'\')" title="Edit the plan"><i data-lucide="square-pen"></i></button>'
       +commentCtlHTML(p.id)
       +sendGrpHTML('share','Share','share-'+p.id)+sendGrpHTML('review','Review','rev-'+p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
@@ -3628,7 +3717,9 @@ resize intact.`,
     document.querySelectorAll('#msg-list .msg-blk').forEach(b=>{b.style.display=(kind[b.dataset.blk]!==false)?'':'none';});}
   function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
-    +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
+    +'<button class="fcard-exp" onclick="toggleFcard(this)">'
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+(o.status==='active'?'Active':'Complete')+'</span>':'')   /* v10p1 #16: status badge leads the agent icon on received messages (Active green / Complete muted); user-sent keep just the sent tag */
+    +badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
     +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div>'+msgBlocksHTML(o)+'</div></div>';}
@@ -3638,8 +3729,12 @@ resize intact.`,
     +'<span class="fcard-prev fcard-log"'+(o.warn?' style="color:var(--warning)"':'')+'>'+o.txt+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
     +'<div class="fcard-body"><div class="fcard-full fcard-log">'+a.name+' · '+o.txt+(o.warn?' · awaiting your input':'')+'</div></div></div>';}
   function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeHTML(AG[k],true)).join('');if(keys.length>cap)h+='<span class="badge-more" style="height:26px">+'+(keys.length-cap)+'</span>';return h;}
+  /* v10p1 #17: History cards take the same checkbox (multi-select) + expand-chevron split as the Team Feed
+     cards — card-sel toggles selection without expanding; fcard-exp expands. Footer actions stay
+     History-specific (Copy/Edit/Retry icons + Stop). */
   function histCardHTML(o){const a=AG[o.from];return '<div class="fcard'+(o.sel?' sel open':'')+'" data-histcard>'
-    +'<div class="fcard-head"><button class="fcard-exp" onclick="selectHistCard(this)">'
+    +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
+    +'<button class="fcard-exp" onclick="toggleFcard(this)">'
     +'<span class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,true)
     +'<i data-lucide="arrow-right" style="width:12px;height:12px;color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
     +'<span class="flex-1"></span>'+attTrigHTML(o)
@@ -3660,26 +3755,26 @@ resize intact.`,
   /* Messages carry typed content blocks keyed to the six Include toggles (Thoughts/Read/Write/Bash/Diffs/Meta),
      so the toggles have real content to filter. A block's data-blk = its kind; one card is an agent→agent relay. */
   const MSGS=[
-    {ag:'sandy',dir:'in',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
+    {ag:'sandy',dir:'in',status:'complete',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
      blocks:[
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
     {ag:'user',dir:'out',time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
-    {ag:'drew',dir:'in',time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
+    {ag:'drew',dir:'in',status:'complete',time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
        {k:'think',t:'The rate-limit finding is already covered by the gateway throttle — demote it to medium and keep the focus on the expiry bypass.'}]},
-    {ag:'vega',dir:'in',time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`,
+    {ag:'vega',dir:'in',status:'complete',time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`,
      blocks:[
        {k:'diff',t:'  function validateToken(token) {\n-   return decode(token)\n+   const c = decode(token)\n+   if (c.exp < now()) throw new TokenExpired()\n+   return c\n  }'}]},
-    {ag:'kai',dir:'in',time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
+    {ag:'kai',dir:'in',status:'complete',time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
      blocks:[
        {k:'write',t:'● Write  ~/.claude/shared/scratchpad.md (+18 −0)'}]},
-    {ag:'sandy',dir:'in',time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
+    {ag:'sandy',dir:'in',status:'complete',time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
-    {ag:'max',dir:'in',time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
+    {ag:'max',dir:'in',status:'active',time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
@@ -3712,24 +3807,58 @@ resize intact.`,
     const m=document.getElementById('msg-list');if(m){m.innerHTML=MSGS.map(fcardHTML).join('');applyMsgFilters();}
     const s=document.getElementById('scratch-list');if(s)s.innerHTML=SCRATCH.map(fcardHTML).join('');
     const l=document.getElementById('log-list');if(l)l.innerHTML=LOG.map(logCardHTML).join('');
-    const h=document.getElementById('hist-list');if(h)h.innerHTML=HIST.map(histCardHTML).join('');}
+    const h=document.getElementById('hist-list');if(h)h.innerHTML=HIST.map(histCardHTML).join('');
+    renderInbox();}
   function toggleFcard(btn){const c=btn.closest('.fcard');if(c)c.classList.toggle('open');LU();}
   function toggleCardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard,.rcard');if(c)c.classList.toggle('sel');}
-  function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel, #feed-inbox .rcard.sel')];
-    if(sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full,.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
+  function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel')];
+    if(sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
     toast(sel.length?('Copied '+sel.length+' card'+(sel.length>1?'s':'')):'Select cards first');}}
   function toggleSummary(){const ov=document.getElementById('feed-summary');if(!ov)return;const open=ov.classList.toggle('open');const btn=document.getElementById('summary-btn');if(btn)btn.classList.toggle('active',open);
     if(open){const sel=document.querySelectorAll('#msg-list .fcard.sel').length;const c=document.getElementById('fo-count');if(c)c.textContent=(sel?sel+' selected messages':'all '+MSGS.length+' messages');}LU();}
 
-  /* ===== Inbox (approvals) — resolve a card → toast, remove it, decrement the live badge (badge = fleet total) ===== */
-  function refreshInbox(){const n=document.querySelectorAll('#feed-inbox .rcard').length;
+  /* ===== Inbox (approvals you owe) — data-driven (REQS), expandable + selectable like Log =====
+     v10p1 #15: each card collapses to identity + type badge + title; expand reveals the detail + actions.
+     The checkbox multi-selects (shared Copy/Share strip). data-agent lets a Pending badge jump-expand it.
+     #11: Reject + Deny use the danger color; Approve stays pink-primary, Always allow stays neutral. */
+  const REQ_META={
+    permission:{cls:'db-permission',ic:'circle-alert',lab:'Permission',edge:'var(--req-permission)'},
+    approval:{cls:'db-approval',ic:'circle-check',lab:'Approval',edge:'var(--req-approval)'},
+    decision:{cls:'db-decision',ic:'git-branch',lab:'Decision',edge:'var(--req-decision)'}
+  };
+  const REQS=[
+    {ag:'drew',type:'permission',time:'14:38',title:'Run bash command',cmd:'rm -rf node_modules && pnpm install'},
+    {ag:'sandy',type:'approval',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
+    {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
+      {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
+      {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
+    {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'}
+  ];
+  function inboxReplyHTML(a){return '<span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>'
+    +'<button class="btn btn-sm" onclick="replyTo(\''+a.name+'\')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}
+  function inboxCardHTML(o){const a=AG[o.ag];const m=REQ_META[o.type];let detail,acts;
+    if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,\'Always allowed\')">Always allow</button>'+inboxReplyHTML(a);}
+    else if(o.type==='approval'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Rejected\')">Reject</button>'+inboxReplyHTML(a);}
+    else{detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
+      acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML(a);}
+    return '<div class="fcard inbox-card" data-agent="'+o.ag+'" style="border-left:6px solid '+m.edge+'">'
+      +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
+      +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
+      +'<span class="dbadge '+m.cls+'"><i data-lucide="'+m.ic+'" style="width:10px;height:10px"></i>'+m.lab+'</span>'
+      +'<span class="inbox-title">'+esc(o.title)+'</span>'
+      +'<span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+      +'<div class="fcard-body"><div class="inbox-detail">'+detail+'</div><div class="inbox-acts">'+acts+'</div></div></div>';}
+  function renderInbox(){const el=document.getElementById('inbox-list');if(el){el.innerHTML=REQS.map(inboxCardHTML).join('');LU();}refreshInbox();}
+  function refreshInbox(){const n=document.querySelectorAll('#feed-inbox .fcard').length;
     const b=document.getElementById('inbox-badge');if(b){b.textContent=n;b.style.display=n?'':'none';}
     const aw=document.getElementById('inbox-await');if(aw)aw.textContent=n+' agent'+(n===1?'':'s')+' awaiting your input — one open request each';}
-  function inboxResolve(btn,verb){const card=btn.closest('.rcard');if(!card)return;const nm=((card.querySelector('.text-foreground.truncate')||{}).textContent||'agent').trim();
+  function inboxResolve(btn,verb){const card=btn.closest('.fcard');if(!card)return;const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();
     toast(verb+' — '+nm+' unblocked');card.style.transition='opacity .2s,transform .2s';card.style.opacity='0';card.style.transform='translateX(8px)';
     setTimeout(()=>{card.remove();refreshInbox();},200);}
-  function inboxDecision(btn){const card=btn.closest('.rcard');const opt=card&&card.querySelector('.opt.on');if(!opt){toast('Select an option first');return;}
-    const nm=((card.querySelector('.text-foreground.truncate')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
+  function inboxDecision(btn){const card=btn.closest('.fcard');const opt=card&&card.querySelector('.opt.on');if(!opt){toast('Select an option first');return;}
+    const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
     toast('Approved '+lab+' — '+nm+' unblocked');card.style.transition='opacity .2s';card.style.opacity='0';
     setTimeout(()=>{card.remove();refreshInbox();},200);}
 
@@ -3745,18 +3874,22 @@ resize intact.`,
 
   /* ===== v1.2: Console — raw feed + slash-command catalog (scoped to the focused agent) ===== */
   const CON_FEED=[
-    {c:'l-out', t:'researcher · 01 sandy — claude code (opus 4.8) · auto · think on'},
+    {c:'l-status',t:'researcher · 01 sandy — claude-code v2.0.14 · model: opus 4.8 · cwd: ~/agent-dashboard'},
     {c:'l-cmd', t:'> audit the session + token-refresh path in src/auth for fixation risks'},
-    {c:'l-tool',t:'● Bash  grep -rn "refreshToken" src/auth'},
-    {c:'l-out', t:'  ⎿ 6 matches across session.ts, tokens.ts'},
-    {c:'l-tool',t:'● Read  src/auth/session.ts (212 lines)'},
-    {c:'l-think',t:"✻ Thinking… the cookie is reissued on refresh but the CSRF secret carries over — a privilege-boundary smell."},
-    {c:'l-asst',t:'I found a session-fixation risk in refreshToken(): the session cookie is'},
-    {c:'l-asst',t:'reissued but the CSRF token is preserved across a privilege change, so a'},
-    {c:'l-asst',t:'pre-auth token stays valid after login. Recommend rotating both together.'},
-    {c:'l-tool',t:'● Write  .scratch/findings-auth.md (+24)'},
+    {c:'l-think',t:'✻ Thinking… the cookie is reissued on refresh but the CSRF secret carries over — a privilege-boundary smell worth probing before I write this up.'},
+    {c:'l-tool',t:'● Bash(grep -rn "refreshToken" src/auth)'},
+    {c:'l-result',t:'⎿  6 matches across session.ts, tokens.ts'},
+    {c:'l-tool',t:'● Read(src/auth/session.ts)'},
+    {c:'l-result',t:'⎿  Read 212 lines'},
+    {c:'l-asst',t:'I found a session-fixation risk in refreshToken(): the session cookie is reissued'},
+    {c:'l-asst',t:'but the CSRF token is preserved across a privilege change, so a pre-auth token'},
+    {c:'l-asst',t:'stays valid after login. Recommend rotating both together.'},
+    {c:'l-tool',t:'● Update(src/auth/session.ts)'},
+    {k:'diff',head:'Updated src/auth/session.ts with 3 additions and 1 removal',t:'  function refreshToken(req) {\n-   return reissue(req.session)\n+   const s = reissue(req.session)\n+   s.csrf = rotateCsrf()\n+   return s\n  }'},
+    {c:'l-tool',t:'● Bash(rm -rf node_modules && pnpm install)'},
+    {k:'perm',title:'Bash command',cmd:'rm -rf node_modules && pnpm install',q:'Do you want to proceed?',opts:['1. Yes',"2. Yes, and don't ask again for Bash commands in ~/agent-dashboard",'3. No, and tell Claude what to do differently (esc)']},
     {c:'l-cmd', t:'> /compact'},
-    {c:'l-sys', t:'⎿ Compacted context · 399.1k → 142.0k tokens'},
+    {c:'l-ok',  t:'⎿  Compacted context · 399.1k → 142.0k tokens'},
   ];
   const CON_CMDS=[
     {g:'Session & context', items:[
@@ -3798,8 +3931,23 @@ resize intact.`,
       ['/memory','Edit memory files'],
     ]},
   ];
+  /* v10p1 #14: render a faithful Claude Code terminal line — colored native markers (● tool · ⎿ result ·
+     ✻ thinking · > input), +/− diff blocks, and a permission-prompt box. */
+  function conMarkup(t){const m=t.match(/^(\s*)(●|⎿|✻|>)(\s?)([\s\S]*)$/);
+    if(m){const cls={'●':'cmk-bullet','⎿':'cmk-pipe','✻':'cmk-think','>':'cmk-prompt'}[m[2]];
+      return esc(m[1])+'<span class="'+cls+'">'+m[2]+'</span>'+(m[3]||'')+esc(m[4]);}
+    return esc(t);}
+  function conDiffHTML(l){const head=l.head?'<div class="con-line l-result"><span class="cmk-pipe">⎿</span>  '+esc(l.head)+'</div>':'';
+    const body=l.t.split('\n').map(ln=>{const c=ln[0]==='+'?'cdiff-add':(ln[0]==='-'?'cdiff-del':'cdiff-ctx');return '<div class="con-diff-ln '+c+'">'+esc(ln)+'</div>';}).join('');
+    return head+'<div class="con-diff">'+body+'</div>';}
+  function conPermHTML(l){return '<div class="con-perm"><div class="con-perm-h">'+esc(l.title)+'</div>'
+    +(l.cmd?'<div class="con-perm-cmd">'+esc(l.cmd)+'</div>':'')
+    +'<div class="con-perm-q">'+esc(l.q||'Do you want to proceed?')+'</div>'
+    +'<div class="con-perm-opts">'+(l.opts||[]).map((o,i)=>'<div class="con-perm-opt'+(i===0?' sel':'')+'">'+(i===0?'❯ ':'  ')+esc(o)+'</div>').join('')+'</div></div>';}
+  function conLineHTML(l){if(l.k==='perm')return conPermHTML(l);if(l.k==='diff')return conDiffHTML(l);
+    return '<div class="con-line '+(l.c||'l-asst')+'">'+conMarkup(l.t)+'</div>';}
   function renderConsole(){
-    const feed=CON_FEED.map(l=>'<div class="con-line '+l.c+'">'+esc(l.t)+'</div>').join('');
+    const feed=CON_FEED.map(conLineHTML).join('');
     document.querySelectorAll('#con-feed-col,#con-feed-full').forEach(el=>{el.innerHTML=feed;el.scrollTop=el.scrollHeight;});
     const list=CON_CMDS.map(grp=>'<div class="cmd-group"><div class="cmd-group-h">'+esc(grp.g)+'</div>'+
       grp.items.map(it=>'<button class="cmd-row" onclick="pickCmd(this)" data-cmd="'+it[0]+'">'+
@@ -3837,10 +3985,19 @@ resize intact.`,
   function openConsole(){
     const v=document.getElementById('console-view');if(!v)return;
     v.classList.add('open');v.setAttribute('aria-hidden','false');renderConsole();
+    positionConsoleView();
     const s=v.querySelector('.con-search input');if(s){s.value='';filterCmds(s);}
     LU();
   }
-  function closeConsole(){const v=document.getElementById('console-view');if(!v)return;v.classList.remove('open');v.setAttribute('aria-hidden','true');}
+  function closeConsole(){const v=document.getElementById('console-view');if(!v)return;v.classList.remove('open');v.setAttribute('aria-hidden','true');v.style.right='';}
+  /* v10p1 #13: the Console step-into covers only the LEFT + MIDDLE columns — its right edge stops at the
+     left edge of the right column (#pRight), so Team Feed + Prompt stay visible. Recomputed on window
+     resize and splitter drags (a ResizeObserver on #pRight fires for both). Settings keeps its full-window
+     step-into — a deliberate difference (see DESIGN.md). */
+  function positionConsoleView(){const v=document.getElementById('console-view');if(!v||!v.classList.contains('open'))return;
+    const app=document.querySelector('.app'),pr=document.getElementById('pRight');if(!app||!pr)return;
+    const a=app.getBoundingClientRect(),r=pr.getBoundingClientRect();
+    v.style.right=Math.max(0,Math.round(a.right-r.left))+'px';}
 
   /* ===== hover-card primitive: data-hc (+ optional data-hc-title) on any element; info-glyph on panel headers ===== */
   function hcEl(){let p=document.getElementById('hcpop');if(!p){p=document.createElement('div');p.id='hcpop';p.innerHTML='<div class="hc-title"></div><div class="hc-body"></div>';document.body.appendChild(p);}return p;}
@@ -3872,11 +4029,14 @@ resize intact.`,
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
-    renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
+    renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
+    document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
     const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();
-    if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);}
+    if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);
+      const pr=document.getElementById('pRight');if(pr)new ResizeObserver(positionConsoleView).observe(pr);}   /* v10p1 #13: keep the Console step-into's right edge pinned to #pRight on splitter/window resize */
+    window.addEventListener('resize',positionConsoleView);
     document.querySelectorAll('[data-agscope]').forEach(s=>{agSync(s);updateAgBadges(s);updateSendCount(s);});
     seedHoverCards();
     initResizers();updateFmt('fmt');LU();drawEdgesSoon();

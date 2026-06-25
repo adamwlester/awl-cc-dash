@@ -26,14 +26,7 @@
 
 > Current work queue — priority order, mixed effort.
 
-1. **Team Graph Card Order:** Reverse the order of the CTX and Turns sections in the Team Graph agent cards.
-2. **Feed Panel Rename:** Change the Feed panel name back to "Team Feed".
-3. **Remove Footer Save/Load:** Remove "Save setup" and "Load" from the UI footer, since this is now all in the Settings panel.
-4. **Setup Tab First:** Make the "Setup" tab the first tab in the Settings panel.
-5. **Inline Mode Buttons:** Make the fast mode and thinking mode buttons in the Agent panel inline, like the color and icon dropdowns.
-6. **Idle Badge Restyle:** Change the idle status badge from a light `--surface-3` chip with `--muted` text to a solid `--muted` (slate gray) fill with white text, matching the solid-fill + white-text treatment of the active and pending badges and the DESIGN.md spec.
-7. **Header Version Badge:** Change the version badge in the dashboard header to v1.1.
-8. **Remove Token Palette:** Remove the "Token Palette" design-reference legend (the bottom `.ref-section` block) from the mockup entirely, since the palette is now documented elsewhere.
+_Empty — the queued batch shipped._ Items 1–8 landed in the mockup's **v1.1** pass; items 9–22 (info-glyph restyle, icon-only action buttons, Inbox danger buttons, expanded-card timestamps, Console partial-expand, native terminal feed, expandable/selectable Inbox + Pending-jump, Messages status badges, History checkbox+expand, Assets rail+preview, unified Documents/Assets cards, doc/asset Add menu, nav-row rename/delete, and the Compose+Templates merge) shipped in **v10p1** (see `DEVLOG.md`). Pull the next items here from B–E when ready.
 
 ## B — Quick wins
 
@@ -105,10 +98,6 @@
 
 > Loose human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Loose notes** steps in "How agents maintain this list" (file with ID + header, minimal clarity edits, disambiguate references), then clears it from this list.
 
-- Remove the Todo tab from the Documentation panel
-- Rename the Readme tab to "README.md"
-- Rename the Claude tab to "CLAUDE.md"
-
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
@@ -118,8 +107,10 @@
 - I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 - Need to add ToDo functionality back into UI eventually.
-- Need to integrate a prompt send option like "side note" or "interject" that will allow us to send a correction to an ongoing run.
-- Consider adding a Assets 
+- Need to come up with a way to support injectable reused snippets into the prompts.
+- Need to build in more visual elements in plans like charts, mockups and diagrams
+- Consider including an Artifacts tab in Library
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
+- Consider if we should have a toggle for docs etc to enable or block agents editing them.
