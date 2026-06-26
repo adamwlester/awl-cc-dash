@@ -100,7 +100,15 @@
 
 > Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
 
-
+1. **Collapsible Inbox Cards:** Make the Team Feed → Inbox cards (`.inbox-card`) collapsible, and wire up the existing (currently non-functional) checkbox to select the card. Collapsed, a card should show down to its title (`.inbox-title`, e.g. "Run bash command" on the first card).
+2. **Pending Badge Selects Card:** Have the "Pending" status badge — which currently opens the Inbox — also select/highlight the relevant Inbox card.
+3. **Link Agents Drawer Right:** Open the Link Agents drawer (`#link-drawer`) on the right, if that's easy to implement, so the Team Graph cards stay visible while it's open.
+4. **Mode Toggles → Sliders:** Change the Agent panel's Mode-block toggles (Fast · Thinking · Ultraplan) from the current fill-state toggles to slider-style switches, each with an inline heading label.
+5. **Failed Message Badge:** Add a "Failed" status badge to the Team Feed → Messages cards, alongside the existing Active and Complete badges.
+6. **Stop as Icon Button:** Change the History footer's "Stop" button (`histAct('stop')`) to a simple icon-only button like the Copy buttons, and add the same Stop icon button to the Messages footer (`feed-messages-actions`) as the rightmost control.
+7. **Summarize in Scratch & Log:** Add the "Summarize" button (`#summary-btn`, currently only in the Team Feed → Messages footer) to the Scratch and Log tab action footers as well, and make it functional in the mockup.
+8. **Link-to-Prompt Button Sizing:** Make the Library footer's "Link to prompt" button (`libFootHTML`) match the height and format of the other footer-action buttons (it can keep its label), and right-align it within that footer.
+9. **Button-Color Heuristic:** Give every footer/strip button one consistent color rule — pink = the single commit action on the surface (Send / Approve / Save / Create / Run); teal = hand-off, i.e. sends the content to another agent or surface (Share / Review / Link to prompt / Load / Revise / Reply); cream (`--surface-btn`) = quiet local utility that acts in place (Copy / Edit / Comment / Retry / Summarize / Always-allow / mic / attach, and all icon-only buttons); red = destructive (Reject / Deny / Remove / Stop); white (`--secondary-background`) stays for fillable inputs and selector triggers only. Concrete deltas vs. today: (a) recolor `.icon-btn` and `.mic-btn` from white to cream so Copy/Edit/Comment/Retry/Remove/mic/attach become neutral-cream; (b) recolor Revise in the Plans footer (`planFootHTML`) and Reply in the Inbox footer (`inboxReplyHTML`) from cream to teal, making the Plans-footer Revise match the already-teal prompt-row Revise. Keep DESIGN.md's teal/cream rows and the icon-only-buttons line in sync (retire "Revise = the single teal action" → "teal = hand-off").
 
 ## Inbox
 
@@ -110,16 +118,8 @@
 - Change the "Failed" badge in Messages to "Error". Include Error as an option in the Inbox cards including an Error status badge. This should use the danger color so we need to rethink the other status colors, including "Pending", which is currently using danger color. Make sure there is a wired example from the agent card badge to the Inbox for the Error status.
 - I want the turns status bar in agent panel to be dropdown like the Context bar, with the same formatting and the content of the dropdown should be a breakdown of how many terns where used for different operations but I am not sure what operations to track.
 - Remove the trash ghost icon button from the Library nav panel cards so there is more space for text. Delete will be handled by the trash icon in the action strip.
-- Change all the expandable card divider lines to be the same as the card outline color, not the tan color they currently use.
-- Fix the timestamp behavior in the Team Feed cards so that the timestamp stays right aligned when cards are expanded.
 - Remove Time as an End after option completely form the Link Config. 
-- Change the "Filter" label in Team Feed to "From/To"
-- Change the label "Show" to "Type" and "Include" to "Content"
-- Put the Templates section below the Compose section in Compose tab and rename the "Compose" heading to "Editor"
-- Add a header "Editor" above the content fields in both the Plans and Documents tabs of Library. For both, move the copy, edit, comment icon buttons to be inline with that and right aligned like how we have fro Compose right now. Same button style. The Assets will no longer have access to these buttons which is fine.
-- I want to move to a different method of sharing content to agents utilizing the prompts panel instead of the "Share" dropdown/button group or the Review one. I want to turn the Link to prompt button to one of these dropdown/button groups. I want the option to be something like "Embed" or "Link"; consider what language works best to denote that the content should be either embedded in the prompt body or included as an attachment. We will use this both in the Team Feed and Library tabs. Then we just use the link icon for the action button, no label. This needs to work with the section selectors that are part of the editor fields in the Library content.
-- We need to modify how embedded things show in the compose editor. I want hardcoded embedded things to be in a sort of container or delimited section, with maybe muted text. Right now we have the Templates added inline. I want them, and anything else linked into the textarea, to be appended vertically and with some clear boundary. Each embedded block needs to have a small font, mute text, static header line indicating the source. This should be clickable such that it takes the user back to the source wherever it is stored/rendered in the dashboard.
-- All of this new behavior needs to be wired up in the mockup.
+
 
 ## Scratch
 
@@ -136,4 +136,4 @@
 - Need to come up with a way to support injectable reused snippets into the prompts.
 - Need to add ToDo functionality back into UI eventually.
 - Find a way to to support highlighting words and terms in text and having it defined in context.
-- I want inline squiggle spelling highlights in any large text areas like in Prompt->Compose.
+- We need to be able to support multiple plans.

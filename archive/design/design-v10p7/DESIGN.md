@@ -1,0 +1,284 @@
+# AWL Multi-Agent Dashboard — Design Reference
+
+A single-window desktop app for running and coordinating many Claude Code agents at once. This document is the ground-truth reference for the dashboard's **UI/UX intent** — what each part is *for* and *why it behaves the way it does*.
+
+> **About this doc — read once.**
+> - **The mockup owns the visuals.** The current wireframe, [mockup.html](mockup.html), is the authority on exact layout, sizing, and styling. It speaks the **[neobrutalism.dev](https://www.neobrutalism.dev)** visual language — token names + utility classes mirror that library's Tailwind theme so the static mockup ports ~1:1 to a React/shadcn build. This README avoids pixels/hexes/labels: the **values** all live in **[`tokens.css`](tokens.css)** (the single source of truth), and the [Design system](#design-system) section below holds the *rules* for using them and points to that file.
+> - **This doc owns the intent**, and intent runs slightly *ahead* of the mockup: where a change has been agreed but not yet drawn (directed link edges), it's described here as the design. Such spots are flagged *(planned)*.
+> - Inferred intent is flagged *(intent: …)*. This doc describes the design as it stands; **undecided questions and deferred/not-built ideas live in the backlog, [`TODO.md`](TODO.md)**, not here.
+
+---
+
+## Purpose & vision
+
+Running several Claude Code sessions in tmux means constant tab-switching, copy-pasting prompts between terminals, and no real visibility into what each agent is doing or how they relate. The dashboard replaces that with **one window** where you can see every agent, its state and context, the messages flowing between agents, and compose/send prompts — **without ever touching the raw CLI.**
+
+The thing that makes this more than "several terminals in a grid" is **context-sharing between agents** — links, a shared scratchpad, and agent-to-agent conversation. That is the defining feature; everything else exists to support it.
+
+Guiding principles that shape the whole UI:
+
+- **Bias toward on-screen, not floating.** Prefer giving a surface a pane or step-into view over floating it. Anchored, transient bits — menus, pickers, hover popovers, quick confirms — are fine; the thing to avoid is movable or stateful floating windows. When something wants that, make it a pane instead.
+- **Compose-first.** Typing into a raw CLI is the thing this tool is meant to replace, so the prompt-composing surface is always present and is the primary action.
+- **One identity per agent, everywhere.** Each agent gets a color + icon used consistently across the graph, feeds, log, history, and chips, so you can track an agent at a glance — see [Agent identity & naming](#agent-identity--naming).
+- **Route control through the GUI, including approvals.** Anything you'd normally approve in the CLI — permission prompts especially — surfaces in the dashboard so you never drop back to a terminal to unblock an agent. (This is why approvals get a first-class home; see [the Inbox tab](#the-inbox-tab).)
+- **Bridge is the backbone; the dashboard is the skin.** Agent lifecycle/send/read already exist below the UI; the dashboard is a control layer on top.
+
+> **Out of scope (deliberately):** per-agent cost/spend tracking, a diff viewer, a terminal-UI (TUI) version, and keyboard-only (F-key) control — all considered and explicitly dropped. *(A raw live-CLI/terminal feed was previously dropped here too, on the grounds that the Team Feed's Messages tab covers what each agent is doing. That was reversed: a raw feed is now provided **on-demand** by the [Agent panel's Console tab](#agent-left-pane) — an expandable surface scoped to one agent, **not** an always-on pane. The Messages tab remains the curated, cross-agent **rendered** view; the Console is the raw, single-agent one.)*
+
+## What it physically is
+
+A desktop application (Electron + React) presenting one window. Each agent is a real Claude Code session running in tmux on WSL2, driven by a local Python (FastAPI) sidecar through the tmux bridge that already handles create/send/read/status; tmux also serves as the crash-recovery safety net. That's the whole stack the UI sits on; this README stays focused on UX.
+
+---
+
+## Layout — the three-column model
+
+A title bar on top, a status footer on the bottom, and three vertical columns between them. The **Agent** column (left) is the narrow one, full-height; the **middle** and **right** columns are the wide ones, each split top/bottom into two stacked panels — **Team Graph** over **Library** in the middle, **Team Feed** over **Prompt** on the right. Columns and their stacked sections are separated by draggable splitters. The whole frame is **full-bleed** — the header, the three-pane body, and the footer meet flush and run edge-to-edge, with no outer margin.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Title bar — app name · version · agent count │ clock · WSL2 · tmux · status     │
+├────────────────────┬────────────────────────────┬───────────────────────────────┤
+│ LEFT (narrow)      │ MIDDLE (wide)              │ RIGHT (wide)                  │
+│                    │                            │                               │
+│ Agent              │ Team Graph                 │ Team Feed                     │
+│ ├ Details          │   (agent cards)            │ ├ Messages                    │
+│ ├ Create           │   + Link Config drawer     │ ├ Scratch                     │
+│ └ Console          │ ────────────────────────── │ ├ Log                         │
+│                    │ Library                    │ └ Inbox                       │
+│                    │ ├ Plans ├ Documents        │   + shared agent filter       │
+│                    │ └ Assets                   │     (persists, Inbox incl.)   │
+│                    │   + doc switcher,          │ ───────────────────────────── │
+│                    │     line-numbered editor   │ Prompt                        │
+│                    │   + Assets rail + preview  │ ├ Compose (Templates inline)  │
+│                    │                            │ └ History                     │
+│                    │                            │   + From / To dropdowns       │
+│                    │                            │   + actions (mic·attach·Send) │
+├────────────────────┴────────────────────────────┴───────────────────────────────┤
+│ Footer — agents/subagents/linked counts · active/idle/pending · session age     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+> *(Layout note — the schematic above is deliberately simplified; each panel's full behavior lives in its own section under [Panels](#panels). A few cross-panel specifics worth flagging here: the always-on agent-selector columns (Prompt **From/To**, Feed **Filter**) are **header dropdowns** — the multi-selects fill with **two-line identity badges** (full-height tile + role over number·name, mirroring the list rows) and collapse to a `+N` chip, so Compose and the feed streams span the full panel width. The **Plans** tab renders the native Claude Code plan files (`~/.claude/plans/*.md`) as **line-numbered markdown** with a per-card review system — see [Library](#library-middle-bottom). Feed/History cards are **expandable** with a header **checkbox** for multi-select and a shared **Copy · Summarize · Share** footer (Summarize opens a slide-over summary — available on **Messages, Scratch, and Log**, each with its own; Share reuses the agent target picker; the Messages tab also adds a rightmost **Stop**). Major panels are separated by a clear **navy divider** (no grip nub; the strip is still drag-resizable). The [current mockup](mockup.html) is the visual authority.)*
+
+The columns are tied together by **selection**: clicking an agent card in the Team Graph loads that agent into the **Agent** panel, so the graph highlight and the Agent panel always describe the same agent in focus.
+
+The **title bar** also carries a **Settings** gear at its right end (beside the status chips) that opens the [Settings](#settings-step-into-view) step-into view — a full-window surface that replaces the body and returns to the 3-pane on exit.
+
+---
+
+## Panels
+
+Each panel below is the single source of truth for its own behavior. Cross-cutting ideas (identity, linking, the scratchpad, lifecycle) are described once in [How it works](#how-it-works--concepts-that-span-panels).
+
+### Team Graph (middle, top)
+
+The roster of live agents, one **card** per agent. A card carries the agent's identity (icon + color, role, number + name) and at-a-glance run state: **two labeled health-colored bars** — a **Ctx** bar (context usage %) and, beneath it, a **Turns** bar (live count against the agent's Max turns, e.g. *Turns 34/50*), each with a leading label and an inline value — a **status badge**, its subagents (small numbered dots), the agent's **Thinking on/off** state in the meta line, and a config summary (model · mode · effort). The currently-selected card is filled (light teal) and marked as the one being viewed.
+
+- **Selection drives the app.** Clicking a card focuses that agent in the Agent panel.
+- **Status at a glance.** A single **status badge** (top-right corner) shows **active / idle / pending**, where *pending* (the warm attention tone) means "this agent is waiting on you." It's deliberately **binary, not a count** — an agent can only be blocked on one thing at a time (see [Inbox](#the-inbox-tab)), so the *number* of agents awaiting you lives on the Team Feed's Inbox tab, not on each card. The badge is also a **shortcut button**: it jumps to **Inbox** when pending, **Prompts → History** when active, or **Prompts → Compose** when idle.
+- **Health coloring.** Both the Turns bar and the Ctx bar use the same good→bad ramp the Timeline uses for context % (green → amber → red), so load reads at a glance without decoding the agent's identity color.
+- **Subagents** appear as small dots on the parent card, reflecting its background tasks/children.
+- **Scales past what fits.** The graph shows many agents (not just a few); cards lay out in a grid and the view scrolls.
+- **Linking starts here.** Select the agents you want to connect and use **Link Agents** to open the Link Config drawer — see [Linking & context-sharing](#linking--context-sharing).
+- **Links as edges *(planned)*.** Active links are intended to render as **directed arrows between cards**; the current mockup doesn't draw them yet (linking lives in the drawer + footer count for now).
+
+### Team Feed (right, top)
+
+The top panel of the right column (the Feed sits above [Prompt](#prompts-right-bottom)): a real-time, cross-agent view of communication, attention, and events, as four tabs over a **shared agent Filter** — a header **dropdown** (in a sub-bar) whose popover is a multi-select **list** of agent identity rows (including a **User** row) with a single **contextual All/None** toggle. Selected agents fill the trigger as identity **badges** (collapsing to a **+N** chip past a cap); the filter persists across all four tabs, **Inbox included**.
+
+Tab order puts the everyday streams first and the **Inbox** (approvals) last (Messages · Scratch · Log · Inbox).
+
+| Tab | What it shows |
+|-----|----------------|
+| **Messages** | The team's traffic, attributed and color-coded by agent, merged into one stream with in-tab toggles for **direction** (Sent / Received) and for how much tool detail to include (Thoughts / Read / Write / Bash / Diffs / Meta). Direction is anchored to **you, the operator**: **Sent** = prompts you pushed to the team; **Received** = everything coming back from agents. (So **User** only ever reads as *Sent* — it never carries an incoming tag.) The direction tag on each message is intentionally neutral — no special color. Each **received** message leads with a **status badge** — **Active** (in-flight) / **Complete** / **Failed** (red) — while user-**Sent** messages keep just the direction tag. Cards are **multi-selectable** (same selection style as History) and feed a **Messages footer** with **Copy · Summarize · Share** plus a rightmost icon-only **Stop** (stops the agent's run), styled like the Prompts footers. |
+| **Scratch** | A live view of the [shared scratchpad](#the-shared-scratchpad): each post stamped with agent ID + time. |
+| **Log** | A timestamped system-event stream (started, committed, flagged, link fired, permission/approval requested…), color-coded by agent. |
+| **Inbox** | The team-wide **approvals inbox** (last tab) — see [The Inbox tab](#the-inbox-tab) just below. |
+
+#### The Inbox tab
+
+The team-wide **approvals inbox** — the human-control surface that keeps agents unblocked without dropping to a terminal. Because a Claude Code agent is single-threaded, **it can only ever be blocked on one thing at a time**, so this tab shows **one card per agent that's waiting on you** (narrowed by the same agent chips as the rest of the feed), and the tab's badge is the **fleet total** — how many agents need you right now. Each card carries the **agent's identity** (icon + role + name) and its request **type**, color-ranked along a warm reddish→copper ramp (see [Design system](#design-system)):
+
+| Type | For | Controls |
+|------|-----|----------|
+| **Permission** | A tool/command the agent wants to run (the same prompts you'd normally approve in the CLI) | Approve · Deny · Always allow |
+| **Approval** | A plan/handoff to review before it proceeds | Approve · **Review** · Reject |
+| **Decision** | A question with candidate options to choose between | pick an option, then an explicit **Approve** (disabled until you've selected) |
+
+The **Deny** and **Reject** controls use the **danger** color; **Approve** stays pink-primary and **Always allow** stays neutral.
+
+- **Cards are expandable + selectable.** Like the Log/Messages cards, each Inbox card **collapses to its identity row + type badge + title** and **expands on click** to reveal the request detail + its controls; the header **checkbox** multi-selects it into the shared Copy/Share strip. A **Pending** status badge on a [Team Graph](#team-graph-middle-top) card jumps here and **scrolls to, expands, selects (its checkbox), and highlights** that agent's card.
+- **Review routes to the plan** *(Approval cards only)*. Between Approve and Reject, a **Review** button **hands you to the Library panel's Plans tab**, expanding and briefly highlighting the matching plan so you can read/edit the full proposal before deciding — rather than embedding a plan editor inside the card. This is the deliberate cross-link between the two surfaces: the *plan* is a document (it lives with the docs); its *approval* surfaces here in the Inbox. *(The reciprocal — a plan's own Approve routing a card back into the Inbox — is the same handoff in reverse.)*
+- **Reply routes to Prompts.** Every card has its own **Reply** button, set off to the far right of the card (separate from the approve/deny controls so it reads as its own path). It doesn't open an inline field — it **hands you to the [Prompts](#prompts-right-bottom) panel**, jumping to Compose with that agent pre-selected as the sole target, so a free-form reply is composed and sent from the one place all prompts originate.
+
+### Agent (left pane)
+
+Everything about **one** agent — whichever is selected in the graph. Three tabs share the pane.
+
+- **Details** — the agent's configuration and live readouts, in three deliberately-separated bands:
+  1. **On-demand config** (Role, No., Name, Description, Model, Skills, Tools, Color, Icon). These are *greyed by default*; click a field's **pencil** to edit, then **save** — so configuration can't be changed by accident mid-run. **Role** is a dropdown (with free-text entry) populated from the user- and project-level `agent.md` files; picking one in **Create** prepopulates the related fields from its front matter. **Skills** and **Tools** are multi-select dropdowns (skills from the skills files; tools = the native Claude Code tool set) that keep floating chips. *(Model is intentionally editable, not locked: an agent's model can be changed mid-run.)*
+  2. **Always-editable while running** — **Mode**, **Effort**, and **Lifecycle** auto-stop limits, the knobs you reach for during a run, so they stay live. The **Mode** block carries the permission-mode segmented control (**Plan · Ask · Edit · Auto · Bypass**, where Bypass is the bypass-permissions danger option) and, beneath it, three **slider switches** on one evenly-spaced row — each a simplified inline control (icon · label · switch, no button box) — **Fast** (maps to `/fast`), **Thinking** (extended thinking), and **Ultraplan** (the deeper native plan mode). The switch is the **shared `.swh` toggle** used elsewhere (e.g. the Settings MCP/plugin enables), so they read identically; on/off state reads from the switch (the knob slides and the track turns teal when on), not from words in the label. Two toggles are **gated** (dimmed + inert until their precondition is met, since they don't otherwise apply): **Fast is gated to Opus** — enabled only when this panel's **Model** is **Opus** (`/fast` is an Opus mode); and **Ultraplan is gated to plan mode** — enabled only when the Mode control above is set to **Plan**. See [Lifecycle & autonomy](#lifecycle--autonomy).
+  3. **Live readout** — the **health-colored** context-usage bar (with a Compact action); a **Turns** readout (the count inline beside the label like Context, then a health bar + %); and the **Timeline**: a point-by-point list of the messages sent to the model that fills the rest of the panel, with two actions over the same list — **Rewind** (roll this agent back to the chosen point) and **Handoff** (branch from that point into a *new* agent). See [Rewind & Handoff](#rewind--handoff).
+  - **Footer:** **Retire** only.
+- **Create** — the new-agent wizard: Role, No., Name (with a randomize affordance), Description, Skills, Tools, Color, Icon, Model, Mode (with the same Fast / Thinking / Ultraplan toggles), Effort, Lifecycle. **Handoff** lands here with the source agent's settings prepopulated (and editable).
+  - **Footer:** **Create · Reset · Cancel**.
+- **Console** — the focused agent's **raw Claude Code terminal feed** paired with a **slash-command runner**, both scoped to the single selected agent (so a command's target is unambiguous — *no* multi-select, which is exactly why this lives here and not in the multi-target Prompt or the multi-filter Feed). The feed **faithfully mimics a real Claude Code terminal** — a dark monospace surface with the native markers (`>` input · `●` tool calls with `⎿` results · `✻ Thinking…` · a model/status line · `+`/`−` diffs · a native permission-prompt box) — so it reads as the agent's actual CLI output, the raw counterpart to the Team Feed's rendered [Messages](#team-feed-right-top). Because a native terminal is *not* the dashboard's neobrutalism surface, the feed uses a **self-contained `--term-*` palette** — a **documented exception** to the otherwise-strict "every value comes from `tokens.css`" rule. The exception is scoped to the feed surface only: the surrounding **agent bar, command catalog, run bar, and Expand control stay neobrutalism**. The command surface is the **single home for every slash command** — *not* split into agent-specific vs. shared, because everything simply runs on the focused agent: a **scrollable catalog grouped into conceptual clusters** (Session & context · Model & behavior · Info & status · Tools & integrations · Project & custom · System), each entry a command + a one-line description, with a filter box. Commands that already have a dedicated home (e.g. `/model` in Details, `/mcp` in [Settings](#settings-step-into-view)) are still listed here, tagged *also-available-there* — the catalog is deliberately complete. Picking an entry stages it into the run bar; a typed-or-staged command runs against the focused agent and its output lands in the feed.
+  - **Width via Expand.** Because raw output and a grouped catalog both want more room than the narrow Agent column gives, the Console carries an **Expand** control that pops it into a **step-into view that covers only the left + middle columns** — its right edge stops at the left edge of the right column, so the **Team Feed + Prompt stay visible** while you work against the live terminal (the edge is recomputed on window resize and splitter drags). This is a **deliberate difference from [Settings](#settings-step-into-view)**, whose step-into covers the *whole* body: the Console is a working surface you reference against the live feed, where Settings is a configuration modal you step fully into. Both share the step-into mechanics (replace their region, return on **Close** / Esc) and the [bias toward on-screen surfaces over floating ones](#purpose--vision). The pieces **reflow** between states: in-column the feed leads and the catalog rides as a **slide-up panel** over it (full panel width); expanded, the catalog becomes a persistent **left rail** beside a wide feed, with the run bar across the bottom — the rail-beside-body shape [Library](#library-middle-bottom)'s doc-switcher already uses.
+  - **Footer:** the **run bar** itself (the command input + Run) — the Console's bottom strip, in place of a button row.
+  - *(The Console reflects whichever agent is focused, like the rest of this pane: selecting a graph card repaints its identity bar, feed header, and run-bar target — the same selection-drives-the-panel wiring as Details.)*
+
+### Prompts (right, bottom)
+
+The compose-first heart of the app — the bottom panel of the **right** column, beneath the Team Feed. Three tabs sit over a **shared sub-header**, so the way you address a prompt is consistent no matter which tab you're on.
+
+- **Shared From + To** — a header **sub-bar** of two dropdowns (the selection persists across all three tabs), so Compose and the streams span the full width:
+  - **From / Source** (single-select) — who the prompt is *from*: **User**, or an agent (sending *as* that agent for coordination). A compact **dropdown** whose trigger shows only the active selection as a collapsed identity badge; no All/None (single-select needs neither).
+  - **To / Target** (multi-select) — who it goes *to*: a **dropdown** whose popover is the full agent **identity-row list** (recolorable tile + two-line role·name, no truncation), led by a **Scratch** row that posts to the [shared scratchpad](#the-shared-scratchpad), with a single **contextual All/None** toggle (shows *All* until everything is selected, then *None*). Picked targets fill the trigger as identity **badges** and collapse to a **+N** chip past a cap; multi-target is simply picking several — there's no separate "broadcast" mode.
+- **Tabs** (just **Compose · History** now — Templates folded into Compose):
+  - **Compose** — the prompt area, with **Templates inlined at the top**. A **"Templates" sub-header** holds a single-select **dropdown** (default **None** + the saved templates) and, below it, the **fill input** (greyed until a template is active). Beneath that sits the main **compose box** — a `contenteditable` rich field (so it can hold clickable placeholder pills inline alongside free text) under a **"Compose"** label with **copy / clear** ghost icons. Selecting a template **inserts its body at the cursor** (or appends if the box isn't focused) *without wiping* existing text; inserted **placeholders stay clickable pills** that target the fill input; **None** clears the active template and re-greys the input. The box stays fully editable. See [the Templates flow](#the-templates-flow).
+  - **History** — past prompts for the focused agent, attributed and **right-aligned timestamped** (the time pins to the card's right edge in both the collapsed *and* expanded states, matching Team Feed cards). Cards take the **same checkbox (multi-select) + expand-chevron** split as the Team Feed cards (the checkbox selects without expanding; the row expands); their actions live in a single footer strip — **Copy · Edit · Retry · Stop** (all icon-only; Stop is danger-red) — rather than per-card. A prompt that carried **attachments** shows a small **paperclip + count chip** in the card header (only when there are any); clicking it opens a popover listing each attachment, and clicking an entry **opens it in the Library** — images in **Assets**, docs in **Documents**. *(History-only for now; the same chip is built to extend to Team Feed → Messages later.)*
+- **Action row** (the shared Prompts footer) — leads with a **mic** button for voice dictation (moved out of the Compose header) and a **paperclip attach** button (right after the mic) that picks an image from the [Library → Assets](#library-middle-bottom) list — both directions register there, so Assets stays the source of truth — then the Revise and Response-format controls, and the Send split button at the right. Sending uses a pair of **split buttons** (a button joined to a dropdown chip), styled as a **pink primary** (Send) next to a **teal secondary** (Revise):
+  - **Send** (primary) with a **timing** chip — **Now · Inject · Next · Queue** (no "Hold"; that only makes sense for a link). The chip carries the delivery timing, reusing the same vocabulary as link [Triggers](#linking--context-sharing). **Now** interrupts and delivers immediately; **Inject** delivers to a *running* agent without stopping it (a one-shot message applied at the next safe boundary); **Next** waits for the next turn boundary; **Queue** appends to the agent's prompt queue.
+  - **Revise** with a **scope** chip — **Grammar · Language · Refactor** (default Grammar): runs an AI cleanup/rewrite pass on the prompt before you send it, scoped from a light spelling/grammar fix up to a full restructure.
+  - **Scope:** Compose offers Revise + Send (plus mic + attach). History swaps the row for its own footer (**Copy · Edit · Retry · Stop**, all icon-only) and hides the action row.
+
+### Library (middle, bottom)
+
+The home for **organizing and reviewing all of a project's documents and reference assets** — three tabs: **Plans · Documents · Assets**. The **Plans** tab carries a **count badge** (same rounded-square style as the Team Feed's Inbox badge) signalling **new plans** — those not yet reviewed (in *review* or *draft* state); it hides when the count is zero. It's the other half of the middle column, beneath the Team Graph. (The panel was named "Documentation" while it held only docs; "Library" reflects that it now also holds images.)
+
+- **The shared doc editor.** The **Plan** and **Documents** tabs render their files as **line-numbered markdown** whose line numbers match the raw file, so "see line N" is a real reference. An **interactive left rail** indexes every line and section: click a rail cell to **select a line, a whole section, or the entire document** (so a chunk can be shared or commented on). The rail cells are **color-coded by what a click selects** — pink = the **title** (selects the whole doc), dark teal = a **section**, light teal = a **line**; the selected text highlights in **light pink**, and re-clicking the active cell clears it. Inline code is tinted so it reads apart from body text.
+- **The Plans tab is the review surface.** It lists the native Claude Code plan files (`~/.claude/plans/*.md`, shown under a single directory line + a "*N plans · N awaiting review*" count) as **expandable cards**. Each card's header is **three rows**: ① owner **agent badge** · title · state (e.g. *In review*); ② the **feedback tally badges** (Approve/Revise/Block counts) · *done/total steps*; ③ filename · **Created / Edited** date-time with a relative "ago". Expanding a card reveals the line-numbered plan beside a **nav rail**, then the shared footer.
+- **The nav rail** has two modes: **Outline** (the section list, each with a worst-verdict dot + comment count) and **Feedback** (one **card per response** — the reviewer's agent badge + a thumbs **agree** toggle, a color-coded **verdict badge** (Approve/Revise/Block) + a **section badge**, and a clamped comment summary). Selecting feedback moves **three indicators together**: the **card** fills (light teal), its **section text** highlights (teal, linking card ↔ text), and the **comment popout** opens. Closing the popout or deselecting clears all three, and opening a different comment switches all three — driven from either a Feedback card or the in-text rail-gutter badge. The rail **resizes with the text column** (it grows when the popout opens, so cards aren't clipped).
+- **Comments dock under the text.** Section feedback also surfaces as a **verdict badge in the rail gutter** at that section's line; clicking it (or a Feedback card) opens a **comment popout** docked under the plan body at the same width, with a merged **verdict + section** header and, per response, the reviewer's badge · time · a thumbs agree toggle. You add your own with the **Comment** button — enabled once you select a line/section — which opens a **composer** in the same popout: your badge, a **Mark as** verdict dropdown (Approve/Revise/Block), a thumbs agree default, an optional note, and **Save**.
+- **Actions sit in the shared footer.** One footer holds, left-aligned, **Copy · Edit · Comment** (neutral) and **Share · Review** (teal; both reuse the agent target picker — Share distributes the plan, Review sends it for review), then — right-justified — the decision trio: **Revise** (send the flagged sections back to the authoring agent) · **Reject** · **Approve**. (It wraps to a second row on a narrow column.)
+- **Cross-linked with the Inbox.** A plan is a *document* (it lives here); its *approval* surfaces in the Team Feed's [Inbox](#the-inbox-tab). The Inbox's **Review** button jumps here, expanding and briefly highlighting the matching plan; a plan's **Approve/Reject** is the same handoff in reverse.
+- **Documents and Assets share a card shape** (a simplified Plans, *without* Plans' owner/title/tally/steps rows): a basic **header** with the file **path** + **Created / Edited** dates, then the body (the line-numbered editor for docs, the image preview for assets), then a shared **footer** — **Copy · Edit · Comment** as **icon-only** buttons (left), then — **right-aligned** — **Link to prompt** (full footer-button height, teal hand-off) + **Remove** (danger, icon-only). (Assets' **Edit** is present but greyed/disabled — an image isn't text-editable.) Both tabs use the same **nav rail** (icon/thumbnail · name · path), and each nav row carries a ghost **rename** (pencil) + **delete** (trash) icon; an **Add** affordance at the foot of the rail offers **Add file** (opens the explorer) or **Paste** (pastes the clipboard and auto-names the new row).
+- **The Documents tab** folds every project doc into **one** tab (it replaces the old per-file Readme / Claude tabs). The nav **path is load-bearing** — it disambiguates same-named files (the project `CLAUDE.md` vs the user-level `~/.claude/CLAUDE.md`). Selecting a row loads that doc into the **same line-numbered editor + rail** the Plans tab uses. Only **README**, the project **CLAUDE.md**, and the user-level **CLAUDE.md** are listed by default; the rail's **Add** affordance adds more.
+- **The Assets tab** holds **reference images** as a **rail + preview** (the same shape as Documents): a left list of **thumbnail + name**, with the selected asset's **preview** filling the right. Assets is the **single source of truth** for media — an image added here, *or* attached while composing via the [Prompts paperclip](#prompts-right-bottom), both register in this one list.
+
+### Settings (step-into view)
+
+A top-level **Settings** surface for the whole workspace — the configuration that isn't about any one agent. It's opened from a **gear in the title bar** (right cluster, beside the WSL2 / tmux / Connected chips) and presents as a **step-into full-window view**: it replaces the 3-pane body in place, toggles in and out, and returns to the 3-pane on **Close** (or Esc). It is deliberately **not a fourth always-on column** and **not a floating window** — it steps into the same frame rather than overlaying it, in keeping with the dashboard's [bias toward on-screen surfaces over floating ones](#purpose--vision).
+
+**Tabs are by subject, not by elevation.** Five subjects — **Setups · Usage · MCP · Plugins · Config** (Setups leads as the first, default-shown tab) — and where a subject spans config scopes, **scope is a secondary segment inside the tab** (never a tab of its own), so a single subject is never split across tabs:
+
+| Tab | What it owns | Scope segment |
+|-----|--------------|---------------|
+| **Setups** | The full **Save / Load setup** flow (agents + links). | — |
+| **Usage** | Plan, limits, and token consumption — the `/stats` · `/status` surface. **Usage only**; per-agent cost/dollar spend stays [out of scope](#purpose--vision). | — |
+| **MCP** | The global server registry — enable/disable, connection & OAuth health, and the disabled-server **parking** state. | user / project |
+| **Plugins** | Installed plugins + enabled state, and marketplaces. | user / project / local |
+| **Config** | Default model, permission mode, sandbox, hooks, env, CLAUDE.md, plans. Each setting tagged **Live** (takes effect now) or **New session** (needs a restart). | global / project |
+
+Cross-cutting rules:
+
+- **Read-only vs editable, separated.** Within every tab, read-only status/health/usage is kept in its own band, visually distinct from editable config — so glancing at state never reads as a control.
+- **Global edits are gated.** Changing global (`~/.claude`) config — which affects every project — is held behind an explicit **confirm**, with a standing warning on the Global scope.
+- **It owns the global registry, not per-agent scope.** Enablement here is "is server/plugin X available at all," a different thing from "may agent Y use server X," which stays in the [Agent panel](#agent-left-pane). The two are deliberately not conflated.
+- **The footer keeps a glanceable shortcut.** A token-usage summary lives in the [status footer](#layout--the-three-column-model) for quick access (it jumps straight into Usage); the panel holds the full detail. (The footer's former Save/Load shortcut was removed — the Setups tab is now the single home for that flow.)
+
+---
+
+## How it works — concepts that span panels
+
+### Agent identity & naming
+
+Every agent has a stable identity made of a **role**, a per-role **number**, a short **human name**, a **color**, and an **icon** — e.g. *researcher · 01 · sandy* → `researcher-01-sandy`. Human names (sandy, kai, drew, rowan…) are used because they're easy to say and remember when you're talking about agents. Color and icon are chosen per agent (not fixed by role) and then appear *everywhere* that agent does, which is what makes the whole UI scannable.
+
+### Linking & context-sharing
+
+The defining capability: a persistent **link** that forwards context from one agent to another so they can collaborate (including back-and-forth "conversation" between two agents). You create a link from the [Team Graph](#team-graph-middle-top) and configure it in the **Link Config drawer** — a sheet that opens immediately to the **right of the Team Graph panel** (anchored to the left edge of the right pane, sliding out from behind the graph) so the whole Team Graph stays visible while you set the link up:
+
+- **Direction** — a 3-state toggle: A→B, B→A, or A↔B (both). *(On the graph itself, links are intended to read as directed arrows — see [Team Graph](#team-graph-middle-top).)*
+- **Trigger** — *when/how* the message is delivered:
+  | Trigger | Behavior |
+  |---------|----------|
+  | **Now** | Interrupt the target and deliver immediately. |
+  | **Inject** | Deliver to a *running* target without stopping it — a one-shot message applied at the next safe boundary (between tool calls). |
+  | **Next** | Wait for the target's current response to finish, then deliver — ahead of its queue. |
+  | **Queue** | Wait for the current response *and* let the existing queue drain first (the polite default). |
+  | **Hold** | Stage the message for your manual approval before it's sent. |
+- **Payload** — *what* is sent:
+  | Payload | Meaning |
+  |---------|---------|
+  | **Message** | The source's output, forwarded as a single rendered message. |
+  | **Transcript** | The source agent's full conversation/context, export-style (*intent: drawn from the agent's transcript; exact source TBD*). |
+  | **Manual** | No automatic content — you compose it by hand each time the link fires. |
+- **End After** — optional safety limits so bidirectional links can't run away: **Turns / Time / Tokens** as independent toggles, each with its own value. None on = no limit; if several are on, the link ends at the first one reached.
+
+**How messages read (sender + trigger).** A message an agent receives carries lightweight metadata — who sent it and which trigger delivered it — embedded in the message for the *receiving agent's* benefit. The dashboard hides those tags and renders the human-facing version: a color-coded sender heading, a small trigger badge, and the body text. One message, two presentations. User-sent prompts go through as plain text.
+
+### The shared scratchpad
+
+A single shared markdown document agents post to as a **living** workspace — each post attributed to an agent and timestamped, viewable live in the Team Feed's [Scratch tab](#team-feed-right-top) and writable from [Prompts → Target → Scratch](#prompts-right-bottom). The attribution/timestamps exist because it's a running log of who-said-what; a clean, stateless document can be produced from it at the end. *(Posting in, reading out is the whole interaction for now; richer per-post selecting/commenting is deferred — see [`TODO.md`](TODO.md).)*
+
+### Rewind & Handoff
+
+Both act on the **Timeline** in the Agent → Details tab — the list of points (messages sent to the model) in the focused agent's run:
+
+- **Rewind** — roll *this* agent back to a chosen point and resume from there.
+- **Handoff** — branch from a chosen point into a *new* agent: it opens the Create tab with the source agent's settings prepopulated (editable), so you can carry the work onward without disturbing the original. *(Richer handoff artifacts/summaries are deferred — see [`TODO.md`](TODO.md).)*
+
+### Lifecycle & autonomy
+
+The project leans toward letting an agent "go as far as it can" on a task rather than babysitting it — so agents carry **auto-stop limits** (per-agent **Max turns** and **Context %**) that end a run safely when hit. These are deliberately a **different scope** from a link's [End After](#linking--context-sharing) limits: **Lifecycle bounds a single agent's run; End After bounds an inter-agent exchange.** Keep the two distinct.
+
+### The Templates flow
+
+The Prompts **Compose** tab turns reusable prompt files into fill-in-the-blank forms, inlined above the compose box *(Templates was a separate tab until it folded into Compose)*:
+
+- A single-select **dropdown** (default **None** + the saved templates) sits in the Compose tab's **"Templates" sub-header**, with the **fill input** below it (greyed until a template is active).
+- Selecting a template **inserts its body into the compose box at the cursor** (or appends if the box isn't focused), *without wiping* existing text; its placeholders come in as **clickable pills** (filled pills show their value; unfilled show the bare tag, e.g. `{severity_threshold}`).
+- Click a pill → the **fill input** activates (a single-line field that auto-grows) with **Reset** and **Apply** as trailing icon buttons *outside* the field; type a value and Apply pushes it back into the pill, which **stays editable/re-selectable** (Reset clears it back to the bare tag). *(The input isn't tinted to the pill's color — the placeholder simply names the active tag.)*
+- Filled vs. unfilled pills are visually distinct, and the active pill gets a selected style, so it's clear what's left to fill before you Send. **None** clears the active template and re-greys the input; the compose box itself stays **fully editable** throughout.
+
+---
+
+## Design system
+
+> **Where the values live.** Every raw value — colour, type, spacing, radius, shadow — lives once in **[`tokens.css`](tokens.css)**, the single source of truth, exposed as CSS custom properties (`--main`, `--secondary-background`, `--border`, the 16 `--ag-*` agent colours, …). The mockup links that file and references the tokens via `var()`; the live swatch board for every token is [`tokens.css`](tokens.css) itself. This section owns the **rules** — which token to reach for, and why — and names tokens rather than repeating their hexes. To change a value, edit `tokens.css`; to change a *rule*, edit here.
+
+The dashboard speaks the **[neobrutalism.dev](https://www.neobrutalism.dev)** visual language — thick **2px navy borders** (`--border`), **hard offset shadows** with no blur (`--shadow` / `--shadow-sm`) on raised/interactive elements, **flat fills**, a uniform **tight radius** (`--radius-base`), and the **Archivo** type family (heading 800 / body 500) with **JetBrains Mono** for metrics. The palette keeps the **"Happy Hues 17"** core (cream / navy / pink) and puts that palette's teal to work as a secondary. Token names mirror neobrutalism's Tailwind theme (`bg-main`, `bg-secondary-background`, `border-border`, `shadow-shadow`, `rounded-base`, `font-heading` / `font-base`) so the static mockup ports ~1:1 to React/shadcn.
+
+**Surfaces** — deliberately just **three warm surfaces**, plus a button tint and a hairline:
+
+| Role | Token | Used for |
+|------|-------|----------|
+| **canvas** | `--background` | the app background; the Team Graph scroll-well |
+| **card** | `--secondary-background` | cards, inputs, panel bodies, **and the Team Feed tab wells** (Messages/Scratch/Log/Inbox, white like Prompts → History) — white pops against the cream canvas |
+| **chrome** | `--surface-3` | panel headers/footers, toolbars, segmented tracks |
+| **button** | `--surface-btn` | low-emphasis **action buttons** — a warm cream, lighter than chrome so buttons still pop on `--surface-3` footers (form inputs/selector fields stay white) |
+| hairline | `--rule` | dividers between rows inside a bordered list |
+
+Border + heading ink is navy (`--border` / `--foreground`, 2px everywhere). Muted text ramps `--muted` → `--muted-2`.
+
+**Accents — one emphasis ladder** (grounded in Material 3 color roles + Carbon button hierarchy): **pink = primary · teal = secondary · cream = low-emphasis · red = danger.** Read any button by asking *what does clicking it do to this content?* — **pink** commits it *here* (one per surface), **teal** sends it *elsewhere* (hand-off / outbound to another agent or surface), **cream** is a quiet local utility that acts in place, **red** destroys, and **white is not a button** (reserved for fillable inputs + selector triggers). The one nuance is that teal carries two jobs of the same emphasis tier: a **hand-off action** *and* anything **selected/active** (segmented values, toggles, the selection fill). They rarely sit side by side — state lives in the config panel, hand-off actions in footers — so teal carrying both is correct, not muddy.
+
+| Accent | Token | Meaning (tier) |
+|--------|-------|---------|
+| **pink** | `--main` | **PRIMARY** — the one primary action per surface (Send · Apply · Create · Approve · Save) · active **panel tab** · attention/count badges (Inbox, token pill) · title bar · the **selected-text highlight** in the doc render (a light-pink tint) |
+| **teal** | `--secondary` | **SECONDARY** — **hand-off / outbound** *actions* (Revise · Reply · Share · Review · Link to prompt · Load — they send the content to another agent or surface) · active value in segmented controls / model·trigger tabs / toggles · selection **rings** · the "N selected" count badge |
+| **light teal** | `--select` | **selection FILL** (the "secondary container") — selected list rows *and* cards (graph nodes, History, Messages, plan **Feedback** cards), and the text of the section a selected Feedback card refers to |
+| **cream** | `--surface-btn` | **LOW-EMPHASIS** action buttons — quiet local utilities that act in place (Copy · Edit · Comment · Retry · Summarize · Reset · Always-allow · mic · attach), **including the icon-only buttons** (these sit on cream too, so the neutral tier is *one* surface — white is reserved for fillable inputs/selectors, not buttons) |
+| **success** | `--success` | success / active |
+| **warning** | `--warning` | attention / pending |
+| **danger** | `--danger` | destructive (Retire, Reject, Stop, Bypass) |
+
+Form **inputs** and **selector-field triggers** (Color, Icon, Role, Source, Skills, Tools) stay white (`--secondary-background`) — fillable surfaces read distinct from clickable low-emphasis buttons; the accent rides the *value/selected option*, not the field chrome.
+
+**Selectors — inline vs. menu.** *Inline* selectors (all options visible — segmented controls, tabs, toggles) show the chosen option as a **teal fill** (`--secondary`) in place. *Menu* selectors (options hidden behind a trigger — Color/Source/Skills/Tools and **Response**) keep a **neutral** trigger; teal rides the selected option(s) inside the open menu plus a small **teal count badge** for multi-selects.
+
+**Split buttons** read **light chip + full action**: the dropdown chip is a *lighter tint* of the action's accent (it recedes; the action leads). Send = full-pink action (`--main`) + light-pink chip (`--main-dim`); Revise = full-teal action (`--secondary`) + light-teal chip (`--secondary-dim`). The chip is a *parameter of that action*, so it stays in the action's hue family rather than going teal.
+
+**Inbox / attention ramp** — the three request types are ranked by urgency along a single warm ramp (reddish → copper) so importance reads without scattering colors: **Permission (`--req-permission`) → Approval (`--req-approval`) → Decision (`--req-decision`)**. The warning tone (`--warning`) signals **pending** elsewhere: on a graph card it tints the **status badge** (this agent is waiting on you); on the Team Feed's Inbox tab it's a **filled count badge** (how many agents are waiting).
+
+**Status:** shown per graph card as a rectangular **text badge** in the top-right corner (a button that jumps to Inbox / History / Compose) — active `--success` · idle a solid `--muted` (slate-gray) fill with **white text** — matching the solid-fill + white-text treatment of the active and pending badges (the lighter `--ag-user` / `--muted-2` tone is reserved for the User row and the footer idle dot) · pending → the warning tone above. The **context bar** on graph cards and in the Agent panel is colored by **health** (`--success` → `--warning` → `--danger`), not by the agent's identity color — matching the Timeline's context-% coloring.
+
+**Agent identity palette** — **16** colors assigned per agent (tokens `--ag-crimson` … `--ag-magenta` in `tokens.css`) and kept in a different *register* from the UI accents above (deeper and more saturated than the light pink/teal/status tints) so identity never collides with meaning. It's the **"Jewel" family**: an even **OKLCH** set — 16 hues spaced evenly around the wheel at one fixed deep lightness/chroma (`oklch 0.52 0.15`), so every agent is equally weighted and none reads as a UI signal. They're defined and listed (and shown in the mockup's picker) in spectral **ROYGBIV** order: crimson · vermilion · amber · gold · citron · lime · fern · emerald · teal · cyan · azure · cobalt · indigo · violet · orchid · magenta. The mockup's identity JS reads each agent's colour from these tokens, so the picker, the agent tiles, and the agent roster all draw from one place. Each agent also picks an **icon** from the **game-icons.net** set (167 in `assets/icons/agents/`); these render as **recolorable tiles** — the tile background takes the agent's color and the glyph is a white knockout (`--icon-fg`). UI (non-agent) icons are **Lucide** (`assets/icons/ui/`), drawn at ~2.25px stroke to suit the heavy borders.
+
+**Core components** (behavior the mockup styles): **Resizable** panel groups (drag-resizable, but major panels read as a clear **3px navy divider** rather than a grip nub), heading strips, tabbed panels with a persistent shared sub-header, segmented controls (single-select), **split buttons** (a pink primary or teal secondary joined to a dropdown chip — Send+timing, Revise+scope; light chip + full action), agent **identity rows** (recolorable tile + two-line role·name; selected = light-teal fill + check) used for the Source / Target / Filter selectors with a **contextual All/None** toggle, **color & icon pickers** (current selection always visible; sized so both dropdowns are the same height), the **context accordion** (a usage bar that expands to a per-category breakdown), **labeled status bars** (a leading label · health-colored bar · inline value, used for Turns + Context on graph cards and in the Agent panel), the **doc editor** (line-numbered markdown with a color-coded line/section selection rail + a docked comment popout), selectable cards (graph nodes · History · Messages · plan **Feedback** cards — light-teal fill), cards with a colored left accent stripe (Inbox), the Timeline point-list, and palette-matched scrollbars. The **Console** adds a **terminal feed** that **faithfully mimics a real Claude Code CLI** — a dark monospace surface with native markers (`>` input · `●`/`⎿` tool calls + results · `✻` thinking · a model/status line · `+`/`−` diffs · a permission box) via a self-contained **`--term-*` palette**, a documented exception to the token rule, while the surrounding chrome stays neobrutalism — + a **command catalog** (conceptual groups under sticky hairline-ruled headers; **two-line rows** — bold-mono command over a muted one-line description — so the command column scans cleanly; a faint flat *also-in-X* tag; light-teal hover) + a run bar, and an **Expand** step-into that covers the **left + middle columns only** (so the right column stays visible — a deliberate difference from Settings' full-window step-into; catalog as a slide-up panel in-column, as a left rail when expanded). The **Settings step-into view** adds its own small kit: subject tabs over a secondary scope segment, **on/off switches** (teal-when-on) for MCP/plugin enablement, read-only vs editable section headers, lifecycle **Live / New-session** tags, health-colored usage bars, and an explicit global-edit confirm.
+
+**Hover cards (documentation-through-design).** Major components carry an **info popover** — an anchored, transient hover/focus card (an allowed anchored-transient surface, **not** a stateful floating window, per the [bias toward on-screen surfaces](#purpose--vision)) that documents what the component does and why. It's **pure documentation**: no clickable links inside, so routing stays on the real controls. The trigger model is **hybrid** — a small **info-glyph** that **trails immediately after** panel-header labels / tabs / the Link drawer label (a **no-chrome muted glyph** that brightens on hover — no circle or border, vertically centered to the title; the header's right-hand controls stay pushed to the end), and **whole-element hover** on small atoms (the status badge, the Ctx/Turns bars, the Trigger/Payload segments) where a glyph would clutter. One shared primitive drives them all from a `data-hc` attribute. This is the "documentation through the design process" surface — behavior that can't be *clicked* in the static mockup is captured *on the component it describes*.
+
+**Conventions:** one uniform tight radius (`--radius-base` / `rounded-base`; small badges/chips use a slightly tighter radius but are still **rounded squares** — no pills); hard offset shadows (`--shadow` / `--shadow-sm`) are reserved for raised / interactive elements, while inert rows and **non-interactive badges are flat** (border-only). Identity badges used as labels (card headers, feed/history/nav cards, the comment popout) are flat; the raised treatment is kept only for the interactive From/To/Filter dropdown trigger. Single-line inputs carry an inline clear "**X**". The repeated **Copy / Edit / Comment / Retry** actions — plus **Stop** (icon-only **danger**) — are **icon-only** buttons (the mic-button style, on the cream neutral surface, + a hover tooltip) wherever they appear — Plans footer, Team Feed strip (the Messages footer's **Stop** sits rightmost), History strip, the Documents/Assets footers — while labeled buttons (Summarize, Share, Review, Revise, Reject, Approve, Link to prompt) keep their text. (The token values themselves live in [`tokens.css`](tokens.css); the mockup no longer carries an in-page Palette Reference legend.) **Badge families** are kept to a small, named set so the rounded-square vocabulary reads as a system rather than a zoo: **count** chips (Inbox/Plans counts, the teal "N selected"), **status** badges (graph-card active/idle/pending; History `db-*` lifecycle states), **identity** badges (the recolorable tile + role·name used as labels everywhere), and **request-type** badges (the Inbox Permission/Approval/Decision attention ramp — now token-driven via `.db-permission/.db-approval/.db-decision` rather than inline styles). A full one-pass consolidation across every existing badge style is tracked in [`TODO.md`](TODO.md).

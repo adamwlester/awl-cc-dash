@@ -397,6 +397,14 @@ Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
 
 ---
 
+### 2026-06-25 21:37:39 — Snapshot design-v10p7 + TODO backlog churn (committed pre-existing changes)
+
+Committed pre-existing uncommitted work (made outside this session). Froze a **design-v10p7** snapshot under `archive/design/design-v10p7/` (DESIGN.md, TODO.md, mockup.html, mockup-toolkit.js, tokens.css). In `design/TODO.md`, the **Next up** queue (items 1–9, the v10.7 build) was cleared after human review, and a fresh round of rough notes was captured under **Inbox** (the Embed/Attach content-sharing revision + smaller tweaks: Library nav trash-icon removal, divider-line color, Feed timestamp alignment, Link Config "Time as End-after" removal, Filter→From/To, Show→Type / Include→Content, Templates-below-Compose + "Editor" rename, Plans/Documents "Editor" header) plus two **Scratch** notes (agent-lifespan indicator; inline squiggle spell-highlights, replacing the old "support multiple plans" note).
+
+Files: design/TODO.md, archive/design/design-v10p7/ (DESIGN.md, TODO.md, mockup.html, mockup-toolkit.js, tokens.css), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
