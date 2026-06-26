@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library → Plans editor + rail — design exploration</title>
+
+<!--
+  AWL Dashboard · UI snippet — Library → Plans editor region (layout + left-rail UX)
+  =================================================================================
+  Standalone sketch for two asks in the Library → Plans / Documents editor. NOT
+  wired into mockup.html. Values from ../tokens.css; component CSS copied from the
+  mockup's plan-nav / doc-editor families and adjusted only where noted.
+
+  Bullet 1 — heading + nav alignment (matches the Documents tab):
+   • The "Editor" header sits ONLY above the editor box (right column), not spanning
+     the nav box. The nav rail (Outline / Feedback) rises to the TOP of the section,
+     full height — like .docnav in Documents.
+
+  Bullet 2 — the interactive left rail (.md-rail), used in Plans + Documents:
+   • STRIPS 2× THICKER — the colour-coded left edge 3px → 6px (pink = title/whole doc,
+     dark-teal = section, light-teal = line).
+   • RAIL FILLS THE WINDOW — the editor body flex-fills its container (Plans is capped
+     at max-height:300px today; this removes that), and a trailing filler continues the
+     rail track to the bottom below the last line.
+   • HOVER HIGHLIGHTS ALL ASSOCIATED TEXT in canvas cream (--background) — hovering a
+     line cell lights that (wrapped) line, a section cell the whole section, the title
+     cell the whole document. (Today only the single line reacts.) Click-select is
+     unchanged in the real component — this demos the hover preview.
+   • WRAP-FILL — rail blocks cover the FULL height of a wrapped line (no white gap):
+     .md-row uses align-items:stretch (was flex-start).
+-->
+
+<link rel="stylesheet" href="../tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; font-family:'Archivo',sans-serif; font-weight:500;
+    color:var(--foreground); background:var(--background); padding:28px 20px 60px; }
+  .caption{ width:100%; max-width:680px; margin:0 auto 20px; text-align:center; }
+  .caption h1{ font-weight:900; font-size:17px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .caption p{ font-size:12px; line-height:1.5; color:var(--muted); margin:0; }
+  .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+
+  /* a Plans card shell, so the region reads in context */
+  .plan-card{ width:100%; max-width:680px; margin:0 auto; background:var(--secondary-background);
+    border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:13px; }
+  .plan-title{ font-weight:900; font-size:14px; margin:0 0 2px; }
+  .plan-dates{ font-size:9.5px; color:var(--muted); font-weight:600; margin-bottom:11px; }
+  .plan-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
+
+  /* ===== Plans review region — nav rail (left, full height) + editor (right) ===== */
+  .plan-rev{ display:flex; gap:9px; height:460px; }          /* fixed demo height to show fill + rail-to-bottom */
+  /* nav box rises to the TOP and stretches full height (default align-items:stretch) — like .docnav */
+  .plan-nav{ flex:0 0 138px; display:flex; flex-direction:column; min-width:0;
+    border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:6px; }
+  .nav-tabs{ display:flex; gap:4px; margin-bottom:6px; }
+  .nav-tab{ flex:1; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding:4px 0; text-align:center;
+    border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--muted); cursor:pointer; }
+  .nav-tab.on{ background:var(--secondary); color:var(--secondary-foreground); box-shadow:var(--shadow-sm); }
+  .ol-cap{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted-2); margin:2px 0 5px; }
+  .ol-list{ display:flex; flex-direction:column; gap:2px; }
+  .ol-item{ display:flex; align-items:center; gap:6px; width:100%; text-align:left; padding:5px 7px; border:2px solid transparent; border-radius:var(--radius-base);
+    background:transparent; cursor:pointer; font-size:10px; font-weight:700; color:var(--foreground); }
+  .ol-item:hover{ background:var(--surface-3); }
+  .ol-item.on{ background:var(--secondary-background); border-color:var(--border); box-shadow:var(--shadow-sm); }
+  .ol-dot{ width:9px; height:9px; flex:0 0 auto; border:2px solid var(--border); border-radius:50%; background:var(--muted-2); }
+  .ol-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .ol-c{ font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:var(--muted); flex:0 0 auto; }
+
+  /* editor column — header over the EDITOR only, then the body fills the rest */
+  .plan-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0; }
+  .lib-edit-head{ display:flex; align-items:center; gap:5px; margin-bottom:6px; flex:0 0 auto; }
+  .lib-edit-lab{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .flex-1{ flex:1; }
+  .ghost-ic{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:20px; padding:0;
+    border:none; border-radius:var(--radius-base); background:transparent; color:var(--muted); cursor:pointer; transition:color .12s, background .12s; }
+  .ghost-ic:hover{ color:var(--foreground); background:rgba(0,24,88,0.08); }
+  .ghost-ic svg{ width:14px; height:14px; }
+
+  /* ===== the doc editor body + interactive rail (from mockup, with the noted changes) ===== */
+  .doc-ed{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  .md{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:auto;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.6; background:var(--secondary-background);
+    border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+  .md-row{ display:flex; align-items:stretch; }                 /* CHANGED: stretch (was flex-start) → rail covers wrapped height */
+  .md-row.hl{ background:var(--background); }                   /* hover preview — canvas cream */
+
+  /* rail cell — 6px colour strip (was 3px); number top-aligned so it tracks the first visual line */
+  .md-rail{ flex:0 0 auto; width:58px; display:flex; align-items:flex-start; justify-content:flex-end; gap:4px; padding:3px 6px 0 4px;
+    border:none; border-left:6px solid var(--select); border-right:2px solid var(--rule); background:var(--surface-3);
+    color:var(--muted-2); cursor:pointer; font-family:'JetBrains Mono',monospace; }
+  .md-rail.is-sec{ border-left-color:var(--rail-section); }     /* dark teal = section */
+  .md-rail.is-title{ border-left-color:var(--main); }          /* pink = title → whole doc */
+  .md-rail .rn{ font-size:9.5px; }
+  .md-rail--fill{ border-left-color:transparent; cursor:default; }   /* track continues past last line, no colour strip */
+
+  .md-line{ flex:1 1 auto; min-width:0; padding:1px 9px; white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
+  .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
+  .md-h2{ font-weight:800; color:var(--ag-azure); }
+  .md-blank{ min-height:0.9em; }
+  .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 3px; }
+  .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
+  .md-fill{ flex:1 1 auto; min-height:24px; }                  /* absorbs leftover height → rail reaches the bottom */
+  .md-fill .md-line{ background:transparent; }
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    <h1>Library → Plans — editor + left rail (design sketch)</h1>
+    <p>Two fixes in one region: the <b>Editor</b> heading sits over the editor box (nav rail rises to the top, like Documents), and the interactive left rail gets <b>6px strips</b>, <b>fill-to-bottom</b>, <b>canvas-cream hover across all associated text</b>, and <b>wrap-aware blocks</b>. Hover any rail cell — line, section (<code>##</code>), or the title — to preview what it selects.</p>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-title">Token rotation hardening</div>
+    <div class="plan-dates"><b>Created</b> Jun 18 · <b>Edited</b> Jun 24 · researcher · 01 sandy</div>
+
+    <div class="plan-rev">
+      <!-- NAV BOX — full height, top-aligned (bullet 1) -->
+      <aside class="plan-nav">
+        <div class="nav-tabs"><button class="nav-tab on">Outline</button><button class="nav-tab">Feedback</button></div>
+        <div class="ol-cap">Sections</div>
+        <div class="ol-list" id="ol-list"></div>
+      </aside>
+
+      <!-- EDITOR COLUMN — header over the editor box only (bullet 1) -->
+      <div class="plan-main">
+        <div class="lib-edit-head">
+          <span class="lib-edit-lab">Editor</span>
+          <span class="flex-1"></span>
+          <button class="ghost-ic" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          <button class="ghost-ic" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          <button class="ghost-ic" title="Comment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg></button>
+        </div>
+        <div class="doc-ed"><div class="md" id="md"></div></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const DOC = [
+    '# Token rotation hardening',
+    '',
+    '## Purpose',
+    'Rotate API tokens without dropping in-flight requests.',
+    'This requirement is written as a deliberately long sentence so it wraps onto several visual lines, which lets the snippet show that the rail block on the left now stretches to cover the full wrapped height instead of leaving a white gap beneath the line number.',
+    '- [x] Thicken the rail colour strips to 6px',
+    '- [ ] Continue the rail to the bottom of the editor',
+    '',
+    '## Approach',
+    'Issue the new token, then drain the old one on a grace timer.',
+    'Verify the `expiry` path under reuse before cutover.',
+  ].join('\n');
+
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inlineMd = s => esc(s).replace(/`([^`]+)`/g,'<span class="md-code-i">$1</span>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+
+  function build(text){
+    const rows = text.split('\n').map((ln,i)=>{
+      const n=i+1, isSec=/^##\s+/.test(ln), isTitle=/^#\s+/.test(ln), sec=isSec?ln.replace(/^##\s+/,''):'';
+      const rail='<button class="md-rail'+(isSec?' is-sec':'')+(isTitle?' is-title':'')+'" data-line="'+n+'"'
+        +(isSec?' data-sec="'+esc(sec)+'"':'')+(isTitle?' data-title="1"':'')
+        +' title="'+(isTitle?'Select the whole document':(isSec?'Select this section':'Select line '+n))+'"><span class="rn">'+n+'</span></button>';
+      let body;
+      if(isTitle) body='<span class="md-line md-h1">'+inlineMd(ln.replace(/^#\s+/,''))+'</span>';
+      else if(isSec) body='<span class="md-line md-h2">'+inlineMd(sec)+'</span>';
+      else if(/^\s*-\s*\[( |x|X)\]\s+/.test(ln)){const done=/\[(x|X)\]/.test(ln);const t=ln.replace(/^\s*-\s*\[( |x|X)\]\s+/,'');
+        body='<span class="md-line md-task'+(done?' done':'')+'"><span class="md-box">'+(done?'☑':'☐')+'</span> '+inlineMd(t)+'</span>';}
+      else if(ln.trim()==='') body='<span class="md-line md-blank"> </span>';
+      else body='<span class="md-line">'+inlineMd(ln)+'</span>';
+      return '<div class="md-row'+(isSec?' md-h2-row':'')+'" data-line="'+n+'"'+(isSec?' data-sec="'+esc(sec)+'"':'')+'>'+rail+body+'</div>';
+    }).join('');
+    // trailing filler: continues the rail track to the bottom past the last line
+    return rows + '<div class="md-row md-fill" aria-hidden="true"><span class="md-rail md-rail--fill"></span><span class="md-line"></span></div>';
+  }
+
+  const md = document.getElementById('md');
+  md.innerHTML = build(DOC);
+
+  // outline list from the doc's ## sections
+  const ol = document.getElementById('ol-list');
+  ol.innerHTML = [...md.querySelectorAll('.md-row.md-h2-row')].map((r,i)=>
+    '<button class="ol-item'+(i===0?' on':'')+'"><span class="ol-dot"></span><span class="ol-nm">'+r.querySelector('.md-line').textContent+'</span></button>').join('');
+
+  // hover preview — light the associated rows in canvas cream
+  function group(rail){
+    const row = rail.closest('.md-row');
+    if(rail.dataset.title) return [...md.querySelectorAll('.md-row')].filter(r=>!r.classList.contains('md-fill'));
+    if(rail.classList.contains('is-sec')){const out=[row];let nx=row.nextElementSibling;
+      while(nx && !nx.classList.contains('md-h2-row') && !nx.classList.contains('md-fill')){out.push(nx);nx=nx.nextElementSibling;}return out;}
+    return [row];
+  }
+  md.querySelectorAll('.md-rail').forEach(rail=>{
+    if(rail.classList.contains('md-rail--fill')) return;
+    rail.addEventListener('mouseenter',()=>group(rail).forEach(r=>r.classList.add('hl')));
+    rail.addEventListener('mouseleave',()=>md.querySelectorAll('.md-row.hl').forEach(r=>r.classList.remove('hl')));
+  });
+</script>
+</body>
+</html>

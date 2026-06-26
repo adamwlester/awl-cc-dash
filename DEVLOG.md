@@ -545,6 +545,142 @@ Files: design/mockup.html, design/tokens.css, DEVLOG.md
 
 ---
 
+### 2026-06-26 02:10:00 — TODO: queued "Jump-to-End Pill (all scrollable windows)" in Next up
+
+Added a new **Next up** item (#3) to `design/TODO.md`: a floating "jump to bottom / jump to top" pill (Slack/Discord/terminal-style — appears when scrolled away from an edge, snaps to the extreme on click, hides at the edge) to be applied to every scrollable window, styled from `tokens.css`. Marked as the broader companion to the feed-specific A2 "Jump to Feed Ends"; no snippet — implement directly in the mockup when given the go-ahead. Planning only; nothing built.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 02:05:01 — Plans editor + rail snippet: redone as a faithful first-card clone
+
+Replaced the earlier reinvented `design/ui-snippets/plans-editor-rail.html` (01:34) — which would have misled a porting agent — with a **verbatim 1:1 clone of the mockup's first plan card** (PLANS[0] "Auth token-rotation remediation", open), assembled by a subagent: the card's CSS + render JS + data copied straight from `mockup.html` (badges, agent tile, verdicts, Outline/Feedback nav, Embed/Attach + Review + decision footer), links `../tokens.css`, lucide via CDN, with deep send/comment machinery stubbed to no-ops (markup/CSS intact). The **only** intentional diffs are isolated + labelled (a trailing "SNIPPET CHANGES" CSS override block + JS tagged `bullet 1`/`bullet 2`/`CHANGED`): **bullet 1** — Editor header moved inside `plan-main` (over the editor box only), nav rail rises to the top full-height (Documents-style); **bullet 2** — rail strips 6px (was 3px), `.md-row` stretch so blocks cover wrapped-line height, editor flex-fills + filler row runs the rail track to the bottom, hover lights all associated text in canvas cream (`--background`); **plus** Outline-section click now runs `railClick` so it selects the whole section identically to a section rail-click (was a brief `.md-target` header flash).
+
+Verified headless (isolated throwaway Chrome, `--screenshot`/`file://`): faithful render confirmed vs the clone; temp auto-invokes captured the cream section-hover, the Outline-click pink whole-section select, and the collapsed (header-only) open/close toggle; fill-to-bottom shown by raising the demo editor height above the doc length; 520px narrow check reflows with no overflow (title wraps 3 lines, strip covers all). Shots in `artifacts/shots/` (`plans-rail-v2-*`).
+
+Files: design/ui-snippets/plans-editor-rail.html, DEVLOG.md
+
+---
+
+### 2026-06-26 02:12:29 — TODO Next up: queued Library Plans/Documents editor rail + layout
+
+Added Next-up item #4 to `design/TODO.md` deferring to `design/ui-snippets/plans-editor-rail.html` for context: the Library→Plans/Documents editor changes — Editor header over the editor box + nav rail to the top (bullet 1), the `.md-rail` UX (6px strips, wrap-fill, fill-to-bottom, canvas-cream hover; bullet 2), and routing the Outline-section click through `railClick` for parity with the section rail.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 02:48:37 — Messages-card rail/blocks/multi-select design sketch
+
+New snippet `design/ui-snippets/messages-card.html` — the same real Messages feed card (the `max` ACTIVE/RECV card with bash/diff/write blocks, cloned verbatim from `mockup.html` via a subagent: `msgCardHTML`/`msgRailHTML`/`msgBlockHTML` + badge/tile/sprite + CSS, links `../tokens.css`) shown two ways. **Current** = the verbatim mockup (thin teal per-block rail, discrete sub-cards, single block-select), static. **Proposed** (isolated in a "SNIPPET CHANGES" CSS block + `*V2` JS builders): the per-block rail restyled to the Library `.md-rail` look — narrow tan box + a small **uniform teal** accent strip, no numbers; the blocks collapsed into one **contiguous panel** (bordered box, hairline dividers, no gaps) so they read vertically continuous and Library-like; and **multi-select within a card** (toggle, one card at a time — selecting blocks in another card clears this one's; still mutually exclusive with the whole-card pink select). Reflects the answered decisions (uniform accent, one-card-at-a-time).
+
+Verified headless (isolated throwaway Chrome, `--screenshot`/`file://`): side-by-side at 1180 (seeded states — Current 1 block, Proposed 2 blocks — show single vs multi at a glance) and stacked at 600 (responsive, no overflow). Shots `artifacts/shots/msg-card-v2*`. Scratch clone removed.
+
+Files: design/ui-snippets/messages-card.html, DEVLOG.md
+
+---
+
+### 2026-06-26 02:59:22 — TODO Next up: queued Messages card rail + blocks + multi-select
+
+Added Next-up item #5 to `design/TODO.md` deferring to `design/ui-snippets/messages-card.html` (the "Proposed" column): restyle the Messages per-block rail (`.mrail`) to the Library `.md-rail` tan-box + uniform-teal-strip look (no numbers); collapse the per-block sub-cards into one contiguous panel (dividers, no gaps); and allow multi-select within a card (one card at a time, mutually exclusive with the whole-card pink select).
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 03:05:00 — Snippet: square agent-card redesign + TODO Next up #6
+
+Built `design/ui-snippets/agent-card.html` — a standalone sketch of the reorganised Team Graph agent card (NOT wired into the mockup). One overloaded grid of four square cards, each demonstrating a different state, covering every new element: **model in the header** with an **opus-only FAST lightning bolt** (bright = on / muted = off / hidden for non-opus — cards A/B/C-D), **three icon chips** (mode·effort·think) in a **two-column body** beside narrower Ctx/Turns bars, a full-width **current-run block** (live status + single-colour progress keyed to status — determinate green / barber-pole indeterminate / warm pending / muted idle), an **age stamp** (datetime + auto-scaling duration), and **square subagent badges** (neutral fill, agent-colour text, quiet hairline + `SUBAGENTS` label, `+N` overflow). Chrome mirrors the mockup's `.node` family; values from `tokens.css`; Lucide for icons. Verified in-browser (Playwright, :8807) at 900/820/360px — fixed an age-stamp truncation by moving it to its own full-width line; all states render, no clipping at real ~186px card size. Filed as **TODO Next up #6** ("Agent Card Redesign (square)") with the full spec + five open decisions (FAST override greying, subagent sub-status encoding, empty-state collapse-vs-reserve, progress-% source, pale-colour text contrast). Planning only — nothing built into `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+### 2026-06-26 03:40:00 — Messages-card snippet: corrected to match the Library rail (pink select, cream hover, turn-number whole-select row)
+
+Reworked the "Proposed" column of `design/ui-snippets/messages-card.html` after grounding in the actual renders (Library `plans-editor-rail.html` + the Messages card). Four corrections, all isolated in the "SNIPPET CHANGES" CSS block + `*V2`/`msgWholeSel` JS: (1) **hover** now mirrors Library — `.mrail--lib:hover` tints the rail cell pink and the row's content lights **cream** (`--background`), declared after `.bsel` so a selected row still previews cream; (2) a **top title row** holds the **turn number** in the doc-title style (`.msg-turn`, weight 900 / 12px) with a pink strip, and `msgWholeSel` makes it select the whole message (toggles every row pink, one card at a time) — the header preview repoints to it too (replacing `msgCardSelV2`); (3) **selection is now always light pink** (`--main-dim`) for rail cell + content (was teal `--secondary`/`--select`); (4) the rail/text **seam** is gone — `border-right` blends to `--main-dim` on select. Added `turn:17` to the demo MSGS object. Verified headless (own throwaway Chrome profile) at 1300px + 600px and in seeded whole-select / hover states; the verbatim "Current" column is untouched. Headed parity pass deliberately skipped — per the session instruction to stay fully headless while another agent works the UI. Snippet only; nothing wired into `mockup.html`.
+
+Files: design/ui-snippets/messages-card.html, DEVLOG.md
+
+### 2026-06-26 04:05:00 — Messages-card snippet: drop rail strips, whole-card cream hover, review-style type badges
+
+Second pass on the "Proposed" column of `design/ui-snippets/messages-card.html` (snippet only): (1) **removed the rail colour strips** — the rail is now a plain tan select handle (the top whole-select row is identified by its bold turn-number content, not a strip; `.mrail--title` kept as a JS hook only); (2) **title hover now lights the WHOLE card cream** — hover moved from pure-CSS adjacent-sibling to JS `msgRailHover`/`msgRailHoverOut` adding `.hl` (a block rail lights its own row, the top title rail lights every row), mirroring Library's `railHover`; (3) **tiny type badges** — added `.blk-badge` matching the Plans review badge `.vbadge` geometry (18px, 2px border, 9px/800 uppercase) via a new `msgBlockHTMLv2`; each block shows Thought/Bash/Diff/Write and the primary prose is tagged **"Message"** (it maps to no tool filter); the old inline `BASH`/`DIFF` labels are gone. Current column stays verbatim (untouched `msgBlockHTML`). Verified headless (own throwaway Chrome) at 1300px + 600px and in seeded whole-select, block-hover, and title-hover(whole-card) states. Headed parity pass deliberately skipped per the session instruction to stay fully headless while another agent works the UI. Nothing wired into `mockup.html`.
+
+Files: design/ui-snippets/messages-card.html, DEVLOG.md
+
+---
+
+### 2026-06-26 03:55:00 — Agent-card snippet v2: full restructure per review feedback
+
+Rebuilt `design/ui-snippets/agent-card.html` after the v1 layout was rejected (not actually square, cramped half-width bars, no real feed treatment). v2 is a **single-column fixed square** (190×190): header with **model right-justified + bottom-aligned to the name** (opus-only FAST bolt trailing, hidden for non-opus) and the **age stamp before a full-bleed divider**; a neobrutalism **Marquee** (two-track `marquee`/`marquee2` loop, replicated from neobrutalism.dev) streaming the **live feed**; the **Run** status bar; **inline** mode·effort·think icon chips; then **Ctx/Turns** — all three bars sharing one row template so widths match and run full. Dividers are **full-bleed** (border colour). Subagents are now **bold, agent-colour, neutral clickable badges** (`+N` overflow) with the header label dropped, in a **reserved fixed-size section** (idle/0-sub cards show a muted "no subagents" placeholder) so all cards stay uniform squares. Four cards exercise FAST on/off/hidden, determinate/indeterminate/pending/idle Run, and 3/1/0/6-sub states. Verified in-browser (Playwright, :8807) at 900px + 430px — square holds on reflow, feed scrolls/pauses-on-hover, badges show the press. Updated **TODO Next up #6** to the v2 spec (resolved: model→header, single-column, marquee, full-bleed dividers, reserved subagent section, header dropped; still open: FAST override greying, subagent sub-status encoding, progress-% source, pale-colour contrast). Planning only — nothing in `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 04:20:00 — Agent-card snippet v3: activity-band refinement
+
+Tightened `design/ui-snippets/agent-card.html` per review. Introduced a full-bleed **activity band**: one container whose top/bottom borders are the two dividers, holding the **textless Run progress strip** (no border/label/value, single-colour keyed to status) sitting **flush on top of** the **Marquee** feed (now **no fill / no padding / full bleed**) with no gap — the Run bar left the labeled-bars group. Below the band, the three **mode·effort·think** chips now **spread full width** (`space-between`, edges aligned to the bar rows); the bars group is just **Ctx + Turns**. Verified in-browser (Playwright, :8807) at 900px + 430px — band reads as a clean ticker, square holds on reflow, all four states (determinate / barber-pole indeterminate / muted-idle / warm-pending) and FAST on/off/hidden render correctly. Updated **TODO Next up #6** body to the band model. Planning only — nothing in `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 04:45:00 — Agent-card snippet v4: activity band relocated to the bottom
+
+Per review, moved the activity band (Run strip + Marquee) from under the header down to the **bottom**, pinned directly above the subagent strip (`.band` now `margin-top:auto`), and added a **third full-bleed divider between the Run strip and the Marquee** so the bottom stack reads `divider → Run strip → divider → Marquee → divider → subagents` (the band's bottom border doubles as the subagent divider). The top of the card is now a clean, divider-free block: header + age → full-width `mode·effort·think` chips → Ctx/Turns bars. Also answered the user's question — the coder card's striped Run bar is the intentional **barber-pole indeterminate** loading pattern (working, % unknown), not a glitch. Verified in-browser (Playwright, :8807) at 900px + a 2.4× zoom pass on card A — all three band dividers render, Run strip + Marquee each bounded, square holds, four run states + FAST on/off/hidden correct. Updated **TODO Next up #6** body to the bottom-band layout. Planning only — nothing in `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 05:05:00 — TODO #6 rewritten as a self-contained agent-card build brief
+
+Consolidated the agent-card item (TODO Next up #6) into one clean implementation brief a fresh agent can build from with no conversation context: named the **port target** (`.node` cards in `.graph-grid`, and that the snippet copied `.node` chrome to map back), the fixed-square approach (lock `aspect-ratio:1` on the existing grid), the full top→bottom anatomy (header with model+FAST bolt+age · full-width chips · Ctx/Turns · bottom activity band `divider→Run→divider→Marquee→divider→subagents` · reserved subagent badges), explicit **build notes** (work from tokens, demo data only, keep DESIGN.md's Team Graph card section in sync, verify per the UI rules), and the four **open decisions to settle with the human** (FAST override, subagent working/idle encoding, Run-% source, pale-colour badge contrast). Removed the stale "age sits right before a divider" line (the v4 top block has no divider) and the version cruft. No snippet/mockup change.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 05:25:00 — Agent-card snippet v5: restore header divider; confirm age right-aligned
+
+Per review, **restored the full-bleed divider under the header** (below the age line) in all four cards of `design/ui-snippets/agent-card.html` — the v4 "clean top block, no divider" choice was reverted to the original "divider under the header" look. The **age stamp was already `text-align:right`**; verified in-browser (Playwright, :8807, 2.4× zoom on card A + full set at 900px) that it renders flush-right, and that the new header divider sits below it with the square still holding (the bottom band's `margin-top:auto` absorbs the added ~14px). Updated the caption and **TODO Next up #5** (the human renumbered the agent-card item from #6 to #5): the Header bullet now states the right-aligned age is followed by a full-bleed divider under the whole header (dropped the "no divider under it" wording). Planning only — nothing in `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 04:26:53 — Messages-card snippet: type tag moved INTO the rail box; realistic content for all block kinds
+
+Reworked `design/ui-snippets/messages-card.html` (Proposed column) per fresh user feedback after a takeover review: the type tag now lives **inside the rail box** (was a bordered pill prefixed to the content) — a tight lowercase 3-char abbreviation (`msg · tht · rd · bsh · dif · wrt · mta`), **top-aligned**, **minimal** (transparent → shows the rail's tan, no pill/border), font size+weight matched to the Plans review badge (`.vbadge`, 9px/800). The **title row's rail box is empty** ("Turn 17" stays in the content as `.msg-turn`). Replaced `.blk-badge` CSS with `.rail-tag`; widened `.mrail--lib` 22→34px with flex top-align; added `RAIL_TAG`/`railTag()`, dropped `MSG_KIND_LBL2` and the inline content label from `msgBlockHTMLv2`. Demo data rewritten to exercise **all 7 block kinds** (message·think·read·bash·diff·write·meta) with realistic Claude-Code rendered text drawn from this UI session. Verified headless/isolated (default, narrow 600px, whole-select, block-hover, title-hover); skipped headed pass per the standing no-interfere rule. `mockup.html` untouched.
+
+Files: design/ui-snippets/messages-card.html, DEVLOG.md
+
+---
+
+### 2026-06-26 05:55:00 — Agent-card snippet v6: age moved to a top meta strip
+
+Per review (user picked the "top meta strip" option), moved the date/age out of its own row and up into a thin **top meta strip** across all four cards of `design/ui-snippets/agent-card.html`: the age is now **small (7.5px) and left-aligned** on the left, paired with the **status badge** on the right. To do it the `.node-badge` went from **absolute corner-pinned** to **in-flow** (new `.hd-meta` flex row, `justify-content:space-between`); `.age` lost its right-align/full-width and became a flex child. The identity row and the full-bleed header divider are unchanged below it. (Also corrected the earlier right-align to **left-align** as the user intended.) Verified in-browser (Playwright, :8807) at 900px + 2.4× zoom — meta strip reads cleanly, header divider still present, square holds across all four cards. Updated **TODO Next up #5** Header bullet to the meta-strip layout. Planning only — nothing in `mockup.html`.
+
+Files: design/ui-snippets/agent-card.html, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 06:40:00 — mockup: Agent panel created-time + drop "Configuration" label
+
+First **live `mockup.html`** change for the agent-card work (snippets aside). Agent → **Details** header: (1) **removed** the "Configuration — tap the pencil to edit a field" label line entirely (the per-field pencils stay, so the behaviour is unchanged); (2) added the agent's **created-time** (datetime + auto-scaling "ago" duration) **stacked right-aligned under the status badge** — placement chosen by the user. Wired it data-driven: added a `created` field to all 13 agents in the `AG` object and a line in `repaintAgentPanel` so selecting any graph card repaints it (verified: max → `06-26 13:05 · 3h37m`, sandy → `06-26 14:30 · 2h12m`). **Narrow-width fix:** the created-time first squeezed the agent name into wrapping at the 240px panel min — gave the name priority (`truncate`, and the badge/time column shares space `flex-1 min-w-0`) so the **name stays on one line** and the **time truncates** ("06-26 14:30 · …") at the extreme instead. Verified in-browser (Playwright, :8807) at normal width + 2.2× zoom (≈ panel min-width) + per-agent selection; 0 console errors. Synced `design/DESIGN.md` (Details now documents the header identity + status badge + created-time).
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-26 06:55:00 — mockup: spread Agent-panel badge/created-time to tile top & bottom
+
+Follow-up tweak — the status badge and created-time were bunched together in the centered right column. Set that column to `justify-between` + `h-10` (matching the 40px agent tile) so the **badge pins to the top of the tile and the created-time to the bottom**, with the empty space between them. Kept the outer row `items-center` so the name stays centered and only the badge/time column is affected — a clean flex change (no magic beyond matching the tile height) that maps directly to the eventual React build, per the user's ask not to pre-bake throwaway layout. Verified in-browser (Playwright, :8807): badge top = tile top (86px), created bottom = tile bottom (126px); full `06-26 14:30 · 2h12m` at normal width, name-priority/time-truncate intact at panel min-width. No DESIGN.md change needed (header description still accurate).
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

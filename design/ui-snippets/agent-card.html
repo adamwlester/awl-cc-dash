@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent card — square redesign v2 (design exploration)</title>
+
+<!--
+  AWL Dashboard · UI snippet — Team Graph "agent card" (square redesign, v2)
+  =========================================================================
+  Standalone sketch of the reorganised Team Graph node card. NOT wired into
+  mockup.html. Values from ../tokens.css (single source); card chrome
+  (border / shadow / radius / agent tiles / .node-badge status pills / .pbar)
+  mirrors the mockup's .node family. Lucide for icons.
+
+  LAYOUT (top → bottom), single column, fixed SQUARE:
+   • HEADER — identity (tile + role + name) on the left; MODEL (+ opus-only
+     FAST bolt) on the right, RIGHT-justified and BOTTOM-aligned to the name.
+     The AGE stamp (created datetime + auto-scaling duration) is the last line
+     of the header, right before the divider.
+   • full-bleed DIVIDER (edge-to-edge, border colour)
+   • LIVE FEED — a neobrutalism MARQUEE (two-track marquee/marquee2 loop)
+     streaming the agent's current activity as one scrolling line. Idle cards
+     show it static + muted (no scroll).
+   • RUN bar — the run/progress status bar (single colour, opposite polarity
+     to the load bars → no danger ramp; keys off status: active green ·
+     pending warm · idle muted/empty; barber-pole INDETERMINATE when % unknown)
+   • SETTINGS — three inline icon chips (mode · effort · think)
+   • LOAD bars — Ctx + Turns. All THREE bars (Run/Ctx/Turns) share one row
+     template so their widths are identical and full.
+   • full-bleed DIVIDER
+   • SUBAGENTS — square NEUTRAL CLICKABLE badges, BOLD agent-colour numerals.
+     No header label. Section is RESERVED at a fixed size even when empty so
+     every card keeps the same height → uniform squares.
+
+  CARDS (one state each)
+   A researcher/sandy · opus · FAST ON  · ACTIVE  · determinate run · 3 subs
+                        (effort+think greyed = FAST override — PROPOSED)
+   B coder/max        · opus · FAST OFF · ACTIVE  · indeterminate run · 1 sub
+   C synthesizer/kai  · sonnet (no bolt)· IDLE    · muted/empty run · 0 subs (reserved)
+   D auditor/drew     · haiku (no bolt) · PENDING · warm run · 6 subs (+N cap)
+
+  OPEN DECISION (still): does FAST override effort/think (greyed, card A)?
+  Depends on the real semantics of what FAST controls. Card A shows the option.
+  (Pale agent colours amber/gold/citron remain a contrast caveat as badge text.)
+-->
+
+<link rel="stylesheet" href="../tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; font-family:'Archivo',sans-serif; font-weight:500;
+    color:var(--foreground); background:var(--background); padding:30px 22px 70px; }
+
+  .caption{ width:100%; max-width:840px; margin:0 auto 26px; }
+  .caption h1{ font-family:'Archivo'; font-weight:900; font-size:18px; margin:0 0 7px; letter-spacing:-0.01em; }
+  .caption p{ font-size:12.5px; line-height:1.55; color:var(--muted); margin:0; }
+  .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+
+  /* Team Graph scroll-well; cards held at a FIXED square size (no 1fr stretch) */
+  .well{ width:100%; max-width:840px; margin:0 auto; background:var(--background);
+    border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:18px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,190px); gap:18px; justify-content:center; }
+
+  figure{ margin:0; width:190px; }
+  figcaption{ margin-top:8px; font-size:10px; line-height:1.4; color:var(--muted); text-align:center; }
+  figcaption b{ color:var(--foreground); font-weight:800; }
+
+  /* ============================ agent card (fixed square) ============================ */
+  .card{ position:relative; width:190px; height:190px; display:flex; flex-direction:column; gap:6px;
+    background:var(--secondary-background); border:2px solid var(--border);
+    border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px; overflow:hidden; }
+  .card.selected{ background:var(--select); box-shadow:var(--shadow); }
+
+  /* full-bleed divider — breaks past the 9px card padding, border colour */
+  .div{ height:0; border-top:2px solid var(--border); margin:0 -9px; }   /* full-bleed divider (used inside the band) */
+
+  /* status badge — copied from mockup .node-badge family; now in-flow (right end of the top meta strip) */
+  .nbadge{ flex:0 0 auto; display:inline-flex; align-items:center;
+    padding:1px 6px; border:2px solid var(--border); border-radius:3px; font-size:7px; font-weight:900;
+    letter-spacing:0.07em; text-transform:uppercase; box-shadow:var(--shadow-sm); }
+  .nb-active{ background:var(--success); color:#fff; }
+  .nb-pending{ background:var(--warning); color:#fff; }
+  .nb-idle{ background:var(--muted); color:#fff; }
+
+  /* ---- header ---- */
+  /* top meta strip: age (left) + status badge (right), thin, way up at the top */
+  .hd-meta{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .hd-top{ display:flex; align-items:flex-end; gap:7px; }
+  .agtile{ width:26px; height:26px; flex:0 0 auto; align-self:center; display:inline-flex; align-items:center;
+    justify-content:center; border:2px solid var(--border); border-radius:var(--radius-base);
+    background:currentColor; overflow:hidden; }
+  .agtile-luc{ width:60%; height:60%; color:var(--icon-fg); }
+  .idblk{ min-width:0; line-height:1.05; flex:1 1 auto; }
+  .role{ font-size:8px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .name{ font-family:'Archivo'; font-weight:900; font-size:11.5px; color:var(--foreground);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .model{ flex:0 0 auto; display:flex; align-items:center; font-family:'JetBrains Mono',monospace; font-weight:700;
+    font-size:9px; color:var(--foreground); padding-bottom:1px; }       /* bottom-aligns to name via flex-end */
+  .bolt{ width:11px; height:11px; margin-left:4px; color:var(--warning); }   /* FAST on */
+  .bolt.off{ color:var(--muted-2); opacity:0.45; }                            /* FAST off (opus, inactive) */
+  .age{ flex:1 1 auto; min-width:0; text-align:left; font-family:'JetBrains Mono',monospace; font-size:7.5px; font-weight:600;
+    color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ---- activity band: Run strip + divider + Marquee, full-bleed, pinned to the bottom
+         (its top/bottom borders are two of the dividers; the .div inside is the third) ---- */
+  .band{ margin:auto -9px 0; border-top:2px solid var(--border); border-bottom:2px solid var(--border); }
+  /* Run progress strip — no text, no border, full bleed, sits ABOVE the marquee with no gap */
+  .run-strip{ position:relative; height:6px; overflow:hidden; background:var(--surface-3); }
+  .run-strip > i{ display:block; height:100%; width:0; }
+  .run-active  > i{ background:var(--success); }
+  .run-pending > i{ background:var(--warning); }
+  .run-idle{ opacity:0.5; }
+  .run-indet > i{ width:100%; background:var(--success); position:relative; }
+  .run-indet > i::after{ content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
+    animation:barber 0.8s linear infinite; }
+  @keyframes barber{ to{ background-position:24px 0; } }
+  /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed */
+  .feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:15px; }
+  .feed .trk{ white-space:nowrap; font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:600;
+    color:var(--muted); will-change:transform; }
+  .feed .trk.a{ animation:marquee 9s linear infinite; }
+  .feed .trk.b{ position:absolute; top:0; height:100%; display:flex; align-items:center; animation:marquee2 9s linear infinite; }
+  .feed:hover .trk{ animation-play-state:paused; }
+  @keyframes marquee{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-100%); } }
+  @keyframes marquee2{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(0); } }
+  /* idle feed — static, muted, no scroll */
+  .feed.idle .trk{ color:var(--muted-2); font-style:italic; animation:none; }
+  .feed.idle .trk.b{ display:none; }
+
+  /* ---- load bars: Ctx + Turns (shared row template) ---- */
+  .bars{ display:flex; flex-direction:column; gap:5px; }
+  .brow{ display:flex; align-items:center; gap:6px; }
+  .bl{ flex:0 0 auto; width:24px; font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.02em;
+    color:var(--muted); font-family:'JetBrains Mono',monospace; }
+  .pbar{ position:relative; flex:1 1 auto; height:8px; border:2px solid var(--border); border-radius:3px;
+    overflow:hidden; background:var(--surface-3); }
+  .pbar > i{ display:block; height:100%; width:0; }
+  .bv{ flex:0 0 auto; width:30px; text-align:right; font-size:8px; font-weight:700; color:var(--muted);
+    font-family:'JetBrains Mono',monospace; }
+
+  /* ---- settings: three icon chips spread full width (left/right aligned to the bar rows) ---- */
+  .settings{ display:flex; align-items:center; justify-content:space-between; }
+  .chip{ display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-weight:700;
+    font-size:9px; color:var(--foreground); }
+  .chip svg{ width:11px; height:11px; color:var(--muted); flex:0 0 auto; }
+  .chip.off{ opacity:0.32; }                                  /* greyed = overridden by FAST (proposed) */
+
+  /* ---- subagents: reserved fixed section · neutral clickable badges (band above pins this group to the bottom) ---- */
+  .subs{ min-height:18px; display:flex; align-items:center; padding-top:1px; }
+  .sbadges{ display:flex; flex-wrap:wrap; gap:5px; }
+  .sbadge{ width:18px; height:18px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--border); border-radius:3px; background:var(--surface-btn); box-shadow:var(--shadow-sm);
+    font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:900; cursor:pointer;
+    transition:transform .07s, box-shadow .07s; }
+  .sbadge:hover{ transform:translate(1px,1px); box-shadow:none; }
+  .sbadge.more{ color:var(--muted); }
+  .subs-empty{ font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    <h1>Agent card — square redesign v2 (design sketch)</h1>
+    <p>Single-column square card: a thin <b>top meta strip</b> (small left-aligned <b>age</b> · status badge), then identity
+    with <b>model right-aligned</b> in the header (opus-only <b>FAST</b> bolt) and a full-bleed divider, then the three
+    <code>mode·effort·think</code> chips spread full width and the <b>Ctx/Turns</b> bars.
+    Pinned to the bottom is the full-bleed <b>activity band</b> — the textless <b>Run</b> progress strip and the
+    <b>neobrutalism Marquee</b> feed (no fill), each separated by a divider — sitting right above the reserved
+    <b>subagent</b> strip of bold, clickable neutral badges. Not wired into <code>mockup.html</code>. Hover the feed to pause it; hover a badge to see the press.</p>
+  </div>
+
+  <div class="well">
+    <div class="grid">
+
+      <!-- A — opus · FAST ON · ACTIVE · determinate run · 3 subs (effort+think greyed = override) -->
+      <figure>
+        <div class="card selected">
+          <div class="hd-meta">
+            <div class="age" title="Created · elapsed">06-26 14:30 · 2h12m</div>
+            <span class="nbadge nb-active">Active</span>
+          </div>
+          <div class="hd-top">
+            <span class="agtile" style="color:var(--ag-emerald)"><i data-lucide="search" class="agtile-luc"></i></span>
+            <div class="idblk"><div class="role">researcher</div><div class="name">01 sandy</div></div>
+            <div class="model">opus 4.8<i data-lucide="zap" class="bolt" title="Fast mode: ON (opus only)"></i></div>
+          </div>
+          <div class="div"></div>
+          <div class="settings">
+            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+            <span class="chip off" title="Reasoning effort — overridden by Fast"><i data-lucide="gauge"></i>high</span>
+            <span class="chip off" title="Extended thinking — overridden by Fast"><i data-lucide="brain"></i>on</span>
+          </div>
+          <div class="bars">
+            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i></div><span class="bv">62%</span></div>
+            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="bv">34/50</span></div>
+          </div>
+          <div class="band">
+            <div class="run-strip run-active"><i style="width:64%"></i></div>
+            <div class="div"></div>
+            <div class="feed">
+              <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+              <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+            </div>
+          </div>
+          <div class="subs">
+            <div class="sbadges">
+              <span class="sbadge" style="color:var(--ag-emerald)">1</span>
+              <span class="sbadge" style="color:var(--ag-emerald)">2</span>
+              <span class="sbadge" style="color:var(--ag-emerald)">3</span>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>A · opus, FAST on</b><br>active · determinate run · effort+think greyed (override)</figcaption>
+      </figure>
+
+      <!-- B — opus · FAST OFF · ACTIVE · indeterminate run · 1 sub -->
+      <figure>
+        <div class="card">
+          <div class="hd-meta">
+            <div class="age" title="Created · elapsed">06-26 13:05 · 3h37m</div>
+            <span class="nbadge nb-active">Active</span>
+          </div>
+          <div class="hd-top">
+            <span class="agtile" style="color:var(--ag-cobalt)"><i data-lucide="code" class="agtile-luc"></i></span>
+            <div class="idblk"><div class="role">coder</div><div class="name">01 max</div></div>
+            <div class="model">opus 4.8<i data-lucide="zap" class="bolt off" title="Fast mode: OFF (opus only)"></i></div>
+          </div>
+          <div class="div"></div>
+          <div class="settings">
+            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>edit</span>
+            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+          </div>
+          <div class="bars">
+            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i></div><span class="bv">41%</span></div>
+            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="bv">22/50</span></div>
+          </div>
+          <div class="band">
+            <div class="run-strip run-active run-indet"><i></i></div>
+            <div class="div"></div>
+            <div class="feed">
+              <span class="trk a">running test suite&nbsp;&nbsp;·&nbsp;&nbsp;142 passed&nbsp;&nbsp;·&nbsp;&nbsp;0 failed&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+              <span class="trk b">running test suite&nbsp;&nbsp;·&nbsp;&nbsp;142 passed&nbsp;&nbsp;·&nbsp;&nbsp;0 failed&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+            </div>
+          </div>
+          <div class="subs">
+            <div class="sbadges">
+              <span class="sbadge" style="color:var(--ag-cobalt)">1</span>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>B · opus, FAST off</b><br>active · indeterminate run (barber-pole) · bolt muted</figcaption>
+      </figure>
+
+      <!-- C — sonnet (no bolt) · IDLE · muted/empty run · 0 subs (reserved) -->
+      <figure>
+        <div class="card">
+          <div class="hd-meta">
+            <div class="age" title="Created · elapsed">06-25 09:12 · 1d</div>
+            <span class="nbadge nb-idle">Idle</span>
+          </div>
+          <div class="hd-top">
+            <span class="agtile" style="color:var(--ag-violet)"><i data-lucide="git-merge" class="agtile-luc"></i></span>
+            <div class="idblk"><div class="role">synthesizer</div><div class="name">01 kai</div></div>
+            <div class="model">sonnet 4.6</div>
+          </div>
+          <div class="div"></div>
+          <div class="settings">
+            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>med</span>
+            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+          </div>
+          <div class="bars">
+            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="bv">18%</span></div>
+            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:12%;background:var(--success)"></i></div><span class="bv">6/50</span></div>
+          </div>
+          <div class="band">
+            <div class="run-strip run-idle"><i></i></div>
+            <div class="div"></div>
+            <div class="feed idle">
+              <span class="trk a">idle — awaiting prompt</span>
+            </div>
+          </div>
+          <div class="subs"><span class="subs-empty">no subagents</span></div>
+        </div>
+        <figcaption><b>C · sonnet (no bolt)</b><br>idle · muted/empty run · subagent strip reserved</figcaption>
+      </figure>
+
+      <!-- D — haiku (no bolt) · PENDING · warm run · 6 subs (+N cap) -->
+      <figure>
+        <div class="card">
+          <div class="hd-meta">
+            <div class="age" title="Created · elapsed">06-26 15:48 · 54m</div>
+            <span class="nbadge nb-pending">Pending</span>
+          </div>
+          <div class="hd-top">
+            <span class="agtile" style="color:var(--ag-crimson)"><i data-lucide="shield-check" class="agtile-luc"></i></span>
+            <div class="idblk"><div class="role">auditor</div><div class="name">01 drew</div></div>
+            <div class="model">haiku 4.5</div>
+          </div>
+          <div class="div"></div>
+          <div class="settings">
+            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>plan</span>
+            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>low</span>
+            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+          </div>
+          <div class="bars">
+            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:73%;background:var(--warning)"></i></div><span class="bv">73%</span></div>
+            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:88%;background:var(--danger)"></i></div><span class="bv">44/50</span></div>
+          </div>
+          <div class="band">
+            <div class="run-strip run-pending"><i style="width:40%"></i></div>
+            <div class="div"></div>
+            <div class="feed">
+              <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+              <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+            </div>
+          </div>
+          <div class="subs">
+            <div class="sbadges">
+              <span class="sbadge" style="color:var(--ag-crimson)">1</span>
+              <span class="sbadge" style="color:var(--ag-crimson)">2</span>
+              <span class="sbadge" style="color:var(--ag-crimson)">3</span>
+              <span class="sbadge" style="color:var(--ag-crimson)">4</span>
+              <span class="sbadge more" title="2 more subagents">+2</span>
+            </div>
+          </div>
+        </div>
+        <figcaption><b>D · haiku (no bolt)</b><br>pending · warm run · subagent overflow (+N) · Turns near max</figcaption>
+      </figure>
+
+    </div>
+  </div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

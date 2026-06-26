@@ -1820,14 +1820,12 @@
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
             <div class="flex items-center gap-2.5">
               <span class="agtile" id="det-tile" style="width:40px;height:40px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
-              <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide truncate" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight truncate" style="font-weight:900" id="det-name">01 sandy</div></div>
-              <div class="flex flex-col items-end justify-between flex-1 min-w-0 h-10">
-                <button class="node-badge nb-pending det-badge" id="det-badge" style="position:static" onclick="statusJump('pending')" data-hc-title="Status badge" data-hc="Also a shortcut — Active jumps to Prompts → History, Idle to Prompts → Compose, Pending to the Inbox. Deliberately binary (not a count): an agent is blocked on one thing at a time; the fleet total lives on the Inbox tab badge." title="Pending — awaiting your input · open Inbox">Pending</button>
-                <div class="text-[9px] font-mono text-muted-2 truncate max-w-full leading-none" id="det-created" title="Created · elapsed">06-26 14:30 · 2h12m</div>
-              </div>
+              <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900" id="det-name">01 sandy</div></div>
+              <button class="node-badge nb-pending det-badge" id="det-badge" style="position:static" onclick="statusJump('pending')" data-hc-title="Status badge" data-hc="Also a shortcut — Active jumps to Prompts → History, Idle to Prompts → Compose, Pending to the Inbox. Deliberately binary (not a count): an agent is blocked on one thing at a time; the fleet total lives on the Inbox tab badge." title="Pending — awaiting your input · open Inbox">Pending</button>
             </div>
 
             <div class="grp-div"></div>
+            <div class="text-[9px] font-heading uppercase tracking-wider text-muted">Configuration <span class="normal-case font-semibold text-muted-2">— tap the pencil to edit a field</span></div>
 
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div class="field">
@@ -3333,7 +3331,6 @@ project CLAUDE.md. Global defaults that travel with you.
     const tile=document.getElementById('det-tile');if(tile){tile.style.color=a.color;const u=tile.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
     const role=document.getElementById('det-role');if(role)role.textContent=a.role;
     const name=document.getElementById('det-name');if(name)name.textContent=a.name;
-    const cr=document.getElementById('det-created');if(cr&&a.created)cr.textContent=a.created;
     const nb=n.querySelector('.node-badge');const db=document.getElementById('det-badge');
     if(nb&&db){const cl=[...nb.classList].find(c=>/^nb-/.test(c))||'nb-idle';db.className='node-badge '+cl+' det-badge';db.textContent=nb.textContent;
       const st=cl==='nb-pending'?'pending':(cl==='nb-active'?'active':'idle');db.setAttribute('onclick','statusJump(\''+st+'\')');db.title=nb.title;}
@@ -3685,19 +3682,19 @@ project CLAUDE.md. Global defaults that travel with you.
   /* shared agent model + identity badges (one source of truth for badges everywhere) */
   const AG={
     user:{role:'human',name:'User',user:true},
-    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard',created:'06-26 14:30 · 2h12m'},
-    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem',created:'06-25 09:12 · 1d'},
-    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask',created:'06-26 15:48 · 54m'},
-    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot',created:'06-26 13:05 · 3h37m'},
-    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox',created:'06-26 11:20 · 5h22m'},
-    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider',created:'06-24 16:40 · 2d'},
-    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle',created:'06-26 16:02 · 40m'},
-    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion',created:'06-23 08:15 · 3d'},
-    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot',created:'06-26 10:05 · 6h37m'},
-    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal',created:'06-26 15:10 · 1h32m'},
-    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut',created:'06-22 14:00 · 4d'},
-    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye',created:'06-26 16:25 · 17m'},
-    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled',created:'06-26 12:48 · 3h54m'}
+    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard'},
+    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem'},
+    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask'},
+    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot'},
+    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox'},
+    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider'},
+    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle'},
+    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion'},
+    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot'},
+    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal'},
+    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut'},
+    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye'},
+    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled'}
   };
   const AG_ORDER=['sandy','kai','drew','max','rowan','nova','vega','quinn','wren','lex','sage','io','fen'];
   function agtileHTML(a){return a.user
