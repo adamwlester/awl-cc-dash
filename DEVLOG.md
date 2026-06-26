@@ -681,6 +681,102 @@ Files: design/mockup.html, DEVLOG.md
 
 ---
 
+### 2026-06-26 06:57:00 — design: rough Context turn-scope select snippet
+
+New ui-snippet `design/ui-snippets/context-turn-dropdown.html` — a rough exploration of the Inbox idea to scope the Agent-panel **Context** breakdown by turn. Replaces the breakdown header's `.bd-model` text with a **native `<select>`** (`All` default, then `Turn n…1` descending) and **enlarges the trailing ratio** (`.bd-tot`) so the two sit naturally inline; native select chosen deliberately to avoid a custom popover (free scroll/keyboard/a11y for long turn lists). Renders only the upper part (header + colour bar); demo data; flagged to be overwritten with the settled version. Verified headless (Playwright, :8123): `All` shows the full-window category stack + 80% cutoff, a turn shows that turn's internal composition, and the select stays inline with the enlarged ratio in both states.
+
+Files: design/ui-snippets/context-turn-dropdown.html, DEVLOG.md
+
+---
+
+### 2026-06-26 06:16:10 — Snippets: teal-selection overhaul + reviewer-chip/badge/icon fixes (messages, plans, agent cards)
+
+Reworked the selection system across `messages-card.html` + `plans-editor-rail.html` to make **teal the select colour** (pink eliminated from all highlights): rail-based selection (and the Messages whole-card select) → **light teal** (`--select`); Plans **feedback/badge highlight** (`fbhl`, click a Feedback card → its section) → **dark teal** (`--rail-section`, white ink) — the one place `#2f97a6` lives now; **rail strips removed** in Plans (plain tan rail box); rail-cell **hover → cream** (no pink); Plans title row enlarged so its whole-doc select-all box matches the Messages title box. Fixed three things the other agent left off: **box-sizing** — the clones don't load Tailwind (which gives the mockup `border-box`), so the footer chips rendered +4px and the reviewer-chip badge floated; added `*{box-sizing:border-box}` to both, which makes the **reviewer chip hug + all footer actions match the mockup's 30px**; Messages **agent badge → full `.badge` (reviewer-chip standard)** and header reordered to **agent → status → dir**; `agent-card.html` placeholder Lucide glyphs → the **real AG sprite icons** (wizard/robot/golem/gasmask) via the injected sprite. The **divider colour change (tan `--rule` → `--border`) was reverted** — it belongs to the held feed-cards/divider batch, not this turn. Verified headless/isolated (default, whole-select, block/title hover, Plans rail-select + dark-teal feedback, narrow, footer-chip zoom); skipped the headed pass per the standing no-interfere rule.
+
+Files: design/ui-snippets/messages-card.html, design/ui-snippets/plans-editor-rail.html, design/ui-snippets/agent-card.html, DEVLOG.md
+
+---
+
+### 2026-06-26 07:10:00 — design: context-dropdown.html (full breakdown + turn-scope select)
+
+New `design/ui-snippets/context-dropdown.html` replaces the rough `context-turn-dropdown.html` (removed): a faithful clone of the mockup's **full** Context breakdown (CSS lifted verbatim from `mockup.html`) with only the confirmed changes — the `.bd-model` text becomes a **native `<select>`** (`Total` default, then `Turn n…1`), the trailing `.bd-tot` ratio is enlarged + the header centered, and selecting a turn rescopes the header (`20.4k / 1.0M · 2.04%` — same metric type, turn tokens / window · 2-dp share), the bar, and the row %s (% of that turn) while the loaded-context sub-sections stay put. A small native-select width-fit makes the short `Total` label hug the chevron instead of floating in a box sized to the widest option. Verified headless (Playwright, :8123): Total = faithful snapshot with the 80% cutoff; Turn 24 = Messages/MCP/Memory composition summing to 100%, no cutoff; select hugs chevron in both. Headed parity pass deferred to mockup integration.
+
+Files: design/ui-snippets/context-dropdown.html (added), design/ui-snippets/context-turn-dropdown.html (removed), DEVLOG.md
+
+---
+
+### 2026-06-26 07:12:00 — design/TODO.md: queued Context Turn-Scope Select in Next up
+
+Filed the resolved context-by-turn design into **Next up** as item 6 (**Context Turn-Scope Select**), referencing the snippet `design/ui-snippets/context-dropdown.html` with port guidance: replace the breakdown header's `.bd-model` text with the native `Total` / `Turn n…1` select, enlarge `.bd-tot`, and rescope the header / bar / row-%s to the selected turn (header % = share of the window, 2-dp; rows = % of the turn — the differing denominators are intentional), keeping the sub-sections + the native-select width-fit; demo data only, sync `DESIGN.md` + verify per the UI rules. The originating Inbox note had already been cleared by the human. Queued item only — nothing built in the mockup.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 07:13:00 — Snippets: badge centering + navy dividers + plans footer/heading fixes (messages, plans)
+
+Three approved follow-up batches. **messages-card.html** — the RECV/dir tag now centers to the Active status badge (`.fcard-dir` made `inline-flex; align-items:center` so its inline child is measured as a box like `.dbadge`, instead of painting low); the 3 structural dividers (card-body rule, block-to-block rule, rail separator) flipped tan `--rule` → navy `--border`. **plans-editor-rail.html** — **structural dividers only** flipped to navy (section rules, list-row separators, the gutter/rail separator, popover header, cmd-group rule) while the **inline code-chip + count-badge outlines stay tan** (per the user's confirmed "structural dividers only" scope); selected/feedback rows suppress the navy rail seam (`border-right-color` → `--select` / `--rail-section`) so selection reads as one clean teal / dark-teal band; the **Link (Embed/Attach) chip moved into the right action group leading Revise**, leaving the **reviewer chip as the only left-aligned action**; defined the missing **`.flex-1` utility** (these clones don't load Tailwind, so every `flex-1` spacer was dead) which right-aligns the Editor-heading ghost buttons **and** restores the plan-head rows (status badge / steps / dates) to mockup parity; the right action group now wraps so **Approve never clips** at the narrow extreme. Verified headless/isolated (default, gutter zoom, selection+feedback states via a scratch copy, narrow 540/470 footer wrap, messages header zoom); headed pass skipped per the standing no-interfere rule. The **feed-cards snippet remains the only held item**. DEVLOG is ~730 lines — **rotation is due** but deferred this turn to avoid clashing with the other agent's concurrent appends.
+
+Files: design/ui-snippets/messages-card.html, design/ui-snippets/plans-editor-rail.html, DEVLOG.md
+
+---
+
+### 2026-06-26 07:14:00 — design/TODO.md: moved the Next up queue into A — Quick wins
+
+Relocated all 6 **Next up** items verbatim into the **A — Quick wins** section (now A1–A6: Turns Breakdown Dropdown, Response Settings Popover, Jump-to-End Pill, Library Plans/Documents Editor Rail + Layout, Agent Card Redesign, Context Turn-Scope Select), full content + sub-bullets + build-notes preserved unchanged. **Next up** is now left empty beneath its heading + intro per the "leave empty sections empty" rule. Doc reorganization only — nothing built in the mockup. (DEVLOG ~735 lines — rotation remains due, still deferred this turn per the prior note.)
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 07:18:00 — messages-card: fix white gap between rail and content on select
+
+Selected Messages blocks showed a white gap between the teal rail cell and the teal content (Plans/Documents didn't). Cause: `.mrow` carries `gap:7px` (correct for the old floating-strip rail), and the contiguous library rows `.mrow--lib` inherited that horizontal gap — the `.mrail-wrap--lib{ gap:0 }` override only killed the *vertical* row gap, not the horizontal one. Added `.mrow--lib{ gap:0 }` so the rail box butts flush against the content (divided only by the navy `border-right`), matching the `.md-row` model in Plans. Verified headless/isolated: bsh+dif now render as one unbroken teal band, all rows contiguous; the CURRENT/before column keeps its intentional strip gap (fix is scoped to `--lib`).
+
+Files: design/ui-snippets/messages-card.html, DEVLOG.md
+
+---
+
+### 2026-06-26 07:30:00 — design/TODO.md: synced Quick-wins items with the snippet work + added the global divider recolour
+
+Audited the A — Quick wins items tied to the snippet work and made them capture the actual modifications. **A4 (Plans/Documents Editor Rail)** rewritten: the stale "colour strips 6px" line replaced with **strips removed → light-teal selection** (rail cell + content one `--select` band), **dark-teal feedback highlight** (`--rail-section`), **cream hover**, **enlarged title row**, **navy structural dividers** (inline code/badge outlines stay tan), and the **footer Link/Embed-Attach chip moved into the right group leading Revise with the reviewer chip as the only left action** — plus an explicit **"clone-only, do NOT re-port"** note that `box-sizing` + `.flex-1` are Tailwind-absence patches (the mockup already has them, so verify rather than re-add the 30px actions / right-aligned ghost buttons / plan-head rows). **A5 (Agent Card)** got a one-line note that the tiles use the real `#ag-*` sprite glyphs (not placeholder Lucide) and its dividers are already navy. **Added A7 — Messages Card** (the port item was missing entirely): contiguous Library-style rail box, type tag inside each rail box, teal multi-select, agent→status→dir header, navy dividers. **Added A8 — Card Divider Recolour (navy, globally):** the standalone the human asked for — recolour *all* major structural in-card dividers tan `--rule` → navy `--border` across the whole mockup (every card, not just the snippet ones), inline code/badge outlines excluded, by switching usages not redefining `--rule`. Doc capture only — nothing built in the mockup.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 07:41:12 — design/TODO.md: queued Feed Card Selection Parity + Feed Timestamp Alignment in Quick wins
+
+Added two human-requested **A — Quick wins** items for the Team Feed cards (A9, A10). **A9 — Feed Card Selection Parity:** make the Scratch / Log / Inbox cards use the Messages card's selection model in `mockup.html` — header-click whole-card select (light teal), a separate chevron for the dropdown, attach via the chip, remove the `.card-sel` checkbox; **no internal/sub-card selection** (these cards have no sub-fields), with an explicit note to match the live Messages cards and NOT import the per-block rail/sub-select work from the messages-card snippet (which would wrongly re-add sub-selection). **A10 — Feed Timestamp Alignment:** the Scratch + Log card timestamps drift out of right-alignment when expanded — fix so they hold the right edge in both collapsed and expanded states. Doc capture only — nothing built in the mockup. (A concurrent agent was actively rewriting TODO.md + DEVLOG this session; these items landed after A8 on retry. DEVLOG rotation remains deferred per the prior entries to avoid clobbering the concurrent appends.)
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 08:04:19 — design/TODO.md: restored Output Export + Jump to Feed Ends; fixed A3's stale cross-ref
+
+Reconciled two issues the concurrent Next-up→Quick-wins relocate had introduced. **Restored two dropped Quick-wins items** the relocate overwrote — **Output Export** (extend per-card Copy into select/cut/export of larger output spans) and **Jump to Feed Ends** (jump-to-start/end per feed) — re-added verbatim as A11/A12, appended rather than re-inserted at the top to avoid renumbering A1–A10 and their A4/A7/A8 cross-refs while the file is under concurrent edit. **Fixed A3's stale reference**: the Jump-to-End Pill pointed at "A2 'Jump to Feed Ends'" but A2 is now Response Settings Popover — repointed it to the restored item **by name** (renumber-proof, since the A1–A8 ports are slated to move to Next up) with a reciprocal name-ref on A12. Nothing beyond these reconciliations changed; verified all three edits present post-write.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 08:10:00 — design/TODO.md: filed the 6 reviewed Inbox notes into Next up (13–18)
+
+After a clarify pass with the human, filed all 6 **Inbox** notes into **Next up** as items 13–18 and cleared the Inbox (left empty per the rule). Each was disambiguated to the real mockup component names and given the resolved specifics: **13 Universal Footer Mic** (move `#compose-mic` to `.footbar` as the first control, neutral styling, wired enable-only-in-editable-field, no focus-steal), **14 Remove "Time" from Link Config End After** (drop the Time toggle from the Turns·Time·Tokens grid → 2 cols, scrub refs), **15 Panel-Size Hover Readout on Drag** (live px readout following the cursor on `.rz-handle` drags, left/top then right/bottom), **16 Compose Attachment-Section Heading** ("Attachments" above `.attach-strip`), **17 Plans/Inbox Tab Badges → Teal** (`.req-badge` on `#plans-badge` + `#inbox-badge` → `--secondary`, matching `.fmt-badge`), **18 Documents/Assets Nav Rows** (per-type file icon replacing the doc icon/thumbnail, remove the Delete trash, keep the Rename pencil un-greyed, line 2 stays path/size, widen the rail for filename room). Entry-6 follow-ups settled with my suggested defaults (keep path/size · keep Rename pencil · per-type lucide icon). Doc capture only — nothing built in the mockup.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 09:01:32 — design/TODO.md + agent-card snippet: audit follow-ups (seam rule, badge-consistency item, comment fix, reminder cleanup)
+
+Acted on the human's review of the 7a–7f-vs-Next-up audit. **TODO.md:** (1) added a **Preserve selection seams** clause to item 8 (Card Divider Recolour) — on selected/feedback rows the navy rail/gutter separator must recolour to the band fill (`--select` / `--rail-section`) so selection highlights aren't sliced by a navy line; the snippet cards already do this, the snippet-less cards (Scratch/Log/Inbox, Compose, Context/Turns, agent cards) need it. (2) Added new **item 19 Agent-Badge Size Consistency** — item 7 bumps the Messages badge to the full `.badge` while the sibling `badgeHTML(a,true)` `.badge-sm` badges (Scratch/Log/Inbox `fcardHTML`/`logCardHTML`/`inboxCardHTML`, History `histCardHTML`, Plans review `.plan-row.r1`/`.fb-top`) stay small; subagent mini-badges + the full-size Context head badge excluded. (3) Added open decision **(e)** to item 5 — subagent badge click action undecided. (4) Removed the redundant per-item "keep DESIGN.md in sync" reminders from items 5–8 + 13–18 (the top "Next up — implementing items" step 3 already mandates it). **agent-card.html:** rewrote the stale top LAYOUT comment to match the real v6 markup — age in the `.hd-meta` top strip; settings/load bars after the header divider; activity band `.band` (run → divider → marquee) pinned at the bottom above `.subs`. Doc/spec only — nothing built in the mockup.
+
+Files: design/TODO.md, design/ui-snippets/agent-card.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

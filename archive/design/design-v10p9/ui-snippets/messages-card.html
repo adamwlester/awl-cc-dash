@@ -1,172 +1,154 @@
-<!doctype html>
+<!--
+  Messages card — rail restyle + block-container + multi-select (design sketch). NOT wired into mockup.html.
+  The card's CSS + JS are copied VERBATIM from design/mockup.html (line ranges noted inline). The page shows the
+  SAME real card two ways:
+    • CURRENT  — the verbatim mockup (thin teal per-block rail, discrete sub-cards, single block-select). Static reference.
+    • PROPOSED — the requested changes, isolated in the "SNIPPET CHANGES" CSS block + the *V2 JS builders:
+        - rail restyled to the Library `.md-rail` look — a plain TAN box, NO colour strip, no numbers;
+        - blocks become ONE contiguous panel (Library-style: bordered box, hairline dividers, no gaps) instead of discrete sub-cards;
+        - a TOP title row holds the TURN NUMBER (doc-title style) in its CONTENT; its rail box is EMPTY and selects the whole message (mirrors Library's title rail);
+        - the TYPE TAG lives INSIDE each rail box (left gutter), top-aligned, minimal (transparent — shows the rail's tan, no pill/border),
+          font size+weight matched to the Plans review badge (.vbadge, 9px/800). Tight lowercase abbreviations: msg · tht · rd · bsh · dif · wrt · mta
+          (msg = the primary prose, which maps to no tool filter). The old inline "BASH"/"DIFF" content labels are gone;
+        - HOVER mirrors Library: the hovered rail cell + the row's content both light CREAM (--background);
+          hovering the EMPTY title rail lights the WHOLE card's content cream (it select-alls);
+        - SELECTION = light teal (--select) — rail cell + content the same teal, no seam; no pink anywhere;
+        - MULTI-select within a card (toggle; one card at a time — selecting blocks in another card clears this one's).
+  Decisions baked in: no rail strip; type tag INSIDE the rail box (tight 3-char, top-aligned, transparent); title rail empty;
+  selection colour = light teal (--select); primary-text tag = "msg"; multi-select scope = one card at a time.
+  Demo data exercises ALL block kinds (message · think · read · bash · diff · write · meta) with realistic Claude Code rendered text.
+-->
+<!-- (was: VERBATIM CLONE of one expanded Messages feed card from design/mockup.html — base preserved below.) -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent card — square redesign v2 (design exploration)</title>
-
-<!--
-  AWL Dashboard · UI snippet — Team Graph "agent card" (square redesign, v2)
-  =========================================================================
-  Standalone sketch of the reorganised Team Graph node card. NOT wired into
-  mockup.html. Values from ../tokens.css (single source); card chrome
-  (border / shadow / radius / agent tiles / .node-badge status pills / .pbar)
-  mirrors the mockup's .node family. Lucide for icons.
-
-  LAYOUT (top → bottom), single column, fixed SQUARE:
-   • TOP META STRIP (.hd-meta) — the AGE stamp (created datetime + auto-scaling
-     duration), small + LEFT-aligned, paired with the STATUS badge (.nbadge)
-     in-flow at the RIGHT end (no longer corner-pinned/overhanging).
-   • IDENTITY ROW (.hd-top) — tile + role + name on the left; MODEL (+ opus-only
-     FAST bolt) on the right, RIGHT-justified and BOTTOM-aligned to the name.
-   • full-bleed DIVIDER (.div — edge-to-edge, border colour) closes the header
-   • SETTINGS (.settings) — three inline icon chips (mode · effort · think),
-     spread full width.
-   • LOAD bars (.bars) — Ctx + Turns, shared row template (label · bar · value).
-   • ACTIVITY BAND (.band) — pinned to the BOTTOM, directly above the subagents;
-     order RUN strip → DIVIDER → MARQUEE:
-       – RUN strip (.run-strip) — textless run/progress bar (single colour,
-         opposite polarity to the load bars → no danger ramp; keys off status:
-         active green · pending warm · idle muted/empty; barber-pole
-         INDETERMINATE when % unknown).
-       – MARQUEE (.feed) — a neobrutalism two-track (marquee/marquee2) loop
-         streaming the agent's current activity as one scrolling line, full-bleed;
-         idle cards show it static + muted (no scroll).
-   • SUBAGENTS (.subs) — square NEUTRAL CLICKABLE badges, BOLD agent-colour
-     numerals. No header label. Section is RESERVED at a fixed size even when
-     empty so every card keeps the same height → uniform squares.
-
-  CARDS (one state each)
-   A researcher/sandy · opus · FAST ON  · ACTIVE  · determinate run · 3 subs
-                        (effort+think greyed = FAST override — PROPOSED)
-   B coder/max        · opus · FAST OFF · ACTIVE  · indeterminate run · 1 sub
-   C synthesizer/kai  · sonnet (no bolt)· IDLE    · muted/empty run · 0 subs (reserved)
-   D auditor/drew     · haiku (no bolt) · PENDING · warm run · 6 subs (+N cap)
-
-  OPEN DECISION (still): does FAST override effort/think (greyed, card A)?
-  Depends on the real semantics of what FAST controls. Card A shows the option.
-  (Pale agent colours amber/gold/citron remain a contrast caveat as badge text.)
--->
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messages card clone</title>
 <link rel="stylesheet" href="../tokens.css">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
-  *{ box-sizing:border-box; }
-  body{ margin:0; min-height:100vh; font-family:'Archivo',sans-serif; font-weight:500;
-    color:var(--foreground); background:var(--background); padding:30px 22px 70px; }
+/* ---- CSS copied VERBATIM from design/mockup.html (line ranges noted) ---- */
+*{ box-sizing:border-box; }   /* the mockup gets this from Tailwind's preflight; this snippet doesn't load Tailwind, so set it explicitly to match the mockup's box model */
+body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24px; }
+/* 524-528 */
+    .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden;
+      border:2px solid var(--border); border-radius:var(--radius-base); background:currentColor; }   /* P1c: tile bg = agent colour so a non-square tile (badges) has no white strips above/below the icon's square */
+    .agtile .ag-svg{ width:100%; height:100%; display:block; }
+    .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
+    .agtile--user{ background:var(--ag-user); }
+    /* 741-745 */
+    .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:3px; border:2px solid var(--border); background:transparent; color:var(--muted); }
+    .dir-out,.dir-in{ background:transparent; color:var(--muted); }   /* direction is conveyed by the label alone — no special tint */
+    .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:3px; border:2px solid var(--border); }
+    .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
+    .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
+    /* 979-981 */
+    .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
+    .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
+    .db-error{ background:var(--danger-soft); color:var(--danger); }   /* P2: soft-red = the run errored (alongside Active / Complete) — Error owns the danger colour */
+    /* 1010-1015 */
+    .msg-blocks{ display:flex; flex-direction:column; gap:3px; margin-top:7px; }
+    .msg-blk{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10px; line-height:1.5; padding:4px 7px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
+    .msg-blk-lbl{ display:inline-block; font-weight:800; text-transform:uppercase; font-size:7.5px; letter-spacing:.05em; color:var(--muted); margin-right:6px; }
+    .msg-blk.blk-think{ background:var(--secondary-background); color:var(--muted); font-style:italic; }
+    .msg-blk.blk-meta{ background:var(--secondary-background); color:var(--muted-2); }
+    .msg-blk.blk-diff .blk-add{ color:var(--success); } .msg-blk.blk-diff .blk-del{ color:var(--danger); }
+    /* 1172-1190 */
+    .badge{ display:inline-flex; align-items:center; flex:0 0 auto; height:30px; border:2px solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); box-shadow:none; overflow:hidden; }   /* P1c: dropdown agent badges match the 30px footer action-button footprint */
+    .badge-c .agtile{ height:100%; width:28px; border:none; border-right:2px solid var(--border); border-radius:0; }
+    .badge-c .b-lab{ display:flex; flex-direction:column; justify-content:center; line-height:1.05; padding:0 8px; min-width:0; }
+    .badge-c .b-role{ font-size:6.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; color:var(--muted); white-space:nowrap; }
+    .badge-c .b-name{ font-size:9.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    .badge-sm{ height:26px; }
+    .badge-sm .agtile{ width:23px; }
+    .badge-sm .b-role{ font-size:6px; }
+    .badge-sm .b-name{ font-size:9px; }
+    .badge.ag-user-badge .agtile{ background:var(--ag-user); }
+    /* 1261-1316 */
+    .fcard{ position:relative; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); overflow:hidden; }
+    .fcard.sel{ background:var(--select); box-shadow:var(--shadow); }
+    .fcard-head{ display:flex; align-items:center; gap:8px; padding:7px 9px; }
+    .card-sel{ flex:0 0 auto; width:17px; height:17px; border:2px solid var(--border); border-radius:4px; background:var(--secondary-background);
+      cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:transparent; padding:0; }
+    .card-sel svg{ width:11px; height:11px; }
+    .fcard.sel .card-sel{ background:var(--secondary); color:var(--secondary-foreground); }
+    .fcard-exp{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; text-align:left; background:transparent; border:none; cursor:pointer; padding:0; }
+    .fcard-chev{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); transition:transform .15s; margin-left:auto; }
+    .fcard.open .fcard-chev{ transform:rotate(90deg); }
+    .fcard-dir{ flex:0 0 auto; }
+    .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; margin-left:auto; }
+    .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--rule); }
+    .fcard.open .fcard-body{ display:block; }
+    .fcard.open .fcard-prev{ display:none; }
+    .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
+    .fcard-log{ font-family:'JetBrains Mono',monospace; font-size:10px; }
+    .msgcard.sel{ background:var(--select); box-shadow:var(--shadow); }   /* whole-card select = light teal */
+    .msel-head{ cursor:pointer; }
+    .fcard-chevbtn{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:none; cursor:pointer; align-self:center; }
+    .fcard-chevbtn:hover{ background:var(--surface-3); border-radius:4px; }
+    .fcard-chevbtn .fcard-chev{ margin-left:0; }
+    .mrail-wrap{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+    .mrow{ display:flex; align-items:stretch; gap:7px; }
+    .mrail{ flex:0 0 auto; width:13px; align-self:stretch; min-height:20px; padding:0; cursor:pointer; border:2px solid var(--rail-section); border-radius:3px; background:var(--secondary-background); }   /* teal = block-select affordance */
+    .mrail:hover{ background:var(--select); }
+    .mrow.bsel .mrail{ background:var(--secondary); }
+    .mrow.bsel .mrow-c{ outline:2px solid var(--secondary); outline-offset:1px; border-radius:var(--radius-base); background:var(--select); }   /* selected block highlight (teal) */
+    .mrow-c{ flex:1 1 auto; min-width:0; }
+    .mrow-c .fcard-full{ margin-top:0; padding:1px 2px; }
+    .mrow-c .msg-blk{ margin:0; }
 
-  .caption{ width:100%; max-width:840px; margin:0 auto 26px; }
-  .caption h1{ font-family:'Archivo'; font-weight:900; font-size:18px; margin:0 0 7px; letter-spacing:-0.01em; }
-  .caption p{ font-size:12.5px; line-height:1.55; color:var(--muted); margin:0; }
-  .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+    /* ---- page chrome (demo only) ---- */
+    .wrap{ max-width:1120px; margin:0 auto; }
+    .caption{ text-align:center; margin-bottom:18px; }
+    .caption h1{ font-weight:900; font-size:17px; margin:0 0 6px; letter-spacing:-0.01em; }
+    .caption p{ font-size:12px; line-height:1.5; color:var(--muted); margin:0 auto; max-width:780px; }
+    .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+    .demo{ display:flex; gap:24px; align-items:flex-start; }
+    .demo-col{ flex:1 1 0; min-width:0; }
+    .demo-lbl{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 2px 8px; }
+    .demo-static .mrail, .demo-static .fcard-exp, .demo-static .fcard-chevbtn{ pointer-events:none; }
+    @media(max-width:860px){ .demo{ flex-direction:column; } }
 
-  /* Team Graph scroll-well; cards held at a FIXED square size (no 1fr stretch) */
-  .well{ width:100%; max-width:840px; margin:0 auto; background:var(--background);
-    border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:18px; }
-  .grid{ display:grid; grid-template-columns:repeat(auto-fill,190px); gap:18px; justify-content:center; }
+    /* ===================================================================================
+       SNIPPET CHANGES — the "Proposed" design (the CURRENT column above is the verbatim mockup).
+       Kept as an override block + *V2 JS builders so a porting agent sees exactly the diff.
+       =================================================================================== */
+    /* contiguous Library-style panel: one bordered box; rows butt together with hairline dividers (no gaps) */
+    .mrail-wrap--lib{ gap:0; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    .mrow--lib + .mrow--lib{ border-top:2px solid var(--rule); }
+    /* rail = plain narrow TAN box (no colour strip — removed); a continuous select handle down the panel.
+       The top whole-select row is identified by its bold turn-number content, not a strip. (.mrail--title kept as a JS hook only.) */
+    .mrail--lib{ width:34px; align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding-top:7px; border:none; border-right:2px solid var(--rule); border-radius:0; background:var(--surface-3); cursor:pointer; }
+    .msg-turn{ font-weight:900; font-size:12px; color:var(--foreground); }   /* turn number in the doc-title style (mirrors Library .md-h1) */
 
-  figure{ margin:0; width:190px; }
-  figcaption{ margin-top:8px; font-size:10px; line-height:1.4; color:var(--muted); text-align:center; }
-  figcaption b{ color:var(--foreground); font-weight:800; }
+    /* SELECTION = light teal (--select), the universal select fill (no pink): rail cell + content the SAME teal.
+       Blend the rail/text divider on select so there's no seam between rail and text. */
+    .mrow--lib.bsel .mrail--lib{ background:var(--select); border-right-color:var(--select); }
+    .mrow--lib.bsel .mrow-c{ background:var(--select); outline:none; border-radius:0; }
 
-  /* ============================ agent card (fixed square) ============================ */
-  .card{ position:relative; width:190px; height:190px; display:flex; flex-direction:column; gap:6px;
-    background:var(--secondary-background); border:2px solid var(--border);
-    border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px; overflow:hidden; }
-  .card.selected{ background:var(--select); box-shadow:var(--shadow); }
+    /* FIX 1 — hover mirrors Library: the directly-hovered rail cell tints pink, and hovering a rail lights row CONTENT cream.
+       A block rail lights just its row; the TOP title rail lights the WHOLE card (it select-alls) — driven by .hl via JS
+       (mirrors Library railHover), so a multi-row preview is possible. Declared AFTER .bsel so hover previews over selection. */
+    .mrail--lib:hover{ background:var(--background); }
+    .mrow--lib.hl .mrow-c{ background:var(--background); }
+    .mrow--lib.hl .mrail--lib{ background:var(--background); }   /* hover preview lights the rail cell cream too (incl. title-hover = whole card) */
 
-  /* full-bleed divider — breaks past the 9px card padding, border colour */
-  .div{ height:0; border-top:2px solid var(--border); margin:0 -9px; }   /* full-bleed divider (used inside the band) */
-
-  /* status badge — copied from mockup .node-badge family; now in-flow (right end of the top meta strip) */
-  .nbadge{ flex:0 0 auto; display:inline-flex; align-items:center;
-    padding:1px 6px; border:2px solid var(--border); border-radius:3px; font-size:7px; font-weight:900;
-    letter-spacing:0.07em; text-transform:uppercase; box-shadow:var(--shadow-sm); }
-  .nb-active{ background:var(--success); color:#fff; }
-  .nb-pending{ background:var(--warning); color:#fff; }
-  .nb-idle{ background:var(--muted); color:#fff; }
-
-  /* ---- header ---- */
-  /* top meta strip: age (left) + status badge (right), thin, way up at the top */
-  .hd-meta{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
-  .hd-top{ display:flex; align-items:flex-end; gap:7px; }
-  .agtile{ width:26px; height:26px; flex:0 0 auto; align-self:center; display:inline-flex; align-items:center;
-    justify-content:center; border:2px solid var(--border); border-radius:var(--radius-base);
-    background:currentColor; overflow:hidden; }
-  .agtile-luc{ width:60%; height:60%; color:var(--icon-fg); }
-  .agtile .ag-svg{ width:100%; height:100%; display:block; }   /* real agent sprite tile (full-bleed, matches the mockup's .agtile) */
-  .idblk{ min-width:0; line-height:1.05; flex:1 1 auto; }
-  .role{ font-size:8px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .name{ font-family:'Archivo'; font-weight:900; font-size:11.5px; color:var(--foreground);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .model{ flex:0 0 auto; display:flex; align-items:center; font-family:'JetBrains Mono',monospace; font-weight:700;
-    font-size:9px; color:var(--foreground); padding-bottom:1px; }       /* bottom-aligns to name via flex-end */
-  .bolt{ width:11px; height:11px; margin-left:4px; color:var(--warning); }   /* FAST on */
-  .bolt.off{ color:var(--muted-2); opacity:0.45; }                            /* FAST off (opus, inactive) */
-  .age{ flex:1 1 auto; min-width:0; text-align:left; font-family:'JetBrains Mono',monospace; font-size:7.5px; font-weight:600;
-    color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-  /* ---- activity band: Run strip + divider + Marquee, full-bleed, pinned to the bottom
-         (its top/bottom borders are two of the dividers; the .div inside is the third) ---- */
-  .band{ margin:auto -9px 0; border-top:2px solid var(--border); border-bottom:2px solid var(--border); }
-  /* Run progress strip — no text, no border, full bleed, sits ABOVE the marquee with no gap */
-  .run-strip{ position:relative; height:6px; overflow:hidden; background:var(--surface-3); }
-  .run-strip > i{ display:block; height:100%; width:0; }
-  .run-active  > i{ background:var(--success); }
-  .run-pending > i{ background:var(--warning); }
-  .run-idle{ opacity:0.5; }
-  .run-indet > i{ width:100%; background:var(--success); position:relative; }
-  .run-indet > i::after{ content:''; position:absolute; inset:0;
-    background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
-    animation:barber 0.8s linear infinite; }
-  @keyframes barber{ to{ background-position:24px 0; } }
-  /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed */
-  .feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:15px; }
-  .feed .trk{ white-space:nowrap; font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:600;
-    color:var(--muted); will-change:transform; }
-  .feed .trk.a{ animation:marquee 9s linear infinite; }
-  .feed .trk.b{ position:absolute; top:0; height:100%; display:flex; align-items:center; animation:marquee2 9s linear infinite; }
-  .feed:hover .trk{ animation-play-state:paused; }
-  @keyframes marquee{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-100%); } }
-  @keyframes marquee2{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(0); } }
-  /* idle feed — static, muted, no scroll */
-  .feed.idle .trk{ color:var(--muted-2); font-style:italic; animation:none; }
-  .feed.idle .trk.b{ display:none; }
-
-  /* ---- load bars: Ctx + Turns (shared row template) ---- */
-  .bars{ display:flex; flex-direction:column; gap:5px; }
-  .brow{ display:flex; align-items:center; gap:6px; }
-  .bl{ flex:0 0 auto; width:24px; font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.02em;
-    color:var(--muted); font-family:'JetBrains Mono',monospace; }
-  .pbar{ position:relative; flex:1 1 auto; height:8px; border:2px solid var(--border); border-radius:3px;
-    overflow:hidden; background:var(--surface-3); }
-  .pbar > i{ display:block; height:100%; width:0; }
-  .bv{ flex:0 0 auto; width:30px; text-align:right; font-size:8px; font-weight:700; color:var(--muted);
-    font-family:'JetBrains Mono',monospace; }
-
-  /* ---- settings: three icon chips spread full width (left/right aligned to the bar rows) ---- */
-  .settings{ display:flex; align-items:center; justify-content:space-between; }
-  .chip{ display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-weight:700;
-    font-size:9px; color:var(--foreground); }
-  .chip svg{ width:11px; height:11px; color:var(--muted); flex:0 0 auto; }
-  .chip.off{ opacity:0.32; }                                  /* greyed = overridden by FAST (proposed) */
-
-  /* ---- subagents: reserved fixed section · neutral clickable badges (band above pins this group to the bottom) ---- */
-  .subs{ min-height:18px; display:flex; align-items:center; padding-top:1px; }
-  .sbadges{ display:flex; flex-wrap:wrap; gap:5px; }
-  .sbadge{ width:18px; height:18px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
-    border:2px solid var(--border); border-radius:3px; background:var(--surface-btn); box-shadow:var(--shadow-sm);
-    font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:900; cursor:pointer;
-    transition:transform .07s, box-shadow .07s; }
-  .sbadge:hover{ transform:translate(1px,1px); box-shadow:none; }
-  .sbadge.more{ color:var(--muted); }
-  .subs-empty{ font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
+    /* type tag lives INSIDE the rail box (left gutter), top-aligned — minimal: transparent (shows the rail's tan), no pill/border.
+       Font size + weight match the Plans review badge (.vbadge): 9px / 800. Tight lowercase abbreviations (msg · tht · rd · bsh · dif · wrt · mta). */
+    .rail-tag{ font-family:'Archivo',sans-serif; font-size:9px; font-weight:800; letter-spacing:0.02em; line-height:1; color:var(--muted); white-space:nowrap; pointer-events:none; }
+    .mrow--lib.bsel .mrail--lib .rail-tag{ color:var(--foreground); }   /* tag stays legible on the teal selected rail */
+    /* blocks shed their individual border/bg so they read as contiguous rows within the panel */
+    .mrow--lib .msg-blk{ border:none; border-radius:0; background:transparent; padding:5px 9px; }
+    .mrow--lib .fcard-full{ margin:0; padding:6px 9px; }
 </style>
 </head>
 <body>
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+﻿  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
     <symbol id="ag-wizard" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256.3 19.42C204 57.2 177.2 111 152.5 160.7c43.4-24.6 101.7-32.9 126.9-28.7-63.8 10.6-108 25.8-144.4 64.3-2.2 4.5-4.1 8.3-6.4 13.1 115.4-27.8 134.4-27 250.9-.7C368 158.6 343 126.6 304 65.83 345.9 118.4 428.1 208.1 424.3 190.6 401.4 85.73 324.2 23.49 256.3 19.42zM88 231.3c-31 7.4-53.9 17.5-62.8 26.7.9 11.7 6.7 22.1 17.5 32 11.8 10.8 29.6 20.4 51.3 28.1 2.69.9 5.39 1.8 8.1 2.7-8.4-11-11.2-26.3-13-41.1 0-15.4-3-33.5-1.1-48.4zm336 0c2.2 16.2.6 34.5-1.1 48.4-1.8 14.8-4.6 30.1-13 41.1 20.2-7 44.6-17.6 59.4-30.8 10.8-9.9 16.6-20.3 17.5-32-8.9-9.2-31.7-19.3-62.8-26.7zm-274.4.3-7 14h98.8l-7-14zm128 0-7 14h98.8l-7-14zM119 241c-4.7 1.3-9.4 2.6-14 4.1 1 19.9.6 47.6 11.6 64.5h2.4zm274 0v68.6h2.4c10.5-20.7 11.3-41.8 11.6-64.5-4.6-1.5-9.3-2.8-14-4.1zm-255.9 22.6c-.3 18.8 2 39.5 6.2 55.7 21.1-14.1 41.9-25.7 64.7-25.7 3.2 0 6.4.2 9.4.4l5.2-15.7c-5.6 5.7-12.9 8.9-23.2 8.5-25.2-.8-33.9-11.1-37.5-23.2zm109.4 0-12.4 37.2 21.9 27.4 21.9-27.4-12.4-37.2zm103.6 0c-3.6 12.1-12.3 22.4-37.5 23.2-10.3.4-17.6-2.8-23.2-8.5l5.2 15.7c3.1-.3 6.3-.4 9.4-.4 22.8 0 43.6 11.6 64.7 25.7 4.4-20.1 6.8-37.6 6.2-55.7zm-142.1 48c-20 0-43 14.5-68.9 32.4-19.2 13.3-39.9 28.1-63.3 38.4 28.6 6.1 65.8 4.8 98.2-2.6 21.3-4.8 40.5-12.1 53.7-20.5 8.5-5.5 14.1-11.1 17-16.4l-24.2-30.3c-3.7-.6-7.9-1-12.5-1zm96 0c-4.6 0-8.8.4-12.5 1l-24.2 30.3c2.9 5.3 8.5 10.9 17 16.4 13.2 8.4 32.4 15.7 53.7 20.5 32.4 7.4 69.6 8.7 98.2 2.6-23.4-10.3-44.1-25.1-63.3-38.4-25.9-17.9-48.9-32.4-68.9-32.4zm-48 46.7c-4.6 5.7-10.6 10.8-17.4 15.3h34.8c-6.8-4.5-12.8-9.6-17.4-15.3zm-56.7 33.3c-6.9 2.2-14 4.1-21.3 5.8-9.5 2.2-19.2 3.9-28.9 5.1 6.1 19.6 14.1 39.5 23 58.2l.1.2c4.3-6.7 9.4-13.1 13.5-19.8-2.4 13.9-3.3 27.9-2.3 41.8 1.7 3.3 3.5 6.5 5.3 9.7h134.6c3.6-6.3 7-12.7 10.3-19.2 5.4-21.9 3.9-42.8 5.4-64.2 3.1 11.5 6.1 23 8.5 34.7 5.8-13.6 11.1-27.6 15.4-41.4-9.7-1.2-19.4-2.9-28.9-5.1-7.3-1.7-14.4-3.6-21.3-5.8z"/></symbol>
     <symbol id="ag-golem" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 33.85 168.2 63.1l-6.6 52.9 94.4 27 94.4-27-6.6-52.9zm-54 60.51a10 9.999 0 0 1 10 10.04 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10.04zm108 0a10 9.999 0 0 1 10 10.04 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10.04zM103 104.4v64h18v-23h18.8l2.1-16.2-.4-.1.5-1.7h-21v-23zm153 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm135 0v23h-21l.5 1.7-.4.1 2.1 16.2H391v23h18v-64zm-231.7 29.8-6.5 52.2-16 48.1 20.1 26.8 16.8-50.3 48.7 81.2 24.6-61.5v-71.5zm193.4 0-87.7 25v71.5l24.6 61.5 48.7-81.2 16.8 50.3 20.1-26.8-16-48.1zm-178.7 22 57.2 23.7-3.3 17.3-65.3 1 8.7-32.2zm164 0 11.4 42-65.3-1-3.3-17.3 47.8-19.8zm-221.9 80.7-9.1 36.5 43 8.6zm279.8 0L362 282l43-8.6zm-217.6 16.9-10.5 31.8 32.6 6.5 1.1.2zm155.4 0-23.2 38.5 15-3 18.7-3.7zm-77.7 2.8-17.3 43.1 17.3 3.5 17.3-3.5zm-149 35.2 28.8 172.5L247 478.2V376.4h18v101.8l111.2-13.9L405 291.8l-149 29.8zm111 80.6a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm76 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm-76 64a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10zm76 0a10 9.999 0 0 1 10 10 10 9.999 0 0 1-10 10 10 9.999 0 0 1-10-10 10 9.999 0 0 1 10-10z"/></symbol>
     <symbol id="ag-gasmask" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M364.563 27.5c-24.54 10.796-66.057 18.094-113.875 18.094-47.3 0-89.258-6.898-113.907-17.5C107.477 64.73 97.12 118.44 107 177c10.73 63.596 50.354 119.6 85.688 155.78 17.285-4.952 36.943-7.717 57.843-7.717 20.725 0 40.228 2.72 57.407 7.593 35.5-36.38 75.654-92.59 86.407-155.656 10.04-58.882-.233-112.842-29.78-149.5zm-187.625 80.03c10.768.263 21.255 4.955 29.937 12.282 11.577 9.77 20.607 24.33 25.25 41.657 4.643 17.326 4.078 34.437-1.063 48.686-5.14 14.25-15.398 26.053-29.78 29.906-14.384 3.854-29.174-1.23-40.75-11-11.577-9.77-20.608-24.328-25.25-41.656-4.644-17.327-4.08-34.47 1.062-48.72 5.14-14.248 15.398-26.02 29.78-29.874a38.094 38.094 0 0 1 10.814-1.28zm146.75 0c3.59-.086 7.216.32 10.812 1.282 14.383 3.854 24.64 15.626 29.78 29.876 5.142 14.25 5.707 31.39 1.064 48.718-4.643 17.328-13.674 31.887-25.25 41.656-11.577 9.77-26.367 14.854-40.75 11-14.383-3.853-24.64-15.657-29.78-29.906-5.142-14.25-5.707-31.36-1.064-48.687 4.643-17.33 13.673-31.888 25.25-41.657 8.682-7.328 19.17-12.02 29.938-12.282zm-148.47 18.657c-1.44.063-2.867.286-4.25.657-7.374 1.976-13.434 8.13-17.062 18.187-3.628 10.058-4.295 23.6-.562 37.532 3.733 13.933 11.08 25.324 19.25 32.22 8.17 6.894 16.47 9.194 23.844 7.218 4.996-1.34 9.37-4.6 12.812-9.688-.557.206-1.108.376-1.688.532-14.782 3.96-31.402-10.042-37.093-31.28-5.692-21.24 1.685-41.665 16.468-45.626 3.214-.862 6.526-.853 9.78-.125a47.7 47.7 0 0 0-1.905-1.72c-6.128-5.17-12.326-7.766-18.157-7.905-.486-.012-.957-.02-1.437 0zm148.75 0c-5.83.14-12.028 2.736-18.156 7.907-8.17 6.895-15.516 18.255-19.25 32.187-3.733 13.934-3.065 27.476.563 37.532 3.628 10.057 9.657 16.212 17.03 18.188 7.376 1.976 15.706-.324 23.876-7.22.87-.732 1.748-1.51 2.595-2.343-3.923 1.263-7.97 1.453-11.875.407-14.783-3.96-22.13-24.386-16.438-45.625 5.692-21.24 22.28-35.244 37.063-31.282 1.253.335 2.45.812 3.594 1.375-3.514-5.533-8.07-9.064-13.314-10.47a20.076 20.076 0 0 0-5.687-.656zm-73.437 217.594c-30.047 0-57.177 6.322-76 15.94-18.82 9.616-28.155 21.615-28.155 32.686 0 2.838.615 5.752 1.844 8.656 5.233-4.285 11.252-8.117 17.81-11.468 22.253-11.37 51.873-18 84.5-18 32.63 0 62.25 6.63 84.5 18 6.547 3.344 12.56 7.163 17.783 11.437 1.22-2.894 1.843-5.794 1.843-8.624 0-11.07-9.334-23.07-28.156-32.687-18.822-9.618-45.92-15.94-75.97-15.94zm0 46.5c-30.047 0-57.177 6.322-76 15.94-18.82 9.616-28.155 21.615-28.155 32.686 0 11.07 9.334 23.07 28.156 32.688 18.823 9.617 45.953 15.97 76 15.97 30.05-.002 57.148-6.353 75.97-15.97 18.822-9.617 28.156-21.617 28.156-32.688 0-11.07-9.334-23.07-28.156-32.687-18.822-9.618-45.92-15.94-75.97-15.94zm0 28.19c15.2 0 28.952 2.186 39.75 6.186 5.4 2 10.118 4.412 14 7.813 3.884 3.4 7.25 8.417 7.25 14.467 0 6.05-3.366 11.07-7.25 14.47-3.882 3.4-8.6 5.812-14 7.812-10.798 4-24.55 6.186-39.75 6.186-15.197 0-28.98-2.187-39.78-6.187-5.4-2-10.086-4.413-13.97-7.814-3.882-3.4-7.25-8.418-7.25-14.47 0-6.05 3.368-11.067 7.25-14.467 3.884-3.402 8.57-5.814 13.97-7.814 10.8-4 24.583-6.187 39.78-6.187zm0 18.686c-13.327 0-25.384 2.107-33.28 5.03-3.948 1.464-6.812 3.168-8.156 4.345-.292.256-.263.258-.406.408.143.15.114.15.406.406 1.344 1.177 4.208 2.913 8.156 4.375 7.896 2.923 19.953 5 33.28 5 13.33 0 25.387-2.077 33.282-5 3.948-1.463 6.812-3.2 8.157-4.376.29-.255.26-.257.405-.406-.144-.15-.115-.152-.406-.407-1.346-1.176-4.21-2.88-8.158-4.342-7.895-2.925-19.953-5.032-33.28-5.032z"/></symbol>
@@ -199,180 +181,164 @@
 
   </svg>
 
-
+<div class="wrap">
   <div class="caption">
-    <h1>Agent card — square redesign v2 (design sketch)</h1>
-    <p>Single-column square card: a thin <b>top meta strip</b> (small left-aligned <b>age</b> · status badge), then identity
-    with <b>model right-aligned</b> in the header (opus-only <b>FAST</b> bolt) and a full-bleed divider, then the three
-    <code>mode·effort·think</code> chips spread full width and the <b>Ctx/Turns</b> bars.
-    Pinned to the bottom is the full-bleed <b>activity band</b> — the textless <b>Run</b> progress strip and the
-    <b>neobrutalism Marquee</b> feed (no fill), each separated by a divider — sitting right above the reserved
-    <b>subagent</b> strip of bold, clickable neutral badges. Not wired into <code>mockup.html</code>. Hover the feed to pause it; hover a badge to see the press.</p>
+    <h1>Messages card — rail restyle · contiguous blocks · multi-select</h1>
+    <p>Same real card, two ways. <b>Proposed</b> swaps the thin per-block rail for the Library tan-box rail, makes the blocks one <b>contiguous panel</b> (dividers, no gaps), and puts a tight <b>type tag inside each rail box</b> (<code>msg · tht · rd · bsh · dif · wrt · mta</code>, top-aligned, review-badge size, no pill) — the title row's rail stays empty. Hover lights a row (or the whole card, from the title rail) in cream; selection is light teal; <b>multi-select within the card</b>. Click a Proposed rail to toggle a block; the top "Turn" rail selects the whole message.</p>
   </div>
-
-  <div class="well">
-    <div class="grid">
-
-      <!-- A — opus · FAST ON · ACTIVE · determinate run · 3 subs (effort+think greyed = override) -->
-      <figure>
-        <div class="card selected">
-          <div class="hd-meta">
-            <div class="age" title="Created · elapsed">06-26 14:30 · 2h12m</div>
-            <span class="nbadge nb-active">Active</span>
-          </div>
-          <div class="hd-top">
-            <span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
-            <div class="idblk"><div class="role">researcher</div><div class="name">01 sandy</div></div>
-            <div class="model">opus 4.8<i data-lucide="zap" class="bolt" title="Fast mode: ON (opus only)"></i></div>
-          </div>
-          <div class="div"></div>
-          <div class="settings">
-            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
-            <span class="chip off" title="Reasoning effort — overridden by Fast"><i data-lucide="gauge"></i>high</span>
-            <span class="chip off" title="Extended thinking — overridden by Fast"><i data-lucide="brain"></i>on</span>
-          </div>
-          <div class="bars">
-            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i></div><span class="bv">62%</span></div>
-            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="bv">34/50</span></div>
-          </div>
-          <div class="band">
-            <div class="run-strip run-active"><i style="width:64%"></i></div>
-            <div class="div"></div>
-            <div class="feed">
-              <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-              <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-            </div>
-          </div>
-          <div class="subs">
-            <div class="sbadges">
-              <span class="sbadge" style="color:var(--ag-emerald)">1</span>
-              <span class="sbadge" style="color:var(--ag-emerald)">2</span>
-              <span class="sbadge" style="color:var(--ag-emerald)">3</span>
-            </div>
-          </div>
-        </div>
-        <figcaption><b>A · opus, FAST on</b><br>active · determinate run · effort+think greyed (override)</figcaption>
-      </figure>
-
-      <!-- B — opus · FAST OFF · ACTIVE · indeterminate run · 1 sub -->
-      <figure>
-        <div class="card">
-          <div class="hd-meta">
-            <div class="age" title="Created · elapsed">06-26 13:05 · 3h37m</div>
-            <span class="nbadge nb-active">Active</span>
-          </div>
-          <div class="hd-top">
-            <span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span>
-            <div class="idblk"><div class="role">coder</div><div class="name">01 max</div></div>
-            <div class="model">opus 4.8<i data-lucide="zap" class="bolt off" title="Fast mode: OFF (opus only)"></i></div>
-          </div>
-          <div class="div"></div>
-          <div class="settings">
-            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>edit</span>
-            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
-            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
-          </div>
-          <div class="bars">
-            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i></div><span class="bv">41%</span></div>
-            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="bv">22/50</span></div>
-          </div>
-          <div class="band">
-            <div class="run-strip run-active run-indet"><i></i></div>
-            <div class="div"></div>
-            <div class="feed">
-              <span class="trk a">running test suite&nbsp;&nbsp;·&nbsp;&nbsp;142 passed&nbsp;&nbsp;·&nbsp;&nbsp;0 failed&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-              <span class="trk b">running test suite&nbsp;&nbsp;·&nbsp;&nbsp;142 passed&nbsp;&nbsp;·&nbsp;&nbsp;0 failed&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-            </div>
-          </div>
-          <div class="subs">
-            <div class="sbadges">
-              <span class="sbadge" style="color:var(--ag-cobalt)">1</span>
-            </div>
-          </div>
-        </div>
-        <figcaption><b>B · opus, FAST off</b><br>active · indeterminate run (barber-pole) · bolt muted</figcaption>
-      </figure>
-
-      <!-- C — sonnet (no bolt) · IDLE · muted/empty run · 0 subs (reserved) -->
-      <figure>
-        <div class="card">
-          <div class="hd-meta">
-            <div class="age" title="Created · elapsed">06-25 09:12 · 1d</div>
-            <span class="nbadge nb-idle">Idle</span>
-          </div>
-          <div class="hd-top">
-            <span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span>
-            <div class="idblk"><div class="role">synthesizer</div><div class="name">01 kai</div></div>
-            <div class="model">sonnet 4.6</div>
-          </div>
-          <div class="div"></div>
-          <div class="settings">
-            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
-            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>med</span>
-            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
-          </div>
-          <div class="bars">
-            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="bv">18%</span></div>
-            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:12%;background:var(--success)"></i></div><span class="bv">6/50</span></div>
-          </div>
-          <div class="band">
-            <div class="run-strip run-idle"><i></i></div>
-            <div class="div"></div>
-            <div class="feed idle">
-              <span class="trk a">idle — awaiting prompt</span>
-            </div>
-          </div>
-          <div class="subs"><span class="subs-empty">no subagents</span></div>
-        </div>
-        <figcaption><b>C · sonnet (no bolt)</b><br>idle · muted/empty run · subagent strip reserved</figcaption>
-      </figure>
-
-      <!-- D — haiku (no bolt) · PENDING · warm run · 6 subs (+N cap) -->
-      <figure>
-        <div class="card">
-          <div class="hd-meta">
-            <div class="age" title="Created · elapsed">06-26 15:48 · 54m</div>
-            <span class="nbadge nb-pending">Pending</span>
-          </div>
-          <div class="hd-top">
-            <span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span>
-            <div class="idblk"><div class="role">auditor</div><div class="name">01 drew</div></div>
-            <div class="model">haiku 4.5</div>
-          </div>
-          <div class="div"></div>
-          <div class="settings">
-            <span class="chip" title="Permission mode"><i data-lucide="shield"></i>plan</span>
-            <span class="chip" title="Reasoning effort"><i data-lucide="gauge"></i>low</span>
-            <span class="chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
-          </div>
-          <div class="bars">
-            <div class="brow"><span class="bl">Ctx</span><div class="pbar"><i style="width:73%;background:var(--warning)"></i></div><span class="bv">73%</span></div>
-            <div class="brow"><span class="bl">Trn</span><div class="pbar"><i style="width:88%;background:var(--danger)"></i></div><span class="bv">44/50</span></div>
-          </div>
-          <div class="band">
-            <div class="run-strip run-pending"><i style="width:40%"></i></div>
-            <div class="div"></div>
-            <div class="feed">
-              <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-              <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-            </div>
-          </div>
-          <div class="subs">
-            <div class="sbadges">
-              <span class="sbadge" style="color:var(--ag-crimson)">1</span>
-              <span class="sbadge" style="color:var(--ag-crimson)">2</span>
-              <span class="sbadge" style="color:var(--ag-crimson)">3</span>
-              <span class="sbadge" style="color:var(--ag-crimson)">4</span>
-              <span class="sbadge more" title="2 more subagents">+2</span>
-            </div>
-          </div>
-        </div>
-        <figcaption><b>D · haiku (no bolt)</b><br>pending · warm run · subagent overflow (+N) · Turns near max</figcaption>
-      </figure>
-
-    </div>
+  <div class="demo">
+    <div class="demo-col"><div class="demo-lbl">Current (verbatim mockup)</div><div id="msg-before" class="demo-static"></div></div>
+    <div class="demo-col"><div class="demo-lbl">Proposed</div><div id="msg-after"></div></div>
   </div>
+</div>
 
-<script>lucide.createIcons();</script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  function LU(){ if(window.lucide) lucide.createIcons(); }
+  /* ---- stubs for machinery NOT needed to render/select this single card ---- */
+  function noop(){}
+  var eaUpdate=noop, eaUpdateAll=noop, applyMsgFilters=noop, toast=noop, switchTab=noop;
+
+  /* ---- JS copied VERBATIM from design/mockup.html ---- */
+  /* AG / AG_ORDER (3683-3699) */
+  const AG={
+    user:{role:'human',name:'User',user:true},
+    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard'},
+    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem'},
+    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask'},
+    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot'},
+    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox'},
+    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider'},
+    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle'},
+    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion'},
+    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot'},
+    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal'},
+    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut'},
+    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye'},
+    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled'}
+  };
+  const AG_ORDER=['sandy','kai','drew','max','rowan','nova','vega','quinn','wren','lex','sage','io','fen'];
+  function agtileHTML(a){return a.user
+    ?'<span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span>'
+    :'<span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span>';}
+  function badgeHTML(a,sm){return '<span class="badge badge-c'+(sm?' badge-sm':'')+(a.user?' ag-user-badge':'')+'">'
+    +agtileHTML(a)+'<span class="b-lab"><span class="b-role">'+a.role+'</span><span class="b-name">'+a.name+'</span></span></span>';}
+  /* esc (3710) */
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  /* dirTag (3940) */
+  function dirTag(d){return d==='out'?'<span class="dir-tag dir-out">sent</span>':'<span class="dir-tag dir-in">recv</span>';}
+  /* MSG_KIND_LBL (3942) */
+  const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
+  /* msgBlockHTML (3943-3946) */
+  function msgBlockHTML(b){
+    if(b.k==='diff'){const lines=b.t.split('\n').map(l=>{const c=l[0]==='+'?'blk-add':(l[0]==='-'?'blk-del':'');return '<span class="'+c+'">'+esc(l)+'</span>';}).join('\n');
+      return '<div class="msg-blk blk-diff" data-blk="diff"><span class="msg-blk-lbl">diff</span>'+lines+'</div>';}
+    return '<div class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'"><span class="msg-blk-lbl">'+(MSG_KIND_LBL[b.k]||b.k)+'</span>'+esc(b.t)+'</div>';}
+  /* msgBlocksHTML (3947) */
+  function msgBlocksHTML(o){return (o.blocks&&o.blocks.length)?'<div class="msg-blocks">'+o.blocks.map(msgBlockHTML).join('')+'</div>':'';}
+  /* msgCardHTML (3959-3968) */
+  function msgCardHTML(o,i){const a=AG[o.ag];return '<div class="fcard msgcard" data-selcard data-msgi="'+i+'">'
+    +'<div class="fcard-head">'
+    +'<button class="fcard-exp msel-head" onclick="msgCardSel(event,this)" title="Click to select this whole message (Attach)">'
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* status badge leads received cards (Active/Complete/Failed); user-sent keep just the sent tag */
+    +badgeHTML(a,true)
+    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
+    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+    +'</div>'
+    +'<div class="fcard-body">'+msgRailHTML(o)+'</div></div>';}
+  /* msgRailHTML (3970-3975) */
+  function msgRailHTML(o){
+    let rows='<div class="mrow" data-mblk="text"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
+      +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
+    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
+      +'<div class="mrow-c">'+msgBlockHTML(b)+'</div></div>').join('');}
+    return '<div class="mrail-wrap">'+rows+'</div>';}
+  /* msgCardSel / msgBlkSel / clear* (3976-3979) */
+  function clearMsgBlkSel(){document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
+  function clearMsgCardSel(){document.querySelectorAll('#msg-list .msgcard.sel').forEach(c=>c.classList.remove('sel'));}
+  function msgCardSel(e,btn){const c=btn.closest('.msgcard');if(!c)return;clearMsgBlkSel();c.classList.toggle('sel');eaUpdate('feed');}   /* whole = pink, multi-select; clears any block selection */
+  function msgBlkSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const was=row.classList.contains('bsel');clearMsgBlkSel();clearMsgCardSel();if(!was)row.classList.add('bsel');eaUpdate('feed');}   /* block = teal, single; clears card selection */
+  /* toggleFcard (4079) */
+  function toggleFcard(btn){const c=btn.closest('.fcard');if(c)c.classList.toggle('open');LU();}
+
+  /* ===== SNIPPET CHANGES — "Proposed" builders (the only new JS) ===== */
+  /* contiguous Library-style rail: same rows, but wrapped in one panel with the .--lib rail + multi-select handler */
+  /* tight rail-tag abbreviations shown INSIDE the rail box. Title row = no tag. 'text' = primary prose (no tool filter) → "msg". */
+  const RAIL_TAG={text:'msg',think:'tht',read:'rd',write:'wrt',bash:'bsh',diff:'dif',meta:'mta'};
+  function railTag(k){return '<span class="rail-tag">'+(RAIL_TAG[k]||k)+'</span>';}
+  function msgRailHTMLv2(o){
+    /* FIX 2 — top whole-select row: turn number in the doc-title style sits in the CONTENT; the rail box is EMPTY (no tag) and selects the whole message (mirrors Library's title rail = select-all). */
+    let rows='<div class="mrow mrow--lib mrow--title" data-mblk="title"><button class="mrail mrail--lib mrail--title" onclick="msgWholeSel(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select the whole message"></button>'
+      +'<div class="mrow-c"><div class="fcard-full"><span class="msg-turn">Turn '+(o.turn||'')+'</span></div></div></div>';
+    /* primary text — rail tag "msg" (the agent's words; no tool filter maps to it) */
+    rows+='<div class="mrow mrow--lib" data-mblk="text"><button class="mrail mrail--lib" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag('text')+'</button>'
+      +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
+    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div class="mrow mrow--lib" data-blk="'+b.k+'"><button class="mrail mrail--lib" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag(b.k)+'</button>'
+      +'<div class="mrow-c">'+msgBlockHTMLv2(b)+'</div></div>').join('');}
+    return '<div class="mrail-wrap mrail-wrap--lib">'+rows+'</div>';}
+  /* FIX badges — type is shown by the rail tag now, so the block CONTENT carries NO inline label (Current column keeps verbatim msgBlockHTML). */
+  function msgBlockHTMLv2(b){
+    if(b.k==='diff'){const lines=b.t.split('\n').map(l=>{const c=l[0]==='+'?'blk-add':(l[0]==='-'?'blk-del':'');return '<span class="'+c+'">'+esc(l)+'</span>';}).join('\n');
+      return '<div class="msg-blk blk-diff" data-blk="diff">'+lines+'</div>';}
+    return '<div class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'">'+esc(b.t)+'</div>';}
+  /* FIX 1 — rail hover preview (mirrors Library railHover): a block rail lights its own row cream; the TOP title rail lights EVERY row cream (it select-alls). */
+  function msgRailHover(btn){const card=btn.closest('.msgcard');if(!card)return;
+    if(btn.classList.contains('mrail--title')){card.querySelectorAll('.mrow--lib').forEach(r=>r.classList.add('hl'));}
+    else{const row=btn.closest('.mrow');if(row)row.classList.add('hl');}}
+  function msgRailHoverOut(btn){const card=btn.closest('.msgcard');if(card)card.querySelectorAll('.mrow--lib.hl').forEach(r=>r.classList.remove('hl'));}
+  /* multi-select WITHIN a card (toggle); ONE card at a time → clear other cards' block selection.
+     Touching a single block also clears the top title row's "whole-message" state so it never lingers. */
+  function msgBlkSelMulti(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const card=row.closest('.msgcard');
+    if(card){card.classList.remove('sel');const t=card.querySelector('.mrow--title');if(t)t.classList.remove('bsel');}
+    document.querySelectorAll('.mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
+    row.classList.toggle('bsel');}
+  /* FIX 2 — whole-message select via the top title row (or the header preview): toggle EVERY row in this card pink; ONE card at a time → clear other cards. */
+  function msgWholeSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const card=btn.closest('.msgcard');if(!card)return;
+    document.querySelectorAll('.mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
+    const rows=[...card.querySelectorAll('.mrow--lib')];const all=rows.length&&rows.every(r=>r.classList.contains('bsel'));
+    rows.forEach(r=>r.classList.toggle('bsel',!all));}
+  function msgCardHTMLv2(o,i){const a=AG[o.ag];return '<div class="fcard msgcard" data-selcard data-msgi="'+i+'">'
+    +'<div class="fcard-head">'
+    +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
+    +badgeHTML(a,false)   /* agent badge LEADS, at the full reviewer-chip size (the standard) */
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
+    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
+    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+    +'</div>'
+    +'<div class="fcard-body">'+msgRailHTMLv2(o)+'</div></div>';}
+
+  /* demo card — realistic content across ALL block kinds (drawn from this UI/design session): message · think · read · bash · diff · write · meta */
+  const MSGS=[
+    {ag:'max',dir:'in',status:'active',turn:17,time:'14:47',
+     body:`Built the Turns dropdown on Context's .ctx-trigger primitive so the two bars align; broke turns out by tool with a Coordinating slice. Verified headless at 300 / 420 / full width.`,
+     blocks:[
+       {k:'think',t:`The 340px "overflow" smells like Chrome's min-window crop, not a real bug — drop a vw debug overlay before chasing the CSS.`},
+       {k:'read',t:'● Read  design/mockup.html\n  ⎿ 4,200 lines'},
+       {k:'bash',t:'● Bash  chrome --headless --screenshot popover-wide.png\n  ⎿ 103,090 bytes written'},
+       {k:'diff',t:'● Edit  design/ui-snippets/response-popover.html\n+ .fmt-menu.right{ right:0 }\n- .fmt-menu{ left:0 }'},
+       {k:'write',t:'● Write  design/ui-snippets/turns-dropdown.html\n  ⎿ 210 lines'},
+       {k:'meta',t:'● Task  general-purpose · "Extract faithful plan-card clone"\n  ⎿ 1,627-line clone · 24 tools · 118k tok'}]}
+  ];
+
+  /* render both columns expanded; seed selection states so the before/after reads at a glance */
+  (function(){
+    const k=0;
+    /* CURRENT — verbatim, static; one block selected (single-select, teal) */
+    const before=document.getElementById('msg-before');
+    before.innerHTML=msgCardHTML(MSGS[k], k);
+    before.querySelector('.fcard').classList.add('open');
+    before.querySelectorAll('.mrow')[1].classList.add('bsel');
+    /* PROPOSED — interactive; rows = [0 title · 1 msg · 2 tht · 3 rd · 4 bsh · 5 dif · 6 wrt · 7 mta].
+       Seed bash+diff (4,5) so the multi-select reads as one contiguous pink band (shows "no seam"). */
+    const after=document.getElementById('msg-after');
+    after.innerHTML=msgCardHTMLv2(MSGS[k], k);
+    after.querySelector('.fcard').classList.add('open');
+    const rows=after.querySelectorAll('.mrow');
+    rows[4].classList.add('bsel'); rows[5].classList.add('bsel');
+    LU();
+  })();
+</script>
 </body>
 </html>

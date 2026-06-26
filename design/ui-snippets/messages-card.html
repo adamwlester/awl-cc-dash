@@ -10,12 +10,12 @@
         - the TYPE TAG lives INSIDE each rail box (left gutter), top-aligned, minimal (transparent — shows the rail's tan, no pill/border),
           font size+weight matched to the Plans review badge (.vbadge, 9px/800). Tight lowercase abbreviations: msg · tht · rd · bsh · dif · wrt · mta
           (msg = the primary prose, which maps to no tool filter). The old inline "BASH"/"DIFF" content labels are gone;
-        - HOVER mirrors Library: the hovered rail cell tints pink and the row's content lights CREAM (--background);
+        - HOVER mirrors Library: the hovered rail cell + the row's content both light CREAM (--background);
           hovering the EMPTY title rail lights the WHOLE card's content cream (it select-alls);
-        - SELECTION is ALWAYS light pink (--main-dim) — rail cell + content the same pink, no seam between them;
+        - SELECTION = light teal (--select) — rail cell + content the same teal, no seam; no pink anywhere;
         - MULTI-select within a card (toggle; one card at a time — selecting blocks in another card clears this one's).
   Decisions baked in: no rail strip; type tag INSIDE the rail box (tight 3-char, top-aligned, transparent); title rail empty;
-  selection colour = light pink (matches Library, NOT teal); primary-text tag = "msg"; multi-select scope = one card at a time.
+  selection colour = light teal (--select); primary-text tag = "msg"; multi-select scope = one card at a time.
   Demo data exercises ALL block kinds (message · think · read · bash · diff · write · meta) with realistic Claude Code rendered text.
 -->
 <!-- (was: VERBATIM CLONE of one expanded Messages feed card from design/mockup.html — base preserved below.) -->
@@ -31,6 +31,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
 /* ---- CSS copied VERBATIM from design/mockup.html (line ranges noted) ---- */
+*{ box-sizing:border-box; }   /* the mockup gets this from Tailwind's preflight; this snippet doesn't load Tailwind, so set it explicitly to match the mockup's box model */
 body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24px; }
 /* 524-528 */
     .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden;
@@ -78,15 +79,15 @@ body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24
     .fcard-exp{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; text-align:left; background:transparent; border:none; cursor:pointer; padding:0; }
     .fcard-chev{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); transition:transform .15s; margin-left:auto; }
     .fcard.open .fcard-chev{ transform:rotate(90deg); }
-    .fcard-dir{ flex:0 0 auto; }
+    .fcard-dir{ flex:0 0 auto; display:inline-flex; align-items:center; }   /* SNIPPET FIX: center the dir tag (RECV) to the status badge (Active) — wrap the inline .dir-tag as a measured box, same as .dbadge */
     .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; margin-left:auto; }
     .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--rule); }
+    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--border); }
     .fcard.open .fcard-body{ display:block; }
     .fcard.open .fcard-prev{ display:none; }
     .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
     .fcard-log{ font-family:'JetBrains Mono',monospace; font-size:10px; }
-    .msgcard.sel{ background:var(--main-dim); box-shadow:var(--shadow); }   /* whole = pink */
+    .msgcard.sel{ background:var(--select); box-shadow:var(--shadow); }   /* whole-card select = light teal */
     .msel-head{ cursor:pointer; }
     .fcard-chevbtn{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:none; cursor:pointer; align-self:center; }
     .fcard-chevbtn:hover{ background:var(--surface-3); border-radius:4px; }
@@ -119,27 +120,29 @@ body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24
        =================================================================================== */
     /* contiguous Library-style panel: one bordered box; rows butt together with hairline dividers (no gaps) */
     .mrail-wrap--lib{ gap:0; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
-    .mrow--lib + .mrow--lib{ border-top:2px solid var(--rule); }
+    .mrow--lib{ gap:0; }   /* SNIPPET FIX: kill the inherited 7px horizontal .mrow gap so the rail box butts flush against the content — no white gap between rail and text on select (matches Plans/Documents) */
+    .mrow--lib + .mrow--lib{ border-top:2px solid var(--border); }
     /* rail = plain narrow TAN box (no colour strip — removed); a continuous select handle down the panel.
        The top whole-select row is identified by its bold turn-number content, not a strip. (.mrail--title kept as a JS hook only.) */
-    .mrail--lib{ width:34px; align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding-top:7px; border:none; border-right:2px solid var(--rule); border-radius:0; background:var(--surface-3); cursor:pointer; }
+    .mrail--lib{ width:34px; align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding-top:7px; border:none; border-right:2px solid var(--border); border-radius:0; background:var(--surface-3); cursor:pointer; }
     .msg-turn{ font-weight:900; font-size:12px; color:var(--foreground); }   /* turn number in the doc-title style (mirrors Library .md-h1) */
 
-    /* FIX 3 — selection is ALWAYS light pink (--main-dim), like Library (was teal): rail cell + content the SAME pink.
-       FIX 4 — blend the rail/text divider on select so there's no white seam between rail and text. */
-    .mrow--lib.bsel .mrail--lib{ background:var(--main-dim); border-right-color:var(--main-dim); }
-    .mrow--lib.bsel .mrow-c{ background:var(--main-dim); outline:none; border-radius:0; }
+    /* SELECTION = light teal (--select), the universal select fill (no pink): rail cell + content the SAME teal.
+       Blend the rail/text divider on select so there's no seam between rail and text. */
+    .mrow--lib.bsel .mrail--lib{ background:var(--select); border-right-color:var(--select); }
+    .mrow--lib.bsel .mrow-c{ background:var(--select); outline:none; border-radius:0; }
 
     /* FIX 1 — hover mirrors Library: the directly-hovered rail cell tints pink, and hovering a rail lights row CONTENT cream.
        A block rail lights just its row; the TOP title rail lights the WHOLE card (it select-alls) — driven by .hl via JS
        (mirrors Library railHover), so a multi-row preview is possible. Declared AFTER .bsel so hover previews over selection. */
-    .mrail--lib:hover{ background:var(--main-dim); }
+    .mrail--lib:hover{ background:var(--background); }
     .mrow--lib.hl .mrow-c{ background:var(--background); }
+    .mrow--lib.hl .mrail--lib{ background:var(--background); }   /* hover preview lights the rail cell cream too (incl. title-hover = whole card) */
 
     /* type tag lives INSIDE the rail box (left gutter), top-aligned — minimal: transparent (shows the rail's tan), no pill/border.
        Font size + weight match the Plans review badge (.vbadge): 9px / 800. Tight lowercase abbreviations (msg · tht · rd · bsh · dif · wrt · mta). */
     .rail-tag{ font-family:'Archivo',sans-serif; font-size:9px; font-weight:800; letter-spacing:0.02em; line-height:1; color:var(--muted); white-space:nowrap; pointer-events:none; }
-    .mrow--lib.bsel .mrail--lib .rail-tag{ color:var(--main); }   /* tag stays legible on the pink selected rail */
+    .mrow--lib.bsel .mrail--lib .rail-tag{ color:var(--foreground); }   /* tag stays legible on the teal selected rail */
     /* blocks shed their individual border/bg so they read as contiguous rows within the panel */
     .mrow--lib .msg-blk{ border:none; border-radius:0; background:transparent; padding:5px 9px; }
     .mrow--lib .fcard-full{ margin:0; padding:6px 9px; }
@@ -182,7 +185,7 @@ body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24
 <div class="wrap">
   <div class="caption">
     <h1>Messages card — rail restyle · contiguous blocks · multi-select</h1>
-    <p>Same real card, two ways. <b>Proposed</b> swaps the thin per-block rail for the Library tan-box rail, makes the blocks one <b>contiguous panel</b> (dividers, no gaps), and puts a tight <b>type tag inside each rail box</b> (<code>msg · tht · rd · bsh · dif · wrt · mta</code>, top-aligned, review-badge size, no pill) — the title row's rail stays empty. Hover lights a row (or the whole card, from the title rail) in cream; selection is light pink; <b>multi-select within the card</b>. Click a Proposed rail to toggle a block; the top "Turn" rail selects the whole message.</p>
+    <p>Same real card, two ways. <b>Proposed</b> swaps the thin per-block rail for the Library tan-box rail, makes the blocks one <b>contiguous panel</b> (dividers, no gaps), and puts a tight <b>type tag inside each rail box</b> (<code>msg · tht · rd · bsh · dif · wrt · mta</code>, top-aligned, review-badge size, no pill) — the title row's rail stays empty. Hover lights a row (or the whole card, from the title rail) in cream; selection is light teal; <b>multi-select within the card</b>. Click a Proposed rail to toggle a block; the top "Turn" rail selects the whole message.</p>
   </div>
   <div class="demo">
     <div class="demo-col"><div class="demo-lbl">Current (verbatim mockup)</div><div id="msg-before" class="demo-static"></div></div>
@@ -299,8 +302,8 @@ body{ background:var(--background); font-family:'Archivo',sans-serif; padding:24
   function msgCardHTMLv2(o,i){const a=AG[o.ag];return '<div class="fcard msgcard" data-selcard data-msgi="'+i+'">'
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
+    +badgeHTML(a,false)   /* agent badge LEADS, at the full reviewer-chip size (the standard) */
     +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
-    +badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'

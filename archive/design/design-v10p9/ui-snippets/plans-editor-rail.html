@@ -246,7 +246,7 @@
     .bd-bar{ position:relative; display:flex; height:11px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); margin-bottom:10px; }
     .bd-bar > i{ display:block; height:100%; }
     .cat{ display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px; }
-    .cat + .cat{ border-top:1px solid var(--border); }
+    .cat + .cat{ border-top:1px solid var(--rule); }
     .cat .sw2{ width:10px; height:10px; border:1.5px solid var(--border); border-radius:2px; flex:0 0 auto; }
     .cat .nm{ flex:1; color:var(--foreground); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .cat .tk{ font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--foreground); font-size:10.5px; }
@@ -313,7 +313,7 @@
     .fmt-menu{ position:absolute; z-index:60; width:268px; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:9px; display:none; }
     .fmt-menu.up{ bottom:calc(100% + 6px); } .fmt-menu.left{ left:0; }
     .fmt-menu.open{ display:block; }
-    .fmt-group{ padding:5px 1px; } .fmt-group + .fmt-group{ border-top:2px solid var(--border); margin-top:3px; }
+    .fmt-group{ padding:5px 1px; } .fmt-group + .fmt-group{ border-top:2px solid var(--rule); margin-top:3px; }
     .fmt-gh{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
     .fmt-gh .nm{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); }
     .fmt-gh .mode{ font-size:7.5px; font-weight:700; color:var(--muted-2); text-transform:uppercase; }
@@ -328,7 +328,7 @@
     .aglist{ border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
     /* v9p6 fix: the base .aglist{overflow:hidden} (for corner-clipping) was overriding Tailwind's overflow-y-auto, so the persistent lists clipped without a scrollbar. This higher-specificity rule restores vertical scroll (x stays hidden). */
     .aglist.aglist-scroll{ overflow:hidden; overflow-y:auto; }
-    .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent; border:none; border-top:2px solid var(--border); cursor:pointer; transition:background .1s; }
+    .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent; border:none; border-top:2px solid var(--rule); cursor:pointer; transition:background .1s; }
     .agrow:first-child{ border-top:none; }
     .agrow:hover:not(.on){ background:var(--surface-3); }
     .agrow.on{ background:var(--select); }
@@ -355,7 +355,7 @@
     .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:3px; border:2px solid var(--border); }
     .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
     .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
-    .hist-acts{ display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:2px solid var(--border); }
+    .hist-acts{ display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:2px solid var(--rule); }
     .opt{ display:block; width:100%; text-align:left; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:6px 9px; cursor:pointer; transition:transform .06s, box-shadow .06s; }
     .opt:hover:not(.on){ box-shadow:var(--shadow-sm); transform:translate(-1px,-1px); }
     .opt.on{ background:var(--select); }
@@ -375,7 +375,7 @@
     /* ============================ library ============================ */
     .sec-h{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
     .lib-list{ border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
-    .lib-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-size:11px; font-weight:600; padding:6px 9px; color:var(--foreground); background:transparent; border:none; border-top:2px solid var(--border); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lib-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-size:11px; font-weight:600; padding:6px 9px; color:var(--foreground); background:transparent; border:none; border-top:2px solid var(--rule); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .lib-row:first-child{ border-top:none; }
     .lib-row:hover:not(.on){ background:var(--surface-3); }
     .lib-row.on{ background:var(--select); color:var(--foreground); font-weight:800; }
@@ -419,7 +419,7 @@
     .ed-block-x svg{ width:13px; height:13px; }
     .ed-block-body{ padding:7px 9px; font-size:10px; line-height:1.5; color:var(--muted); background:var(--secondary-background); white-space:pre-wrap; word-break:break-word; }
     .ed-block-body.clamp{ max-height:62px; overflow:hidden; -webkit-mask-image:linear-gradient(var(--foreground) 58%, transparent); mask-image:linear-gradient(var(--foreground) 58%, transparent); }
-    .ed-block-more{ display:block; width:100%; padding:3px; border:none; border-top:2px solid var(--border); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+    .ed-block-more{ display:block; width:100%; padding:3px; border:none; border-top:2px solid var(--rule); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
     .ed-block-more:hover{ color:var(--foreground); }
     /* template variant — interactive/selectable; selecting makes it the active template the fill input drives */
     .ed-block--template{ cursor:pointer; }
@@ -651,7 +651,7 @@
     .plan-card.open .plan-chev{ transform:rotate(90deg); }
     .plan-title{ font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
     .plan-meta{ font-size:8.5px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; }
-    .plan-body{ display:none; padding:0 10px 10px; border-top:2px solid var(--border); }
+    .plan-body{ display:none; padding:0 10px 10px; border-top:2px solid var(--rule); }
     .plan-card.open .plan-body{ display:block; }
     .plan-desc{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin:9px 0 9px; }
     .plan-steps{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
@@ -661,7 +661,7 @@
     .plan-steps li.done svg{ color:var(--success); }
     .plan-steps li.doing svg{ color:var(--warning); }
     .plan-steps li .step-dot{ width:11px; height:11px; flex:0 0 auto; margin-top:1px; border:2px solid var(--muted-2); border-radius:50%; }
-    .plan-foot{ display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:9px; border-top:2px solid var(--border); }
+    .plan-foot{ display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:9px; border-top:2px solid var(--rule); }
     /* doc viewer (README / CLAUDE / TODO) */
     .doc-toolbar{ display:flex; align-items:center; gap:7px; margin-bottom:8px; flex:0 0 auto; }
     .doc-path{ font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; color:var(--muted); padding:3px 8px;
@@ -674,7 +674,7 @@
     .doc-view ul{ margin:0 0 9px; padding-left:17px; } .doc-view li{ margin:2px 0; opacity:.94; }
     .doc-view code{ font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 4px; }
     .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
-    .doc-view .doc-hr{ border:none; border-top:2px solid var(--border); margin:12px 0; }
+    .doc-view .doc-hr{ border:none; border-top:2px solid var(--rule); margin:12px 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.55; }
 
     /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
@@ -726,7 +726,7 @@
     .doc-header .dh-dates{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
     .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
     /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach) */
-    .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--border); }
+    .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--rule); }
     .doc-foot-l{ display:flex; align-items:center; gap:7px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
     .docnav-row{ position:relative; }
@@ -808,7 +808,7 @@
     .md-row:hover{ background:var(--surface-3); }
     .md-row.md-target{ background:var(--select); }
     .md-num{ flex:0 0 auto; width:34px; padding:0 8px 0 0; text-align:right; color:var(--muted-2); font-size:9.5px;
-      user-select:none; border-right:2px solid var(--border); background:var(--surface-3); }
+      user-select:none; border-right:2px solid var(--rule); background:var(--surface-3); }
     .md-line{ flex:1 1 auto; min-width:0; padding:0 9px; white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
     .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
     .md-h2{ font-weight:800; color:var(--ag-azure); }
@@ -865,7 +865,7 @@
     .fb-cmt{ font-size:10.5px; line-height:1.4; color:var(--foreground); opacity:.92; }
     .fb-empty{ font-size:10px; font-weight:700; color:var(--muted-2); padding:10px 4px; text-align:center; }
 
-    .plan-review-bar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:2px solid var(--border); flex-wrap:wrap; }
+    .plan-review-bar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:2px solid var(--rule); flex-wrap:wrap; }
     .prb-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
     .prb-sent{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--success); display:none; }
 
@@ -887,7 +887,7 @@
        of collapsing left next to the badge. Applies to Messages / Scratch / Log / Inbox / History. */
     .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; margin-left:auto; }
     .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--border); }
+    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--rule); }
     .fcard.open .fcard-body{ display:block; }
     .fcard.open .fcard-prev{ display:none; }
     .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
@@ -990,7 +990,7 @@
     .plan-cmt-pop{ display:none; margin-top:8px; border:2px solid var(--border); border-radius:var(--radius-base);
       background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
     .plan-cmt-pop.open{ display:block; }
-    .cmt-pop-head{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-bottom:2px solid var(--border); background:var(--surface-3); }
+    .cmt-pop-head{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-bottom:2px solid var(--rule); background:var(--surface-3); }
     .cmt-pop-head .cph-ic{ flex:0 0 auto; } .cmt-pop-head .cph-ic svg{ width:14px; height:14px; }
     .cph-ic.v-approve{ color:var(--success); } .cph-ic.v-revise{ color:var(--warning); } .cph-ic.v-block{ color:var(--danger); }
     .cph-sec{ font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:var(--muted); background:var(--secondary-background);
@@ -999,7 +999,7 @@
     .cph-time{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; color:var(--muted); }
     .cmt-pop-body{ padding:9px 10px; display:flex; flex-direction:column; gap:9px; }
     .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); }
-    .cmt-pop-item + .cmt-pop-item{ border-top:2px solid var(--border); padding-top:9px; }
+    .cmt-pop-item + .cmt-pop-item{ border-top:2px solid var(--rule); padding-top:9px; }
     .cpi-h{ display:flex; align-items:center; gap:7px; margin-bottom:5px; }
     .cpi-none{ color:var(--muted-2); font-style:italic; }
 
@@ -1026,7 +1026,7 @@
     .doc-view-host .doc-ed > .md{ flex:1 1 auto; min-height:0; max-height:none; }
     /* v9p14 (A5): left-edge of every rail cell is color-coded by what a click selects — light teal = a line, dark teal = a whole section, pink = the title (selects the whole doc) */
     .md-rail{ flex:0 0 auto; width:60px; display:flex; align-items:center; justify-content:flex-end; gap:4px; padding:0 6px 0 4px;
-      border:none; border-left:3px solid var(--select); border-right:2px solid var(--border); background:var(--surface-3); color:var(--muted-2); cursor:pointer; font-family:'JetBrains Mono',monospace; }
+      border:none; border-left:3px solid var(--select); border-right:2px solid var(--rule); background:var(--surface-3); color:var(--muted-2); cursor:pointer; font-family:'JetBrains Mono',monospace; }
     .md-rail:hover{ background:var(--main-dim); color:var(--foreground); }
     .md-rail.is-sec{ border-left-color:var(--rail-section); }   /* dark teal = section select */
     .md-rail.is-title{ border-left-color:var(--main); }   /* pink = title → select all */
@@ -1222,7 +1222,7 @@
     .cmd-group + .cmd-group{ margin-top:3px; }
     .cmd-group-h{ position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px; padding:8px 4px 5px;
       font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted-2); background:var(--secondary-background); }
-    .cmd-group-h::after{ content:""; flex:1 1 auto; height:2px; border-radius:2px; background:var(--border); }
+    .cmd-group-h::after{ content:""; flex:1 1 auto; height:2px; border-radius:2px; background:var(--rule); }
     /* row: TWO lines — command (mono, bold) over its description (sans, muted) — so the eye tracks the mono command column and the helper text reads as clearly subordinate */
     .cmd-row{ display:block; width:100%; text-align:left; padding:5px 7px; border:none; border-radius:var(--radius-base);
       background:transparent; cursor:pointer; font-family:inherit; transition:background .1s; }
@@ -1297,7 +1297,7 @@
 
     /* generic key/value rows */
     .set-row{ display:flex; align-items:center; gap:12px; padding:9px 1px; }
-    .set-row + .set-row{ border-top:1px solid var(--border); }
+    .set-row + .set-row{ border-top:1px solid var(--rule); }
     .set-row .rk{ font-size:11px; font-weight:800; color:var(--foreground); min-width:150px; flex:0 0 auto; display:flex; align-items:center; gap:7px; }
     .set-row .rv{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:700; color:var(--foreground); font-family:'JetBrains Mono',monospace; word-break:break-word; }
     .set-row .rv.plain{ font-family:inherit; font-weight:600; }
@@ -1310,7 +1310,7 @@
     .lc-session{ background:var(--warning-soft); color:var(--warning-text); }
 
     /* usage limit bars (health-colored: success -> warning -> danger) */
-    .use-row{ padding:11px 1px; } .use-row + .use-row{ border-top:1px solid var(--border); }
+    .use-row{ padding:11px 1px; } .use-row + .use-row{ border-top:1px solid var(--rule); }
     .use-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:7px; }
     .use-nm{ font-size:11px; font-weight:800; color:var(--foreground); }
     .use-pct{ font-size:11px; font-weight:800; font-family:'JetBrains Mono',monospace; }
@@ -1388,28 +1388,21 @@
        so set it explicitly. Fixes the footer chips (reviewer / Embed-Attach / Link) rendering +4px and the
        reviewer-chip badge floating instead of hugging, so all footer actions match the mockup's 30px. */
     *{ box-sizing:border-box; }
-    /* flex-1 utility — the mockup gets this from Tailwind; this clone doesn't, so the `<span class="flex-1">`
-       spacers collapse to zero width. Define it so the Editor-heading ghost buttons (Copy·Edit·Comment)
-       right-align to the editor panel, and the plan-head rows (status badge / steps / dates) push right, all per the mockup. */
-    .flex-1{ flex:1 1 0%; }
     /* remove the coloured rail strips (pink title / dark-teal section / light-teal line) — rail is a plain tan box now */
     .md-rail{ border-left:none; }
     /* rail-based selection = light teal (--select), not pink; rail cell + content the same teal, no seam */
     .md-row.rsel,.md-row.rsel-sec{ background:var(--select); }
-    .md-row.rsel .md-rail,.md-row.rsel-sec .md-rail{ background:var(--select); border-right-color:var(--select); color:var(--foreground); }
+    .md-row.rsel .md-rail,.md-row.rsel-sec .md-rail{ background:var(--select); color:var(--foreground); }
     /* hover preview = canvas cream on the row AND its rail cell (no pink) */
     .md-rail:hover{ background:var(--background); color:var(--foreground); }
     .md-row.hl .md-rail{ background:var(--background); }
     /* feedback/badge highlight (click a Feedback card → its section) = DARK TEAL (--rail-section): the one place dark teal lives now.
        White ink for legibility on the saturated fill. */
     .md-row.fbhl,.md-row.fbhl-sec{ background:var(--rail-section); }
-    .md-row.fbhl .md-rail,.md-row.fbhl-sec .md-rail{ background:var(--rail-section); border-right-color:var(--rail-section); color:var(--icon-fg); }
+    .md-row.fbhl .md-rail,.md-row.fbhl-sec .md-rail{ background:var(--rail-section); color:var(--icon-fg); }
     .md-row.fbhl .md-line,.md-row.fbhl-sec .md-line{ color:var(--icon-fg); }
     /* enlarge the title row so its whole-doc select-all rail box is bigger (parity with the Messages title box) */
     .md-line.md-h1{ padding-top:5px; padding-bottom:5px; }
-    /* the Link (Embed/Attach) chip now rides in the right action group, widening it; let that group wrap (stay right)
-       so Approve never clips at the narrow extreme. No effect at normal widths. */
-    .plan-foot-right{ flex-wrap:wrap; justify-content:flex-end; row-gap:7px; }
   </style>
 </head>
 <body>
@@ -1670,8 +1663,8 @@ rotation, covered by a regression test, before merging to main.`,
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
     else right='<button class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
     return '<div class="plan-foot">'
-      +reviewChipHTML(p.id)   /* SNIPPET FIX: reviewer chip is the ONLY left-aligned action */
-      +'<div class="plan-foot-right">'+embedAttachHTML(p.id)+right+'</div></div>';}   /* SNIPPET FIX: Link (Embed/Attach) chip moved right, leading Revise */
+      +embedAttachHTML(p.id)+reviewChipHTML(p.id)
+      +'<div class="plan-foot-right">'+right+'</div></div>';}
   function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);
     const done=p.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
     const stepN=p.md.split('\n').filter(l=>/^\s*-\s*\[( |x|X)\]/.test(l)).length;

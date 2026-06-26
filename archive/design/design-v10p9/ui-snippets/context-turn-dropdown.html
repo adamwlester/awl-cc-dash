@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context turn-scope select — rough design exploration</title>
+
+<!--
+  AWL Dashboard · UI snippet — Context breakdown "scope" select (ROUGH)
+  ====================================================================
+  A throwaway sketch of the Inbox idea: let the Context breakdown be
+  scoped by turn. The model text in the breakdown header (.bd-model,
+  "claude-opus-4-8") is replaced by a NATIVE <select> — All (default)
+  then Turn n … Turn 1 in descending order — and the trailing ratio
+  (.bd-tot, "399.1k / 1.0M · 40%") is ENLARGED so the two feel natural
+  inline with each other. Native <select> on purpose: no custom popover
+  component, so scrolling / keyboard / a11y for a long turn list come
+  for free; only the open option list is OS-rendered.
+
+  SCOPE OF THIS ROUGH CUT (per the human): just the UPPER part of the
+  dropdown — the header row + the colour-coded bar. The category list
+  and sub-sections below are intentionally omitted. A few turn options
+  only. Demo data. To be OVERWRITTEN with the proper version once we
+  settle the design.
+
+  Values from ../tokens.css (single source); component CSS copied
+  verbatim from the mockup's Context breakdown family, with the two
+  deltas isolated in a trailing "SNIPPET CHANGES" block.
+-->
+
+<link rel="stylesheet" href="../tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; font-family:'Archivo',sans-serif; font-weight:500;
+    color:var(--foreground); background:var(--background); padding:28px 20px 60px; }
+
+  .caption{ width:100%; max-width:560px; margin:0 auto 22px; text-align:center; }
+  .caption h1{ font-family:'Archivo'; font-weight:900; font-size:17px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .caption p{ font-size:12px; line-height:1.5; color:var(--muted); margin:0; }
+  .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+
+  /* faux Agent-panel column */
+  .panel{ width:100%; max-width:360px; margin:0 auto; background:var(--secondary-background);
+    border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:13px; }
+
+  /* ===== copied verbatim from mockup.html (Context breakdown family) ===== */
+  .ro-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .ro-label{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+  .ml-auto{ margin-left:auto; } .ml-2{ margin-left:8px; }
+  .link-act{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:4px; }
+  .link-act:hover{ color:var(--link-hover); }
+  .ratio{ font-size:10px; font-weight:700; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+
+  .ctx-trigger{ width:100%; text-align:left; background:var(--secondary-background); border:2px solid var(--border);
+    border-radius:var(--radius-base); padding:8px 9px; cursor:pointer; }
+  .ctx-trigger.open{ border-radius:var(--radius-base) var(--radius-base) 0 0; border-bottom:none; }
+  .summary-row{ display:flex; align-items:center; gap:9px; }
+  .ctxbar{ position:relative; flex:1; height:9px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); }
+  .ctxbar > i{ display:block; height:100%; }
+  .ctx-pct{ font-size:10px; font-weight:700; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+  .chev{ width:13px; height:13px; color:var(--muted); }
+  .chev.up{ transform:rotate(180deg); }
+  .bar-cut{ position:absolute; top:0; right:0; bottom:0; pointer-events:none; z-index:2;
+    border-left:2px solid var(--muted-2); background:rgba(91,95,134,0.30); }
+
+  .acc{ display:none; border:2px solid var(--border); border-top:none; border-radius:0 0 var(--radius-base) var(--radius-base); background:var(--secondary-background); }
+  .acc.open{ display:block; }
+  .bd{ padding:10px; }
+  .bd-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .bd-model{ font-size:11px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--foreground); }
+  .bd-tot{ font-size:10px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+  .bd-bar{ position:relative; display:flex; height:11px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); margin-bottom:10px; }
+  .bd-bar > i{ display:block; height:100%; }
+
+  /* ===================== SNIPPET CHANGES ===================== */
+  /* (1) header switches to center alignment — a <select> won't baseline-align cleanly */
+  .bd-head{ align-items:center; }
+
+  /* (2) trailing ratio enlarged → it becomes the focal data of the row */
+  .bd-tot{ font-size:13px; font-weight:800; color:var(--foreground); }
+
+  /* (3) the scope select replaces .bd-model — native control, flattened + compact
+         so it reads as a quiet label beside the bold ratio, not a clunky form field */
+  .bd-scope{
+    appearance:none; -webkit-appearance:none;
+    font-family:'Archivo',sans-serif; font-weight:800; font-size:12px; line-height:1.1;
+    color:var(--muted); background:transparent;
+    border:none; padding:0 16px 0 0; margin:0; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b5f86' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right center; background-size:11px;
+  }
+  .bd-scope:hover{ color:var(--foreground); }
+  .bd-scope:focus-visible{ outline:2px solid var(--main); outline-offset:2px; border-radius:2px; }
+  /* =========================================================== */
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    <h1>Context breakdown — turn-scope select (rough)</h1>
+    <p>The <code>.bd-model</code> text becomes a native <code>&lt;select&gt;</code> — <code>All</code> then <code>Turn n…1</code> — and the trailing ratio is enlarged so they sit naturally inline. Only the header + colour bar are shown (upper part of the dropdown). Change the select to see the trailing text update.</p>
+  </div>
+
+  <div class="panel">
+    <!-- CONTEXT head (label · Compact · ratio) -->
+    <div class="ro-head">
+      <span class="ro-label">Context</span>
+      <button class="link-act ml-auto">Compact</button>
+      <span class="ratio ml-2">399.1k / 1.0M</span>
+    </div>
+
+    <!-- summary trigger (open) -->
+    <button class="ctx-trigger open" type="button">
+      <div class="summary-row">
+        <div class="ctxbar" id="sum-bar"></div>
+        <span class="ctx-pct">40%</span>
+        <svg class="chev up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+
+    <!-- breakdown panel — UPPER PART ONLY (header + bar) -->
+    <div class="acc open">
+      <div class="bd">
+        <div class="bd-head">
+          <select class="bd-scope" id="scope" aria-label="Context scope"></select>
+          <span class="bd-tot" id="bd-tot">399.1k / 1.0M · 40%</span>
+        </div>
+        <div class="bd-bar" id="bd-bar"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // health colour ramp (from mockup ctxColor)
+  const ctxColor = p => p < 50 ? 'var(--success)' : (p <= 75 ? 'var(--warning)' : 'var(--danger)');
+  const CUTOFF = 80;
+  const cut = on => on ? '<span class="bar-cut" style="left:'+CUTOFF+'%"></span>' : '';
+
+  // ---- ALL: whole-window snapshot (from mockup CTX) ----
+  const ALL = {
+    tot:'399.1k / 1.0M · 40%', pct:40,
+    cats:[
+      {pc:0.2,  c:'var(--ag-azure)'},   // System prompt
+      {pc:0.5,  c:'var(--ag-cyan)'},    // System tools
+      {pc:2.8,  c:'var(--ag-fern)'},    // MCP tools
+      {pc:0.2,  c:'var(--warning)'},    // Custom agents
+      {pc:1.1,  c:'var(--ag-violet)'},  // Memory files
+      {pc:35.2, c:'var(--main)'},       // Messages
+      {pc:60.0, c:'var(--rule)'},       // Free space
+    ],
+  };
+
+  // ---- a few turn options (descending). Per-turn = what that turn ADDED,
+  //      shown as that turn's internal composition (demo only). ----
+  const TURNS = [34, 33, 32, 31, 30, 29, 28];
+  const turnInfo = n => {
+    const added = (6 + (n % 7) * 2.4).toFixed(1);        // demo "+Xk"
+    return {
+      tot:'Turn ' + n + ' · +' + added + 'k',
+      comp:[
+        {pc:60 + (n % 3) * 5, c:'var(--ag-azure)'},      // Tool results
+        {pc:26 - (n % 3) * 4, c:'var(--main)'},          // Assistant reply
+        {pc:14 - (n % 3) * 1, c:'var(--ag-fern)'},       // Your prompt
+      ],
+    };
+  };
+
+  const barHTML = (cats, showCut) =>
+    cats.map(c => '<i style="width:' + c.pc + '%;background:' + c.c + '"></i>').join('') + cut(showCut);
+
+  // summary bar (collapsed-trigger view) — always the whole-window %
+  document.getElementById('sum-bar').innerHTML =
+    '<i style="width:' + ALL.pct + '%;background:' + ctxColor(ALL.pct) + '"></i>' + cut(true);
+
+  // populate the scope select: All + Turn n…1
+  const sel = document.getElementById('scope');
+  sel.insertAdjacentHTML('beforeend', '<option value="all">All</option>');
+  TURNS.forEach(n => sel.insertAdjacentHTML('beforeend', '<option value="' + n + '">Turn ' + n + '</option>'));
+
+  const bdTot = document.getElementById('bd-tot');
+  const bdBar = document.getElementById('bd-bar');
+
+  function render(v){
+    if (v === 'all'){
+      bdTot.textContent = ALL.tot;
+      bdBar.innerHTML = barHTML(ALL.cats, true);     // window cutoff applies
+    } else {
+      const t = turnInfo(+v);
+      bdTot.textContent = t.tot;
+      bdBar.innerHTML = barHTML(t.comp, false);      // a turn's internal mix — no window cutoff
+    }
+  }
+  sel.addEventListener('change', e => render(e.target.value));
+  render('all');
+</script>
+</body>
+</html>

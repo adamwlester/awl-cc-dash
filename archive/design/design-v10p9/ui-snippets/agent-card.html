@@ -14,27 +14,24 @@
   mirrors the mockup's .node family. Lucide for icons.
 
   LAYOUT (top → bottom), single column, fixed SQUARE:
-   • TOP META STRIP (.hd-meta) — the AGE stamp (created datetime + auto-scaling
-     duration), small + LEFT-aligned, paired with the STATUS badge (.nbadge)
-     in-flow at the RIGHT end (no longer corner-pinned/overhanging).
-   • IDENTITY ROW (.hd-top) — tile + role + name on the left; MODEL (+ opus-only
+   • HEADER — identity (tile + role + name) on the left; MODEL (+ opus-only
      FAST bolt) on the right, RIGHT-justified and BOTTOM-aligned to the name.
-   • full-bleed DIVIDER (.div — edge-to-edge, border colour) closes the header
-   • SETTINGS (.settings) — three inline icon chips (mode · effort · think),
-     spread full width.
-   • LOAD bars (.bars) — Ctx + Turns, shared row template (label · bar · value).
-   • ACTIVITY BAND (.band) — pinned to the BOTTOM, directly above the subagents;
-     order RUN strip → DIVIDER → MARQUEE:
-       – RUN strip (.run-strip) — textless run/progress bar (single colour,
-         opposite polarity to the load bars → no danger ramp; keys off status:
-         active green · pending warm · idle muted/empty; barber-pole
-         INDETERMINATE when % unknown).
-       – MARQUEE (.feed) — a neobrutalism two-track (marquee/marquee2) loop
-         streaming the agent's current activity as one scrolling line, full-bleed;
-         idle cards show it static + muted (no scroll).
-   • SUBAGENTS (.subs) — square NEUTRAL CLICKABLE badges, BOLD agent-colour
-     numerals. No header label. Section is RESERVED at a fixed size even when
-     empty so every card keeps the same height → uniform squares.
+     The AGE stamp (created datetime + auto-scaling duration) is the last line
+     of the header, right before the divider.
+   • full-bleed DIVIDER (edge-to-edge, border colour)
+   • LIVE FEED — a neobrutalism MARQUEE (two-track marquee/marquee2 loop)
+     streaming the agent's current activity as one scrolling line. Idle cards
+     show it static + muted (no scroll).
+   • RUN bar — the run/progress status bar (single colour, opposite polarity
+     to the load bars → no danger ramp; keys off status: active green ·
+     pending warm · idle muted/empty; barber-pole INDETERMINATE when % unknown)
+   • SETTINGS — three inline icon chips (mode · effort · think)
+   • LOAD bars — Ctx + Turns. All THREE bars (Run/Ctx/Turns) share one row
+     template so their widths are identical and full.
+   • full-bleed DIVIDER
+   • SUBAGENTS — square NEUTRAL CLICKABLE badges, BOLD agent-colour numerals.
+     No header label. Section is RESERVED at a fixed size even when empty so
+     every card keeps the same height → uniform squares.
 
   CARDS (one state each)
    A researcher/sandy · opus · FAST ON  · ACTIVE  · determinate run · 3 subs
