@@ -447,6 +447,14 @@
     .rz-handle:hover::before{ background:var(--secondary); }
     .rz-grip{ display:none; }   /* v9p14: adjust-handle nub removed */
 
+    /* #15: panel-size readout that follows the cursor while a splitter is dragged — shows both adjacent
+       panels' sizes in px (left/top first, then right/bottom). Hidden unless .show; positioned via JS. */
+    #rz-readout{ position:fixed; z-index:9998; pointer-events:none; display:none;
+      background:var(--foreground); color:#fff; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
+      padding:4px 7px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:800; white-space:nowrap; }
+    #rz-readout.show{ display:block; }
+    #rz-readout .rz-ro-sep{ color:var(--secondary); margin:0 4px; }   /* teal separator between the two panel sizes */
+
     /* ============================ panel internals ============================ */
     .pcard-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0;
       height:36px; min-height:36px; padding:0 10px; background:var(--surface-3); border-bottom:2px solid var(--border); }
@@ -750,7 +758,7 @@
     .opt-nm{ display:block; font-size:11px; font-weight:800; color:var(--foreground); }
     .opt-desc{ display:block; font-size:9.5px; color:var(--muted); line-height:1.3; margin-top:1px; }
     .opt.on .opt-desc{ color:var(--main-foreground); opacity:.75; }
-    .req-badge{ min-width:18px; height:16px; padding:0 5px; border:2px solid var(--border); border-radius:3px; display:inline-flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:900; background:var(--main); color:var(--main-foreground); }   /* v9p14: rounded square */
+    .req-badge{ min-width:18px; height:16px; padding:0 5px; border:2px solid var(--border); border-radius:3px; display:inline-flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:900; background:var(--secondary); color:var(--secondary-foreground); }   /* v9p14: rounded square · #17: teal (was --main pink) — matches the Compose Response .fmt-badge count badge */
 
     /* ============================ mini toggles (feed direction / include) ============================ */
     .minibar{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:7px 2px 9px; }
@@ -2379,9 +2387,8 @@ project CLAUDE.md. Global defaults that travel with you.
             <div><label class="lbl mb-1.5">Payload</label><div class="seg"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
             <div>
               <label class="lbl mb-1.5">End After <span class="text-muted-2 font-semibold normal-case">— no limit unless set</span></label>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-2 gap-2">
                 <div><button class="lim-tog" onclick="toggleLimit(this)">Turns</button><input type="text" class="lim-in" placeholder="50" disabled></div>
-                <div><button class="lim-tog" onclick="toggleLimit(this)">Time</button><input type="text" class="lim-in" placeholder="30m" disabled></div>
                 <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
               </div>
             </div>
@@ -2589,7 +2596,8 @@ project CLAUDE.md. Global defaults that travel with you.
                      pills that target the fill input. -->
                 <div id="prompt-compose" data-group="prompt" class="flex-1 flex flex-col min-h-0">
                   <!-- P3 (#109): horizontal attachment-chip strip ABOVE the editor — chips styled like the Library nav cards, removable, click-to-open in the Library. Hidden when empty. -->
-                  <div id="attach-strip" class="attach-strip shrink-0" style="display:none"></div>
+                  <!-- #16: "Attachments" section heading (.sec-h, styled like the sibling "Templates"/"Editor" Compose labels) sits above the strip; the whole section hides when empty. -->
+                  <div id="attach-section" class="shrink-0" style="display:none"><div class="sec-h">Attachments</div><div id="attach-strip" class="attach-strip"></div></div>
                   <!-- P3 (#118): the compose box is the "Editor" (renamed from "Compose") -->
                   <div class="flex items-center gap-1.5 mb-1.5"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Editor</span><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
                   <div id="compose-field" class="in compose-rich flex-1 min-h-[90px] text-[12px] leading-relaxed" contenteditable="true">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</div>
@@ -2677,6 +2685,9 @@ project CLAUDE.md. Global defaults that travel with you.
       <span class="text-[10px] font-mono font-semibold text-muted">02:14:08</span>
     </div>
   </footer>
+
+  <!-- #15: cursor-following readout of the two adjacent panels' px sizes while a layout splitter is dragged (hidden otherwise) -->
+  <div id="rz-readout" aria-hidden="true"></div>
 
   <!-- ===================== SETTINGS — step-into full-window view (v9p4) ===================== -->
   <div class="settings-view" id="settings-view" aria-hidden="true">
@@ -3187,8 +3198,9 @@ project CLAUDE.md. Global defaults that travel with you.
   ];
   function attIcon(t){return t==='asset'?'image':(t==='temp'?'file-clock':'file-text');}
   function renderAttachStrip(){const el=document.getElementById('attach-strip');if(!el)return;
-    if(!ATTACH.length){el.style.display='none';el.innerHTML='';return;}
-    el.style.display='';
+    const sec=document.getElementById('attach-section');   /* #16: toggle the heading+strip section together so the "Attachments" label hides when empty */
+    if(!ATTACH.length){if(sec)sec.style.display='none';el.innerHTML='';return;}
+    if(sec)sec.style.display='';
     el.innerHTML=ATTACH.map((at,i)=>
       '<span class="att-card" data-ai="'+i+'" data-att="'+esc(at.id)+'" title="'+esc(at.path)+'"><i data-lucide="'+attIcon(at.type)+'" class="att-card-ic"></i>'
         +'<span class="att-card-nm" onclick="openAttachmentCard(event,'+i+')">'+esc(at.name)+'</span>'
@@ -3538,8 +3550,21 @@ project CLAUDE.md. Global defaults that travel with you.
     const horiz=h.dataset.orient==='h',prev=h.previousElementSibling,next=h.nextElementSibling;if(!prev||!next)return;
     const s=horiz?e.clientX:e.clientY,pS=horiz?prev.offsetWidth:prev.offsetHeight,nS=horiz?next.offsetWidth:next.offsetHeight;
     document.body.style.cursor=horiz?'col-resize':'row-resize';document.body.style.userSelect='none';
-    const mv=e2=>{const d=(horiz?e2.clientX:e2.clientY)-s;const p=Math.max(150,pS+d),n=Math.max(150,nS-d);prev.style.flex=p+' 1 0';next.style.flex=n+' 1 0';drawEdges();};   /* v9p6 fix: flex-GROW proportions (basis 0, shrink 1) keep panels responsive after a drag — was '0 0 Npx' (fixed, no shrink), which made a dragged Team Graph refuse to shrink on later window resize and shoved the Prompts footer off-screen */
-    const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.body.style.cursor='';document.body.style.userSelect='';autosizeAll();drawEdgesSoon();};
+    const ro=document.getElementById('rz-readout');   /* #15: cursor-following panel-size readout (px), shown only while dragging */
+    const showReadout=e2=>{if(!ro)return;
+      /* read the ACTUAL rendered sizes after the flex is applied (flex-grow means the clamped basis ≠ on-screen px) */
+      const pPx=horiz?prev.offsetWidth:prev.offsetHeight,nPx=horiz?next.offsetWidth:next.offsetHeight;
+      ro.innerHTML=Math.round(pPx)+'px<span class="rz-ro-sep">'+(horiz?'│':'─')+'</span>'+Math.round(nPx)+'px';   /* left/top panel first, then right/bottom */
+      ro.classList.add('show');
+      /* follow the cursor with a small offset, clamped to stay on-screen */
+      const ow=ro.offsetWidth,oh=ro.offsetHeight,pad=6;
+      let x=e2.clientX+14,y=e2.clientY+16;
+      if(x+ow+pad>window.innerWidth)x=e2.clientX-ow-14;
+      if(y+oh+pad>window.innerHeight)y=e2.clientY-oh-16;
+      ro.style.left=Math.max(pad,x)+'px';ro.style.top=Math.max(pad,y)+'px';};
+    const mv=e2=>{const d=(horiz?e2.clientX:e2.clientY)-s;const p=Math.max(150,pS+d),n=Math.max(150,nS-d);prev.style.flex=p+' 1 0';next.style.flex=n+' 1 0';drawEdges();showReadout(e2);};   /* v9p6 fix: flex-GROW proportions (basis 0, shrink 1) keep panels responsive after a drag — was '0 0 Npx' (fixed, no shrink), which made a dragged Team Graph refuse to shrink on later window resize and shoved the Prompts footer off-screen */
+    showReadout(e);   /* #15: show immediately on mousedown so the readout appears before the first move */
+    const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.body.style.cursor='';document.body.style.userSelect='';if(ro)ro.classList.remove('show');autosizeAll();drawEdgesSoon();};
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});});}
 
   /* ===== v8p6: per-agent thinking toggle (inline with Mode) ===== */
