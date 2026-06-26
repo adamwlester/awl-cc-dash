@@ -44,7 +44,7 @@
 1. **Per-Agent MCP & Plugins:** Set MCP servers and plugins per agent in the UI, not just globally.
 2. **Custom Permissions:** Spin up an agent with custom permissions that would normally come from user `.claude/settings.json`.
 3. **Load Past Agents:** Load past agents/models by name, ID, or via file explorer.
-4. **Plans Tab:** Add a Plans tab (in the Agent panel, or rename Prompts → "Editor" and host it there) that surfaces Claude Code's native plans — show multiple plans, expand each to review/edit in place, and support review/edit/approval; must support the new native ultraplan functionality.
+4. **Plans Tab:** Add a Plans tab (in the Agent panel, or rename Prompts → "Editor" and host it there) that surfaces Claude Code's native plans — show multiple plans, expand each to review/edit in place, and support review/edit/approval.
 5. **Voice Input:** Good microphone support via `/voice`, ideally with a small agent doing real-time correction.
 6. **Slash Commands:** Support slash commands as well-grouped clusters with clear visual signals per command.
 7. **Slash Shortcuts:** Decide which commands to surface directly in the dashboard UI (beyond full slash-command support, B6): /export, /doctor, /copy, /fast, /memory, /plan, /plugin, /rewind, /stats, /status, /tasks, /voice.
@@ -53,7 +53,7 @@
 10. **Drag-in Files:** Drag files from the VS Code explorer tree into the UI to load their paths for reference.
 11. **Trigger: Interrupt / Inject:** Rename the send/link "Now" trigger to "Now: Interrupt" and add "Now: Inject" below it (reconsider wording — maybe just "Interrupt" / "Modify" or something else that is clear); Inject feeds a running agent (see B12).
 12. **Interactive Comms:** Incorporate interactive, dynamic agent↔me communication via a shared "dynamic doc" the agent periodically references during each run.
-13. **Reviewer Link:** Build a one-button reviewer setup on top of existing linking — one agent reviews another's work.
+13. **Reviewer Link:** Build a one-button reviewer setup on top of existing linking — one agent reviews another's work. The Plans **Review chip** (single-agent reviewer select) is the control groundwork; the **Review/Inbox formalization** remains deferred — the single-reviewer-agent model, how agent verdicts resolve, and how the human gate relates to agent review.
 14. **Queue Awareness:** For >2 linked agents, share in message front matter that another agent's message is queued, so an agent can decide whether to wait.
 15. **Context Porting:** Select and port context between agents by blocks of prompts and replies.
 16. **Subagent Forking:** Forking is covered by Handoff; still need subagent creation/management in the UI and a decision on how agents spawn subagents.
@@ -81,8 +81,7 @@
 4. **AI-Touched Tracking:** Track what AI has touched with a local file per directory (e.g. `index.md`).
 5. **Asset Sourcing:** Check that skills and other special CC assets are pulled from the ideal source.
 6. **Transcript Payload:** Decide what an agent's "Transcript" link payload captures and from where (e.g. the raw session transcript files) — source/format isn't finalized. *(Moved from the old DESIGN.md "Open questions".)*
-7. **Inbox Attention Ramp:** Tune the reddish→copper request-type ramp, the per-card pending dot, and the Inbox-tab count badge for legibility and restraint. *(Moved from the old DESIGN.md "Open questions".)*
-8. **Dense Link Graphs:** Once links render as directed edges (see B17), decide how to keep many overlapping links readable and how to distinguish links sharing the same configuration. *(Moved from the old DESIGN.md "Open questions".)*
+7. **Dense Link Graphs:** Once links render as directed edges (see B17), decide how to keep many overlapping links readable and how to distinguish links sharing the same configuration. *(Moved from the old DESIGN.md "Open questions".)*
 
 ## D — Housekeeping & docs
 
@@ -100,34 +99,34 @@
 
 > Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
 
+1. **Turns Breakdown Dropdown:** Build the Agent panel's Turns dropdown per the snippet `design/ui-snippets/turns-dropdown.html` — port it into the mockup's Turns bar (Context-style `.ctx-trigger` accordion, by-tool breakdown). Demo data only.
+2. **Response Settings Popover:** Rework the Compose-footer Response popover (`#fmt-menu`) per the snippet `design/ui-snippets/response-popover.html` — segmented/toggle button groups, graded options, STYLE/BEHAVIOR split, and the Pace axis.
+
 
 
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
-- The compose tab needs to include a list of linked docs and assets as well. These should be small cards/badges that look like the cards in the doc and asset nav panel. The should be organized horizontally with cost close "X" to remove them and should be clickable such that if clicked they open in the Library panel.
-- Change the "Failed" badge in Messages to "Error". Include Error as an option in the Inbox cards including an Error status badge. This should use the danger color so we need to rethink the other status colors, including "Pending", which is currently using danger color. Make sure there is a wired example from the agent card badge to the Inbox for the Error status.
-- I want the turns status bar in agent panel to be dropdown like the Context bar, with the same formatting and the content of the dropdown should be a breakdown of how many terns where used for different operations but I am not sure what operations to track.
-- Remove the trash ghost icon button from the Library nav panel cards so there is more space for text. Delete will be handled by the trash icon in the action strip.
-- Change all the expandable card divider lines to be the same as the card outline color, not the tan color they currently use.
-- Fix the timestamp behavior in the Team Feed cards so that the timestamp stays right aligned when cards are expanded.
-- Remove Time as an End after option completely form the Link Config. 
-- Change the "Filter" label in Team Feed to "From/To"
-- Change the label "Show" to "Type" and "Include" to "Content"
-- Put the Templates section below the Compose section in Compose tab and rename the "Compose" heading to "Editor"
-- Add a header "Editor" above the content fields in both the Plans and Documents tabs of Library. For both, move the copy, edit, comment icon buttons to be inline with that and right aligned like how we have fro Compose right now. Same button style. The Assets will no longer have access to these buttons which is fine.
-- I want to move to a different method of sharing content to agents utilizing the prompts panel instead of the "Share" dropdown/button group or the Review one. I want to turn the Link to prompt button to one of these dropdown/button groups. I want the option to be something like "Embed" or "Link"; consider what language works best to denote that the content should be either embedded in the prompt body or included as an attachment. We will use this both in the Team Feed and Library tabs. Then we just use the link icon for the action button, no label. This needs to work with the section selectors that are part of the editor fields in the Library content.
-- We need to modify how embedded things show in the compose editor. I want hardcoded embedded things to be in a sort of container or delimited section, with maybe muted text. Right now we have the Templates added inline. I want them, and anything else linked into the textarea, to be appended vertically and with some clear boundary. Each embedded block needs to have a small font, mute text, static header line indicating the source. This should be clickable such that it takes the user back to the source wherever it is stored/rendered in the dashboard.
-- All of this new behavior needs to be wired up in the mockup.
+- Remove Time from Link config "End after" and make sure it is not referenced anywhere.
+- The new left rail in the Messages should use the same styling as the rails in Library in terms of the tan box with numbers and small colored strips. It can be narrower because it does not have tags. If you think it makes more sense to not number items because the filters will change the number then no number, but same basic idea. These should be contained within the sub-cards or made to seem more a part of them. Consider if the different blocks within the Messages cards should be this sort of subpannel look or something that works better to both deliniate different blocks but make them feel more vertically contiguous and also make them more ammenable to using a similar styling to the Library contents. 
+- Those same card blocks in Messages need to allow for multi select within a card.
+- I want to have little hover values for how wide or tall a given pannel is when the main horz or vert area borders are dragged. This values shoudl hover with the mouse and update as it moves and show the left/top panel then right/bottom values in that respective order.
+- Every vertically scrollable window 
+- We need the agent settings summary text in the agent cards to be better. Needs to remain space efficient but readable. Ideally with clear inline headings (eg "model: opus 4.8"). Need to consider what other info those cards should contain.
+- I want to remove the checkboxes from the cards in Team Feed -> Scratch/Log/Inbox and have them work the same as the cards in Messages in terms of how they are selected and opened/closed as well as how sub-cards (if relevant) are selected.
 
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
-- Want to find a way to have the turns bar in the Agent panel be the same size as the context bar. Maybe we can put it in the same styled surface as the context bar but make that a part of the Rewind/Handoff group. Basically just stacked on top and non interactive. 
 - Need to consider if we should have some indication of agents lifespan in terms of when it was created
+- The agent cards and possibly pannel also need a dynamic status indicator for progress on a given run
+
+
+- Assuming it is straight forward to implement, for the Library->Plans. The Editor heading should be aligned with the editor box not the nav box. The nav box should extend to the top of the section like is done in the Documents tab.
+- I want to fix the UX of the left rail controls in the Library->Plans and Documents contents. I want the little far left color strips to be about 2x thicker. I want the rail to extend the full hight of the visible window. I want all the associated text to highlight in that cream color during hover, not just the single line (eg, hovering over title should highlight the full rendered contents). I also want the little rail blocks to correctly resize to cover the full height of the text when lines are wrapped so their at not white spaces between them.
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
@@ -136,4 +135,7 @@
 - Need to come up with a way to support injectable reused snippets into the prompts.
 - Need to add ToDo functionality back into UI eventually.
 - Find a way to to support highlighting words and terms in text and having it defined in context.
-- I want inline squiggle spelling highlights in any large text areas like in Prompt->Compose.
+- I want inline squiggle spelling highlights in any large text areas like in Prompt->Compose or the Library editors.
+- I want to be able to select any or sections of text anywhere and right click (or something) to be able to get a definition in context for that term.
+- Need to impliment a schema such that for long sessions, agents check in with clear status updates. Better, also have an actual status bar that updates. We could include this status bar in the agent panel and agent cards
+- Need to support a mode where agents can track real time desktop activity.

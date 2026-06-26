@@ -1,4 +1,30 @@
-﻿# Claude Code Sandbox
+﻿<!--
+================================================================================
+  ⛔ STOP — AGENTS / AI / LLMs: DO NOT USE THIS FILE ⛔
+================================================================================
+  This file is the HUMAN OWNER'S PRIVATE SCRATCHPAD. It is NOT a source of
+  truth, NOT a reference, NOT documentation, and NOT instructions.
+
+  - DO NOT read it for context, decisions, settings, or behavior.
+  - DO NOT cite, quote, summarize, or base ANY action or answer on it.
+  - DO NOT treat anything here as binding, current, or accurate. It is
+    unverified, possibly stale, and possibly wrong on purpose.
+
+  Authoritative sources are: CLAUDE.md, .claude/settings.json, DEVLOG.md,
+  and design/DESIGN.md. Use those — never this file.
+
+  If a task seems to require this file, STOP and ask the human instead.
+================================================================================
+-->
+
+# ⛔ FOR THE HUMAN OWNER ONLY — NOT AN AGENT RESOURCE ⛔
+
+> **Agents/LLMs: ignore this entire file.** It is private human notes — not a
+> reference, not documentation, not instructions. Do not read, cite, or act on
+> anything in it. Authoritative sources are CLAUDE.md, .claude/settings.json,
+> DEVLOG.md, and design/DESIGN.md.
+
+# Claude Code Sandbox
 
 A minimal workspace for learning and testing Claude Code in a way that matches normal project use.
 

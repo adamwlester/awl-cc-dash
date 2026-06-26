@@ -47,7 +47,9 @@
   --warning:#d98a2b;   /* attention / pending */
   --danger:#d23b6a;    /* destructive (Retire, Reject, Stop, Bypass) */
 
-  /* Inbox / attention ramp — request types ranked by urgency (reddish → copper) */
+  /* Inbox request-type ramp (reddish → copper) — RETIRED in the P2 Inbox-sections refactor: the Inbox now
+     groups cards by typed section instead of colour-ranking a per-card badge. Tokens retained (not currently
+     referenced) for possible reuse; Error now owns --danger as the single Inbox alarm. */
   --req-permission:#d23b4a;
   --req-approval:#cf7a2c;
   --req-decision:#a9710f;
@@ -78,7 +80,7 @@
   /* doc rail: section-select indicator (dark teal) */
   --rail-section:#2f97a6;
 
-  /* Inbox request soft tints (paired with the --req-* text tokens above) */
+  /* Inbox request soft tints (paired with the --req-* text tokens above) — also retired with the ramp; retained, unused */
   --req-permission-soft:#f6dcd9;
   --req-approval-soft:var(--warning-soft);           /* same value as --warning-soft, named for the Inbox context */
   --req-decision-soft:#f0e6cd;

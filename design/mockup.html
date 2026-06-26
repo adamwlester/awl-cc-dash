@@ -5,6 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWL Multi-Agent Dashboard — v1.2 (neobrutalism)</title>
   <!--
+    LINK-BEHAVIOR & DASHBOARD REFACTOR (P0–P4) — content-sharing collapsed into one Embed/Attach control routed
+    through the Editor, plus an Inbox/Editor rebuild (version badge unchanged at v1.2; full per-phase log in DEVLOG.md).
+    This block is the current-state summary; the version blocks below are kept as history (older = older, see line ~203).
+      • P0 MODE TOGGLES: Ultraplan removed entirely; the Mode block is two labeled toggle-buttons —
+        "Opus Fast-Mode Off/On" (gated to Opus) · "Thinking Mode Off/On" — in both Details + Create.
+      • P1 FOUNDATIONS: the inserted-block primitive (blockHTML → embed | template | citation, card-outline boundary);
+        select-to-act generalized to Team Feed Messages (click card = pink whole + select-all, per-block rail = teal,
+        chevron separate so select ≠ expand); feed relabels Filter→From/To · Show→Type · Include→Content; dropdown
+        agent badges tightened to the 30px footer-button footprint with edge-to-edge tiles (no white strips).
+      • P2 INBOX: typed sections Permission · Plan · Decision · Error (the section header carries the type — no per-card
+        type badge); Approval→Plan (Review + Reply only); new Error type (Retry · Dismiss · Reply, danger edge + subtype);
+        the drew/ECONNREFUSED message reads Error + a wired Inbox card; Reply pre-fills the Editor with a frozen embed
+        reference block; Error owns the danger colour (status set reconciled).
+      • P3 EDITOR: "Compose" heading → "Editor"; vertical order attachment-strip → Editor → Templates; templates insert
+        as selectable/removable template BLOCKS the fill input drives; Library Plans + Documents gain an "Editor" header
+        (ghost Copy·Edit·Comment), Assets drops those buttons.
+      • P4 EMBED/ATTACH: one selection-gated Embed/Attach control (link icon, no label) on the Library footers + the Feed
+        strip — replaces the Share send-group + "Link to prompt". Section/block → Embed (frozen block into the Editor);
+        whole-doc/asset/card → Attach (strip chip; real path for files, /tmp/… for materialized feed content). Inline
+        citations (delete-cascade on attach removal); single-agent Review chip on Plans; the rail-badge comment popout is
+        section-anchored (all verdicts, each row its own verdict badge).
     v10p1 — TODO.md "A — Next up" batch (14 items 9–22; version badge unchanged at v1.2):
       • INFO GLYPH (#9): the panel-header hover-card glyph is now a no-chrome muted `info` mark beside the
         label (brightens on hover) — the old bordered circle broke the rounded-squares rule + mis-centered.
@@ -140,7 +161,7 @@
       • MESSAGES header: the sticky Sent/Received filter row sits on the cream canvas (--background),
         not a white/transparent surface, so cards scroll cleanly under it.
       • PLAN HEADER: rebuilt as two rows. Row 1 leads with the OWNER badge, then the state badge, the
-        title, and any Ultraplan tag (item 15). Row 2 is a meta strip: the plain-text filename (mono,
+        title. Row 2 is a meta strip: the plain-text filename (mono,
         muted — matches the "~/.claude/plans/" line, no chip), a prominent COUNTS strip (steps done +
         per-verdict Approve/Revise/Block tallies), and the created / edited dates (items 17, 19, 21).
       • NAV PANE: an outlined, fixed-width hug (no horizontal scroll). Outline lists the ## sections
@@ -225,7 +246,7 @@
       • DOCUMENTATION PANEL (A3): a new "Documentation" panel — the home for organizing all docs.
         Tabs: Plan · README.md · CLAUDE.md · TODO.md (plus a "+" add-doc affordance). Plan hosts the
         native-plan interface (backlog C4): a list of plans, each an expandable card with a step
-        checklist and Review/Edit/Approve · Reject actions, including an ultraplan entry. The three
+        checklist and Review/Edit/Approve · Reject actions. The three
         file tabs are a doc viewer — a path chip + Copy + an Edit toggle that swaps the rendered view
         for a mono textarea. Content is grounded to this workspace, kept representative like the rest
         of the mockup. New JS: switchTab('doc',…) reuse, docEdit(), togglePlan(), planAct().
@@ -501,7 +522,7 @@
   <style>
     /* ============================ agent identity tile (recolorable game-icon) ============================ */
     .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:transparent; }
+      border:2px solid var(--border); border-radius:var(--radius-base); background:currentColor; }   /* P1c: tile bg = agent colour so a non-square tile (badges) has no white strips above/below the icon's square */
     .agtile .ag-svg{ width:100%; height:100%; display:block; }
     .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
     .agtile--user{ background:var(--ag-user); }
@@ -768,6 +789,75 @@
     .compose-rich .ph-text{ font-size:inherit; }
     select.tpl-select{ cursor:pointer; height:32px; padding:0 9px; }
 
+    /* ============================ P1a — the inserted-block primitive (embed | template | citation) ============================ */
+    /* One block component the Editor holds inline, stacked vertically as delimited blocks. The boundary
+       uses the card-OUTLINE colour (--border), NOT the tan divider (--rule). Muted, small font, a static
+       "from <source>" header, a remove (×), and (for embeds) click-to-source + clamp/expand when long.
+       Consumed by P2 (Reply reference block), P3 (templates / editor body), P4 (embeds / citations). */
+    .ed-block{ margin:8px 0; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow:hidden; }
+    .ed-block:first-child{ margin-top:0; }
+    .ed-block-head{ display:flex; align-items:center; gap:6px; padding:3px 5px 3px 8px; background:var(--surface-3); border-bottom:2px solid var(--border); }
+    .ed-block-from{ font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .ed-block-from b{ font-weight:900; color:var(--foreground); }
+    .ed-block-from.clickable{ cursor:pointer; }
+    .ed-block-from.clickable:hover{ color:var(--link-hover); text-decoration:underline; }
+    .ed-block-kind{ flex:0 0 auto; font-size:7px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-2); }
+    .ed-block-x{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:3px; }
+    .ed-block-x:hover{ color:var(--danger); background:var(--danger-soft); }
+    .ed-block-x svg{ width:13px; height:13px; }
+    .ed-block-body{ padding:7px 9px; font-size:10px; line-height:1.5; color:var(--muted); background:var(--secondary-background); white-space:pre-wrap; word-break:break-word; }
+    .ed-block-body.clamp{ max-height:62px; overflow:hidden; -webkit-mask-image:linear-gradient(var(--foreground) 58%, transparent); mask-image:linear-gradient(var(--foreground) 58%, transparent); }
+    .ed-block-more{ display:block; width:100%; padding:3px; border:none; border-top:2px solid var(--rule); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+    .ed-block-more:hover{ color:var(--foreground); }
+    /* template variant — interactive/selectable; selecting makes it the active template the fill input drives */
+    .ed-block--template{ cursor:pointer; }
+    .ed-block--template.sel{ box-shadow:0 0 0 2px var(--secondary) inset; }
+    .ed-block--template.sel .ed-block-head{ background:var(--select); }
+    /* inline citation pill — points at an attachment chip (P4) */
+    .ed-cite{ display:inline-flex; align-items:center; gap:3px; padding:0 5px; margin:0 1px; height:16px; vertical-align:-2px; border:2px solid var(--secondary); border-radius:3px; background:var(--secondary-dim); color:var(--secondary-foreground); font-size:9px; font-weight:800; cursor:pointer; }
+    .ed-cite svg{ width:9px; height:9px; }
+    .ed-cite:hover{ background:var(--secondary); }
+
+    /* ============================ P3 — attachment-chip strip (above the Editor) ============================ */
+    .attach-strip{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .att-card{ display:inline-flex; align-items:center; gap:5px; max-width:172px; height:26px; padding:0 3px 0 7px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); box-shadow:var(--shadow-sm); }
+    .att-card-ic{ width:12px; height:12px; flex:0 0 auto; color:var(--muted); }
+    .att-card-nm{ flex:1 1 auto; min-width:0; font-size:9.5px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+    .att-card-nm:hover{ color:var(--link-hover); text-decoration:underline; }
+    .att-card-cite{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:3px; }
+    .att-card-cite:hover{ color:var(--secondary-foreground); background:var(--secondary-dim); }
+    .att-card-cite svg{ width:11px; height:11px; }
+    .att-card-x{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:3px; }
+    .att-card-x:hover{ color:var(--danger); background:var(--danger-soft); }
+    .att-card-x svg{ width:11px; height:11px; }
+    /* P3 (#119): the Library Plans/Documents "Editor" header — mirrors the Compose Editor header (label left,
+       ghost Copy·Edit·Comment right). Assets has no header (an image isn't text-editable). */
+    .lib-edit-head{ display:flex; align-items:center; gap:5px; margin-bottom:6px; }
+    .lib-edit-lab{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+
+    /* ============================ P4a — the Embed/Attach control (replaces Share + Link-to-prompt) ============================ */
+    /* Selection-gated: a section/line/block selection → Embed; a whole-doc/title selection or an Asset/whole
+       feed card(s) → Attach. Both modes stay visible (the inapplicable one greys); the action is a link icon. */
+    .ea-grp{ display:inline-flex; align-items:stretch; height:30px; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; box-shadow:var(--shadow-sm); }
+    .ea-mode{ display:inline-flex; align-items:center; padding:0 9px; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; background:var(--surface-btn); color:var(--muted); border:none; border-right:2px solid var(--border); cursor:pointer; }
+    .ea-mode.on{ background:var(--secondary); color:var(--secondary-foreground); }
+    .ea-mode:disabled{ opacity:.4; cursor:not-allowed; }
+    .ea-act{ display:inline-flex; align-items:center; justify-content:center; width:30px; background:var(--surface-btn); color:var(--foreground); border:none; cursor:pointer; }
+    .ea-act:hover:not(:disabled){ background:var(--secondary); color:var(--secondary-foreground); }
+    .ea-act:disabled{ opacity:.4; cursor:not-allowed; }
+    .ea-act svg{ width:14px; height:14px; }
+
+    /* ============================ P4c — the Review chip (single-agent reviewer select + icon-only send) ============================ */
+    .rev-chip{ display:inline-flex; align-items:stretch; height:30px; position:relative; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+    .rev-trig{ display:inline-flex; align-items:center; gap:4px; padding:0 4px 0 0; background:var(--secondary-background); border:none; border-right:2px solid var(--border); border-radius:var(--radius-base) 0 0 var(--radius-base); cursor:pointer; }
+    .rev-trig:hover{ background:var(--surface-3); }
+    .rev-chip .badge{ height:26px; border:none; box-shadow:none; }
+    .rev-trig .picker-cv{ width:13px; height:13px; flex:0 0 auto; color:var(--muted); }
+    .rev-act{ display:inline-flex; align-items:center; justify-content:center; width:30px; flex:0 0 auto; background:var(--secondary); color:var(--secondary-foreground); border:none; border-radius:0 var(--radius-base) var(--radius-base) 0; cursor:pointer; }
+    .rev-act:hover{ filter:brightness(.95); }
+    .rev-act svg{ width:14px; height:14px; }
+    .rev-pop{ left:0; right:auto; min-width:210px; }
+
     /* ============================ link drawer (Sheet) ============================ */
     /* v1.x #3 (rev): the Link Config drawer opens against the LEFT edge of the right pane (#pRight) — i.e.
        immediately to the RIGHT of the Team Graph panel it's launched from — so the whole Team Graph stays
@@ -795,17 +885,15 @@
       background:var(--secondary-background); color:var(--muted); cursor:pointer; box-shadow:var(--shadow-sm); white-space:nowrap;
       transition:transform .07s, box-shadow .07s, background .12s; }
     .think-tog:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .think-tog.on{ color:var(--foreground); }   /* v1.x #4 (rev): the shared .swh slider carries the on-state */
+    .think-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }   /* labeled toggle-button: the whole button fills teal when on */
     .think-tog svg{ width:12px; height:12px; }
-    /* v1.x #4 (rev): Mode toggles are SIMPLIFIED INLINE controls — icon + heading label + the shared
-       .swh slider switch, three evenly spaced across one row (grid-cols-3). No button box; the slider
-       reuses the exact Settings switch (.swh, teal-when-on, defined below) so the two stay in sync. */
-    .think-tog.tog-cell{ width:100%; min-width:0; justify-content:center; gap:5px; padding:0; height:auto; border:none; background:transparent; box-shadow:none; text-transform:none; letter-spacing:0; font-size:10px; color:var(--foreground); }
-    .think-tog.tog-cell:hover{ transform:none; box-shadow:none; }
+    /* Mode toggles are labeled toggle BUTTONS — icon + a label that reads its own Off/On state
+       ("Opus Fast-Mode Off/On" · "Thinking Mode Off/On"), two evenly spaced across one row
+       (grid-cols-2). The whole button fills teal when on (.think-tog.on). */
+    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:4px; padding:0 4px; min-width:0; }
     .think-tog.tog-cell .tt-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
     .think-tog.tog-cell svg{ flex:0 0 auto; }
-    .think-tog.tog-cell .swh{ flex:0 0 auto; }
-    /* v1.2: Ultraplan toggle is gated to Plan mode — dimmed + inert unless the Mode seg = Plan */
+    /* Opus Fast-Mode toggle is gated to the Opus model — dimmed + inert unless Model = Opus */
     .think-tog.gated{ opacity:.4; cursor:not-allowed; }
     .think-tog.gated:hover{ transform:none; box-shadow:var(--shadow-sm); background:var(--secondary-background); }
 
@@ -873,10 +961,10 @@
     .mic-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .mic-btn.rec{ background:var(--danger); color:#fff; }
     .mic-btn svg{ width:14px; height:14px; }
-    /* v10p1 #10: icon-only action button (mic-button style + hover tooltip via title) — used for the
-       Copy / Edit / Comment / Retry actions wherever they appear (Plans footer, Team Feed strip, History
-       strip, Documents/Assets footers). Labeled buttons (Summarize, Share, Review, Revise, Reject,
-       Approve, Stop, Link to prompt) keep their text. */
+    /* icon-only action button (cream mic-button style + hover tooltip via title) — used for Copy / Retry in
+       the Team Feed + History action strips, plus the danger Stop. (Plans/Documents Copy·Edit·Comment moved
+       to the Editor header in P3 and use the ghost icon style — see .ghost-ic / .lib-edit-head.) Labeled
+       buttons (Summarize, Revise, Reject, Approve) keep their text. */
     .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:0 0 auto; padding:0;
       border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);   /* v1.x #9: neutral-tier cream (unified with .btn low-emphasis); white stays for fillable inputs/selectors only */
       cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
@@ -890,16 +978,14 @@
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
     .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
     .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
-    .db-failed{ background:var(--danger-soft); color:var(--danger); }   /* v1.x #5: soft-red = the run failed (alongside Active / Complete) */
+    .db-error{ background:var(--danger-soft); color:var(--danger); }   /* P2: soft-red = the run errored (alongside Active / Complete) — Error owns the danger colour */
 
     /* ============================ v9p7 (A3) — Documentation panel (Plan + doc viewers) ============================ */
     /* plan-status badges (reuse the .dbadge shell) */
     .db-draft{ background:var(--surface-3); color:var(--muted); }
     .db-review{ background:var(--warning-soft); color:var(--warning-text); }     /* amber = awaiting review */
-    /* Inbox request-type badges — the reddish→copper attention ramp (tokens from tokens.css) */
-    .db-permission{ background:var(--req-permission-soft); color:var(--req-permission); display:inline-flex; align-items:center; gap:4px; }
-    .db-approval{ background:var(--req-approval-soft); color:var(--req-approval); display:inline-flex; align-items:center; gap:4px; }
-    .db-decision{ background:var(--req-decision-soft); color:var(--req-decision); display:inline-flex; align-items:center; gap:4px; }
+    /* (the old per-card Inbox request-type badges + their reddish→copper ramp were retired in P2 — the
+       Inbox now groups by typed section; the --req-* tokens stay in tokens.css but are no longer used here) */
     /* v10p1 #15: Inbox cards reuse the expandable .fcard shell — collapsed = identity + type badge +
        title; expanded reveals the request detail + action row. */
     .inbox-card .inbox-title{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -907,6 +993,19 @@
     .inbox-card .inbox-acts{ display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap; }
     .inbox-card .fcard-body{ padding-top:9px; }
     .inbox-card .dbadge{ flex:0 0 auto; }
+    /* P2: Inbox grouped into typed SECTIONS (Permission · Plan · Decision · Error) — the section header
+       carries the label, so cards drop the per-card type badge. Clean headers; danger is reserved for the
+       Error section/cards as the single alarm (supersedes the old reddish→copper attention ramp). */
+    #inbox-list{ gap:12px; }
+    .inbox-sec-head{ display:flex; align-items:center; gap:7px; padding:0 2px 6px; }
+    .inbox-sec-lab{ font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+    .inbox-sec-n{ font-size:8.5px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--muted-2); border:2px solid var(--rule); border-radius:3px; padding:0 5px; line-height:1.5; }
+    .inbox-sec-cards{ display:flex; flex-direction:column; gap:8px; }
+    .inbox-sec--error .inbox-sec-lab{ color:var(--danger); }
+    .inbox-sec--error .inbox-sec-n{ color:var(--danger); border-color:var(--danger); }
+    .inbox-card.inbox-card--error{ border-left:6px solid var(--danger); }   /* Error = the alarm; other types stay edge-free (2-class to beat .fcard's border shorthand) */
+    .inbox-subtype{ flex:0 0 auto; font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--danger); border:2px solid var(--danger); border-radius:3px; padding:0 5px; background:var(--danger-soft); }
+    .inbox-err{ white-space:pre-wrap; }
     /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
     .msg-blocks{ display:flex; flex-direction:column; gap:3px; margin-top:7px; }
     .msg-blk{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10px; line-height:1.5; padding:4px 7px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
@@ -940,7 +1039,6 @@
     .plan-card.open .plan-chev{ transform:rotate(90deg); }
     .plan-title{ font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
     .plan-meta{ font-size:8.5px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; }
-    .plan-ultra{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 6px; border-radius:3px; border:2px solid var(--border); background:var(--secondary); color:var(--secondary-foreground); flex:0 0 auto; }
     .plan-body{ display:none; padding:0 10px 10px; border-top:2px solid var(--rule); }
     .plan-card.open .plan-body{ display:block; }
     .plan-desc{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin:9px 0 9px; }
@@ -1015,7 +1113,7 @@
     .doc-header .dh-path{ font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .doc-header .dh-dates{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
     .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
-    /* shared footer — Copy · Edit · Comment (icon-only) + Link to prompt · Remove (danger, right) */
+    /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach) */
     .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--rule); }
     .doc-foot-l{ display:flex; align-items:center; gap:7px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
@@ -1071,13 +1169,13 @@
     .b-empty{ font-size:10px; font-weight:700; color:var(--muted-2); }
     /* identity badge (full-height stamped icon + two-line role over number·name — saves horizontal space) */
     /* v9p13: identity badge is a non-interactive LABEL → flat (no offset shadow); interactivity lives on its container (the dropdown trigger field + chevron, or the clickable card) */
-    .badge{ display:inline-flex; align-items:center; flex:0 0 auto; height:32px; border:2px solid var(--border); border-radius:var(--radius-base);
-      background:var(--secondary-background); box-shadow:none; overflow:hidden; }
+    .badge{ display:inline-flex; align-items:center; flex:0 0 auto; height:30px; border:2px solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); box-shadow:none; overflow:hidden; }   /* P1c: dropdown agent badges match the 30px footer action-button footprint */
     .badge-c .agtile{ height:100%; width:28px; border:none; border-right:2px solid var(--border); border-radius:0; }
     .badge-c .b-lab{ display:flex; flex-direction:column; justify-content:center; line-height:1.05; padding:0 8px; min-width:0; }
     .badge-c .b-role{ font-size:6.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; color:var(--muted); white-space:nowrap; }
     .badge-c .b-name{ font-size:9.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
-    .badge-more{ height:32px; padding:0 9px; display:inline-flex; align-items:center; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base);
+    .badge-more{ height:30px; padding:0 9px; display:inline-flex; align-items:center; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base);
       background:var(--surface-3); font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:800; color:var(--muted); }
     .src-pop-head{ position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; padding:1px 4px 6px; background:var(--secondary-background); }
     .src-dd.multi .src-pop{ min-width:230px; }
@@ -1155,21 +1253,6 @@
     .fb-cmt{ font-size:10.5px; line-height:1.4; color:var(--foreground); opacity:.92; }
     .fb-empty{ font-size:10px; font-weight:700; color:var(--muted-2); padding:10px 4px; text-align:center; }
 
-    /* shared send-to-agents control (Review on a plan · Share on the feed) — agent dropdown + Send */
-    .send-grp{ display:inline-flex; align-items:stretch; height:30px; }
-    .send-grp .src-dd{ height:30px; }
-    .send-grp .send-trig{ height:30px; min-width:118px; display:inline-flex; align-items:center; gap:6px; padding:0 9px; cursor:pointer;
-      background:var(--secondary-background); border:2px solid var(--border); border-right:none; border-radius:var(--radius-base) 0 0 var(--radius-base); }
-    .send-grp .send-trig .picker-cv{ margin-left:auto; width:13px; height:13px; }
-    .send-grp .send-lbl{ font-size:10px; font-weight:800; color:var(--foreground); white-space:nowrap; }
-    .send-grp .send-cnt{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:800; color:var(--secondary-foreground);
-      background:var(--secondary); border:2px solid var(--border); border-radius:3px; padding:0 4px; }
-    .send-grp .send-act{ display:inline-flex; align-items:center; gap:5px; padding:0 11px; border:2px solid var(--border);
-      border-radius:0 var(--radius-base) var(--radius-base) 0; background:var(--main); color:var(--main-foreground); cursor:pointer; box-shadow:var(--shadow-sm);
-      font-size:10px; font-weight:800; transition:transform .07s, box-shadow .07s; }
-    .send-grp .send-act:hover{ transform:translate(1px,1px); box-shadow:none; }
-    .send-grp .send-act svg{ width:13px; height:13px; }
-    .send-grp .src-pop{ min-width:210px; left:0; }
     .plan-review-bar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:2px solid var(--rule); flex-wrap:wrap; }
     .prb-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
     .prb-sent{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--success); display:none; }
@@ -1213,6 +1296,25 @@
     .att-go{ width:12px; height:12px; flex:0 0 auto; color:var(--muted); }
     .fcard-log{ font-family:'JetBrains Mono',monospace; font-size:10px; }
 
+    /* ============================ P1b — Feed (Messages) select-to-act: whole card = pink, block = teal ============================ */
+    /* Mirrors the Library doc rail. Click a card to select the WHOLE message (pink, multi + select-all → Attach);
+       a per-block rail (teal cells) selects one visible block (→ Embed). The chevron expands (select ≠ expand).
+       Messages-only — Scratch/Log keep their checkbox. The rail respects the active Content filter. */
+    .msgcard.sel{ background:var(--main-dim); box-shadow:var(--shadow); }   /* whole = pink */
+    .msel-head{ cursor:pointer; }
+    .fcard-chevbtn{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:none; cursor:pointer; align-self:center; }
+    .fcard-chevbtn:hover{ background:var(--surface-3); border-radius:4px; }
+    .fcard-chevbtn .fcard-chev{ margin-left:0; }
+    .mrail-wrap{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+    .mrow{ display:flex; align-items:stretch; gap:7px; }
+    .mrail{ flex:0 0 auto; width:13px; align-self:stretch; min-height:20px; padding:0; cursor:pointer; border:2px solid var(--rail-section); border-radius:3px; background:var(--secondary-background); }   /* teal = block-select affordance */
+    .mrail:hover{ background:var(--select); }
+    .mrow.bsel .mrail{ background:var(--secondary); }
+    .mrow.bsel .mrow-c{ outline:2px solid var(--secondary); outline-offset:1px; border-radius:var(--radius-base); background:var(--select); }   /* selected block highlight (teal) */
+    .mrow-c{ flex:1 1 auto; min-width:0; }
+    .mrow-c .fcard-full{ margin-top:0; padding:1px 2px; }
+    .mrow-c .msg-blk{ margin:0; }
+
     /* Summarize slide-over overlay (covers just the message list, toggled by the footer button) */
     .feed-body-wrap{ position:relative; }
     .feed-overlay{ position:absolute; inset:0; z-index:20; background:var(--background); border-left:0;
@@ -1233,27 +1335,13 @@
       color:var(--muted); background:var(--surface-3); border:2px solid var(--rule); border-radius:3px; padding:2px 7px; margin:9px 0 2px; }
     .plan-file svg{ color:var(--muted); }
     .plan-head .badge{ flex:0 0 auto; } .plan-title{ flex:1 1 auto; }
-    /* send control trigger (Share / Review) — chip + Send, styled like the Revise split group */
-    .send-trig{ height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 9px; cursor:pointer;
-      background:var(--secondary-background); border:2px solid var(--border); border-right:none; border-radius:var(--radius-base) 0 0 var(--radius-base); box-shadow:var(--shadow-sm); }
-    .send-trig .picker-cv{ width:13px; height:13px; }
-    .send-act.is-off{ opacity:.45; pointer-events:none; }
-    .send-grp .src-pop{ top:auto; bottom:calc(100% + 6px); left:0; right:auto; min-width:212px; }
-    .plan-review-bar .send-grp .src-pop{ top:calc(100% + 6px); bottom:auto; }
-    /* mock toast (Share / Review send confirmations) */
+    /* mock toast (action confirmations) */
     .toast{ position:fixed; left:50%; bottom:56px; transform:translateX(-50%) translateY(8px); z-index:200; max-width:70vw;
       background:var(--foreground); color:#fff; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow);
       padding:9px 15px; font-size:11px; font-weight:800; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
     .toast.show{ opacity:1; transform:translateX(-50%); }
 
-    /* ============================ v9p11 — Documentation/Plan polish ============================ */
-    /* send / review groups: leading chevron indicator (mirrors the Revise split-drop), no subject icon, hug width */
-    .send-grp .send-trig{ min-width:0; gap:6px; }
-    .send-grp .send-cv{ width:13px; height:13px; color:var(--muted); flex:0 0 auto; }
-    .send-grp.grp-teal .send-trig{ background:var(--secondary-dim); }
-    .send-grp.grp-teal .send-act{ background:var(--secondary); color:var(--secondary-foreground); }
-
-    /* two-row plan header (row 1: owner badge → state → title → ultra · row 2: filename · counts · dates) */
+    /* two-row plan header (row 1: owner badge → state → title · row 2: filename · counts · dates) */
     .plan-head{ align-items:flex-start; }
     .plan-head .plan-chev{ margin-top:3px; }
     .plan-head-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px; }
@@ -1411,7 +1499,7 @@
 
     /* v9p14c: all plan actions live in the shared footer again (the separate upper strip was removed).
        The footer wraps on a narrow column; the decision trio (.plan-foot-right) stays grouped + right. */
-    .plan-foot > .btn, .plan-foot > .send-grp{ height:30px; }
+    .plan-foot > .btn{ height:30px; }
     /* the Comment control is now a plain icon button; greyed (but still clickable → toast) until a line/
        section is selected */
     .cmt-btn.is-off{ opacity:.5; }
@@ -1431,9 +1519,6 @@
        card ↔ text — distinct from the user's pink comment selection) */
     .md-row.fbhl, .md-row.fbhl-sec{ background:var(--select); }
     .md-row.fbhl .md-rail, .md-row.fbhl-sec .md-rail{ background:var(--select); color:var(--foreground); }
-
-    /* A3: Share + Review labels match the other footer controls' size (also the Feed Share group) */
-    .send-grp .send-lbl{ font-size:11px; font-weight:800; }
 
     /* ============================ v8p7/v8p8 — selectable cards (History single-select · Messages multi-select), mirror Team Graph .node ============================ */
     #prompt-history .rcard, #feed-messages .rcard{ box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }
@@ -1644,7 +1729,7 @@
     /* compact on/off switch (enable/disable · plugins) — teal when on (active-value semantics) */
     .swh{ position:relative; width:40px; height:21px; border:2px solid var(--border); border-radius:11px; background:var(--surface-3); cursor:pointer; flex:0 0 auto; padding:0; transition:background .12s; }
     .swh::after{ content:''; position:absolute; top:1px; left:1px; width:15px; height:15px; border:2px solid var(--border); border-radius:50%; background:var(--secondary-background); transition:left .13s; }
-    .swh.on, .think-tog.on .swh{ background:var(--secondary); } .swh.on::after, .think-tog.on .swh::after{ left:20px; }   /* v1.x #4 (rev): Mode toggles reuse the .swh switch; the parent .think-tog.on drives its on-state */
+    .swh.on{ background:var(--secondary); } .swh.on::after{ left:20px; }
 
     /* plugin skill chips (emulating the VS Code "Manage Plugins" rows) */
     .pl-chips{ display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
@@ -1824,12 +1909,11 @@
 
             <!-- MODE (permission modes + Fast / Think toggles) -->
             <div>
-              <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Fast = /fast (gated to Opus) · Thinking = extended thinking · Ultraplan = deeper native plan mode, gated to Plan mode.">Mode</label>
+              <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Opus Fast-Mode = /fast (gated to Opus) · Thinking Mode = extended thinking.">Mode</label>
               <div class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
-              <div class="grid grid-cols-3 gap-2 mt-2">
-                <button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span><span class="swh" aria-hidden="true"></span></button>
-                <button class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span><span class="swh" aria-hidden="true"></span></button>
-                <button class="think-tog tog-cell ultra-tog gated" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span><span class="swh" aria-hidden="true"></span></button>
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button>
+                <button class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode On</span></button>
               </div>
             </div>
 
@@ -1936,7 +2020,7 @@
               <div class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-3 gap-2 mt-2"><button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span><span class="swh" aria-hidden="true"></span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span><span class="swh" aria-hidden="true"></span></button><button class="think-tog tog-cell ultra-tog" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span><span class="swh" aria-hidden="true"></span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
             <div><label class="ro-label block mb-1.5">Effort</label><div class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
@@ -2193,6 +2277,7 @@
                   <!-- README.md -->
                   <div class="docdoc on" data-doc="readme">
                     <div class="doc-header"><span class="dh-path">agent-dashboard/README.md</span><span class="dh-dates"><b>Created</b> Jun 17 · 7d ago&nbsp;&nbsp;<b>Edited</b> Jun 20 · 17h ago</span></div>
+                    <div data-libhead="doc-readme" data-libkind="doc"></div>
                     <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
 
@@ -2216,6 +2301,7 @@ single pink-to-teal emphasis ladder.</textarea>
                   <!-- CLAUDE.md (project) -->
                   <div class="docdoc" data-doc="claude">
                     <div class="doc-header"><span class="dh-path">agent-dashboard/CLAUDE.md</span><span class="dh-dates"><b>Created</b> Jun 16 · 8d ago&nbsp;&nbsp;<b>Edited</b> Jun 21 · 9h ago</span></div>
+                    <div data-libhead="doc-claude" data-libkind="doc"></div>
                     <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
 
@@ -2237,6 +2323,7 @@ the AWL multi-agent dashboard.
                   <!-- CLAUDE.md (user-level) -->
                   <div class="docdoc" data-doc="claudeuser">
                     <div class="doc-header"><span class="dh-path">~/.claude/CLAUDE.md</span><span class="dh-dates"><b>Created</b> May 28 · 27d ago&nbsp;&nbsp;<b>Edited</b> Jun 22 · 2d ago</span></div>
+                    <div data-libhead="doc-claudeuser" data-libkind="doc"></div>
                     <div class="doc-view-host" id="doc-claudeuser-view" style="flex:1 1 auto;min-height:0"></div>
                     <textarea class="doc-edit in" id="doc-claudeuser-edit" style="display:none"># CLAUDE.md
 
@@ -2317,11 +2404,11 @@ project CLAUDE.md. Global defaults that travel with you.
 
           <!-- v9p9: agent filter moved into a header sub-bar (multi w/ identity badges) -->
           <div class="subbar">
-            <span class="subbar-lab">Filter</span>
+            <span class="subbar-lab">From/To</span>
             <div class="src-dd dd multi" data-agscope data-badge-cap="3">
               <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
               <div class="src-pop">
-                <div class="src-pop-head"><span class="sec-h" style="margin:0">Filter</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                 <div class="aglist aglist-scroll" style="max-height:300px">
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
@@ -2348,11 +2435,11 @@ project CLAUDE.md. Global defaults that travel with you.
             <!-- MESSAGES -->
             <div id="feed-messages" data-group="feed" class="flex-1 overflow-y-auto px-3 pt-1 pb-3" style="background:var(--background)">
               <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:2px solid var(--rule)">
-                <span class="mini-cap">Show</span>
+                <span class="mini-cap">Type</span>
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages you sent to the team"><i data-lucide="arrow-up-right"></i>Sent</button>
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
                 <span class="mini-div"></span>
-                <span class="mini-cap">Include</span>
+                <span class="mini-cap">Content</span>
                 <button class="minitog on" onclick="miniToggle(this)">Thoughts</button>
                 <button class="minitog" onclick="miniToggle(this)">Read</button>
                 <button class="minitog" onclick="miniToggle(this)">Write</button>
@@ -2414,20 +2501,16 @@ project CLAUDE.md. Global defaults that travel with you.
 
         <!-- SHARED FEED ACTION STRIP (acts on selected cards across Messages/Scratch/Log/Inbox) -->
         <div class="pcard-foot px-2 py-2.5" id="feed-messages-actions">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">   <!-- P4a: wraps at narrow so the wider Embed/Attach control never overflows -->
+            <button class="icon-btn" id="msg-selall-btn" title="Select / deselect all messages" onclick="msgSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- P1b: global select-all (Messages only) -->
             <button class="icon-btn" title="Copy selected cards" onclick="feedAct('copy')"><i data-lucide="copy"></i></button>
             <button class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
-            <!-- Share = shared send-to-agents control (item 13): agent target list + Send, styled like the Revise group -->
-            <div class="send-grp grp-teal" data-sendkind="share">
-              <div class="src-dd dd multi" id="share-dd" data-agscope data-sendcount>
-                <button class="send-trig" type="button" onclick="toggleSrcPop(this)"><i data-lucide="chevron-down" class="send-cv"></i><span class="send-lbl">Share</span><span class="send-cnt" data-sendcnt>0</span></button>
-                <div class="src-pop">
-                  <div class="src-pop-head"><span class="sec-h" style="margin:0">Share to</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
-                  <div class="aglist aglist-scroll" data-aglist="share" style="max-height:260px"></div>
-                </div>
-              </div>
-              <button class="send-act is-off" title="Share to selected agents" onclick="sendTo(this)"><i data-lucide="send-horizontal"></i></button>
+            <!-- P4a: Embed/Attach control (replaces the Share send-group) — selection-gated; a block → Embed, whole card(s) → Attach; the link icon sends in the enabled mode -->
+            <div class="ea-grp" data-eahost="feed">
+              <button class="ea-mode" data-eamode="embed" onclick="eaSend(this)" title="Embed the selected block into the Editor as a quoted block" disabled>Embed</button>
+              <button class="ea-mode" data-eamode="attach" onclick="eaSend(this)" title="Attach the selected message(s) as a reference chip" disabled>Attach</button>
+              <button class="ea-act" onclick="eaSend(this)" title="Add the selection to the prompt" disabled><i data-lucide="link"></i></button>
             </div>
             <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab -->
             <button class="icon-btn icon-btn--danger" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
@@ -2503,17 +2586,21 @@ project CLAUDE.md. Global defaults that travel with you.
                      cursor (or appends) without wiping existing text; inserted placeholders stay clickable
                      pills that target the fill input. -->
                 <div id="prompt-compose" data-group="prompt" class="flex-1 flex flex-col min-h-0">
-                  <div class="sec-h">Templates <span class="text-muted-2 font-semibold normal-case">insert a saved template at the cursor</span></div>
+                  <!-- P3 (#109): horizontal attachment-chip strip ABOVE the editor — chips styled like the Library nav cards, removable, click-to-open in the Library. Hidden when empty. -->
+                  <div id="attach-strip" class="attach-strip shrink-0" style="display:none"></div>
+                  <!-- P3 (#118): the compose box is the "Editor" (renamed from "Compose") -->
+                  <div class="flex items-center gap-1.5 mb-1.5"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Editor</span><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
+                  <div id="compose-field" class="in compose-rich flex-1 min-h-[90px] text-[12px] leading-relaxed" contenteditable="true">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</div>
+                  <!-- P3 (#118): Templates moved BELOW the editor; picking one inserts a selectable/removable template BLOCK that the fill input drives -->
+                  <div class="sec-h mt-3">Templates <span class="text-muted-2 font-semibold normal-case">insert a template block at the cursor</span></div>
                   <select id="tpl-select" class="in tpl-select shrink-0" onchange="applyTemplate(this.value)">
                     <option value="">None</option>
                   </select>
                   <div class="tpl-fill mt-2 shrink-0">
-                    <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Select a template, then tap a placeholder…" disabled></textarea>
+                    <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Insert a template, then tap a placeholder pill…" disabled></textarea>
                     <button class="fill-btn" title="Reset placeholder" onclick="resetPlaceholder()" disabled><i data-lucide="rotate-ccw"></i></button>
                     <button class="fill-btn fill-btn--go" title="Apply value" onclick="fillPlaceholder()" disabled><i data-lucide="corner-down-left"></i></button>
                   </div>
-                  <div class="flex items-center gap-1.5 mb-1.5 mt-3"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Compose</span><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
-                  <div id="compose-field" class="in compose-rich flex-1 min-h-[90px] text-[12px] leading-relaxed" contenteditable="true">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</div>
                 </div>
 
                 <!-- HISTORY -->
@@ -2917,15 +3004,14 @@ project CLAUDE.md. Global defaults that travel with you.
     if(g==='feed'){ const ma=document.getElementById('feed-messages-actions'); if(ma)ma.classList.remove('hidden');
       const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',!(t==='messages'||t==='scratch'||t==='log'));   /* v1.x #7: Summarize available on Messages + Scratch + Log */
       const stp=document.getElementById('msg-stop-btn'); if(stp)stp.classList.toggle('hidden',t!=='messages');   /* v1.x #6: Stop only on Messages */
+      const sa=document.getElementById('msg-selall-btn'); if(sa)sa.classList.toggle('hidden',t!=='messages');   /* P1b: select-all only on Messages */
       const ov=document.getElementById('feed-summary'); if(ov)ov.classList.remove('open'); if(sb)sb.classList.remove('active');   /* close any open summary when switching feed tabs */
       drawEdgesSoon(); }
   }
   /* ===== generic interactions (ported from v7p3) ===== */
   function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden');}
   function agSync(scope){const link=scope.querySelector('[data-allnone]');if(!link)return;const rows=[...scope.querySelectorAll('.agrow')];const allOn=rows.length>0&&rows.every(r=>r.classList.contains('on'));link.dataset.act=allOn?'none':'all';link.textContent=allOn?'None':'All';}  /* show only the useful action */
-  function toggleAgRow(el){el.classList.toggle('on');const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);updateSendCount(sc);}}   /* multi-select (Target / Filter / send controls) */
-  /* v9p10: send-control selection count (Share / Review) */
-  function updateSendCount(sc){if(!sc||!sc.hasAttribute('data-sendcount'))return;const c=sc.querySelector('[data-sendcnt]');const n=sc.querySelectorAll('.agrow.on').length;if(c)c.textContent=n;const grp=sc.closest('.send-grp');const act=grp?grp.querySelector('.send-act'):null;if(act)act.classList.toggle('is-off',n===0);}
+  function toggleAgRow(el){el.classList.toggle('on');const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);}}   /* multi-select (Target / Filter) */
   /* v9p9: header-dropdown popover toggle (To / Filter) + identity-badge summary in the trigger */
   function toggleSrcPop(btn){const dd=btn.closest('.src-dd');if(!dd)return;const pop=dd.querySelector('.src-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open)pop.classList.add('open');}
   function updateAgBadges(scope){const wrap=scope.querySelector('[data-badges]');if(!wrap)return;
@@ -2936,8 +3022,8 @@ project CLAUDE.md. Global defaults that travel with you.
     if(!on.length)html='<span class="b-empty">No agents</span>';
     wrap.innerHTML=html;LU();}
   function pickAgRow(el){const w=el.closest('.aglist')||el.parentElement;w.querySelectorAll('.agrow').forEach(c=>c.classList.remove('on'));el.classList.add('on');} /* single-select (Source) */
-  function agAllNone(btn){const s=btn.closest('[data-agscope]');if(!s)return;const on=btn.dataset.act!=='none';s.querySelectorAll('.agrow').forEach(r=>r.classList.toggle('on',on));agSync(s);updateAgBadges(s);updateSendCount(s);}  /* contextual All / None toggle */
-  function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(g.classList.contains('mode-seg'))syncUltraGate(g);}
+  function agAllNone(btn){const s=btn.closest('[data-agscope]');if(!s)return;const on=btn.dataset.act!=='none';s.querySelectorAll('.agrow').forEach(r=>r.classList.toggle('on',on));agSync(s);updateAgBadges(s);}  /* contextual All / None toggle */
+  function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
   function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
   function pickDecision(el){const c=el.closest('.fcard,.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
   function miniToggle(el){el.classList.toggle('on');applyMsgFilters();}
@@ -2958,15 +3044,15 @@ project CLAUDE.md. Global defaults that travel with you.
 
   /* ===== v9p7 (A3): Documentation panel — Plan expand/collapse + doc viewer edit toggle ===== */
   function togglePlan(head){const c=head.closest('.plan-card');if(c)c.classList.toggle('open');LU();}
-  /* v9p8: Inbox (Approval card) → review the full plan in Documentation → Plan, expanded + flagged */
+  /* Inbox (Plan card) → review the full plan in Library → Plans, expanded + flagged */
   function reviewPlan(planId){switchTab('doc','plan');const card=document.getElementById(planId);if(!card)return;
     card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});
     card.classList.remove('plan-flash');void card.offsetWidth;card.classList.add('plan-flash');
     setTimeout(()=>card.classList.remove('plan-flash'),1000);LU();}
   function docEdit(btn,name){const view=document.getElementById('doc-'+name+'-view');const edit=document.getElementById('doc-'+name+'-edit');if(!view||!edit)return;
     const editing=edit.style.display!=='none';
-    if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Edit';}
-    else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check" class="w-3.5 h-3.5"></i>Save';edit.focus();}
+    if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen"></i>';btn.title='Edit';}   /* P3: icon-only ghost in the Editor header (title carries Edit/Save) */
+    else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check"></i>';btn.title='Save';edit.focus();}
     LU();}
   function docAdd(){/* appends a doc-nav row + editor pane — wired below once the doc markup is known (mock) */
     toast('Add a document — choose a file to add to the Library');}
@@ -3014,24 +3100,17 @@ project CLAUDE.md. Global defaults that travel with you.
     const nav=document.getElementById('asset-nav'),main=document.getElementById('asset-main');
     if(nav)nav.querySelectorAll('.assetnav-row').forEach(r=>r.classList.toggle('on',r===row));
     if(main)main.querySelectorAll('.assetdoc').forEach(d=>d.classList.toggle('on',d.dataset.asset===id));LU();}
-  /* shared Documents/Assets footer (#19): Copy · Edit · Comment (icon-only) + Link to prompt · Remove (danger, right).
-     Assets' Edit is present but greyed/disabled. */
-  function libFootHTML(host,kind){const isAsset=kind==='asset';
-    const edit=isAsset
-      ?'<button class="icon-btn is-off" disabled title="Images can\'t be edited"><i data-lucide="square-pen"></i></button>'
-      :'<button class="icon-btn doc-edit-btn" onclick="docEdit(this,\''+host.replace('doc-','')+'\')" title="Edit"><i data-lucide="square-pen"></i></button>';
-    const comment=isAsset
-      ?'<button class="icon-btn" onclick="libComment(\''+host+'\')" title="Comment on this asset"><i data-lucide="message-square-plus"></i></button>'
-      :commentCtlHTML(host);
-    return '<div class="doc-foot-l">'
-      +'<button class="icon-btn" onclick="libCopy(\''+host+'\',\''+kind+'\')" title="Copy"><i data-lucide="copy"></i></button>'
-      +edit+comment
-      +'</div>'
-      +'<button class="btn-secondary" onclick="libLink(\''+host+'\')" title="Attach to a prompt"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>'   /* v1.x #8: full footer-button height (no btn-sm) + right-aligned — moved out of the left group, before Remove */
+  /* P3 (#119): the Library "Editor" header for Plans + Documents — ghost Copy·Edit·Comment, right-aligned,
+     reusing Compose's ghost icon-buttons. Assets gets no header (an image isn't text-editable). */
+  function editHeadHTML(copyClick,editClick,cmtHost,editCls){return '<div class="lib-edit-head"><span class="lib-edit-lab">Editor</span><span class="flex-1"></span>'
+    +'<button class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
+    +'<button class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
+    +'<button class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
+  /* P3 (#119): the footer drops Copy·Edit·Comment (now in the Editor header) — keeps only Link-to-prompt + Remove. */
+  function libFootHTML(host,kind){
+    return '<span class="flex-1"></span>'+embedAttachHTML(host)   /* P4a: "Link to prompt" → the Embed/Attach control */
       +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
   function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
-  function libComment(host){toast('Comment on '+host.replace('asset-','')+' — mock');}
-  function libLink(host){switchTab('prompt','compose');toast('Linked '+host.replace(/^(doc|asset)-/,'')+' to a prompt');}
   function libRemove(host,kind){if(kind==='asset'){const id=host.replace('asset-','');const i=ASSETS.findIndex(x=>x.id===id);if(i<0)return;const nm=ASSETS[i].name;ASSETS.splice(i,1);if(assetSel===id)assetSel=ASSETS.length?ASSETS[0].id:'';renderAssets();toast('Removed '+nm);return;}
     const name=host.replace('doc-','');const pane=document.getElementById('doc-documents');if(!pane)return;
     const row=pane.querySelector('.docnav-row[data-doc="'+name+'"]');const dd=pane.querySelector('.docdoc[data-doc="'+name+'"]');
@@ -3060,6 +3139,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function setFillEnabled(on){const ta=document.getElementById('tpl-fill-input');const r=document.querySelector('#prompt-compose .fill-btn:not(.fill-btn--go)');const g=document.querySelector('#prompt-compose .fill-btn--go');
     [ta,r,g].forEach(e=>{if(e)e.disabled=!on;});if(!on&&ta){ta.value='';}}
   function pickPlaceholder(el){const f=document.getElementById('compose-field')||document;f.querySelectorAll('.ph-text').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');phSel=el;
+    const blk=el.closest('.ed-block--template');if(blk){f.querySelectorAll('.ed-block--template.sel').forEach(b=>b.classList.remove('sel'));blk.classList.add('sel');}   /* P3: a pill click also makes its template block the active one */
     setFillEnabled(true);const ta=document.getElementById('tpl-fill-input');if(!ta)return;ta.setAttribute('placeholder',el.dataset.tag||'');ta.value=el.dataset.value||'';autosize(ta);ta.focus();}
   function fillPlaceholder(){if(!phSel){toast('Tap a placeholder pill first');return;}const ta=document.getElementById('tpl-fill-input');const v=ta.value.trim();phSel.dataset.value=v;if(v){phSel.classList.add('filled');phSel.textContent=v;}else{phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;}phSel.classList.add('sel');}
   function resetPlaceholder(){if(!phSel)return;phSel.dataset.value='';phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;const ta=document.getElementById('tpl-fill-input');if(ta){ta.value='';autosize(ta);ta.focus();}}
@@ -3079,23 +3159,169 @@ project CLAUDE.md. Global defaults that travel with you.
   function saveComposeRange(){const f=composeField();if(!f)return;const sel=window.getSelection();if(sel&&sel.rangeCount){const r=sel.getRangeAt(0);if(f.contains(r.commonAncestorContainer))composeRange=r.cloneRange();}}
   /* select a template → insert its body at the cursor (or append if the box isn't focused) without wiping
      existing text; None clears the active template + re-greys the fill input. The box stays fully editable. */
+  /* P3 (#118): picking a template inserts a selectable template BLOCK (the P1a primitive) at the cursor —
+     not inline raw text. The active block (.sel) is the one the fill input drives; None deselects + greys. */
   function applyTemplate(idx){const f=composeField();if(!f)return;
-    if(idx===''){phSel=null;setFillEnabled(false);f.querySelectorAll('.ph-text.sel').forEach(p=>p.classList.remove('sel'));return;}
+    if(idx===''){phSel=null;setFillEnabled(false);f.querySelectorAll('.ed-block--template.sel,.ph-text.sel').forEach(p=>p.classList.remove('sel'));return;}
     const t=TEMPLATES[parseInt(idx,10)];if(!t)return;
-    const frag=document.createRange().createContextualFragment(' '+t.body()+' ');
+    f.querySelectorAll('.ed-block--template.sel').forEach(b=>b.classList.remove('sel'));
+    const html=blockHTML('template',{source:'Template · '+t.name,body:t.body(),active:true,tpl:idx,kindLabel:'template'});
+    const frag=document.createRange().createContextualFragment(html);
     if(composeRange&&f.contains(composeRange.commonAncestorContainer)){composeRange.collapse(false);composeRange.insertNode(frag);}
     else f.appendChild(frag);
     setFillEnabled(true);LU();}
-  function copyCompose(){const f=composeField();if(f&&navigator.clipboard)navigator.clipboard.writeText(f.innerText||f.textContent||'').catch(()=>{});toast('Compose copied');}
+  /* P3: when a template block becomes active, enable the fill input + sync the picker to it */
+  function onTplBlockSelected(el){setFillEnabled(true);const sel=document.getElementById('tpl-select');if(sel&&el.dataset.tpl!=null&&el.dataset.tpl!=='')sel.value=el.dataset.tpl;}
+  function copyCompose(){const f=composeField();if(f&&navigator.clipboard)navigator.clipboard.writeText(f.innerText||f.textContent||'').catch(()=>{});toast('Editor copied');}
   function clearCompose(){const f=composeField();if(f){f.innerHTML='';composeRange=null;f.focus();}}
+
+  /* ============================ P3 (#109) — the attachment-chip strip (above the Editor) ============================ */
+  /* Horizontal chips styled like the Library nav cards — each removable (×) and click-to-open in the Library.
+     Seeded with representative items; P4's Attach pushes here (a real path for files, a temp-style path for
+     materialized content). Hidden when empty. */
+  const ATTACH=[
+    {id:'a1',name:'auth-token-rotation.md',path:'~/.claude/plans/auth-token-rotation-shimmering-falcon.md',type:'doc'},
+    {id:'a2',name:'jwt-expiry-trace.png',path:'assets/jwt-expiry-trace.png',type:'asset'}
+  ];
+  function attIcon(t){return t==='asset'?'image':(t==='temp'?'file-clock':'file-text');}
+  function renderAttachStrip(){const el=document.getElementById('attach-strip');if(!el)return;
+    if(!ATTACH.length){el.style.display='none';el.innerHTML='';return;}
+    el.style.display='';
+    el.innerHTML=ATTACH.map((at,i)=>
+      '<span class="att-card" data-ai="'+i+'" data-att="'+esc(at.id)+'" title="'+esc(at.path)+'"><i data-lucide="'+attIcon(at.type)+'" class="att-card-ic"></i>'
+        +'<span class="att-card-nm" onclick="openAttachmentCard(event,'+i+')">'+esc(at.name)+'</span>'
+        +'<button class="att-card-cite" type="button" onclick="citeAttachment(event,'+i+')" title="Cite this attachment in the prose"><i data-lucide="link"></i></button>'   /* P4b: insert an inline citation pill at the cursor */
+        +'<button class="att-card-x" type="button" onclick="removeAttachment(event,'+i+')" title="Remove attachment"><i data-lucide="x"></i></button></span>').join('');
+    LU();}
+  function openAttachmentCard(e,i){if(e)e.stopPropagation();const at=ATTACH[i];if(!at)return;
+    if(at.type==='temp'){toast('Materialized temp file — '+at.path);return;}
+    switchTab('doc',at.type==='asset'?'assets':'documents');toast('Opening '+at.name+' in the Library');}
+  function removeAttachment(e,i){if(e)e.stopPropagation();const at=ATTACH[i];if(!at)return;ATTACH.splice(i,1);
+    onAttachmentRemoved(at);   /* P4b: deleting an attachment cascades to remove its citations */
+    renderAttachStrip();}
+  function addAttachment(at){ATTACH.push(at);renderAttachStrip();}   /* P4a Attach hook */
+
+  /* ============================ P4a — the Embed/Attach control ============================ */
+  /* Replaces Share + Link-to-prompt on the Library footers + the Feed action strip. A section/line/block
+     selection → Embed (drop a frozen embed block into the Editor); a whole-doc/title selection or an Asset
+     (or whole feed card[s]) → Attach (add a chip: a real path for files, a temp-style path for materialized
+     content). The link icon sends in whichever mode the selection enables; the other mode greys. */
+  let attSeq=100;
+  function nextAttId(){return 'att-'+(++attSeq);}
+  function embedAttachHTML(host){return '<div class="ea-grp" data-eahost="'+esc(host)+'">'
+    +'<button class="ea-mode" data-eamode="embed" onclick="eaSend(this)" title="Embed the selection into the Editor as a quoted block" disabled>Embed</button>'
+    +'<button class="ea-mode" data-eamode="attach" onclick="eaSend(this)" title="Attach the selection as a reference chip (path)" disabled>Attach</button>'
+    +'<button class="ea-act" onclick="eaSend(this)" title="Add the selection to the prompt" disabled><i data-lucide="link"></i></button></div>';}
+  function eaSelKind(host){
+    if(host==='feed'){if(document.querySelector('#msg-list .mrow.bsel'))return 'part';if(document.querySelector('#msg-list .msgcard.sel'))return 'whole';return null;}
+    if(host.indexOf('asset-')===0)return 'whole';   /* an Asset is always attachable as a file */
+    const sel=SELby[host];if(!sel)return null;return sel.kind==='all'?'whole':'part';}
+  function eaUpdate(host){const grp=document.querySelector('.ea-grp[data-eahost="'+host+'"]');if(!grp)return;
+    const kind=eaSelKind(host);const enEmbed=kind==='part',enAttach=kind==='whole';
+    const em=grp.querySelector('[data-eamode="embed"]'),at=grp.querySelector('[data-eamode="attach"]'),act=grp.querySelector('.ea-act');
+    em.disabled=!enEmbed;at.disabled=!enAttach;em.classList.toggle('on',enEmbed);at.classList.toggle('on',enAttach);
+    act.disabled=!kind;grp.dataset.eamode=enEmbed?'embed':(enAttach?'attach':'');}
+  function eaUpdateAll(){document.querySelectorAll('.ea-grp[data-eahost]').forEach(g=>eaUpdate(g.dataset.eahost));}
+  function eaSend(btn){const grp=btn.closest('.ea-grp');if(!grp||btn.disabled)return;const host=grp.dataset.eahost;
+    const mode=btn.dataset.eamode||grp.dataset.eamode;if(!mode){toast('Select something to share first');return;}
+    if(mode==='embed')eaEmbed(host);else eaAttach(host);}
+  function libSourceLabel(host){
+    if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');return 'Library → Documents · '+(dd?dd.textContent.split('/').pop():host);}
+    const p=PLANS.find(x=>x.id===host);if(p)return 'Library → Plans · '+p.title;return 'Library';}
+  function eaEmbed(host){
+    if(host==='feed')return eaEmbedFeed();
+    const sel=SELby[host];if(!sel)return;const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return;
+    const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
+    const text=rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();
+    insertEmbed(libSourceLabel(host)+' · '+sel.label,text,"switchTab('doc','"+(host.indexOf('doc-')===0?'documents':'plan')+"')");}
+  function eaEmbedFeed(){const row=document.querySelector('#msg-list .mrow.bsel');if(!row)return;
+    const card=row.closest('.msgcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
+    const text=((row.querySelector('.mrow-c')||{}).textContent||'').trim();
+    const kind=row.dataset.mblk==='text'?'message':(row.dataset.blk||'block');
+    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+kind,text,"switchTab('feed','messages')");}
+  function insertEmbed(src,text,srcAction){const f=document.getElementById('compose-field');if(!f)return;
+    switchTab('prompt','compose');
+    f.insertAdjacentHTML('beforeend',blockHTML('embed',{source:src,body:esc(text),srcAction:srcAction,clamp:text.length>220,kindLabel:'embed'}));
+    if(window.lucide&&lucide.createIcons)lucide.createIcons();toast('Embedded into the Editor');}
+  function eaAttach(host){
+    if(host==='feed')return eaAttachFeed();
+    let name,path,type='doc';
+    if(host.indexOf('asset-')===0){const a=ASSETS.find(x=>'asset-'+x.id===host);if(!a)return;name=a.name;path=a.path;type='asset';}
+    else if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');path=dd?dd.textContent:host;name=path.split('/').pop();type='doc';}
+    else {const p=PLANS.find(x=>x.id===host);if(!p)return;name=p.file;path='~/.claude/plans/'+p.file;type='doc';}
+    addAttachment({id:nextAttId(),name:name,path:path,type:type});toast('Attached '+name+' — path reference + a "read this" instruction');}
+  function eaAttachFeed(){const cards=[...document.querySelectorAll('#msg-list .msgcard.sel')];if(!cards.length)return;
+    cards.forEach(card=>{const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];const t=o.time.replace(':','');
+      addAttachment({id:nextAttId(),name:a.name+'-msg-'+t+'.md',path:'/tmp/awl/feed-'+a.name+'-'+t+'.md',type:'temp'});});
+    toast('Attached '+cards.length+' message'+(cards.length>1?'s':'')+' — materialized to a temp file');}
+
+  /* ============================ P4b — inline citations ============================ */
+  /* From a chip's link icon, with the cursor in the prose, insert a citation pill carrying the attachment's
+     path. Deleting a citation does NOT delete the attachment; deleting an attachment cascades to its citations;
+     you can only cite something already attached (the trigger lives on the chip). */
+  function citeAttachment(e,i){if(e)e.stopPropagation();const at=ATTACH[i];if(!at)return;
+    const f=document.getElementById('compose-field');if(!f){toast('Open the Editor first');return;}
+    switchTab('prompt','compose');
+    const pill=citeHTML({att:at.id,source:at.path,label:at.name});
+    const frag=document.createRange().createContextualFragment(pill+' ');
+    if(composeRange&&f.contains(composeRange.commonAncestorContainer)){composeRange.collapse(false);composeRange.insertNode(frag);}
+    else f.appendChild(frag);
+    if(window.lucide&&lucide.createIcons)lucide.createIcons();toast('Cited '+at.name+' in the prose');}
+  function onAttachmentRemoved(at){if(!at)return;const f=document.getElementById('compose-field');if(!f)return;
+    f.querySelectorAll('.ed-cite[data-att="'+at.id+'"]').forEach(c=>c.remove());}   /* cascade: remove this attachment's citations */
+
+  /* ============================ P4c — the Review chip (single-agent reviewer select) ============================ */
+  const REVIEWERS={};
+  function reviewChipHTML(planId){const k=REVIEWERS[planId]||'vega';const a=AG[k];
+    return '<div class="rev-chip" data-revchip="'+planId+'">'
+      +'<button class="rev-trig" type="button" onclick="toggleRevPop(this)" title="Choose the reviewer">'+badgeHTML(a,false)+'<i data-lucide="chevrons-up-down" class="picker-cv"></i></button>'
+      +'<div class="src-pop rev-pop"><div class="src-pop-head"><span class="sec-h" style="margin:0">Reviewer</span></div><div class="aglist aglist-scroll" style="max-height:220px">'+AG_ORDER.filter(x=>x!=='user').map(x=>revRowHTML(planId,x,x===k)).join('')+'</div></div>'
+      +'<button class="rev-act" type="button" onclick="sendReview(this)" title="Send this plan for review"><i data-lucide="scan-search"></i></button></div>';}
+  function revRowHTML(planId,k,on){const a=AG[k];return '<button class="agrow'+(on?' on':'')+'" type="button" onclick="pickReviewer(this,\''+planId+'\',\''+k+'\')">'+agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
+  function toggleRevPop(btn){const dd=btn.closest('.rev-chip');if(!dd)return;const pop=dd.querySelector('.rev-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open)pop.classList.add('open');}
+  function pickReviewer(row,planId,k){REVIEWERS[planId]=k;const chip=row.closest('.rev-chip');
+    chip.querySelectorAll('.aglist .agrow').forEach(r=>r.classList.remove('on'));row.classList.add('on');
+    const trig=chip.querySelector('.rev-trig');trig.innerHTML=badgeHTML(AG[k],false)+'<i data-lucide="chevrons-up-down" class="picker-cv"></i>';
+    closeAllPopups();LU();}
+  function sendReview(btn){const chip=btn.closest('.rev-chip');if(!chip)return;const k=REVIEWERS[chip.dataset.revchip]||'vega';toast('Sent for review to '+AG[k].name);}
+
+  /* ============================ P1a — the inserted-block primitive ============================ */
+  /* One renderer, three kinds the Editor holds inline:
+       embed    — frozen quoted content (a doc section / a message block): muted, a "from <source>" header,
+                  click-to-source, a remove ×, clamp+expand when long. Not editable.
+       template — the same shell but interactive/selectable; the active one's pills fill from Templates.
+       citation — an inline pill in the prose pointing at an attachment chip.
+     Boundary uses the card-outline colour (--border). Consumed by P2 (Reply reference block),
+     P3 (templates / editor body) and P4 (embeds / citations). One primitive, three variants. */
+  function blockHTML(kind,o){o=o||{};
+    if(kind==='citation') return citeHTML(o);
+    const isTpl=kind==='template';
+    const fromCls='ed-block-from'+(o.srcAction?' clickable':'');
+    const fromAttr=o.srcAction?(' role="button" tabindex="0" onclick="'+o.srcAction+'" title="Open source in the dashboard"'):'';
+    const head='<div class="ed-block-head">'
+      +'<span class="'+fromCls+'"'+fromAttr+'>from <b>'+esc(o.source||'source')+'</b></span>'
+      +'<span class="flex-1"></span>'
+      +(o.kindLabel?'<span class="ed-block-kind">'+esc(o.kindLabel)+'</span>':'')
+      +'<button class="ed-block-x" type="button" onclick="removeBlock(event,this)" title="Remove block"><i data-lucide="x"></i></button></div>';
+    const body='<div class="ed-block-body'+(o.clamp?' clamp':'')+'">'+(o.body||'')+'</div>'
+      +(o.clamp?'<button class="ed-block-more" type="button" onclick="toggleBlockClamp(event,this)">Show more</button>':'');
+    const cls='ed-block ed-block--'+kind+(isTpl&&o.active?' sel':'');
+    const dataAttr=(isTpl?(' data-tpl="'+(o.tpl!=null?o.tpl:'')+'" onclick="selectTplBlock(this)"'):'')+(o.src?' data-src="'+esc(o.src)+'"':'');
+    return '<div class="'+cls+'" data-block="'+kind+'"'+dataAttr+' contenteditable="false">'+head+body+'</div>';}
+  function citeHTML(o){o=o||{};return '<span class="ed-cite" contenteditable="false" data-att="'+esc(o.att||'')+'" onclick="gotoCitation(event,this)" title="Citation → '+esc(o.source||o.label||'attachment')+'"><i data-lucide="link"></i>'+esc(o.label||o.source||'source')+'</span>';}
+  function removeBlock(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const b=btn.closest('.ed-block');if(b)b.remove();}
+  function toggleBlockClamp(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const body=btn.previousElementSibling;if(!body)return;const clamped=body.classList.toggle('clamp');btn.textContent=clamped?'Show more':'Show less';}
+  function selectTplBlock(el){ /* make this template block the active one (the Templates fill input drives it — wired in P3) */
+    const host=el.closest('#compose-field')||document;host.querySelectorAll('.ed-block--template.sel').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');
+    if(typeof onTplBlockSelected==='function')onTplBlockSelected(el);}
+  function gotoCitation(e,el){if(e)e.stopPropagation(); /* P4 wires routing to the cited attachment's source */ toast((el.getAttribute('title')||'Citation'));}
 
   /* ===== node selection — SELECTION DRIVES THE APP: clicking a card repaints the whole Agent panel
      (identity, config readouts, Ctx/Turns) + the Console from that focused agent. (scripted demo) ===== */
   let FOCUS='sandy';
   function agKeyFromNode(n){const d=(n&&n.dataset&&n.dataset.agent)||'';return d.split('-').pop();}
   function setSegActive(id,label){if(!label)return;const seg=document.getElementById(id);if(!seg)return;
-    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.textContent.trim().toLowerCase()===label.toLowerCase()));
-    if(seg.classList.contains('mode-seg'))syncUltraGate(seg);}
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.textContent.trim().toLowerCase()===label.toLowerCase()));}
   function nodeBarRaw(n,label){const rows=[...n.querySelectorAll('.nbar-row')];const r=rows.find(x=>{const l=x.querySelector('.nbl');return l&&l.textContent.trim()===label;});
     if(!r)return null;const i=r.querySelector('.pbar i');const pct=i?parseFloat(i.style.width):null;const val=(r.querySelector('.nbv')||{}).textContent||'';return{pct:pct,val:val};}
   function repaintConsoleIdentity(a){document.querySelectorAll('.con-agentbar').forEach(bar=>{const t=bar.querySelector('.agtile');if(t){t.style.color=a.color;const u=t.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
@@ -3181,7 +3407,7 @@ project CLAUDE.md. Global defaults that travel with you.
   /* v1.x #2: Fast (/fast) is Opus-only — gate a panel's Fast toggle whenever its selected model isn't Opus */
   function gateFast(tabs){const panel=tabs.closest('[data-group="mid"]');if(!panel)return;const ft=panel.querySelector('.fast-tog');if(!ft)return;
     const m=((tabs.querySelector('.model-tab.active')||{}).dataset||{}).model;const ok=m==='opus';
-    ft.classList.toggle('gated',!ok);if(!ok)ft.classList.remove('on');
+    ft.classList.toggle('gated',!ok);if(!ok){ft.classList.remove('on');const l=ft.querySelector('.tt-lbl');if(l)l.textContent='Opus Fast-Mode Off';}
     ft.title=ok?'Opus fast mode (/fast) — faster responses, slightly lower quality':'Fast mode (/fast) is Opus-only — select Opus to enable';}
   document.querySelectorAll('.model-tabs').forEach(tabs=>{
     const wrap=tabs.parentElement,ver=tabs.nextElementSibling,curEl=wrap.querySelector('#model-current,.model-cur');
@@ -3314,12 +3540,8 @@ project CLAUDE.md. Global defaults that travel with you.
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});});}
 
   /* ===== v8p6: per-agent thinking toggle (inline with Mode) ===== */
-  function toggleThink(b){b.classList.toggle('on');}
-  function toggleFast(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');}   /* v1.x #2: Fast is gated to Opus (see gateFast) */
-  /* v1.2: Ultraplan toggle — gated to Plan mode; the gate syncs whenever the Mode seg changes */
-  function toggleUltra(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');}
-  function syncUltraGate(seg){if(!seg)return;const active=seg.querySelector('button.active');const isPlan=!!active&&active.textContent.trim()==='Plan';
-    const ultra=seg.parentElement.querySelector('.ultra-tog');if(ultra){ultra.classList.toggle('gated',!isPlan);if(!isPlan)ultra.classList.remove('on');}}
+  function toggleThink(b){b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Thinking Mode '+(on?'On':'Off');}
+  function toggleFast(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Opus Fast-Mode '+(on?'On':'Off');}   /* labeled toggle-button: the label reads its own Off/On state; Fast is gated to Opus (see gateFast) */
 
   /* ===== v8p6: graph status badge → jump to the relevant surface, scoped to the focused agent ===== */
   function statusJump(status,el){
@@ -3493,8 +3715,10 @@ project CLAUDE.md. Global defaults that travel with you.
      file so "see line N" is a real reference. */
   function getFeedback(host){if(host.indexOf('doc-')===0)return DOC_FB[host]||[];const p=PLANS.find(x=>x.id===host);return p?p.feedback:[];}
   function fbCountsBySec(list){const m={};list.forEach(f=>{(m[f.sec]=m[f.sec]||{approve:0,revise:0,block:0})[f.verdict]++;});return m;}
+  /* P4d: the rail badge is a SECTION anchor — its count is ALL verdicts on the section and a click opens
+     every comment for that section (the worst-verdict colour stays as a severity hint). */
   function railBadge(host,sec,c){const worst=c.block?'block':(c.revise?'revise':'approve');const m=VERDICT[worst];const n=c.approve+c.revise+c.block;
-    return '<span class="rd v-'+worst+'" title="Open '+n+' comment'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openCmtPop(\''+host+'\',\''+esc(sec)+'\',\''+worst+'\')"><i data-lucide="'+m.ic+'"></i><span class="rd-n">'+n+'</span></span>';}
+    return '<span class="rd v-'+worst+'" title="Open '+n+' comment'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openCmtPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="'+m.ic+'"></i><span class="rd-n">'+n+'</span></span>';}
   function mdEditorHTML(host,text){const fb=fbCountsBySec(getFeedback(host));
     const rows=text.split('\n').map((ln,i)=>{const n=i+1;const isSec=/^##\s+/.test(ln);const isTitle=/^#\s+/.test(ln);const sec=isSec?ln.replace(/^##\s+/,''):'';const c=isSec?fb[sec]:null;
       const rail='<button class="md-rail'+(isSec?' is-sec':'')+(isTitle?' is-title':'')+'" onclick="railClick(event,\''+host+'\','+n+')" data-line="'+n+'"'+(isSec?' data-sec="'+esc(sec)+'"':'')+(isTitle?' data-title="1"':'')+' title="'+(isTitle?'Select the whole document':(isSec?'Select this section':'Select line '+n))+'">'+(c?railBadge(host,sec,c):'')+'<span class="rn">'+n+'</span></button>';
@@ -3510,7 +3734,7 @@ project CLAUDE.md. Global defaults that travel with you.
   /* per-host selection — pick a single line or a whole section so it can be commented on / shared */
   const SELby={};
   function setCmtCtl(host,on){const ctl=document.querySelector('[data-cmthost="'+host+'"]');if(ctl)ctl.classList.toggle('is-off',!on);}
-  function clearSel(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));SELby[host]=null;setCmtCtl(host,false);}
+  function clearSel(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));SELby[host]=null;setCmtCtl(host,false);eaUpdate(host);}
   function railClick(e,host,n){e.stopPropagation();const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return;
     const row=ed.querySelector('.md-row[data-line="'+n+'"]');if(!row)return;
     const isTitle=!!row.querySelector('.md-h1');const isSec=row.classList.contains('md-h2-row');const cur=SELby[host];
@@ -3522,10 +3746,11 @@ project CLAUDE.md. Global defaults that travel with you.
     else if(isSec){row.classList.add('rsel');let nx=row.nextElementSibling;while(nx&&!nx.classList.contains('md-h2-row')){nx.classList.add('rsel-sec');nx=nx.nextElementSibling;}
       SELby[host]={kind:'sec',ref:row.dataset.sec,label:'§ '+row.dataset.sec};}
     else{row.classList.add('rsel');SELby[host]={kind:'line',ref:n,label:'Line '+n};}
-    setCmtCtl(host,true);}
+    setCmtCtl(host,true);eaUpdate(host);}
   function renderDocView(name){const ta=document.getElementById('doc-'+name+'-edit'),view=document.getElementById('doc-'+name+'-view');if(ta&&view)view.innerHTML=mdEditorHTML('doc-'+name,ta.value);}
   function renderDocs(){['readme','claude','claudeuser'].forEach(renderDocView);
-    document.querySelectorAll('#doc-documents [data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});LU();}   /* v10p1 #19: each doc gets the shared header (static) + footer (Copy·Edit·Comment·Link·Remove) */
+    document.querySelectorAll('#doc-documents [data-libhead]').forEach(s=>{const host=s.dataset.libhead,name=host.replace('doc-','');s.innerHTML=editHeadHTML("libCopy('"+host+"','doc')","docEdit(this,'"+name+"')",host,'doc-edit-btn');});   /* P3 #119: each doc gets the Editor header (ghost Copy·Edit·Comment) above its content */
+    document.querySelectorAll('#doc-documents [data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});LU();}   /* footer = Link-to-prompt + Remove */
 
   /* 3-state verdicts (stroke icons, verdict-colored): Approve / Revise / Block */
   const VERDICT={approve:{ic:'circle-check',cls:'v-approve',lab:'Approve'},revise:{ic:'triangle-alert',cls:'v-revise',lab:'Revise'},block:{ic:'circle-x',cls:'v-block',lab:'Block'}};
@@ -3549,17 +3774,19 @@ project CLAUDE.md. Global defaults that travel with you.
     const row=[...ed.querySelectorAll('.md-row.md-h2-row')].find(r=>r.dataset.sec===sec);if(!row)return;
     row.classList.add('fbhl');let nx=row.nextElementSibling;while(nx&&!nx.classList.contains('md-h2-row')){nx.classList.add('fbhl-sec');nx=nx.nextElementSibling;}}
   function deselectNavCards(host){const nav=document.querySelector('[data-plannav="'+host+'"]');if(nav)nav.querySelectorAll('.fb-card.sel').forEach(c=>c.classList.remove('sel'));}
-  function selectMatchingCards(host,sec,verdict){const nav=document.querySelector('[data-plannav="'+host+'"]');if(!nav)return;
-    nav.querySelectorAll('.fb-card').forEach(c=>c.classList.toggle('sel',c.dataset.fbsec===sec&&c.dataset.fbverdict===verdict));}
-  function navCardClick(card,host,sec,verdict){if(card.classList.contains('sel')){closeCmtPop(host);return;}openCmtPop(host,sec,verdict);}
+  function selectMatchingCards(host,sec){const nav=document.querySelector('[data-plannav="'+host+'"]');if(!nav)return;   /* P4d: section anchor — select every card in the section */
+    nav.querySelectorAll('.fb-card').forEach(c=>c.classList.toggle('sel',c.dataset.fbsec===sec));}
+  function navCardClick(card,host,sec){if(card.classList.contains('sel')){closeCmtPop(host);return;}openCmtPop(host,sec);}
   /* comment popout (docked under the body, same width): merged verdict badge + section badge header;
      each response carries an agent badge, time, and a thumbs agree toggle */
-  function openCmtPop(host,sec,verdict){const list=getFeedback(host);const pop=popFor(host);if(!pop)return;
-    const items=list.filter(f=>f.sec===sec&&f.verdict===verdict);
-    pop.innerHTML='<div class="cmt-pop-head">'+verdictBadgeHTML(verdict)+'<span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length>1?'s':'')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
+  /* P4d: section-anchored popout — lists EVERY comment on the section (all verdicts), each row carrying its
+     own verdict badge + thumbs. The header drops the single-verdict badge; the count matches the contents. */
+  function openCmtPop(host,sec){const list=getFeedback(host);const pop=popFor(host);if(!pop)return;
+    const items=list.filter(f=>f.sec===sec);
+    pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
-        return '<div class="cmt-pop-item"><div class="cpi-h">'+badgeHTML(a,true)+'<span class="cph-time">'+(f.time||'')+'</span><span class="flex-1"></span>'+thumbsHTML()+'</div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">'+verdictBadgeHTML(verdict)+' no comment left</div>')+'</div>';}).join('')+'</div>';
-    pop.classList.add('open');LU();selectMatchingCards(host,sec,verdict);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
+        return '<div class="cmt-pop-item"><div class="cpi-h">'+badgeHTML(a,true)+verdictBadgeHTML(f.verdict)+'<span class="cph-time">'+(f.time||'')+'</span><span class="flex-1"></span>'+thumbsHTML()+'</div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
+    pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   function closeCmtPop(host){const pop=popFor(host);if(pop){pop.classList.remove('open');pop.innerHTML='';}deselectNavCards(host);clearFbHL(host);}
   /* v9p14c: a small "Mark as" verdict dropdown lives INSIDE the composer (the Comment control is now a
      plain button); pick a verdict here, then Save commits it */
@@ -3586,14 +3813,11 @@ project CLAUDE.md. Global defaults that travel with you.
     if(host.indexOf('doc-')===0)renderDocView(host.replace('doc-',''));
     else{renderPlans();reopenPlan(host);planNavMode(host,'feedback');}
     toast('Comment saved — marked '+VERDICT[v].lab);}
-  /* v9p14c: the Comment control is a plain icon button (the upload action + verdict split are gone — the
-     verdict is chosen in the composer's "Mark as" dropdown); enabled once a line/section is selected */
-  function commentCtlHTML(host){return '<button class="icon-btn cmt-btn is-off" data-cmthost="'+host+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button>';}
   function openFeedback(host){if(document.getElementById(host))planNavMode(host,'feedback');}
 
   /* PLANS — seeded from real ~/.claude/plans/*.md markdown (rendered verbatim, line-numbered) */
   const PLANS=[
-    {id:'plan-1',file:'auth-token-rotation-shimmering-falcon.md',status:'review',title:'Auth token-rotation remediation',owner:'sandy',ultra:false,open:true,created:'Jun 18 09:12',createdAgo:'3d',edited:'Jun 20 14:07',editedAgo:'17h',
+    {id:'plan-1',file:'auth-token-rotation-shimmering-falcon.md',status:'review',title:'Auth token-rotation remediation',owner:'sandy',open:true,created:'Jun 18 09:12',createdAgo:'3d',edited:'Jun 20 14:07',editedAgo:'17h',
      md:`# Auth token-rotation remediation
 
 ## Context
@@ -3627,7 +3851,7 @@ rotation, covered by a regression test, before merging to main.`,
        {sec:'Steps',ag:'drew',verdict:'approve',time:'14:47',comment:'Order is right; add an explicit negative test for an already-expired refresh token.'},
        {sec:'Risks',ag:'kai',verdict:'block',time:'14:51',comment:'Need a rollback path if rotation churn spikes auth latency on prod before this can ship.'}
      ]},
-    {id:'plan-2',file:'session-handoff-export-quiet-harbor.md',status:'approved',title:'Session-handoff transcript export',owner:'wren',ultra:false,open:false,created:'Jun 12 16:40',createdAgo:'9d',edited:'Jun 19 09:21',editedAgo:'2d',
+    {id:'plan-2',file:'session-handoff-export-quiet-harbor.md',status:'approved',title:'Session-handoff transcript export',owner:'wren',open:false,created:'Jun 12 16:40',createdAgo:'9d',edited:'Jun 19 09:21',editedAgo:'2d',
      md:`# Session-handoff transcript export
 
 ## Context
@@ -3643,7 +3867,7 @@ being lost when the run ends.
 ## TL;DR
 Structured JSONL transcript export so an agent's context survives a handoff.`,
      feedback:[{sec:'Steps',ag:'sandy',verdict:'approve',time:'09:18',comment:'Verified the export round-trips on a 200-turn session.'}]},
-    {id:'plan-3',file:'dashboard-layout-reflow-electric-meadow.md',status:'draft',title:'Dashboard layout reflow',owner:'lex',ultra:true,open:false,created:'Jun 20 10:50',createdAgo:'20h',edited:'Jun 20 11:02',editedAgo:'20h',
+    {id:'plan-3',file:'dashboard-layout-reflow-electric-meadow.md',status:'draft',title:'Dashboard layout reflow',owner:'lex',open:false,created:'Jun 20 10:50',createdAgo:'20h',edited:'Jun 20 11:02',editedAgo:'20h',
      md:`# Dashboard layout reflow
 
 ## Context
@@ -3675,26 +3899,17 @@ resize intact.`,
   function feedbackListHTML(host,list){if(!list.length)return '<div class="fb-empty">No feedback yet —<br>send for review below.</div>';
     return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
       /* v9p13: fb-card is a DIV (not a button) — it contains the thumb-toggle buttons, and a <button> can't legally nest buttons (the parser was closing the card early, spilling the thumbs / verdict / comment OUT of the card) · v9p14b: selectable (teal) + highlights its section · v9p14c: data-fbsec/verdict let openCmtPop sync the matching card(s) */
-      return '<div class="fb-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" data-fbverdict="'+f.verdict+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\',\''+f.verdict+'\')" title="Select this comment →">'
+      return '<div class="fb-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" data-fbverdict="'+f.verdict+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\')" title="Open all comments on this section →">'
         +'<div class="fb-top">'+badgeHTML(a,true)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
         +'<div class="fb-mid">'+verdictBadgeHTML(f.verdict)+'<span class="sel-badge">§ '+f.sec+'</span></div>'
         +(f.comment?'<div class="fb-cmt">'+esc(f.comment)+'</div>':'')+'</div>';}).join('')+'</div>';}
-  /* a Share/Review send group (agent dropdown + paper-airplane). Teal = optional action; styled like the Revise split */
-  function sendGrpHTML(kind,lbl,listKey){
-    return '<div class="send-grp grp-teal" data-sendkind="'+kind+'"><div class="src-dd dd multi" data-agscope data-sendcount>'
-    +'<button class="send-trig" type="button" onclick="toggleSrcPop(this)"><i data-lucide="chevron-down" class="send-cv"></i><span class="send-lbl">'+lbl+'</span><span class="send-cnt" data-sendcnt>0</span></button>'
-    +'<div class="src-pop"><div class="src-pop-head"><span class="sec-h" style="margin:0">'+(kind==='review'?'Send to':'Share to')+'</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div><div class="aglist aglist-scroll" data-aglist="'+listKey+'" style="max-height:220px"></div></div>'
-    +'</div><button class="send-act is-off" title="'+(kind==='review'?'Send this plan for review':'Share this plan')+'" onclick="sendTo(this)"><i data-lucide="send-horizontal"></i></button></div>';}
-  /* v9p14c: everything lives in ONE shared footer again — Copy · Edit · Comment · Share · Review left-aligned,
-     then the decision trio (Revise · Reject · Approve) right-justified. (The separate upper strip is gone.) */
+  /* P4: the Plans footer holds the Embed/Attach control + the single-agent Review chip (left), then the
+     decision trio (Revise · Reject · Approve) right-justified. Copy·Edit·Comment live in the Editor header. */
   function planFootHTML(p){let right;
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
     else right='<button class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
-    return '<div class="plan-foot">'
-      +'<button class="icon-btn" onclick="planCopy(\''+p.id+'\')" title="Copy the plan text"><i data-lucide="copy"></i></button>'
-      +'<button class="icon-btn" onclick="planAct(\'edit\',\''+p.id+'\')" title="Edit the plan"><i data-lucide="square-pen"></i></button>'
-      +commentCtlHTML(p.id)
-      +sendGrpHTML('share','Share','share-'+p.id)+sendGrpHTML('review','Review','rev-'+p.id)
+    return '<div class="plan-foot">'   /* P4: Share → Embed/Attach control; Review → single-agent reviewer chip; decision trio stays right */
+      +embedAttachHTML(p.id)+reviewChipHTML(p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
   /* 3-row header: [owner badge · title · state] / [feedback badges · steps done] / [filename · created/edited] */
   function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);
@@ -3705,11 +3920,12 @@ resize intact.`,
     if(!fbadges)fbadges='<span class="fb-none">No feedback yet</span>';
     return '<div class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,true)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span class="dbadge '+bb[0]+'">'+bb[1]+'</span>'+(p.ultra?'<span class="plan-ultra">Ultraplan</span>':'')+'</div>'
+      +'<div class="plan-row r1">'+badgeHTML(a,true)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
       +'<div class="plan-row r2"><span class="cnt-strip">'+fbadges+'</span><span class="flex-1"></span><span class="steps-txt'+(done===stepN?' all':'')+'">'+done+'/'+stepN+' steps done</span></div>'
       +'<div class="plan-row r3"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
-      +'<div class="plan-body"><div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
+      +'<div class="plan-body">'+editHeadHTML("planCopy('"+p.id+"')","planAct('edit','"+p.id+"')",p.id,'')   /* P3 #119: Editor header above the plan content */
+      +'<div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
       +'<div class="plan-main">'+mdEditorHTML(p.id,p.md)+'</div></div>'
       +planFootHTML(p)+'</div></div>';}
   function renderPlans(){const el=document.getElementById('plan-list');if(el)el.innerHTML=PLANS.map(planCardHTML).join('');
@@ -3734,12 +3950,38 @@ resize intact.`,
     const tog=lbl=>{const b=[...bar.querySelectorAll('.minitog')].find(x=>x.textContent.trim()===lbl);return b?b.classList.contains('on'):true;};
     const dirOn={out:tog('Sent'),in:tog('Received')};
     const km={Thoughts:'think',Read:'read',Write:'write',Bash:'bash',Diffs:'diff',Meta:'meta'};const kind={};Object.keys(km).forEach(l=>kind[km[l]]=tog(l));
-    document.querySelectorAll('#msg-list .fcard').forEach((c,i)=>{const o=MSGS[i];if(o&&o.dir)c.style.display=dirOn[o.dir]?'':'none';});
-    document.querySelectorAll('#msg-list .msg-blk').forEach(b=>{b.style.display=(kind[b.dataset.blk]!==false)?'':'none';});}
+    document.querySelectorAll('#msg-list .msgcard').forEach(c=>{const o=MSGS[+c.dataset.msgi];if(o&&o.dir)c.style.display=dirOn[o.dir]?'':'none';});
+    /* P1b: hide whole block ROWS (rail + content) so only currently-visible blocks are selectable; a hidden block can't stay selected */
+    document.querySelectorAll('#msg-list .mrow[data-blk]').forEach(r=>{const vis=kind[r.dataset.blk]!==false;r.style.display=vis?'':'none';if(!vis)r.classList.remove('bsel');});}
+  /* P1b: a Messages card uses the shared select-to-act model — click the header to select the WHOLE card
+     (pink, multi + select-all), a per-block rail to select one block (teal), the chevron to expand
+     (select ≠ expand). Scratch still uses fcardHTML (checkbox). */
+  function msgCardHTML(o,i){const a=AG[o.ag];return '<div class="fcard msgcard" data-selcard data-msgi="'+i+'">'
+    +'<div class="fcard-head">'
+    +'<button class="fcard-exp msel-head" onclick="msgCardSel(event,this)" title="Click to select this whole message (Attach)">'
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* status badge leads received cards (Active/Complete/Failed); user-sent keep just the sent tag */
+    +badgeHTML(a,true)
+    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
+    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+    +'</div>'
+    +'<div class="fcard-body">'+msgRailHTML(o)+'</div></div>';}
+  /* the block rail: the default message text is one selectable block, then each typed block (think/read/…) */
+  function msgRailHTML(o){
+    let rows='<div class="mrow" data-mblk="text"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
+      +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
+    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
+      +'<div class="mrow-c">'+msgBlockHTML(b)+'</div></div>').join('');}
+    return '<div class="mrail-wrap">'+rows+'</div>';}
+  function clearMsgBlkSel(){document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
+  function clearMsgCardSel(){document.querySelectorAll('#msg-list .msgcard.sel').forEach(c=>c.classList.remove('sel'));}
+  function msgCardSel(e,btn){const c=btn.closest('.msgcard');if(!c)return;clearMsgBlkSel();c.classList.toggle('sel');eaUpdate('feed');}   /* whole = pink, multi-select; clears any block selection */
+  function msgBlkSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const was=row.classList.contains('bsel');clearMsgBlkSel();clearMsgCardSel();if(!was)row.classList.add('bsel');eaUpdate('feed');}   /* block = teal, single; clears card selection */
+  function msgSelectAll(btn){clearMsgBlkSel();const cards=[...document.querySelectorAll('#msg-list .msgcard')].filter(c=>c.style.display!=='none');const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));cards.forEach(c=>c.classList.toggle('sel',!allOn));eaUpdate('feed');}
   function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
     +'<button class="fcard-exp" onclick="toggleFcard(this)">'
-    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',failed:'Failed'}[o.status]||'Complete')+'</span>':'')   /* v10p1 #16 + v1.x #5: status badge leads the agent icon on received messages (Active green / Complete muted / Failed red); user-sent keep just the sent tag */
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
     +badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
@@ -3800,7 +4042,7 @@ resize intact.`,
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
        {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
-    {ag:'drew',dir:'in',status:'failed',time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
+    {ag:'drew',dir:'in',status:'error',time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
        {k:'meta',t:'auto-stop: run ended on error · 0 retries left'}]}
@@ -3829,7 +4071,7 @@ resize intact.`,
     {badge:'db-complete',status:'Complete',from:'kai',to:['max'],time:'14:30',att:[{name:'auth-token-rotation-shimmering-falcon.md',type:'doc'}],body:`Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.`}
   ];
   function renderFeed(){
-    const m=document.getElementById('msg-list');if(m){m.innerHTML=MSGS.map(fcardHTML).join('');applyMsgFilters();}
+    const m=document.getElementById('msg-list');if(m){m.innerHTML=MSGS.map(msgCardHTML).join('');applyMsgFilters();}
     const s=document.getElementById('scratch-list');if(s)s.innerHTML=SCRATCH.map(fcardHTML).join('');
     const l=document.getElementById('log-list');if(l)l.innerHTML=LOG.map(logCardHTML).join('');
     const h=document.getElementById('hist-list');if(h)h.innerHTML=HIST.map(histCardHTML).join('');
@@ -3867,8 +4109,7 @@ resize intact.`,
         </ul>
         <h5>Needs you</h5>
         <ul>
-          <li>2 pending requests — <b class="k">drew</b> permission (14:38) and <b class="k">sandy</b> approval (14:41).</li>
-          <li><b class="k">sage</b> is holding the deploy gate (14:43).</li>
+          <li>4 open Inbox requests — <b class="k">sage</b> permission (deploy gate, 14:43), <b class="k">sandy</b> plan to merge (14:41), <b class="k">vega</b> decision on rotation strategy (14:44), and <b class="k">drew</b> error — staging unreachable (14:48).</li>
         </ul>
         <p class="fo-sub">Generated from all 9 log entries · mock summary</p>`}
   };
@@ -3886,56 +4127,77 @@ resize intact.`,
      v10p1 #15: each card collapses to identity + type badge + title; expand reveals the detail + actions.
      The checkbox multi-selects (shared Copy/Share strip). data-agent lets a Pending badge jump-expand it.
      #11: Reject + Deny use the danger color; Approve stays pink-primary, Always allow stays neutral. */
-  const REQ_META={
-    permission:{cls:'db-permission',ic:'circle-alert',lab:'Permission',edge:'var(--req-permission)'},
-    approval:{cls:'db-approval',ic:'circle-check',lab:'Approval',edge:'var(--req-approval)'},
-    decision:{cls:'db-decision',ic:'git-branch',lab:'Decision',edge:'var(--req-decision)'}
-  };
+  /* P2: Inbox grouped into typed SECTIONS — Permission · Plan · Decision · Error. The section header
+     carries the type label, so cards drop the per-card type badge (this supersedes the old reddish→copper
+     attention ramp). Approval → Plan. Decision is the AskUserQuestion surface — one question per card.
+     Plan cards keep only Review (→ Plans tab) + Reply; approval + agent verdicts live in the Plans tab. */
+  const INBOX_SECTIONS=[
+    {type:'permission',lab:'Permission'},
+    {type:'plan',lab:'Plan'},
+    {type:'decision',lab:'Decision'},
+    {type:'error',lab:'Error'}
+  ];
+  function secLabel(t){const s=INBOX_SECTIONS.find(x=>x.type===t);return s?s.lab:t;}
   const REQS=[
-    {ag:'drew',type:'permission',time:'14:38',title:'Run bash command',cmd:'rm -rf node_modules && pnpm install'},
-    {ag:'sandy',type:'approval',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
+    {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'},
+    {ag:'sandy',type:'plan',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
-    {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'}
+    {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'}   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
   ];
-  function inboxReplyHTML(a){return '<span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>'
-    +'<button class="btn-secondary btn-sm" onclick="replyTo(\''+a.name+'\')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* v1.x #9: Reply = teal hand-off (routes to an agent via Prompts) */
-  function inboxCardHTML(o){const a=AG[o.ag];const m=REQ_META[o.type];let detail,acts;
+  function inboxReplyHTML(){return '<span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>'
+    +'<button class="btn-secondary btn-sm" onclick="inboxReply(this)" title="Reply via the Editor (quotes the request as a reference block)"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted */
+  function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,\'Always allowed\')">Always allow</button>'+inboxReplyHTML(a);}
-    else if(o.type==='approval'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Rejected\')">Reject</button>'+inboxReplyHTML(a);}
-    else{detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
-      acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML(a);}
-    return '<div class="fcard inbox-card" data-agent="'+o.ag+'" style="border-left:6px solid '+m.edge+'">'
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,\'Always allowed\')">Always allow</button>'+inboxReplyHTML();}
+    else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plan: Review (→ Plans) + Reply only — no Approve/Reject */
+      acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+    else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
+      acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
+    else{detail='<div class="rc-body inbox-err">'+esc(o.body)+'</div>';   /* Error: inline error text + Retry · Dismiss · Reply (no View, no Forward) */
+      acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML();}
+    const sub=(o.type==='error'&&o.subtype)?'<span class="inbox-subtype">'+esc(o.subtype)+'</span>':'';
+    return '<div class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
       +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
-      +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
-      +'<span class="dbadge '+m.cls+'"><i data-lucide="'+m.ic+'" style="width:10px;height:10px"></i>'+m.lab+'</span>'
+      +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)+sub
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
       +'<span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
       +'<div class="fcard-body"><div class="inbox-detail">'+detail+'</div><div class="inbox-acts">'+acts+'</div></div></div>';}
-  function renderInbox(){const el=document.getElementById('inbox-list');if(el){el.innerHTML=REQS.map(inboxCardHTML).join('');LU();}refreshInbox();}
+  function renderInbox(){const el=document.getElementById('inbox-list');if(el){
+      let html='';INBOX_SECTIONS.forEach(sec=>{const items=REQS.filter(r=>r.type===sec.type);if(!items.length)return;
+        html+='<div class="inbox-sec inbox-sec--'+sec.type+'"><div class="inbox-sec-head"><span class="inbox-sec-lab">'+sec.lab+'</span><span class="inbox-sec-n">'+items.length+'</span></div>'
+          +'<div class="inbox-sec-cards">'+items.map(o=>inboxCardHTML(o,REQS.indexOf(o))).join('')+'</div></div>';});
+      el.innerHTML=html;LU();}refreshInbox();}
   function refreshInbox(){const n=document.querySelectorAll('#feed-inbox .fcard').length;
     const b=document.getElementById('inbox-badge');if(b){b.textContent=n;b.style.display=n?'':'none';}
     const aw=document.getElementById('inbox-await');if(aw)aw.textContent=n+' agent'+(n===1?'':'s')+' awaiting your input — one open request each';}
-  function inboxResolve(btn,verb){const card=btn.closest('.fcard');if(!card)return;const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();
+  /* P2: after removing a card, drop its section if it's now empty, else update the section count */
+  function inboxAfterRemove(sec){if(!sec)return;const cards=sec.querySelectorAll('.fcard');if(!cards.length){sec.remove();return;}const c=sec.querySelector('.inbox-sec-n');if(c)c.textContent=cards.length;}
+  function inboxResolve(btn,verb){const card=btn.closest('.fcard');if(!card)return;const sec=card.closest('.inbox-sec');const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();
     toast(verb+' — '+nm+' unblocked');card.style.transition='opacity .2s,transform .2s';card.style.opacity='0';card.style.transform='translateX(8px)';
-    setTimeout(()=>{card.remove();refreshInbox();},200);}
+    setTimeout(()=>{card.remove();inboxAfterRemove(sec);refreshInbox();},200);}
   function inboxDecision(btn){const card=btn.closest('.fcard');const opt=card&&card.querySelector('.opt.on');if(!opt){toast('Select an option first');return;}
-    const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
+    const sec=card.closest('.inbox-sec');const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
     toast('Approved '+lab+' — '+nm+' unblocked');card.style.transition='opacity .2s';card.style.opacity='0';
-    setTimeout(()=>{card.remove();refreshInbox();},200);}
+    setTimeout(()=>{card.remove();inboxAfterRemove(sec);refreshInbox();},200);}
+  /* P2: generalized Reply — pre-fill the Editor with a FROZEN embed reference block (P1a) of this card's
+     contents, then pre-target the agent. Decision embeds the question + its options; the rest the detail. */
+  function inboxReply(btn){const card=btn.closest('.fcard');if(!card)return;const o=REQS[+card.dataset.reqi];const a=AG[card.dataset.agent];if(!o||!a)return;
+    let body;if(o.type==='decision'){body=esc(o.title)+'\n\n'+(o.options||[]).map(op=>'• '+esc(op.nm)+' — '+esc(op.desc)).join('\n');}
+    else{body=esc(o.title)+(o.body?('\n\n'+esc(o.body)):'')+(o.cmd?('\n\n$ '+esc(o.cmd)):'');}
+    const block=blockHTML('embed',{source:'Inbox · '+secLabel(o.type)+' from '+a.role+' '+a.name,body:body,srcAction:"switchTab('feed','inbox')",clamp:true,kindLabel:'reply'});
+    const f=document.getElementById('compose-field');if(f)f.insertAdjacentHTML('afterbegin',block);
+    replyTo(a.name);if(window.lucide&&lucide.createIcons)lucide.createIcons();toast('Reply drafted — '+a.name+' quoted in the Editor');}
+  /* P2: Error Retry — load the last command into the Editor (routes through the Editor, not the Console) */
+  function inboxRetry(btn){const card=btn.closest('.fcard');if(!card)return;const o=REQS[+card.dataset.reqi];const a=AG[card.dataset.agent];const cmd=(o&&(o.cmd||o.title))||'';
+    const f=document.getElementById('compose-field');if(f)f.insertAdjacentHTML('afterbegin','<div>'+esc(cmd)+'</div>');
+    if(a&&!a.user)replyTo(a.name);else switchTab('prompt','compose');
+    toast('Retry — last command loaded in the Editor');}
 
   /* shared send-to-agents control (Share on the feed · Review on a plan) */
   let _tt=null;
   function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t);}t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2400);}
-  function sendTo(btn){const grp=btn.closest('.send-grp');if(!grp)return;const scope=grp.querySelector('[data-agscope]');
-    const sel=[...scope.querySelectorAll('.agrow.on')].map(r=>AG[r.dataset.ag].name);
-    if(!sel.length){toast('Pick at least one agent first');return;}
-    closeAllPopups();const kind=grp.dataset.sendkind;
-    toast((kind==='review'?'Sent for review to ':'Shared with ')+sel.join(', '));
-    const sentEl=grp.parentElement.querySelector('[data-sent]');if(sentEl){sentEl.style.display='inline';sentEl.textContent='✓ sent to '+sel.length+' agent'+(sel.length>1?'s':'');}}
 
   /* ===== v1.2: Console — raw feed + slash-command catalog (scoped to the focused agent) ===== */
   const CON_FEED=[
@@ -4080,7 +4342,7 @@ resize intact.`,
     'Agent':"The selected agent — its identity, config, and live run state. Details (config + Context/Turns + Rewind/Handoff timeline) · Create (new-agent wizard) · Console (raw CLI feed + slash-command runner).",
     'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending), subagent dots, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
     'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
-    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent Filter (persists across all four tabs). Messages (team traffic; toggle direction + tool detail) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (approvals you owe — its badge is the fleet total).",
+    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Messages (team traffic; Type = direction, Content = tool detail; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Permission · Plan · Decision · Error sections; its badge is the fleet total).",
     'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. From (single) sets who it's sent as; To (multi, led by the Scratch row) sets who receives it. Compose · Templates · History, with From/To persisting across all three.",
     'Link Config':"Forwards context from one agent to another. Direction A→B / B→A / A↔B. Trigger (when it delivers): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue drains the queue (polite default) · Hold stages for your approval. Payload (what is sent): Message · Transcript · Manual. End After bounds this exchange — distinct from an agent's own Lifecycle limits."
   };
@@ -4094,7 +4356,7 @@ resize intact.`,
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
-    renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate);
+    renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();eaUpdateAll();
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
@@ -4102,7 +4364,7 @@ resize intact.`,
     if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);
       const pr=document.getElementById('pRight');if(pr)new ResizeObserver(positionConsoleView).observe(pr);}   /* v10p1 #13: keep the Console step-into's right edge pinned to #pRight on splitter/window resize */
     window.addEventListener('resize',positionConsoleView);
-    document.querySelectorAll('[data-agscope]').forEach(s=>{agSync(s);updateAgBadges(s);updateSendCount(s);});
+    document.querySelectorAll('[data-agscope]').forEach(s=>{agSync(s);updateAgBadges(s);});
     seedHoverCards();
     initResizers();updateFmt('fmt');LU();drawEdgesSoon();
   }

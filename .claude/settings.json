@@ -30,7 +30,9 @@
       "Skill(session-brief:*)"
     ],
     "deny": [
-      "Read(./.vscode/claude-prompts.code-snippets)"
+      "Read(./.vscode/claude-prompts.code-snippets)",
+      "Read(./dev/notes/_human-only/**)",
+      "Read(./dev/notes/_human-only)"
     ],
     "ask": [
       "Bash(git push *)",
@@ -50,5 +52,6 @@
   },
   "agent": "vibe-guide",
   "enableAllProjectMcpServers": true,
+  "fastMode": true,
   "plansDirectory": "./.claude/plans"
 }

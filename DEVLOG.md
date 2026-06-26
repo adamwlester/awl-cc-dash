@@ -405,6 +405,146 @@ Files: design/TODO.md, archive/design/design-v10p7/ (DESIGN.md, TODO.md, mockup.
 
 ---
 
+### 2026-06-25 21:48:17 — Authored the link-behavior / dashboard refactor brief (dev/prompts)
+
+Captured a long design discussion into `dev/prompts/link-behavior-refactor.md` — a phased (P0→P4) implementation brief for the next agent. Scope: the **Embed/Attach** content-sharing model (replacing the Share + "Link to prompt" controls, routed through the renamed **Editor** with frozen embed blocks, interactive template blocks, an attachment strip + inline citations); the **Inbox** restructure (typed sections + a new **Error** type, Approval→Plan, Plan cards lose Approve/Reject, status-color rework); the single-agent **Review** chip; the rail-badge multi-comment fix; dropdown agent-badge tightening; and Ultraplan removal + the v10p6 labeled-toggle revert. Grounded in exact mockup anchors (functions/classes/line refs); no product code changed yet. Review/Inbox formalization (B13) + real backend left deferred.
+
+Files: dev/prompts/link-behavior-refactor.md, DEVLOG.md
+
+---
+
+### 2026-06-25 22:28:44 — Refactor brief: folded in note 119 + scoped Scratch/Log + Reply-block primitive
+
+Worked four human decisions into `dev/prompts/link-behavior-refactor.md` with minimal edits. (1) **Note 119 now in scope** — P3 gains the Library **Plans & Documents "Editor" header** with Copy·Edit·Comment lifted inline/right-aligned, reusing Compose's ghost copy/clear icons (Assets drops them); removed from Out-of-scope, added to the TODO-removal + DESIGN-sync lists, P3 title/acceptance updated. (2) **Scratch/Log explicitly out** — P1b select-to-act + Embed/Attach scoped **Messages-only**, with a matching Out-of-scope bullet. (3) **Plans decision trio** preservation left to the standing "preserve what you weren't asked to change" rule (per human), reinforced naturally in the 119 bullet. (4) **Reply reference block** documented as a frozen `embed` block reusing the P1a primitive (P2 + the P1a consumer list). No product code changed.
+
+Files: dev/prompts/link-behavior-refactor.md, DEVLOG.md
+
+---
+
+### 2026-06-25 22:51:21 — Link-behavior refactor P0: Ultraplan removed + Mode-toggle reverted to labeled buttons
+
+First phase of the `dev/prompts/link-behavior-refactor.md` run. **Ultraplan removed entirely** from `design/mockup.html`: the `.ultra-tog` toggle (both Details + Create), `toggleUltra`/`syncUltraGate` JS, the `syncUltraGate` calls in `segPick`/`setSegActive`/init, the `.plan-ultra` CSS + the plan-card Ultraplan tag render, the `ultra` field on all three `PLANS` rows, and every `ultraplan` string (incl. two changelog comments + a CSS comment) — verified `grep -i ultraplan design/` returns 0 matches in the mockup (only the legitimate Effort-seg "Ultra" buttons remain, untouched). **Mode toggles reverted** from the `.swh` slider style to the **labeled toggle-button style** (the brief's named v10p6 target was actually the short-label button style; the "Opus fast-mode Off/On" long-label markup + label-rewriting JS live in v10p2/v10p4 — pulled from there per the brief's explicit `(reads 'Opus fast-mode Off/On')` intent). Now **two toggles only** in a 2-col grid in both Details + Create, labels read their own state (**Opus Fast-Mode Off/On**, **Thinking Mode Off/On**), the whole button fills teal when on. **Opus Fast-Mode stays gated to Opus** (`gateFast` now also resets the label to "Off" when it clears `.on`); Thinking ungated. Synced `design/DESIGN.md` (Mode-block paragraph → two labeled toggle-buttons; Create wizard line) and `design/TODO.md` B4 (dropped the "must support the new native ultraplan functionality" clause).
+
+**Verified in-browser** (Playwright MCP, served :8801) at narrow (990) + wide (1920): 0 console errors (favicon 404 only); `syncUltraGate`/`toggleUltra` are `undefined`; Details shows ungated Fast + Thinking-On, Create shows gated Fast (Inherit) + Thinking-Off; click-through confirmed Fast on→"On"+teal, Think off→"Off", model Opus→Sonnet gates+clears Fast to "Off", gated click is a no-op, Sonnet→Opus un-gates; labels show full at wide and ellipsis-truncate gracefully at narrow with no row overflow (icons + tooltips disambiguate, the established pattern). Nothing else in the Agent panel shifted. (Note: the Playwright MCP browser's headless/headed mode is fixed at server launch — re-screenshotted the touched states at both extremes as the parity check.)
+
+Files: design/mockup.html, design/DESIGN.md, design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-25 23:13:44 — Link-behavior refactor P1: block primitive · feed select-to-act · badge tightening
+
+The foundational phase P2–P4 lean on. **P1a — inserted-block primitive:** added `blockHTML(kind,o)` (+ `citeHTML`, `removeBlock`, `toggleBlockClamp`, `selectTplBlock`, `gotoCitation`) and an `.ed-block` CSS family — one renderer, three variants: **embed** (frozen quoted content: "from <source>" header, click-to-source, remove ×, clamp+expand), **template** (same shell but selectable/active), **citation** (`.ed-cite` inline pill). Boundary uses the card-outline colour (`--border` navy), not the tan divider. Built as a reusable scaffold; it's wired into the editor in P3 and consumed by P2 (Reply) / P4 (embeds, citations), so its DESIGN.md write-up lands when it's visible there. **P1b — feed select-to-act (Messages only):** new `msgCardHTML`/`msgRailHTML` replace `fcardHTML` for the Messages list (Scratch still uses `fcardHTML` + its checkbox, per scope). Removed the per-card checkbox → **click the header to select the whole card** (pink `--main-dim`, multi-select) with a **select-all** (`#msg-selall-btn`, Messages-only via switchTab) in the action strip; the **chevron is its own button** so *select ≠ expand*. Each card gets a **block rail**: the default message text + each typed block are individually selectable (teal `--select`), and the rail tracks the active **Content** filter — `applyMsgFilters` now hides whole `.mrow[data-blk]` rows (rail + content) and clears a hidden block's selection. Card-select clears any block-select and vice-versa (one intent at a time → Attach vs Embed in P4). Relabelled the feed controls **Filter→From/To · Show→Type · Include→Content**. **P1c — badge tightening:** `.badge`/`.badge-more` 32→**30px** (matches the footer action-button footprint, so the P4 Review chip's full badge isn't taller than its neighbours), and `.agtile` background → `currentColor` so a non-square badge tile shows the agent colour edge-to-edge instead of **white strips** above/below the icon's square (zero glyph distortion; square tiles + the `--ag-user` tile are unaffected).
+
+**Verified in-browser** (Playwright MCP, :8801) at narrow (1000) + wide (1920): 0 console errors (favicon only). Confirmed numerically + visually: dropdown badges = 30px (= footer Revise/Approve/Summarize) with letterbox 0 / tile bg = agent colour, graph + user tiles unregressed; header-click selects the whole card pink (not expanded), chevron expands, block-rail click selects one block teal (clears the card), Content filter hides block rows + clears their selection, select-all toggles all; block primitive renders all three variants (navy boundary, from-header, ×, clamp/"Show more", active template, citation pill) via a transient injection (not committed). No row/card overflow at either extreme. Synced `design/DESIGN.md` (Team Feed From/To + Messages select-to-act & Type/Content relabels; the Library doc-editor note that the Feed shares the model; the Design-system identity-badge height + edge-to-edge tile convention). (Playwright MCP browser mode is fixed at launch — re-screenshotted touched states at both extremes as the parity check.)
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-25 23:16:00 — Queue Turns-breakdown dropdown in design TODO
+
+Added a **Next up** item to `design/TODO.md`: turn the Agent panel's Turns bar into an expandable dropdown like Context (its own `.ctx-trigger`, a `breakdownHTML`-style accordion), breaking turns out **by tool used** (Read/search · Edit/Write · Bash · MCP · Subagent · Web) with a **Coordinating** slice folded in for the multi-agent angle, header mirroring Context (`34/50 · 68% · 16 left`), demo data only. Captures the in-session design direction; no mockup change yet.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-25 23:31:37 — Link-behavior refactor P2: Inbox restructured into typed sections + Error type
+
+Rebuilt the Inbox around **typed sections** — **Permission · Plan · Decision · Error** — rendered by a sectioned `renderInbox` (`INBOX_SECTIONS`, section header carries the label + count, empty sections skipped, count updates / section drops on resolve via `inboxAfterRemove`). The **per-card type badge is gone** (the section conveys type), superseding the reddish→copper attention ramp (TODO C7). **Approval → Plan**, and **Plan cards drop Approve/Reject** — only **Review** (→ Library Plans via `reviewPlan`) + Reply (approval/verdicts live in the Plans tab). **Decision** is documented as the `AskUserQuestion` surface (one question/card) — options + an Approve gated until you pick + Reply. **New Error type:** `inboxCardHTML` renders inline error text + **Retry · Dismiss · Reply** (no View, no Forward), a short **subtype** chip, and a **danger left-edge** (`.inbox-card.inbox-card--error`, 2-class to beat `.fcard`'s border shorthand); the Error section header is danger. **Wired the failed→Error example:** the Messages `status:'failed'` drew/ECONNREFUSED card is now `status:'error'` (badge reads **Error**, `.db-failed`→`.db-error`), and drew's REQS entry is an **Error** card — so drew's graph **Pending** badge jumps to it. **Reply generalized** (`inboxReply`): pre-fills the Editor with a **frozen `embed` reference block** (the P1a primitive) quoting the card — a Decision embeds the question + options; Plan/Permission/Error the detail — and pre-targets the agent; **Retry** (`inboxRetry`) loads the last command into the Editor (not the Console). **Status colours reconciled:** Error owns danger; Pending stays warning; no collisions (Error reuses the existing `--danger`, so no tokens.css change needed).
+
+**Verified in-browser** (Playwright MCP, :8801) at 1500 + narrow 1010: 0 console errors. Confirmed: 4 sections one-each, 0 legacy `.dbadge` type badges, Plan=[Review,Reply], Decision=[Approve(disabled),Reply]+2 options, Error=[Retry,Dismiss,Reply]+subtype "Connection"+danger edge+inline ECONNREFUSED text; Messages badges show **Error** (not Failed); Reply inserts an embed block sourced "Inbox · Plan from researcher 01 sandy" and targets sandy; drew Pending badge → opens+selects drew's Error card; no card/list overflow at the narrow extreme (actions wrap). Synced `design/DESIGN.md` (rewrote *The Inbox tab* → typed-section table with Error + AskUserQuestion Decision + Plan-loses-Approve/Reject + generalized Reply-embed; Design-system danger row + retired attention-ramp paragraph + badge-families note; Team-Feed Inbox row + the Team Feed hover-card). TODO.md Inbox-note removals batched for the final housekeeping pass. (Playwright MCP browser mode fixed at launch — re-checked touched states at both extremes.)
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-25 23:38:08 — Response-popover design sketch in design/ui-snippets
+
+New standalone snippet `design/ui-snippets/response-popover.html` (first file in the new `ui-snippets/` dir) — an "ideal" version of the Compose-footer Response settings popover, not wired into the mockup. Links `../tokens.css`. Reworks the current `#fmt-menu`: wider (340px), single-select axes → `.seg` segmented controls with graded options (Length/Altitude/Register), multi-select axes → `.tog-cell` toggle grids (Structure/Emphasis), a STYLE/BEHAVIOR split, a new **Pace** dial (Snap→Deep) framed as independent of the agent's Effort tier, a Reasoning-shown axis, and an override-count badge.
+
+Verified in-browser (Playwright MCP, :8802) at 1280 + 560: caught left-anchor overflow at the narrow width → switched the popover to right-anchor (`.fmt-menu.right` + `max-width:calc(100vw-24px)`) → re-verified clean at both extremes. Exercised the controls: seg single-select, multi-toggle, group-level override badge (3 axes changed → badge 3), Reset → defaults/badge hidden. Console clean (favicon 404 only).
+
+Files: design/ui-snippets/response-popover.html, DEVLOG.md
+
+---
+
+### 2026-06-25 23:44:05 — Response-popover: toggle cells match segmented-button type/sizing
+
+Restyled the multi-select `.tog-cell` toggle grids in `design/ui-snippets/response-popover.html` to read identically to the `.seg` segmented buttons — dropped the all-caps + letter-spacing + drop-shadow + fixed 28px height, now 9.5px / weight-700 (active 800), muted colour, `6px` vertical padding, and the seg's background-tint hover. Still standalone bordered boxes (not connected), per request. CSS-only; interaction logic unchanged.
+
+Verified headless with an **isolated throwaway Chrome profile** (not the shared Playwright MCP browser — another agent is on the UI) via `--screenshot` over `file://` at 1280 + 560. Confirmed: toggle cells now match the segments in text size/weight/case and button height, the `.on` teal matches segment `.active`, and the right-anchored popover stays clean with no overflow at the narrow extreme. Shots in `artifacts/shots/`.
+
+Files: design/ui-snippets/response-popover.html, DEVLOG.md
+
+---
+
+### 2026-06-25 23:53:32 — Turns-dropdown design sketch in design/ui-snippets
+
+New standalone snippet `design/ui-snippets/turns-dropdown.html` — the Agent-panel Turns breakdown idea from TODO Next up, built on Context's own primitive (`.ctx-trigger` + `.acc` accordion + `.bd` breakdown, CSS copied verbatim from the mockup; links `../tokens.css`). Shows Context collapsed above + Turns open below so the bar alignment + parallel are visible. Turns broken out **by tool** (Read/search · Edit/Write · Bash · Coordinating · MCP · Subagent · Web) summing to 34, with a **Remaining 16** segment closing the 50-turn budget (parallels Context's Free space), header `34 / 50 · 16 left`, a health-amber 68% summary bar, and two drill-downs (`/ Tools used (calls)`, `/ Coordinated with`) paralleling Context's memory/agents subs.
+
+Verified headless with an isolated throwaway Chrome profile (not the shared MCP browser) via `--screenshot`/`file://`. Note: Chrome-on-Windows clamps the window to ~484px min, so `--window-size` below that just *crops* a 484px layout — a debug overlay (`vw=484`) confirmed the apparent narrow-overflow was that crop artifact, not a real bug. Tested true narrow via an iframe forcing 300px + 420px panel viewports: clean at both + full width, no clipping. Hardened the page meanwhile (fluid panel `width:100%;max-width:360`, block layout + `margin:auto`, caption `width:100%`).
+
+Files: design/ui-snippets/turns-dropdown.html, DEVLOG.md
+
+---
+
+### 2026-06-25 23:54:36 — Link-behavior refactor P3: Compose→Editor · templates-as-blocks · attachment strip · Library Editor headers
+
+**Prompt panel:** renamed the **Compose heading → "Editor"** and reordered the tab to **attachment-strip → Editor → Templates** (#118). New `#attach-strip` (#109) renders horizontal chips styled like the Library nav cards from an `ATTACH` array — each with a **remove ×** + **click-to-open in the Library** (`renderAttachStrip`/`openAttachmentCard`/`removeAttachment`/`addAttachment`; seeded with 2 representative items, hidden when empty). **Templates now insert as blocks:** `applyTemplate` builds a selectable **`template` block** (the P1a primitive) at the cursor instead of inline raw text; the **active** block (`.sel`) is what the fill input drives — `onTplBlockSelected` enables the fill + syncs the picker, and `pickPlaceholder` now also activates a pill's parent block. None deselects + greys. So the Editor holds free prose + stacked delimited blocks (frozen embeds + interactive templates). **Library (#119):** added an **"Editor" header** (label + right-aligned ghost **Copy·Edit·Comment**, reusing Compose's `.ghost-ic`) above the content in **Plans + Documents** (`editHeadHTML`; doc placeholders + `renderDocs` fill; `planCardHTML` inserts it above `.plan-rev`); `libFootHTML`/`planFootHTML` **dropped Copy·Edit·Comment** from the footers (Documents/Assets footer = Link-to-prompt + Remove; Plans footer = Share·Review + decision trio). **Assets drop the three buttons entirely** (no Editor header — an image isn't text-editable). `docEdit` toggles icon-only (pencil↔check) so the ghost button stays icon-only.
+
+**Verified in-browser** (Playwright MCP, :8801 — cleared a stale locked MCP-chrome profile to relaunch) at 1500 + narrow 1010: 0 console errors (favicon only). Confirmed: compose order = attach-strip→editor-header→editor-field→templates(header/select/fill); Editor label; 2 attach chips (remove 2→1 works, click opens Library); template pick → 1 active block w/ 5 pills + fill enabled; pill click activates its block, Apply fills the pill ("src/auth/*"→"src/auth/tokens.ts"), block ×-removes; Documents Editor header (3 ghost btns) + footer [Link, Remove]; Plans Editor header (3 ghost) + footer has no icon-btn Copy/Edit + Share/Review/decision; Assets has no Editor header + footer [Link, Remove]. No overflow at the narrow extreme (strip wraps, blocks/headers fit). Synced `design/DESIGN.md` (Prompts Compose bullet → Editor + attachment strip + templates-as-blocks; The Templates flow → the 3-variant block primitive + templates-below-as-blocks; Library Plans footer→Editor-header split + Documents/Assets card-shape + the Conventions icon-style note + the layout ASCII). TODO.md note removals batched for the final pass.
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-25 23:55:00 — TODO Next up: point Turns + Response items at their snippets
+
+Trimmed the **Turns Breakdown Dropdown** Next-up item to a one-liner that defers to `design/ui-snippets/turns-dropdown.html`, and added a **Response Settings Popover** item deferring to `design/ui-snippets/response-popover.html`. Both now reference their snippet as the design source with minimal inline explanation, rather than restating the spec.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 00:17:17 — Link-behavior refactor P4: Embed/Attach capstone · citations · Review chip · comment-bug fix
+
+The content-sharing capstone — collapses sharing into one **Embed/Attach** control routed through the Editor. **P4a:** `embedAttachHTML(host)` renders a selection-gated [Embed | Attach | link-icon] control; `eaSelKind`/`eaUpdate`/`eaUpdateAll` gate it (section/line/block → Embed; whole-doc/title or Asset or whole feed card[s] → Attach; both modes visible, the inapplicable one greys, link icon sends). It **replaces** the Share send-group + "Link to prompt" on the Library footers (`planFootHTML`, `libFootHTML`) and the Feed action strip. **Embed** drops a frozen `embed` block into the Editor from the selection (`eaEmbed`/`eaEmbedFeed`/`insertEmbed`); **Attach** adds a strip chip (`eaAttach`/`eaAttachFeed`) — a real path for files, a `/tmp/awl/...` **materialized temp path** for feed content. Gating wired into `railClick`/`clearSel` (Library) + `msgCardSel`/`msgBlkSel`/`msgSelectAll` (Feed) + `eaUpdateAll()` on init. **P4b — citations:** each attachment chip gets a link icon → `citeAttachment` inserts an inline `citation` pill (carrying the att id) at the cursor; `onAttachmentRemoved` cascades (removing an attachment deletes its citations); deleting a citation leaves the attachment; you can only cite an existing attachment (trigger lives on the chip). **P4c — Review chip:** `reviewChipHTML`/`revRowHTML`/`pickReviewer`/`sendReview` replace the Plans multi-select Review send-group with a single-agent reviewer select (full agent badge trigger — 30px from P1c — + an icon-only `scan-search` send). **P4d — comment-bug fix:** the rail badge is now a **section anchor** — `railBadge`/`openCmtPop`/`selectMatchingCards`/`navCardClick` drop the worst-verdict filter, so a click opens **all** comments on the section (count matches), each row carrying its **own** verdict badge + thumbs.
+
+**Verified in-browser** (Playwright MCP, :8801) at 1500 / narrow 1010 / wide 1920: 0 console errors. Confirmed: Plan EA gates (no-sel→disabled · section→Embed · title→Attach), Asset→Attach default, Feed block→Embed / card→Attach; Embed inserts a sourced block ("Library → Plans · … · § Context"), Attach adds chips (asset real path; feed `/tmp/awl/feed-01 sandy-1441.md` temp); citation insert (1) + cascade-on-attach-remove (→0); reviewer pick vega→drew updates the badge; **P4d** §Approach badge=2 opens 2 comments [Revise, Approve] each with its own verdict (the old bug opened 1). Caught + fixed a narrow-overflow: the wider Embed/Attach made the Feed strip overflow by 44px at 1010 → added `flex-wrap` (one row at wide=30px, clean 2-row at narrow=68px, no overflow); Plans footer wraps too. Synced `design/DESIGN.md` (new *Sharing content into a prompt — Embed/Attach* subsection incl. payloads + temp-file note + citations + Review chip; the comment-popout → section-anchored; Library Plans/Documents/Assets footers; Team-Feed Messages footer; the teal emphasis-ladder row + Conventions + layout note). (Playwright MCP browser mode fixed at launch — re-screenshotted touched states at both extremes.)
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-26 00:22:51 — Link-behavior refactor: finish — TODO housekeeping, B13 deferred marker, final walk
+
+Closed out the `dev/prompts/link-behavior-refactor.md` run (P0–P4 all built + logged above). **TODO.md:** the human had already cleared the implemented Inbox notes (Embed/Attach, Failed→Error, the relabels, Templates-below/Editor, the Editor-header, embedded-blocks) and reworked Next up, so the only housekeeping left was **closing C7** (Inbox Attention Ramp — superseded by the typed Inbox sections; removed + renumbered C8→C7, no inbound xrefs) and the **B4** ultraplan clause (done in P0). **B13 deferred marker:** extended **B13 (Reviewer Link)** to capture the deferred **Review/Inbox formalization** (single-reviewer-agent model, how agent verdicts resolve, how the human gate relates to agent review) — P4c built only the Review *control*; the workflow stays deferred. **Final headed walk** (Playwright MCP, :8801) at wide 1920 + narrow 1010, 0 console errors: regression-invariants all hold — P0 two labeled Mode toggles + `toggleUltra` undefined; P1c badges 30px; P1b 8 msg select-to-act cards, no checkbox; P2 four Inbox sections incl. the danger Error card; P3 Editor label + attachment strip; P4 11 Embed/Attach controls + 3 Review chips, the Share send-group gone and no visible "Link to prompt"; nothing outside the requested changes regressed at either extreme. (Playwright MCP browser mode is fixed at launch — the walk ran through the single configured browser; touched states re-screenshotted at both extremes as the parity check.)
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 01:34:03 — Plans editor + left-rail design sketch in design/ui-snippets
+
+New standalone snippet `design/ui-snippets/plans-editor-rail.html` covering two Library→Plans asks in one mock (NOT wired into the mockup; the other agent owns `mockup.html`). Reuses the mockup's `plan-nav` / `doc-ed` / `md-rail` CSS, links `../tokens.css`. **Bullet 1:** the "Editor" header sits over the editor box only, nav rail (Outline/Feedback) rises to the top full-height — the Documents arrangement. **Bullet 2 (the `.md-rail` UX):** colour strips 6px (was 3px); `.md-row` `align-items:stretch` so rail blocks cover wrapped-line height (no gaps); editor body flex-fills + a trailing filler continues the rail track to the bottom past the last line (Plans is capped at `max-height:300px` today, Documents already fills); hover lights all associated text in **canvas cream `--background`** (line→that wrapped line, section→whole section, title→whole doc) via JS reusing the section grouping.
+
+Verified headless (isolated throwaway Chrome profile, `--screenshot`/`file://`): default render confirms the layout + thick strips + wrap-fill + rail-to-bottom; temporary auto-apply of `.hl` captured the title-hover (whole doc) and section-hover (section only) cream states; iframe-forced 460px viewport confirms no overflow when narrow (content scrolls). Shots in `artifacts/shots/`.
+
+Files: design/ui-snippets/plans-editor-rail.html, DEVLOG.md
+
+---
+
+### 2026-06-26 01:34:58 — Link-behavior refactor: stale-sweep + dead-code removal across design/
+
+Post-refactor cleanup pass so `design/` carries no stale comments or orphaned code. **mockup.html — removed dead code** the refactor orphaned: the JS `sendGrpHTML` · `sendTo` · `libLink` · `libComment` · `commentCtlHTML` · `updateSendCount` (+ its 3 call sites in `toggleAgRow`/`agAllNone`/init — it was a guarded no-op once the Share/Review send-groups went), the dead `.db-permission/.db-approval/.db-decision` CSS, and all the orphaned `.send-grp/.send-act/.send-trig/.send-lbl/.send-cnt/.send-cv` CSS (carefully split the live `.plan-foot > .btn` rule out of its shared `.send-grp` selector). **Fixed stale inline comments** to current behavior: the `.icon-btn` usage note (Copy·Edit·Comment moved to the ghost Editor header), the Documents/Assets + Plans footer comments (Embed/Attach, not Share/Link-to-prompt), the `reviewPlan` "Approval card"→"Plan card", and the retired Inbox request-ramp CSS note. **Added a current-state changelog block** atop the mockup's header comment summarizing P0–P4 (the per-version blocks below stay as history). **tokens.css:** marked the `--req-*` + `--req-*-soft` tokens as the **retired** attention ramp — retained but no longer referenced (Error owns `--danger`). Confirmed `grep` finds 0 residual references to any removed symbol/class.
+
+**Re-verified in-browser** (Playwright MCP, :8801) after the removals: 0 console errors (favicon only); smoke test green — From/To All/None toggle still works (the `updateSendCount` drop was behaviour-neutral), the Plans footer Embed/Attach (30px) + Review chip (30px) render and gate correctly (section→Embed enabled), the four Inbox sections intact. DESIGN.md/TODO.md confirmed in sync — their remaining "Share"/"Link to prompt"/"reddish→copper" mentions all describe what was *replaced/retired*, not current state; referenced anchors resolve.
+
+Files: design/mockup.html, design/tokens.css, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
