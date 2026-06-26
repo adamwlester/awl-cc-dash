@@ -1075,6 +1075,9 @@
     .mic-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .mic-btn.rec{ background:var(--danger); color:#fff; }
     .mic-btn svg{ width:14px; height:14px; }
+    /* A13: footer mic starts disabled/muted (no editable field focused) — inert + low-contrast, no hover lift */
+    .mic-btn:disabled{ color:var(--muted-2); opacity:.55; cursor:default; box-shadow:var(--shadow-sm); }
+    .mic-btn:disabled:hover{ transform:none; box-shadow:var(--shadow-sm); }
     /* icon-only action button (cream mic-button style + hover tooltip via title) — used for Copy / Retry in
        the Team Feed + History action strips, plus the danger Stop. (Plans/Documents Copy·Edit·Comment moved
        to the Editor header in P3 and use the ghost icon style — see .ghost-ic / .lib-edit-head.) Labeled
@@ -1410,24 +1413,78 @@
     .att-go{ width:12px; height:12px; flex:0 0 auto; color:var(--muted); }
     .fcard-log{ font-family:'JetBrains Mono',monospace; font-size:10px; }
 
-    /* ============================ P1b — Feed (Messages) select-to-act: whole card = pink, block = teal ============================ */
-    /* Mirrors the Library doc rail. Click a card to select the WHOLE message (pink, multi + select-all → Attach);
-       a per-block rail (teal cells) selects one visible block (→ Embed). The chevron expands (select ≠ expand).
-       Messages-only — Scratch/Log keep their checkbox. The rail respects the active Content filter. */
-    .msgcard.sel{ background:var(--main-dim); box-shadow:var(--shadow); }   /* whole = pink */
+    /* ============================ A7 — Feed (Messages) rail restyle + contiguous blocks + MULTI-select (teal only) ============================ */
+    /* Mirrors the Library doc rail. The rail is now ONE contiguous Library-style TAN panel: rows butt together with
+       hairline dividers (no gaps), the rail cell flush against the content. Each rail box carries a tight 3-char type
+       tag; the top title row is empty and select-alls the whole message ("Turn N" rides in its content). Selection is
+       teal-only and MULTI within a card (a contiguous run reads as one unbroken --select band, rail+content, no seam).
+       Click a card header to select the WHOLE message (teal); the chevron expands (select ≠ expand). The rail respects
+       the active Content filter. (Replaces the old pink whole-card + single teal block model.) */
+    .msgcard.sel{ background:var(--select); box-shadow:var(--shadow); }   /* whole-card select = light teal (no pink) */
     .msel-head{ cursor:pointer; }
     .fcard-chevbtn{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:none; cursor:pointer; align-self:center; }
     .fcard-chevbtn:hover{ background:var(--surface-3); border-radius:4px; }
     .fcard-chevbtn .fcard-chev{ margin-left:0; }
-    .mrail-wrap{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
-    .mrow{ display:flex; align-items:stretch; gap:7px; }
-    .mrail{ flex:0 0 auto; width:13px; align-self:stretch; min-height:20px; padding:0; cursor:pointer; border:2px solid var(--rail-section); border-radius:3px; background:var(--secondary-background); }   /* teal = block-select affordance */
-    .mrail:hover{ background:var(--select); }
-    .mrow.bsel .mrail{ background:var(--secondary); }
-    .mrow.bsel .mrow-c{ outline:2px solid var(--secondary); outline-offset:1px; border-radius:var(--radius-base); background:var(--select); }   /* selected block highlight (teal) */
+    /* contiguous Library-style panel: one bordered box; rows butt together with hairline dividers (no gaps) */
+    .mrail-wrap{ margin-top:8px; display:flex; flex-direction:column; gap:0; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    .mrow{ display:flex; align-items:stretch; gap:0; }   /* gap:0 so the rail box butts flush against the content — no white gap between rail and text on select */
+    .mrow + .mrow{ border-top:2px solid var(--border); }
+    /* rail = plain narrow TAN box (no colour strip); a continuous select handle down the panel. The top whole-select
+       row is identified by its bold turn-number content, not a strip (.mrail--title is a JS hook only). */
+    .mrail{ flex:0 0 auto; width:34px; align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding:7px 0 0; cursor:pointer; border:none; border-right:2px solid var(--border); border-radius:0; background:var(--surface-3); }
+    .msg-turn{ font-weight:900; font-size:12px; color:var(--foreground); }   /* turn number in the doc-title style (mirrors Library .md-h1) */
+    /* SELECTION = light teal (--select), the universal select fill (no pink): rail cell + content the SAME teal.
+       Blend the rail/text divider on select so there's no seam between rail and text. */
+    .mrow.bsel .mrail{ background:var(--select); border-right-color:var(--select); }
+    .mrow.bsel .mrow-c{ background:var(--select); }
+    .mrow.bsel + .mrow.bsel{ border-top-color:var(--select); }   /* A7: a contiguous run of selected rows reads as ONE unbroken teal band — recolour the navy hairline BETWEEN two adjacent selected rows to the band fill (no seam) */
+    /* HOVER (lights AFTER .bsel so a hover preview reads over selection): a block rail lights its own row cream;
+       the empty title rail lights EVERY row cream (it select-alls). */
+    .mrail:hover{ background:var(--background); }
+    .mrow.hl .mrow-c{ background:var(--background); }
+    .mrow.hl .mrail{ background:var(--background); }
+    /* type tag lives INSIDE the rail box (left gutter), top-aligned — minimal: transparent (shows the rail's tan),
+       no pill/border. Font size + weight match the Plans review badge (.vbadge): 9px / 800. Tight lowercase
+       abbreviations (msg · tht · rd · bsh · dif · wrt · mta). */
+    .rail-tag{ font-family:'Archivo',sans-serif; font-size:9px; font-weight:800; letter-spacing:0.02em; line-height:1; color:var(--muted); white-space:nowrap; pointer-events:none; }
+    .mrow.bsel .mrail .rail-tag{ color:var(--foreground); }   /* tag stays legible on the teal selected rail */
     .mrow-c{ flex:1 1 auto; min-width:0; }
-    .mrow-c .fcard-full{ margin-top:0; padding:1px 2px; }
-    .mrow-c .msg-blk{ margin:0; }
+    /* blocks shed their individual border/bg so they read as contiguous rows within the panel */
+    .mrow-c .fcard-full{ margin:0; padding:6px 9px; }
+    .mrow-c .msg-blk{ margin:0; border:none; border-radius:0; background:transparent; padding:5px 9px; }
+
+    /* ============================ A11 — Output Export menu (extends per-card Copy to larger spans) ============================ */
+    /* neutral-tier cream trigger (white/teal reserved); a Menu selector — neutral trigger, options in the popout */
+    .exp{ position:relative; flex:0 0 auto; }
+    .exp-btn{ display:inline-flex; align-items:center; gap:2px; height:30px; padding:0 7px; border:2px solid var(--border); border-radius:var(--radius-base);
+      background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+    .exp-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .exp-btn .ic{ width:14px; height:14px; } .exp-btn .cv{ width:12px; height:12px; color:var(--muted); }
+    .exp.open .exp-btn{ background:var(--secondary-background); }
+    .exp-menu{ display:none; position:absolute; bottom:calc(100% + 6px); left:0; z-index:60; min-width:218px;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:5px; }
+    .exp.open .exp-menu{ display:block; }
+    .exp-h{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); padding:5px 6px 3px; }
+    .exp-mi{ width:100%; display:flex; align-items:flex-start; gap:8px; padding:6px 7px; background:transparent; border:none; border-radius:4px; cursor:pointer; text-align:left; }
+    .exp-mi:hover{ background:var(--surface-3); }
+    .exp-mi>svg{ width:14px; height:14px; flex:0 0 auto; color:var(--muted); margin-top:1px; }
+    .exp-mi .lead{ display:flex; flex-direction:column; min-width:0; line-height:1.25; }
+    .exp-mi .lead b{ font-size:10.5px; font-weight:800; color:var(--foreground); }
+    .exp-mi .lead .sub{ font-size:9px; color:var(--muted); }
+    .fcard.cut-out{ opacity:0; transform:translateX(-10px); transition:opacity .16s, transform .16s; }
+
+    /* ============================ A12 + A3 — generic Jump-to-End pill (ONE control for every scroll region) ============================ */
+    /* A small floating pill in the corner of a scroll region; appears only when scrolled away from that edge, snaps to
+       the very top/bottom on click, hides at the edge (Slack/Discord/terminal). Native scrollbars still do incremental
+       movement. Auto-attached by JS to every scroll region; the pills live INSIDE the region (position:absolute) and JS
+       repositions them on scroll so they stay pinned to the visible bottom-right corner. Neutral cream tier. */
+    .jump-pills{ position:absolute; z-index:25; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+    .jump-pill{ pointer-events:auto; display:none; align-items:center; justify-content:center; width:26px; height:26px; padding:0;
+      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);
+      cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, opacity .12s; opacity:.92; }
+    .jump-pill:hover{ transform:translate(2px,2px); box-shadow:none; opacity:1; }
+    .jump-pill.show{ display:inline-flex; }
+    .jump-pill svg{ width:14px; height:14px; }
 
     /* Summarize slide-over overlay (covers just the message list, toggled by the footer button) */
     .feed-body-wrap{ position:relative; }
@@ -2830,6 +2887,17 @@ project CLAUDE.md. Global defaults that travel with you.
           <div class="flex items-center gap-2 flex-wrap">   <!-- P4a: wraps at narrow so the wider Embed/Attach control never overflows -->
             <button class="icon-btn" id="msg-selall-btn" title="Select / deselect all messages" onclick="msgSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- P1b: global select-all (Messages only) -->
             <button class="icon-btn" title="Copy selected cards" onclick="feedAct('copy')"><i data-lucide="copy"></i></button>
+            <!-- A11: Output Export — extends per-card Copy into select/cut/export of larger spans (selected · whole feed · file) -->
+            <div class="exp" id="feed-exp"><button class="exp-btn" title="Export output…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+              <div class="exp-menu">
+                <div class="exp-h">Copy</div>
+                <button class="exp-mi" onclick="feedExport('copy-sel')"><i data-lucide="copy"></i><span class="lead"><b>Copy selected</b><span class="sub">the selected card(s) to the clipboard</span></span></button>
+                <button class="exp-mi" onclick="feedExport('copy-all')"><i data-lucide="copy-plus"></i><span class="lead"><b>Copy whole feed</b><span class="sub">every card in this tab</span></span></button>
+                <div class="exp-h">Cut &amp; export</div>
+                <button class="exp-mi" onclick="feedExport('cut-sel')"><i data-lucide="scissors"></i><span class="lead"><b>Cut selected</b><span class="sub">copy, then drop the card(s) from the feed</span></span></button>
+                <button class="exp-mi" onclick="feedExport('file-sel')"><i data-lucide="file-down"></i><span class="lead"><b>Export selected → file</b><span class="sub">materialize the selection to a .md file</span></span></button>
+                <button class="exp-mi" onclick="feedExport('file-all')"><i data-lucide="file-down"></i><span class="lead"><b>Export whole feed → file</b><span class="sub">materialize this tab to a .md file</span></span></button>
+              </div></div>
             <button class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
             <!-- P4a: Embed/Attach control (replaces the Share send-group) — selection-gated; a block → Embed, whole card(s) → Attach; the link icon sends in the enabled mode -->
@@ -2941,7 +3009,7 @@ project CLAUDE.md. Global defaults that travel with you.
             <!-- ACTION STRIP -->
             <div class="pcard-foot px-2 py-2.5" id="prompt-actions">
               <div class="flex items-center gap-2">
-                <button class="mic-btn" id="compose-mic" title="Dictate (voice → text)" onclick="toggleMic(this)"><i data-lucide="mic"></i></button>
+                <!-- A13: the dictation mic moved OUT to the main window footer (.footbar) as a universal control; the paperclip (Attach) stays here -->
                 <button class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button>
                 <div class="split split--outline" id="revise-split">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
@@ -2989,6 +3057,10 @@ project CLAUDE.md. Global defaults that travel with you.
 
   <!-- ===================== FOOTER ===================== -->
   <footer class="footbar">
+    <div class="flex items-center gap-3">
+    <!-- A13: universal voice-dictation mic — the FIRST footer element; starts disabled/muted, enables only while focus
+         is in an editable field (input/textarea/.compose-rich), and must NOT steal focus (mousedown preventDefault). -->
+    <button class="mic-btn" id="footer-mic" title="Dictate (voice → text) — focus a text field first" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button>
     <div class="flex items-center gap-2 text-[10px] font-semibold text-muted">
       <span><b class="text-foreground">13</b> agents</span><span class="opacity-40">·</span>
       <span><b class="text-foreground">4</b> subagents</span><span class="opacity-40">·</span>
@@ -2997,6 +3069,7 @@ project CLAUDE.md. Global defaults that travel with you.
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--muted-2);border:2px solid var(--border)"></span>4 idle</span>
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warning);border:2px solid var(--border)"></span>4 pending</span>
     </div>
+    </div><!-- /A13 left group (mic + counts) -->
     <div class="flex items-center gap-2">
       <span class="tok-pill" title="Token usage — full detail in Settings → Usage" style="cursor:pointer" onclick="openSettings('usage')">Σ 1.42M tokens</span>
       <span class="text-[10px] font-mono font-semibold text-muted">02:14:08</span>
@@ -3331,6 +3404,7 @@ project CLAUDE.md. Global defaults that travel with you.
       const ha=document.getElementById('prompt-history-actions'); if(ha)ha.classList.toggle('hidden',t!=='history');
     }
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');s[g]=t;localStorage.setItem('awl-v8',JSON.stringify(s));
+    if(typeof refreshJumpPills==='function')setTimeout(refreshJumpPills,30);   /* A12/A3: a revealed scroll region needs its pills (re)evaluated once it has a real height */
     if(g==='feed'){ const ma=document.getElementById('feed-messages-actions'); if(ma)ma.classList.remove('hidden');
       const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',!(t==='messages'||t==='scratch'||t==='log'));   /* v1.x #7: Summarize available on Messages + Scratch + Log */
       const stp=document.getElementById('msg-stop-btn'); if(stp)stp.classList.toggle('hidden',t!=='messages');   /* v1.x #6: Stop only on Messages */
@@ -3468,7 +3542,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function navDelete(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');if(!row)return;
     if(row.classList.contains('assetnav-row'))libRemove('asset-'+row.dataset.asset,'asset');else libRemove('doc-'+row.dataset.doc,'doc');}
 
-  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open,.add-menu.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
+  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open,.add-menu.open,.exp.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
 
   /* ===== Compose placeholders + merged Templates (v10p1 #22) ===== */
   let phSel=null;
@@ -3550,7 +3624,10 @@ project CLAUDE.md. Global defaults that travel with you.
     +'<button class="ea-mode" data-eamode="attach" onclick="eaSend(this)" title="Attach the selection as a reference chip (path)" disabled>Attach</button>'
     +'<button class="ea-act" onclick="eaSend(this)" title="Add the selection to the prompt" disabled><i data-lucide="link"></i></button></div>';}
   function eaSelKind(host){
-    if(host==='feed'){if(document.querySelector('#msg-list .mrow.bsel'))return 'part';if(document.querySelector('#msg-list .msgcard.sel'))return 'whole';return null;}
+    if(host==='feed'){if(document.querySelector('#msg-list .msgcard.sel'))return 'whole';if(document.querySelector('#msg-list .mrow.bsel'))return 'part';
+      /* A9: Scratch/Log/Inbox whole-card select → Attach (no sub-select, so never 'part') */
+      const list=activeFeedList();if(list&&list.id!=='msg-list'&&list.querySelector('.fcard.sel'))return 'whole';
+      return null;}
     if(host.indexOf('asset-')===0)return 'whole';   /* an Asset is always attachable as a file */
     const sel=SELby[host];if(!sel)return null;return sel.kind==='all'?'whole':'part';}
   function eaUpdate(host){const grp=document.querySelector('.ea-grp[data-eahost="'+host+'"]');if(!grp)return;
@@ -3571,11 +3648,13 @@ project CLAUDE.md. Global defaults that travel with you.
     const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
     const text=rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();
     insertEmbed(libSourceLabel(host)+' · '+sel.label,text,"switchTab('doc','"+(host.indexOf('doc-')===0?'documents':'plan')+"')");}
-  function eaEmbedFeed(){const row=document.querySelector('#msg-list .mrow.bsel');if(!row)return;
-    const card=row.closest('.msgcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
-    const text=((row.querySelector('.mrow-c')||{}).textContent||'').trim();
-    const kind=row.dataset.mblk==='text'?'message':(row.dataset.blk||'block');
-    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+kind,text,"switchTab('feed','messages')");}
+  function eaEmbedFeed(){const rows=[...document.querySelectorAll('#msg-list .mrow.bsel')].filter(r=>!r.classList.contains('mrow--title'));if(!rows.length)return;
+    const card=rows[0].closest('.msgcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
+    /* A7: multi-select → embed the combined text of every selected block (in document order) as one quoted block */
+    const text=rows.map(r=>((r.querySelector('.mrow-c')||{}).textContent||'').trim()).filter(Boolean).join('\n\n');
+    const kinds=rows.map(r=>r.dataset.mblk==='text'?'message':(r.dataset.blk||'block'));
+    const label=kinds.length>1?(kinds.length+' blocks'):kinds[0];
+    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+label,text,"switchTab('feed','messages')");}
   function insertEmbed(src,text,srcAction){const f=document.getElementById('compose-field');if(!f)return;
     switchTab('prompt','compose');
     f.insertAdjacentHTML('beforeend',blockHTML('embed',{source:src,body:esc(text),srcAction:srcAction,clamp:text.length>220,kindLabel:'embed'}));
@@ -3587,10 +3666,17 @@ project CLAUDE.md. Global defaults that travel with you.
     else if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');path=dd?dd.textContent:host;name=path.split('/').pop();type='doc';}
     else {const p=PLANS.find(x=>x.id===host);if(!p)return;name=p.file;path='~/.claude/plans/'+p.file;type='doc';}
     addAttachment({id:nextAttId(),name:name,path:path,type:type});toast('Attached '+name+' — path reference + a "read this" instruction');}
-  function eaAttachFeed(){const cards=[...document.querySelectorAll('#msg-list .msgcard.sel')];if(!cards.length)return;
-    cards.forEach(card=>{const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];const t=o.time.replace(':','');
-      addAttachment({id:nextAttId(),name:a.name+'-msg-'+t+'.md',path:'/tmp/awl/feed-'+a.name+'-'+t+'.md',type:'temp'});});
-    toast('Attached '+cards.length+' message'+(cards.length>1?'s':'')+' — materialized to a temp file');}
+  /* A9: active feed list (Messages/Scratch/Log/Inbox) — the visible one drives the shared select-to-act strip */
+  function activeFeedList(){const t=currentFeedTab();return document.getElementById({messages:'msg-list',scratch:'scratch-list',log:'log-list',inbox:'inbox-list'}[t]||'msg-list');}
+  function eaAttachFeed(){
+    const msgCards=[...document.querySelectorAll('#msg-list .msgcard.sel')];
+    if(msgCards.length){msgCards.forEach(card=>{const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];const t=o.time.replace(/:/g,'');
+        addAttachment({id:nextAttId(),name:a.name+'-msg-'+t+'.md',path:'/tmp/awl/feed-'+a.name+'-'+t+'.md',type:'temp'});});
+      toast('Attached '+msgCards.length+' message'+(msgCards.length>1?'s':'')+' — materialized to a temp file');return;}
+    /* A9: Scratch/Log/Inbox selected cards attach as materialized temp files too */
+    const list=activeFeedList();const tab=currentFeedTab();const cards=list?[...list.querySelectorAll('.fcard.sel')]:[];if(!cards.length)return;
+    cards.forEach((card,k)=>{addAttachment({id:nextAttId(),name:tab+'-'+(k+1)+'.md',path:'/tmp/awl/feed-'+tab+'-'+(k+1)+'.md',type:'temp'});});
+    toast('Attached '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' — materialized to a temp file');}
 
   /* ============================ P4b — inline citations ============================ */
   /* From a chip's link icon, with the cursor in the prose, insert a citation pill carrying the attachment's
@@ -4016,7 +4102,59 @@ project CLAUDE.md. Global defaults that travel with you.
   }
 
   /* ===== v8p6: Compose mic (voice dictation, mock) ===== */
-  function toggleMic(b){b.classList.toggle('rec');const on=b.classList.contains('rec');b.title=on?'Listening… click to stop':'Dictate (voice → text)';}
+  function toggleMic(b){if(b.disabled)return;b.classList.toggle('rec');const on=b.classList.contains('rec');b.title=on?'Listening… click to stop':'Dictate (voice → text)';}
+  /* A13: universal footer mic enablement. The mic is disabled/muted until focus lands in an editable field
+     (input / textarea / contenteditable like .compose-rich); it re-disables when focus leaves. It must NOT steal
+     focus (its mousedown preventDefaults), so the active field keeps focus and dictation targets it. */
+  function isEditable(el){if(!el)return false;const t=el.tagName;if(t==='INPUT'||t==='TEXTAREA')return !el.disabled&&!el.readOnly;return el.isContentEditable===true;}
+  function syncFooterMic(){const m=document.getElementById('footer-mic');if(!m)return;const ed=isEditable(document.activeElement);
+    if(ed){if(m.disabled){m.disabled=false;m.title='Dictate into the focused field (voice → text)';}}
+    else{m.disabled=true;if(m.classList.contains('rec')){m.classList.remove('rec');}m.title='Dictate (voice → text) — focus a text field first';}}
+  function initFooterMic(){
+    document.addEventListener('focusin',syncFooterMic);
+    document.addEventListener('focusout',()=>setTimeout(syncFooterMic,0));   /* let the next focus target settle (e.g. tabbing field→field) before re-evaluating */
+    syncFooterMic();}
+
+  /* ============================ A12 + A3 — ONE generic Jump-to-End pill for EVERY scroll region ============================ */
+  /* Auto-attaches a top + bottom jump pill to each scroll region. Behaviour (Slack/Discord/terminal): a pill shows only
+     when scrolled away from that edge, snaps to the very top/bottom on click, and hides at the edge. Native scrollbars
+     still handle incremental movement. This SINGLE implementation serves both the feed-specific "Jump to Feed Ends"
+     (A12) and the global "Jump-to-End Pill for all scrollable windows" (A3) — there is no second, competing control. */
+  const JUMP_THRESHOLD=24;   /* px from an edge before the pill appears / hides */
+  /* the scroll regions to equip (curated so tiny popovers/menus are skipped); a few share a class, so use a broad set */
+  /* contenteditable (.compose-rich) is intentionally EXCLUDED — injecting a non-editable child would corrupt its text */
+  const JUMP_SELECTOR=['#feed-messages','#feed-scratch','#feed-log','#feed-inbox','#prompt-history',
+    '.doc-view','.con-feed','.con-cat-list','.asset-grid','.docnav','.set-body','.fb-list','.ol-list','.tl','.aglist-scroll'].join(',');
+  function jumpUpdate(el){const pills=el._jumpPills;if(!pills)return;
+    const top=pills.querySelector('.jump-top'),bot=pills.querySelector('.jump-bottom');
+    const canScroll=el.scrollHeight-el.clientHeight>4;
+    const fromTop=el.scrollTop, fromBot=el.scrollHeight-el.clientHeight-el.scrollTop;
+    top.classList.toggle('show', canScroll && fromTop>JUMP_THRESHOLD);
+    bot.classList.toggle('show', canScroll && fromBot>JUMP_THRESHOLD);
+    /* keep the pills pinned to the VISIBLE bottom-right corner of the region as it scrolls (they live inside the
+       scroller, so offset them by scrollTop). Right edge tracks the content box, inset from any scrollbar. */
+    pills.style.top=(el.scrollTop+el.clientHeight-pills.offsetHeight-10)+'px';
+    pills.style.left=(el.scrollLeft+el.clientWidth-pills.offsetWidth-10)+'px';}
+  function attachJump(el){
+    if(el._jumpPills)return;   /* idempotent */
+    /* the scroll region itself is the positioning context (it has scroll, so it establishes a containing block for
+       absolutely-positioned descendants once it isn't static) */
+    const cs=getComputedStyle(el);if(cs.position==='static')el.style.position='relative';
+    const pills=document.createElement('div');pills.className='jump-pills';
+    pills.innerHTML='<button class="jump-pill jump-top" title="Jump to top" type="button"><i data-lucide="chevrons-up"></i></button>'
+      +'<button class="jump-pill jump-bottom" title="Jump to bottom" type="button"><i data-lucide="chevrons-down"></i></button>';
+    el.appendChild(pills);
+    el._jumpPills=pills;
+    pills.querySelector('.jump-top').addEventListener('click',()=>el.scrollTo({top:0,behavior:'smooth'}));
+    pills.querySelector('.jump-bottom').addEventListener('click',()=>el.scrollTo({top:el.scrollHeight,behavior:'smooth'}));
+    let raf=0;el.addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;jumpUpdate(el);});},{passive:true});
+    if(window.ResizeObserver){new ResizeObserver(()=>jumpUpdate(el)).observe(el);}
+    jumpUpdate(el);}
+  function initJumpPills(){document.querySelectorAll(JUMP_SELECTOR).forEach(attachJump);LU();
+    /* re-evaluate every region's pills on window resize (content/region size may change which edges are reachable) */
+    window.addEventListener('resize',()=>document.querySelectorAll(JUMP_SELECTOR).forEach(el=>{if(el._jumpPills)jumpUpdate(el);}));}
+  /* a tab/content switch can change which region is scrollable or its content height — recheck all pills */
+  function refreshJumpPills(){document.querySelectorAll(JUMP_SELECTOR).forEach(el=>{if(el._jumpPills)jumpUpdate(el);else attachJump(el);});LU();}
   /* v1.2: attach an asset to the prompt — opens the Library → Assets picker; a newly attached image
      also registers in the Assets grid (Assets stays the single source of truth). Wired in the real build (mock). */
   function composeAttach(b){switchTab('doc','assets');toast('Pick an asset to attach — Library → Assets (the single source of truth for media)');}
@@ -4415,11 +4553,17 @@ resize intact.`,
   function dirTag(d){return d==='out'?'<span class="dir-tag dir-out">sent</span>':'<span class="dir-tag dir-in">recv</span>';}
   /* typed message content blocks — rendered in the expanded card; the Include toggles show/hide them by kind */
   const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
+  /* A7: the block TYPE is now shown by the rail tag (3-char, in the rail box), so the block CONTENT carries NO inline
+     label. (The old .msg-blk-lbl "BASH"/"DIFF" content labels are gone.) */
   function msgBlockHTML(b){
     if(b.k==='diff'){const lines=b.t.split('\n').map(l=>{const c=l[0]==='+'?'blk-add':(l[0]==='-'?'blk-del':'');return '<span class="'+c+'">'+esc(l)+'</span>';}).join('\n');
-      return '<div class="msg-blk blk-diff" data-blk="diff"><span class="msg-blk-lbl">diff</span>'+lines+'</div>';}
-    return '<div class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'"><span class="msg-blk-lbl">'+(MSG_KIND_LBL[b.k]||b.k)+'</span>'+esc(b.t)+'</div>';}
+      return '<div class="msg-blk blk-diff" data-blk="diff">'+lines+'</div>';}
+    return '<div class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'">'+esc(b.t)+'</div>';}
   function msgBlocksHTML(o){return (o.blocks&&o.blocks.length)?'<div class="msg-blocks">'+o.blocks.map(msgBlockHTML).join('')+'</div>':'';}
+  /* A7: tight rail-tag abbreviations shown INSIDE the rail box. Title row = no tag. 'text' = the agent's primary prose
+     (no tool filter maps to it) → "msg". */
+  const RAIL_TAG={text:'msg',think:'tht',read:'rd',write:'wrt',bash:'bsh',diff:'dif',meta:'mta'};
+  function railTag(k){return '<span class="rail-tag">'+(RAIL_TAG[k]||k)+'</span>';}
   /* apply the Messages minibar: Sent/Received hide whole cards by direction; Include hides blocks by kind */
   function applyMsgFilters(){const bar=document.querySelector('#feed-messages .minibar');if(!bar)return;
     const tog=lbl=>{const b=[...bar.querySelectorAll('.minitog')].find(x=>x.textContent.trim()===lbl);return b?b.classList.contains('on'):true;};
@@ -4433,39 +4577,73 @@ resize intact.`,
      (select ≠ expand). Scratch still uses fcardHTML (checkbox). */
   function msgCardHTML(o,i){const a=AG[o.ag];return '<div class="fcard msgcard" data-selcard data-msgi="'+i+'">'
     +'<div class="fcard-head">'
-    +'<button class="fcard-exp msel-head" onclick="msgCardSel(event,this)" title="Click to select this whole message (Attach)">'
-    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* status badge leads received cards (Active/Complete/Failed); user-sent keep just the sent tag */
+    +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
+    +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed); user-sent keep just the dir tag */
+    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → status → dir */
+    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+    +'</div>'
+    +'<div class="fcard-body">'+msgRailHTML(o)+'</div></div>';}
+  /* A7: contiguous rail panel. Top TITLE row holds the turn number (doc-title style) in its CONTENT; its rail box is
+     EMPTY (no tag) and select-alls the whole message (mirrors Library's title rail). Then the primary prose ("msg"),
+     then each typed block (think/read/…), each rail box carrying its 3-char type tag. */
+  function msgRailHTML(o){
+    let rows='<div class="mrow mrow--title" data-mblk="title"><button class="mrail mrail--title" onclick="msgWholeSel(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select the whole message"></button>'
+      +'<div class="mrow-c"><div class="fcard-full"><span class="msg-turn">Turn '+(o.turn!=null?o.turn:'')+'</span></div></div></div>';
+    rows+='<div class="mrow" data-mblk="text"><button class="mrail" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag('text')+'</button>'
+      +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
+    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag(b.k)+'</button>'
+      +'<div class="mrow-c">'+msgBlockHTML(b)+'</div></div>').join('');}
+    return '<div class="mrail-wrap">'+rows+'</div>';}
+  function clearMsgBlkSel(){document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
+  function clearMsgCardSel(){document.querySelectorAll('#msg-list .msgcard.sel').forEach(c=>c.classList.remove('sel'));}
+  /* A7 hover preview (mirrors Library railHover): a block rail lights its own row cream; the EMPTY title rail lights
+     EVERY row cream (it select-alls). */
+  function msgRailHover(btn){const card=btn.closest('.msgcard');if(!card)return;
+    if(btn.classList.contains('mrail--title')){card.querySelectorAll('.mrow').forEach(r=>r.classList.add('hl'));}
+    else{const row=btn.closest('.mrow');if(row)row.classList.add('hl');}}
+  function msgRailHoverOut(btn){const card=btn.closest('.msgcard');if(card)card.querySelectorAll('.mrow.hl').forEach(r=>r.classList.remove('hl'));}
+  /* A7 multi-select WITHIN a card (toggle); ONE card at a time → selecting a block clears other cards' selection AND
+     the whole-card flag (a single block ≠ whole card). The .mrow.bsel set drives Embed/Attach. */
+  function msgBlkSelMulti(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const card=row.closest('.msgcard');
+    if(card){card.classList.remove('sel');const t=card.querySelector('.mrow--title');if(t)t.classList.remove('bsel');}
+    document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
+    row.classList.toggle('bsel');eaUpdate('feed');}
+  /* A7 whole-message select via the header OR the top title rail: toggle EVERY visible row in this card teal + flag the
+     card .sel (→ Attach); ONE card at a time → clear other cards. */
+  function msgWholeSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const card=btn.closest('.msgcard');if(!card)return;
+    document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
+    clearMsgCardSel();
+    const rows=[...card.querySelectorAll('.mrow')].filter(r=>r.style.display!=='none');
+    const all=rows.length&&rows.every(r=>r.classList.contains('bsel'));
+    rows.forEach(r=>r.classList.toggle('bsel',!all));
+    card.classList.toggle('sel',!all);
+    eaUpdate('feed');}
+  function msgSelectAll(btn){clearMsgBlkSel();const cards=[...document.querySelectorAll('#msg-list .msgcard')].filter(c=>c.style.display!=='none');const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));
+    cards.forEach(c=>{c.classList.toggle('sel',!allOn);const rows=[...c.querySelectorAll('.mrow')].filter(r=>r.style.display!=='none');rows.forEach(r=>r.classList.toggle('bsel',!allOn));});eaUpdate('feed');}
+  /* A9: Scratch/Log/Inbox adopt the Messages card's selection model — header-click selects the WHOLE card (light
+     teal) via msel-head; a separate chevron button toggles the dropdown (select ≠ expand); the card attaches via the
+     shared Embed/Attach chip. NO checkbox, NO internal/sub-card selection (these cards have no sub-fields). */
+  function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
+    +'<div class="fcard-head">'
+    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
     +badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
-    +'<div class="fcard-body">'+msgRailHTML(o)+'</div></div>';}
-  /* the block rail: the default message text is one selectable block, then each typed block (think/read/…) */
-  function msgRailHTML(o){
-    let rows='<div class="mrow" data-mblk="text"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
-      +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
-    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="msgBlkSel(event,this)" title="Select this block (Embed)"></button>'
-      +'<div class="mrow-c">'+msgBlockHTML(b)+'</div></div>').join('');}
-    return '<div class="mrail-wrap">'+rows+'</div>';}
-  function clearMsgBlkSel(){document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
-  function clearMsgCardSel(){document.querySelectorAll('#msg-list .msgcard.sel').forEach(c=>c.classList.remove('sel'));}
-  function msgCardSel(e,btn){const c=btn.closest('.msgcard');if(!c)return;clearMsgBlkSel();c.classList.toggle('sel');eaUpdate('feed');}   /* whole = pink, multi-select; clears any block selection */
-  function msgBlkSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const was=row.classList.contains('bsel');clearMsgBlkSel();clearMsgCardSel();if(!was)row.classList.add('bsel');eaUpdate('feed');}   /* block = teal, single; clears card selection */
-  function msgSelectAll(btn){clearMsgBlkSel();const cards=[...document.querySelectorAll('#msg-list .msgcard')].filter(c=>c.style.display!=='none');const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));cards.forEach(c=>c.classList.toggle('sel',!allOn));eaUpdate('feed');}
-  function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
-    +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
-    +'<button class="fcard-exp" onclick="toggleFcard(this)">'
-    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
-    +badgeHTML(a,true)
-    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
-    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
     +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div>'+msgBlocksHTML(o)+'</div></div>';}
   function logCardHTML(o){const a=AG[o.ag]||AG.user;return '<div class="fcard" data-selcard>'
-    +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
-    +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)
-    +'<span class="fcard-prev fcard-log"'+(o.warn?' style="color:var(--warning)"':'')+'>'+o.txt+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+    +'<div class="fcard-head">'
+    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'+badgeHTML(a,true)
+    +'<span class="fcard-prev fcard-log"'+(o.warn?' style="color:var(--warning)"':'')+'>'+o.txt+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+    +'</div>'
     +'<div class="fcard-body"><div class="fcard-full fcard-log">'+a.name+' · '+o.txt+(o.warn?' · awaiting your input':'')+'</div></div></div>';}
+  /* A9: whole-card select (teal) for Scratch/Log/Inbox — multi-select, drives the shared Copy + Embed/Attach strip */
+  function fcardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard');if(c)c.classList.toggle('sel');eaUpdate('feed');}
   function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeHTML(AG[k],true)).join('');if(keys.length>cap)h+='<span class="badge-more" style="height:26px">+'+(keys.length-cap)+'</span>';return h;}
   /* v10p1 #17: History cards take the same checkbox (multi-select) + expand-chevron split as the Team Feed
      cards — card-sel toggles selection without expanding; fcard-exp expands. Footer actions stay
@@ -4493,31 +4671,31 @@ resize intact.`,
   /* Messages carry typed content blocks keyed to the six Include toggles (Thoughts/Read/Write/Bash/Diffs/Meta),
      so the toggles have real content to filter. A block's data-blk = its kind; one card is an agent→agent relay. */
   const MSGS=[
-    {ag:'sandy',dir:'in',status:'complete',time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
+    {ag:'sandy',dir:'in',status:'complete',turn:8,time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
      blocks:[
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
-    {ag:'user',dir:'out',time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
-    {ag:'drew',dir:'in',status:'complete',time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
+    {ag:'user',dir:'out',turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
+    {ag:'drew',dir:'in',status:'complete',turn:11,time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
        {k:'think',t:'The rate-limit finding is already covered by the gateway throttle — demote it to medium and keep the focus on the expiry bypass.'}]},
-    {ag:'vega',dir:'in',status:'complete',time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`,
+    {ag:'vega',dir:'in',status:'complete',turn:12,time:'14:44',body:`Reviewed the patch diff. Two style nits and one missing test for the rotation path before this can merge.`,
      blocks:[
        {k:'diff',t:'  function validateToken(token) {\n-   return decode(token)\n+   const c = decode(token)\n+   if (c.exp < now()) throw new TokenExpired()\n+   return c\n  }'}]},
-    {ag:'kai',dir:'in',status:'complete',time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
+    {ag:'kai',dir:'in',status:'complete',turn:14,time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
      blocks:[
        {k:'write',t:'● Write  ~/.claude/shared/scratchpad.md (+18 −0)'}]},
-    {ag:'sandy',dir:'in',status:'complete',time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
+    {ag:'sandy',dir:'in',status:'complete',turn:15,time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
-    {ag:'max',dir:'in',status:'active',time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
+    {ag:'max',dir:'in',status:'active',turn:17,time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
        {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
-    {ag:'drew',dir:'in',status:'error',time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
+    {ag:'drew',dir:'in',status:'error',turn:18,time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
        {k:'meta',t:'auto-stop: run ended on error · 0 retries left'}]}
@@ -4554,8 +4732,27 @@ resize intact.`,
   function toggleFcard(btn){const c=btn.closest('.fcard');if(c)c.classList.toggle('open');LU();}
   function toggleCardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard,.rcard');if(c)c.classList.toggle('sel');}
   function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel')];
-    if(sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
+    if(sel.length&&navigator.clipboard){const txt=sel.map(cardText).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
     toast(sel.length?('Copied '+sel.length+' card'+(sel.length>1?'s':'')):'Select cards first');}}
+  /* A11: Output Export — extends per-card Copy into select/cut/export of larger spans. Demo-only: copy spans to the
+     clipboard, "cut" (copy + drop the card from the feed), or "export" a span to a materialized .md file (toast). */
+  function cardText(c){const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent.trim():'';}
+  function toggleExport(btn){const wrap=btn.closest('.exp');if(!wrap)return;const open=wrap.classList.contains('open');closeAllPopups();if(!open)wrap.classList.add('open');}
+  function feedExport(mode){closeAllPopups();
+    const list=activeFeedList();const tab=currentFeedTab();
+    const selCards=list?[...list.querySelectorAll('.fcard.sel')]:[];
+    const allCards=list?[...list.querySelectorAll('.fcard')].filter(c=>c.style.display!=='none'):[];
+    const wantSel=/sel/.test(mode);const cards=wantSel?selCards:allCards;
+    if(wantSel&&!selCards.length){toast('Select cards first');return;}
+    const txt=cards.map(cardText).filter(Boolean).join('\n\n');
+    if(mode==='copy-sel'||mode==='copy-all'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});
+      toast('Copied '+cards.length+' '+tab+' card'+(cards.length>1?'s':''));return;}
+    if(mode==='cut-sel'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});
+      cards.forEach(c=>c.classList.add('cut-out'));setTimeout(()=>cards.forEach(c=>c.remove()),180);
+      toast('Cut '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' — copied, then removed');return;}
+    if(mode==='file-sel'||mode==='file-all'){const n=cards.length;const fname=tab+'-export-'+(new Date().toTimeString().slice(0,5).replace(':',''))+'.md';
+      addAttachment({id:nextAttId(),name:fname,path:'/tmp/awl/'+fname,type:'temp'});
+      toast('Exported '+n+' '+tab+' card'+(n>1?'s':'')+' → '+fname);return;}}
   /* v1.x #7: the summary overlay is shared by Messages · Scratch · Log — each tab gets its own mock summary,
      title and count. The Messages body is captured once from its static HTML so it stays single-sourced. */
   let MSG_SUMMARY_BODY='';
@@ -4634,10 +4831,12 @@ resize intact.`,
       acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML();}
     const sub=(o.type==='error'&&o.subtype)?'<span class="inbox-subtype">'+esc(o.subtype)+'</span>':'';
     return '<div class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
-      +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
-      +'<button class="fcard-exp" onclick="toggleFcard(this)">'+badgeHTML(a,true)+sub
+      +'<div class="fcard-head">'
+      +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a,true)+sub
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
-      +'<span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+      +'<span class="fcard-time">'+o.time+'</span></button>'
+      +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
+      +'</div>'
       +'<div class="fcard-body"><div class="inbox-detail">'+detail+'</div><div class="inbox-acts">'+acts+'</div></div></div>';}
   function renderInbox(){const el=document.getElementById('inbox-list');if(el){
       let html='';INBOX_SECTIONS.forEach(sec=>{const items=REQS.filter(r=>r.type===sec.type);if(!items.length)return;
@@ -4841,12 +5040,13 @@ resize intact.`,
     window.addEventListener('resize',positionConsoleView);
     document.querySelectorAll('[data-agscope]').forEach(s=>{agSync(s);updateAgBadges(s);});
     seedHoverCards();
-    initResizers();updateFmt('fmt');LU();drawEdgesSoon();
+    initResizers();updateFmt('fmt');initFooterMic();LU();drawEdgesSoon();
+    initJumpPills();
   }
   if(document.readyState!=='loading')boot();else window.addEventListener('DOMContentLoaded',boot);
   window.addEventListener('load',()=>{autosizeAll();drawEdgesSoon();LU();});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{autosizeAll();drawEdgesSoon();});
-  document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.vtally'))closeAllPopups();});
+  document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.vtally')&&!e.target.closest('.exp'))closeAllPopups();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){closeSettings();}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();}}});
   setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
   /* live-reload on save (design iteration) */
