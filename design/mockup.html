@@ -714,6 +714,21 @@
     .ml .p{ flex:1; color:var(--foreground); font-family:'JetBrains Mono',monospace; word-break:break-all; }
     .ml .t{ font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--foreground); }
 
+    /* Context turn-scope select (Next-up item 6) — the Context breakdown head swaps its
+       static .bd-model model text for a native <select> (Total / Turn n…1). Native on
+       purpose: free scroll / keyboard / a11y for the long turn list. Two deltas vs the
+       old head: the head centers (a <select> won't baseline-align cleanly against text),
+       and the trailing .bd-tot ratio is enlarged so the select + ratio read as inline peers. */
+    .bd-head.bd-head--scope{ align-items:center; }
+    .bd-head.bd-head--scope .bd-tot{ font-size:13px; font-weight:800; color:var(--foreground); }
+    .bd-scope{ appearance:none; -webkit-appearance:none;
+      font-family:'Archivo',sans-serif; font-weight:800; font-size:12px; line-height:1.1;
+      color:var(--muted); background:transparent; border:none; padding:0 15px 0 0; margin:0; cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b5f86' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right center; background-size:11px; }
+    .bd-scope:hover{ color:var(--foreground); }
+    .bd-scope:focus-visible{ outline:2px solid var(--main); outline-offset:2px; border-radius:2px; }
+
     /* ============================ timeline (rewind / handoff) ============================ */
     .tl{ display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; padding:8px; }
     .tl-row{ display:flex; align-items:center; gap:9px; border:2px solid var(--border); border-radius:var(--radius-base); padding:6px 7px 6px 9px; background:var(--secondary-background); }
@@ -2036,10 +2051,15 @@
               <div class="acc" id="ctx-panel"></div>
             </div>
 
-            <!-- TURNS (v9p14 A12: renamed from History — count inline like Context, then a health bar + %, then the Rewind/Handoff timeline) -->
+            <!-- TURNS (v9p14 A12: renamed from History — count inline like Context, then a health bar + %, then the Rewind/Handoff timeline)
+                 Next-up item 1: the health bar is now a Context-style .ctx-trigger accordion — same primitive as Context, so the Turns
+                 bar finally aligns with it — opening a by-tool breakdown (the categorical summary; the per-turn log lives in the timeline below). -->
             <div class="flex flex-col">
               <div class="ro-head"><span class="ro-label">Turns</span><span class="ml-2 text-[10px] font-bold text-muted font-mono" id="det-turns">34/50</span></div>
-              <div class="flex items-center gap-2 mb-2.5"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span></div>
+              <button class="ctx-trigger" id="turns-btn" type="button">
+                <div class="summary-row"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
+              </button>
+              <div class="acc mb-2.5" id="turns-bd-panel"></div>
               <div class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
@@ -3708,13 +3728,89 @@ project CLAUDE.md. Global defaults that travel with you.
   /* v9p7 (A1): context cutoff — the per-agent Context% auto-stop default. Bars gray out everything above it. */
   window.CTX_CUTOFF=80;
   const cutHTML=()=>'<span class="bar-cut" style="left:'+window.CTX_CUTOFF+'%"></span>';
+  /* Next-up item 6 — Context turn-scope select. The breakdown head's model text becomes a native
+     <select> (Total / Turn n…1 descending, n = the agent's turn count). The head, bar, and category
+     rows RESCOPE to the chosen turn; the two sub-sections ("/ Memory files" + "/ Custom agents")
+     describe what's LOADED in context (loaded once, not per-turn), so they stay put across scopes. */
+  const CTX_NTURNS=34;   /* same source as the Turns "34/50" readout */
+  /* Per-turn contribution (DEMO). Same category vocab as Total: a turn's NEW tokens are mostly
+     Messages, with the odd MCP result / memory (re)load — scoped to that turn (no Free space). */
+  function ctxTurnData(n){
+    const msgsK=7+((n*37)%19);                       /* 7..25k Messages */
+    const mcpK=(n%3===0)?1+((n*13)%4):0;             /* some turns pull a big MCP result */
+    const memK=(n%8===0)?1.2:0;                       /* rare memory (re)load */
+    const cats=[{nm:'Messages',k:msgsK,c:'var(--main)'}];
+    if(mcpK)cats.push({nm:'MCP tools',k:mcpK,c:'var(--ag-fern)'});
+    if(memK)cats.push({nm:'Memory files',k:memK,c:'var(--ag-violet)'});
+    const totK=cats.reduce((s,c)=>s+c.k,0);
+    return {totK,cats};
+  }
   const barHTML=()=>CTX.cats.map(c=>'<i style="width:'+parseFloat(c.pc)+'%;background:'+c.c+'"></i>').join('');
-  function breakdownHTML(){return '<div class="bd"><div class="bd-head"><span class="bd-model">'+CTX.model+'</span><span class="bd-tot">'+CTX.used+' / '+CTX.total+' · '+CTX.pct+'%</span></div><div class="bd-bar">'+barHTML()+cutHTML()+'</div>'
-    +CTX.cats.map(c=>'<div class="cat"><span class="sw2" style="background:'+c.c+'"></span><span class="nm">'+c.nm+'</span><span class="tk">'+c.tk+'</span><span class="pc">'+c.pc+'</span></div>').join('')
-    +'<div class="bd-sub"><h5>/ Memory files</h5>'+MEMF.map(m=>'<div class="ml"><span class="p">'+m.p+'</span><span class="t">'+m.t+'</span></div>').join('')+'</div>'
-    +'<div class="bd-sub"><h5>/ Custom agents</h5>'+ACTX.map(a=>'<div class="ml"><span class="p">'+a.n+'</span><span class="t">'+a.t+'</span></div>').join('')+'</div></div>';}
+  /* the two sub-sections — identical across scopes (loaded context, not a per-turn quantity) */
+  const ctxSubsHTML=()=>'<div class="bd-sub"><h5>/ Memory files</h5>'+MEMF.map(m=>'<div class="ml"><span class="p">'+m.p+'</span><span class="t">'+m.t+'</span></div>').join('')+'</div>'
+    +'<div class="bd-sub"><h5>/ Custom agents</h5>'+ACTX.map(a=>'<div class="ml"><span class="p">'+a.n+'</span><span class="t">'+a.t+'</span></div>').join('')+'</div>';
+  /* static shell — the head <select> + empty containers the scope renderer fills */
+  function breakdownHTML(){return '<div class="bd"><div class="bd-head bd-head--scope"><select class="bd-scope" id="ctx-scope" aria-label="Context scope"></select><span class="bd-tot" id="ctx-bd-tot"></span></div>'
+    +'<div class="bd-bar" id="ctx-bd-bar"></div><div id="ctx-bd-cats"></div><div id="ctx-bd-subs"></div></div>';}
+  const catRow=(c,nm,tk,pc)=>'<div class="cat"><span class="sw2" style="background:'+c+'"></span><span class="nm">'+nm+'</span><span class="tk">'+tk+'</span><span class="pc">'+pc+'</span></div>';
+  function renderCtxTotal(){
+    const tot=document.getElementById('ctx-bd-tot');if(!tot)return;
+    tot.textContent=CTX.used+' / '+CTX.total+' · '+CTX.pct+'%';
+    document.getElementById('ctx-bd-bar').innerHTML=barHTML()+cutHTML();   /* window cutoff applies */
+    document.getElementById('ctx-bd-cats').innerHTML=CTX.cats.map(c=>catRow(c.c,c.nm,c.tk,c.pc)).join('');
+    document.getElementById('ctx-bd-subs').innerHTML=ctxSubsHTML();
+  }
+  function renderCtxTurn(n){
+    const tot=document.getElementById('ctx-bd-tot');if(!tot)return;const d=ctxTurnData(n);
+    /* header: same metric type as Total, numerator = turn tokens, % = share of the 1.0M window (2 dp) */
+    tot.textContent=d.totK.toFixed(1)+'k / '+CTX.total+' · '+(d.totK/10).toFixed(2)+'%';
+    /* bar + rows: % of THIS turn (no Free space, no window cutoff) */
+    document.getElementById('ctx-bd-bar').innerHTML=d.cats.map(c=>'<i style="width:'+(c.k/d.totK*100)+'%;background:'+c.c+'"></i>').join('');
+    document.getElementById('ctx-bd-cats').innerHTML=d.cats.map(c=>catRow(c.c,c.nm,c.k.toFixed(1)+'k',(c.k/d.totK*100).toFixed(1)+'%')).join('');
+    document.getElementById('ctx-bd-subs').innerHTML=ctxSubsHTML();   /* unchanged — loaded context */
+  }
   (function(){const bar=document.getElementById('ctx-bar');if(bar)bar.innerHTML='<i style="width:'+CTX.pct+'%;background:'+ctxColor(CTX.pct)+'"></i>'+cutHTML();const panel=document.getElementById('ctx-panel');if(panel)panel.innerHTML=breakdownHTML();
-    const btn=document.getElementById('ctx-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('ctx-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('ctx-chev');if(ch)ch.classList.toggle('up',open);});})();
+    const btn=document.getElementById('ctx-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('ctx-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('ctx-chev');if(ch)ch.classList.toggle('up',open);});
+    /* wire the scope select: Total + Turn n…1 descending */
+    const sel=document.getElementById('ctx-scope');
+    if(sel){sel.insertAdjacentHTML('beforeend','<option value="total">Total</option>');
+      for(let n=CTX_NTURNS;n>=1;n--)sel.insertAdjacentHTML('beforeend','<option value="'+n+'">Turn '+n+'</option>');
+      /* fit the native <select> to its CURRENT value (+ chevron) — a native select otherwise sizes to its
+         widest option ("Turn 34"), so the short "Total" label would float left of the chevron. */
+      const meas=document.createElement('span');
+      meas.style.cssText='position:absolute;visibility:hidden;white-space:pre;font-family:Archivo,sans-serif;font-weight:800;font-size:12px;';
+      document.body.appendChild(meas);
+      const fitCtxScope=()=>{meas.textContent=sel.options[sel.selectedIndex].text;sel.style.width=(meas.offsetWidth+17)+'px';};
+      sel.addEventListener('change',e=>{fitCtxScope();e.target.value==='total'?renderCtxTotal():renderCtxTurn(+e.target.value);});
+      fitCtxScope();
+      if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitCtxScope);   /* re-fit once the web font loads */
+    }
+    renderCtxTotal();})();
+
+  /* ===== TURNS breakdown (Next-up item 1) ===== */
+  /* The Turns bar becomes a Context-style dropdown: same .ctx-trigger + .acc + .bd chrome as Context,
+     breaking the 34 turns out BY TOOL (Read/search · Edit · Bash · MCP · Subagent · Web) with a
+     COORDINATING slice (the multi-agent angle), a "Remaining" segment closing the 50-turn budget
+     (paralleling Context's "Free space"), and two drill-downs paralleling Context's sub-sections.
+     This is the categorical summary; the per-turn chronological log is the Rewind/Handoff timeline below.
+     NOTE: named TURNS_BD (not TURNS) so it does NOT clash with the timeline's `const TURNS` further down. */
+  const TURNS_BD={subject:'sandy',tot:'34 / 50 · 68%',pct:68,cutoff:null,cats:[
+    {nm:'Read / search',v:'10',pc:'20%',c:'var(--ag-azure)'},{nm:'Edit / Write',v:'8',pc:'16%',c:'var(--ag-emerald)'},
+    {nm:'Bash',v:'6',pc:'12%',c:'var(--ag-gold)'},{nm:'Coordinating',v:'4',pc:'8%',c:'var(--ag-violet)'},
+    {nm:'MCP tools',v:'3',pc:'6%',c:'var(--ag-cyan)'},{nm:'Subagent (Task)',v:'2',pc:'4%',c:'var(--ag-magenta)'},
+    {nm:'Web',v:'1',pc:'2%',c:'var(--ag-citron)'},{nm:'Remaining',v:'16',pc:'32%',c:'var(--rule)'}],
+    subs:[{h:'/ Tools used (calls)',items:[{p:'Read',t:'×18'},{p:'Edit',t:'×14'},{p:'Bash',t:'×9'},{p:'Grep',t:'×7'},{p:'mcp:playwright',t:'×5'},{p:'Task',t:'×2'}]},
+      {h:'/ Coordinated with',items:[{p:'scratchpad (posts)',t:'×2'},{p:'auditor-01 (cross-check)',t:'×1'},{p:'coder-01 (patch review)',t:'×1'}]}]};
+  const turnsCutHTML=co=>co==null?'':'<span class="bar-cut" style="left:'+co+'%"></span>';
+  function turnsBreakdownHTML(D){
+    const bar=D.cats.map(c=>'<i style="width:'+parseFloat(c.pc)+'%;background:'+c.c+'"></i>').join('');
+    const cats=D.cats.map(c=>'<div class="cat"><span class="sw2" style="background:'+c.c+'"></span><span class="nm">'+c.nm+'</span><span class="tk">'+c.v+'</span><span class="pc">'+c.pc+'</span></div>').join('');
+    const subs=D.subs.map(s=>'<div class="bd-sub"><h5>'+s.h+'</h5>'+s.items.map(m=>'<div class="ml"><span class="p">'+m.p+'</span><span class="t">'+m.t+'</span></div>').join('')+'</div>').join('');
+    return '<div class="bd"><div class="bd-head"><span class="bd-model">'+D.subject+'</span><span class="bd-tot">'+D.tot+'</span></div>'
+      +'<div class="bd-bar">'+bar+turnsCutHTML(D.cutoff)+'</div>'+cats+subs+'</div>';
+  }
+  (function(){const panel=document.getElementById('turns-bd-panel');if(panel)panel.innerHTML=turnsBreakdownHTML(TURNS_BD);
+    const btn=document.getElementById('turns-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('turns-bd-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('turns-chev');if(ch)ch.classList.toggle('up',open);});})();
 
   /* ===== HISTORY timeline ===== */
   /* timeline of the focused agent's run — TOTAL = its Max-turns, current turn matches the Turns readout (34/50) */
