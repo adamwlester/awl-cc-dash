@@ -1,8 +1,9 @@
 """SDK driver — runs the agent as an in-process Claude Agent SDK subprocess.
 
-This is the default driver and preserves the sidecar's original behavior: a
-persistent `ClaudeSDKClient` per session, with messages streamed off
-`receive_messages()`.
+This is the no-driver-named *fallback* and a backup / limited-use engine (the
+product is built around the `bridge` driver, the primary path). It preserves the
+sidecar's original behavior: a persistent `ClaudeSDKClient` per session, with
+messages streamed off `receive_messages()`.
 """
 
 from __future__ import annotations

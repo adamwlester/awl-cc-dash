@@ -13,12 +13,12 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 | Folder | Purpose |
 |--------|---------|
 | `frontend/` | The desktop app — Electron + React (electron-vite); the **working MVP**, built in place. The UI today is largely one `src/renderer/App.tsx`. |
-| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`) with shared `serialize.py`: `sdk` (Claude Agent SDK) is the default; the `bridge` driver (real Claude Code TUI via tmux/WSL2 — implemented, **not yet live-verified**) is selectable via `AWL_DRIVER=bridge` or the per-session `driver` field. |
+| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`) with shared `serialize.py`. The **`bridge` driver (real Claude Code TUI via tmux/WSL2) is the primary path the dashboard is built around** — **live-verified below the UI** (run-state, permission round-trips, resume, model/effort) and **solid enough to build on**; only the end-to-end path *through the dashboard UI* is still unproven. The `sdk` driver (in-process Claude Agent SDK) is the **no-driver-named fallback** and a **backup / limited-use engine** — for cases better suited to the in-process SDK (e.g. no WSL2/tmux available, or programmatic flows that don't need a real TUI) — **not** the strategic default. Select a driver with `AWL_DRIVER=bridge` or the per-session `driver` field. |
 | `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **Custom Tooling**. |
 | `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `mockup.html` is the current visual authority; `tokens.css` is the single source of truth for every design value (colors, type, spacing, radius, shadow); `mockup-toolkit.js` is the `Ctrl+G` annotation overlay. |
-| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans) and the **frozen reference MVP** under `archive/mvp/` (a runnable reference copy, kept at behavioral parity with root — only its port differs, 7691 — **do not edit**; the working MVP is root `frontend/`+`sidecar/`). |
+| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans). |
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
-| `tests/` | pytest suite (currently the bridge integration suite). See **Testing** below. |
+| `tests/` | pytest suite — live bridge/sidecar integration (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) + hermetic unit tests (`test_bridge_unit.py`, `test_sidecar_unit.py`). See **Testing** below. |
 | `docs/` | Committed, curated product reference docs. |
 
 **Build workflow & config:**
@@ -75,7 +75,7 @@ from bridge import TmuxBridge
 
 **Built-in but not yet fully utilized:**
 - `extract_messages()` in `transcript.py` — converts JSONL entries to clean `[{role, content, timestamp}]` dicts. Available but not surfaced in the CLI or test suite.
-- `export(mode="log")` — exports structured JSONL transcript to file. Implemented and lightly tested.
+- `export(mode="log")` — exports structured JSONL transcript to file. Implemented; only the sibling `scrollback` mode is tested (the `log` branch is untested).
 - `close()` — kills a single session (vs `shutdown()` which kills all). Implemented, not covered in test suite.
 
 **Test suite:** `tests/test_tmux_bridge.py` — pytest integration suite covering all operations.
@@ -93,7 +93,7 @@ Pulls a full **claude.ai** (web/desktop) conversation via the internal API — t
 
 ## Testing
 
-**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root (currently the bridge integration suite). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
+**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root — live bridge/sidecar integration suites (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) plus hermetic unit tests (`test_bridge_unit.py`, `test_sidecar_unit.py`). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
 
 **How to run** (uses a repo-root `.venv`):
 ```powershell

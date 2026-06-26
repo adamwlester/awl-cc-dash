@@ -1,9 +1,15 @@
 """Session drivers for the AWL sidecar.
 
+The dashboard is built around the `bridge` driver (a real Claude Code TUI in
+tmux/WSL2) — that is the primary, intended path. The `sdk` driver (in-process
+Claude Agent SDK) is a backup / limited-use engine, and is also what
+`create_driver()` lands on when no driver is named (see below): it's the
+code-level fallback, not the strategic default.
+
 `create_driver()` picks the implementation. Selection order:
   1. explicit `driver_name` argument (e.g. from the create-session request),
   2. the `AWL_DRIVER` environment variable,
-  3. default `"sdk"` (the in-process Claude Agent SDK path).
+  3. fallback `"sdk"` (the in-process Claude Agent SDK path) when neither is set.
 
 Driver modules are imported lazily so selecting `sdk` never imports the bridge
 (and vice-versa) — each has different runtime requirements.
@@ -19,6 +25,10 @@ __all__ = ["AgentDriver", "DriverConfig", "EventCallback", "create_driver", "def
 
 
 def default_driver_name() -> str:
+    # `"sdk"` here is the no-driver-named *fallback*, not the strategic default:
+    # the product is built around the `bridge` driver (set AWL_DRIVER=bridge to
+    # use it). It stays `sdk` so the working-MVP UI keeps running even without a
+    # WSL2/tmux environment.
     return (os.environ.get("AWL_DRIVER") or "sdk").strip().lower()
 
 

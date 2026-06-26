@@ -3,10 +3,12 @@ AWL Dashboard — FastAPI Sidecar (v2)
 =====================================
 Multi-turn agent sessions behind a pluggable driver seam.
 
-Each session is backed by an `AgentDriver` (see `drivers/`): the default `sdk`
-driver runs an in-process Claude Agent SDK subprocess; the `bridge` driver runs a
-real Claude Code TUI session in tmux/WSL2. Select with the `AWL_DRIVER` env var
-(`sdk` | `bridge`) or per-session via the create request's `driver` field.
+Each session is backed by an `AgentDriver` (see `drivers/`): the `bridge` driver
+runs a real Claude Code TUI session in tmux/WSL2 — the primary path the dashboard
+is built around — while the `sdk` driver runs an in-process Claude Agent SDK
+subprocess as the no-driver-named fallback / backup engine. Select with the
+`AWL_DRIVER` env var (`sdk` | `bridge`) or per-session via the create request's
+`driver` field.
 The sidecar itself is driver-agnostic.
 """
 

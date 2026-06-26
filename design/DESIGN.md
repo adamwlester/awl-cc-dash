@@ -27,7 +27,7 @@ Guiding principles that shape the whole UI:
 
 ## What it physically is
 
-A desktop application (Electron + React) presenting one window. Each agent is a real Claude Code session running in tmux on WSL2, driven by a local Python (FastAPI) sidecar through the tmux bridge that already handles create/send/read/status; tmux also serves as the crash-recovery safety net. That's the whole stack the UI sits on; this README stays focused on UX.
+A desktop application (Electron + React) presenting one window. Each agent is a real Claude Code session running in tmux on WSL2, driven by a local Python (FastAPI) sidecar through the tmux bridge that already handles create/send/read/status; tmux also serves as the crash-recovery safety net. The **tmux bridge is the primary path the dashboard is built around**; the sidecar can also fall back to an in-process Claude Agent SDK driver, but that's a backup / limited-use engine, not the design target. That's the whole stack the UI sits on; this README stays focused on UX.
 
 ---
 
