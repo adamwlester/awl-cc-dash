@@ -711,7 +711,7 @@
     .bd-bar{ position:relative; display:flex; height:11px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); margin-bottom:10px; }
     .bd-bar > i{ display:block; height:100%; }
     .cat{ display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11px; }
-    .cat + .cat{ border-top:1px solid var(--rule); }
+    .cat + .cat{ border-top:1px solid var(--border); }
     .cat .sw2{ width:10px; height:10px; border:1.5px solid var(--border); border-radius:2px; flex:0 0 auto; }
     .cat .nm{ flex:1; color:var(--foreground); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .cat .tk{ font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--foreground); font-size:10.5px; }
@@ -830,7 +830,7 @@
     .aglist{ border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
     /* v9p6 fix: the base .aglist{overflow:hidden} (for corner-clipping) was overriding Tailwind's overflow-y-auto, so the persistent lists clipped without a scrollbar. This higher-specificity rule restores vertical scroll (x stays hidden). */
     .aglist.aglist-scroll{ overflow:hidden; overflow-y:auto; }
-    .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent; border:none; border-top:2px solid var(--rule); cursor:pointer; transition:background .1s; }
+    .agrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:6px 8px; background:transparent; border:none; border-top:2px solid var(--border); cursor:pointer; transition:background .1s; }
     .agrow:first-child{ border-top:none; }
     .agrow:hover:not(.on){ background:var(--surface-3); }
     .agrow.on{ background:var(--select); }
@@ -857,7 +857,7 @@
     .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:3px; border:2px solid var(--border); }
     .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
     .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
-    .hist-acts{ display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:2px solid var(--rule); }
+    .hist-acts{ display:flex; justify-content:flex-end; gap:2px; margin-top:7px; padding-top:6px; border-top:2px solid var(--border); }
     .opt{ display:block; width:100%; text-align:left; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:6px 9px; cursor:pointer; transition:transform .06s, box-shadow .06s; }
     .opt:hover:not(.on){ box-shadow:var(--shadow-sm); transform:translate(-1px,-1px); }
     .opt.on{ background:var(--select); }
@@ -877,7 +877,7 @@
     /* ============================ library ============================ */
     .sec-h{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
     .lib-list{ border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
-    .lib-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-size:11px; font-weight:600; padding:6px 9px; color:var(--foreground); background:transparent; border:none; border-top:2px solid var(--rule); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lib-row{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-size:11px; font-weight:600; padding:6px 9px; color:var(--foreground); background:transparent; border:none; border-top:2px solid var(--border); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .lib-row:first-child{ border-top:none; }
     .lib-row:hover:not(.on){ background:var(--surface-3); }
     .lib-row.on{ background:var(--select); color:var(--foreground); font-weight:800; }
@@ -921,7 +921,7 @@
     .ed-block-x svg{ width:13px; height:13px; }
     .ed-block-body{ padding:7px 9px; font-size:10px; line-height:1.5; color:var(--muted); background:var(--secondary-background); white-space:pre-wrap; word-break:break-word; }
     .ed-block-body.clamp{ max-height:62px; overflow:hidden; -webkit-mask-image:linear-gradient(var(--foreground) 58%, transparent); mask-image:linear-gradient(var(--foreground) 58%, transparent); }
-    .ed-block-more{ display:block; width:100%; padding:3px; border:none; border-top:2px solid var(--rule); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+    .ed-block-more{ display:block; width:100%; padding:3px; border:none; border-top:2px solid var(--border); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
     .ed-block-more:hover{ color:var(--foreground); }
     /* template variant — interactive/selectable; selecting makes it the active template the fill input drives */
     .ed-block--template{ cursor:pointer; }
@@ -1156,7 +1156,7 @@
     .plan-card.open .plan-chev{ transform:rotate(90deg); }
     .plan-title{ font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
     .plan-meta{ font-size:8.5px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; }
-    .plan-body{ display:none; padding:0 10px 10px; border-top:2px solid var(--rule); }
+    .plan-body{ display:none; padding:0 10px 10px; border-top:2px solid var(--border); }
     .plan-card.open .plan-body{ display:block; }
     .plan-desc{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin:9px 0 9px; }
     .plan-steps{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
@@ -1166,7 +1166,7 @@
     .plan-steps li.done svg{ color:var(--success); }
     .plan-steps li.doing svg{ color:var(--warning); }
     .plan-steps li .step-dot{ width:11px; height:11px; flex:0 0 auto; margin-top:1px; border:2px solid var(--muted-2); border-radius:50%; }
-    .plan-foot{ display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:9px; border-top:2px solid var(--rule); }
+    .plan-foot{ display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:9px; border-top:2px solid var(--border); }
     /* doc viewer (README / CLAUDE / TODO) */
     .doc-toolbar{ display:flex; align-items:center; gap:7px; margin-bottom:8px; flex:0 0 auto; }
     .doc-path{ font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; color:var(--muted); padding:3px 8px;
@@ -1179,7 +1179,7 @@
     .doc-view ul{ margin:0 0 9px; padding-left:17px; } .doc-view li{ margin:2px 0; opacity:.94; }
     .doc-view code{ font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--surface-3); border:1.5px solid var(--rule); border-radius:3px; padding:0 4px; }
     .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
-    .doc-view .doc-hr{ border:none; border-top:2px solid var(--rule); margin:12px 0; }
+    .doc-view .doc-hr{ border:none; border-top:2px solid var(--border); margin:12px 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.55; }
 
     /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
@@ -1231,7 +1231,7 @@
     .doc-header .dh-dates{ font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
     .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
     /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach) */
-    .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--rule); }
+    .doc-foot{ display:flex; align-items:center; gap:7px; flex:0 0 auto; margin-top:9px; padding-top:9px; border-top:2px solid var(--border); }
     .doc-foot-l{ display:flex; align-items:center; gap:7px; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
     .docnav-row{ position:relative; }
@@ -1370,7 +1370,7 @@
     .fb-cmt{ font-size:10.5px; line-height:1.4; color:var(--foreground); opacity:.92; }
     .fb-empty{ font-size:10px; font-weight:700; color:var(--muted-2); padding:10px 4px; text-align:center; }
 
-    .plan-review-bar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:2px solid var(--rule); flex-wrap:wrap; }
+    .plan-review-bar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:2px solid var(--border); flex-wrap:wrap; }
     .prb-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
     .prb-sent{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--success); display:none; }
 
@@ -1392,8 +1392,12 @@
        of collapsing left next to the badge. Applies to Messages / Scratch / Log / Inbox / History. */
     .fcard-time{ font-size:9px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); flex:0 0 auto; margin-left:auto; }
     .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--rule); }
+    .fcard-body{ display:none; padding:0 10px 9px 10px; border-top:2px solid var(--border); }
     .fcard.open .fcard-body{ display:block; }
+    /* A8 selection seam: a selected+expanded feed card (Messages whole-select · Scratch/Log/Inbox)
+       paints one --select band; recolour the body's now-navy top divider to the band fill so the
+       highlight reads as one unbroken band instead of being sliced by a navy line. */
+    .fcard.sel .fcard-body{ border-top-color:var(--select); }
     .fcard.open .fcard-prev{ display:none; }
     .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
     /* v1.2: History attachment chip (count) in the card header + click-to-open popover (History only) */
@@ -1549,7 +1553,7 @@
     .plan-cmt-pop{ display:none; margin-top:8px; border:2px solid var(--border); border-radius:var(--radius-base);
       background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
     .plan-cmt-pop.open{ display:block; }
-    .cmt-pop-head{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-bottom:2px solid var(--rule); background:var(--surface-3); }
+    .cmt-pop-head{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-bottom:2px solid var(--border); background:var(--surface-3); }
     .cmt-pop-head .cph-ic{ flex:0 0 auto; } .cmt-pop-head .cph-ic svg{ width:14px; height:14px; }
     .cph-ic.v-approve{ color:var(--success); } .cph-ic.v-revise{ color:var(--warning); } .cph-ic.v-block{ color:var(--danger); }
     .cph-sec{ font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:var(--muted); background:var(--secondary-background);
@@ -1558,7 +1562,7 @@
     .cph-time{ font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; color:var(--muted); }
     .cmt-pop-body{ padding:9px 10px; display:flex; flex-direction:column; gap:9px; }
     .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); }
-    .cmt-pop-item + .cmt-pop-item{ border-top:2px solid var(--rule); padding-top:9px; }
+    .cmt-pop-item + .cmt-pop-item{ border-top:2px solid var(--border); padding-top:9px; }
     .cpi-h{ display:flex; align-items:center; gap:7px; margin-bottom:5px; }
     .cpi-none{ color:var(--muted-2); font-style:italic; }
 
@@ -1807,7 +1811,7 @@
     .cmd-group + .cmd-group{ margin-top:3px; }
     .cmd-group-h{ position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px; padding:8px 4px 5px;
       font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted-2); background:var(--secondary-background); }
-    .cmd-group-h::after{ content:""; flex:1 1 auto; height:2px; border-radius:2px; background:var(--rule); }
+    .cmd-group-h::after{ content:""; flex:1 1 auto; height:2px; border-radius:2px; background:var(--border); }
     /* row: TWO lines — command (mono, bold) over its description (sans, muted) — so the eye tracks the mono command column and the helper text reads as clearly subordinate */
     .cmd-row{ display:block; width:100%; text-align:left; padding:5px 7px; border:none; border-radius:var(--radius-base);
       background:transparent; cursor:pointer; font-family:inherit; transition:background .1s; }
@@ -1882,7 +1886,7 @@
 
     /* generic key/value rows */
     .set-row{ display:flex; align-items:center; gap:12px; padding:9px 1px; }
-    .set-row + .set-row{ border-top:1px solid var(--rule); }
+    .set-row + .set-row{ border-top:1px solid var(--border); }
     .set-row .rk{ font-size:11px; font-weight:800; color:var(--foreground); min-width:150px; flex:0 0 auto; display:flex; align-items:center; gap:7px; }
     .set-row .rv{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:700; color:var(--foreground); font-family:'JetBrains Mono',monospace; word-break:break-word; }
     .set-row .rv.plain{ font-family:inherit; font-weight:600; }
@@ -1895,7 +1899,7 @@
     .lc-session{ background:var(--warning-soft); color:var(--warning-text); }
 
     /* usage limit bars (health-colored: success -> warning -> danger) */
-    .use-row{ padding:11px 1px; } .use-row + .use-row{ border-top:1px solid var(--rule); }
+    .use-row{ padding:11px 1px; } .use-row + .use-row{ border-top:1px solid var(--border); }
     .use-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:7px; }
     .use-nm{ font-size:11px; font-weight:800; color:var(--foreground); }
     .use-pct{ font-size:11px; font-weight:800; font-family:'JetBrains Mono',monospace; }
@@ -2817,7 +2821,7 @@ project CLAUDE.md. Global defaults that travel with you.
 
             <!-- MESSAGES -->
             <div id="feed-messages" data-group="feed" class="flex-1 overflow-y-auto px-3 pt-1 pb-3" style="background:var(--background)">
-              <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:2px solid var(--rule)">
+              <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:2px solid var(--border)">
                 <span class="mini-cap">Type</span>
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages you sent to the team"><i data-lucide="arrow-up-right"></i>Sent</button>
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
@@ -4509,7 +4513,7 @@ resize intact.`,
     return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
       /* v9p13: fb-card is a DIV (not a button) — it contains the thumb-toggle buttons, and a <button> can't legally nest buttons (the parser was closing the card early, spilling the thumbs / verdict / comment OUT of the card) · v9p14b: selectable (teal) + highlights its section · v9p14c: data-fbsec/verdict let openCmtPop sync the matching card(s) */
       return '<div class="fb-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" data-fbverdict="'+f.verdict+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\')" title="Open all comments on this section →">'
-        +'<div class="fb-top">'+badgeHTML(a,true)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
+        +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
         +'<div class="fb-mid">'+verdictBadgeHTML(f.verdict)+'<span class="sel-badge">§ '+f.sec+'</span></div>'
         +(f.comment?'<div class="fb-cmt">'+esc(f.comment)+'</div>':'')+'</div>';}).join('')+'</div>';}
   /* A4: the Plans footer keeps the single-agent Review chip as the ONLY left-aligned action; the Embed/Attach (Link)
@@ -4530,7 +4534,7 @@ resize intact.`,
     if(!fbadges)fbadges='<span class="fb-none">No feedback yet</span>';
     return '<div class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,true)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
+      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
       +'<div class="plan-row r2"><span class="cnt-strip">'+fbadges+'</span><span class="flex-1"></span><span class="steps-txt'+(done===stepN?' all':'')+'">'+done+'/'+stepN+' steps done</span></div>'
       +'<div class="plan-row r3"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
@@ -4629,7 +4633,7 @@ resize intact.`,
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'
     +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
-    +badgeHTML(a,true)
+    +badgeHTML(a,false)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
@@ -4637,7 +4641,7 @@ resize intact.`,
     +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div>'+msgBlocksHTML(o)+'</div></div>';}
   function logCardHTML(o){const a=AG[o.ag]||AG.user;return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head">'
-    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'+badgeHTML(a,true)
+    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'+badgeHTML(a,false)
     +'<span class="fcard-prev fcard-log"'+(o.warn?' style="color:var(--warning)"':'')+'>'+o.txt+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
@@ -4651,7 +4655,7 @@ resize intact.`,
   function histCardHTML(o){const a=AG[o.from];return '<div class="fcard'+(o.sel?' sel open':'')+'" data-histcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
     +'<button class="fcard-exp" onclick="toggleFcard(this)">'
-    +'<span class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,true)
+    +'<span class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,false)
     +'<i data-lucide="arrow-right" style="width:12px;height:12px;color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
     +'<span class="flex-1"></span>'+attTrigHTML(o)
     +'<span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
@@ -4832,7 +4836,7 @@ resize intact.`,
     const sub=(o.type==='error'&&o.subtype)?'<span class="inbox-subtype">'+esc(o.subtype)+'</span>':'';
     return '<div class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
       +'<div class="fcard-head">'
-      +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a,true)+sub
+      +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a,false)+sub
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
       +'<span class="fcard-time">'+o.time+'</span></button>'
       +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
