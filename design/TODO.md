@@ -135,8 +135,7 @@
 
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
 - Need to consider if we should have some indication of agents lifespan in terms of when it was created
-
-- I want the context dropdown menu in agents panel to have some single select option to view breakdown by last turn, session, or total. The latter two might end up being the same. Is that correct? How could we break this up better for within agent context usage
+- Change stop button to use a filled red icon
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.

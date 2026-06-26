@@ -777,6 +777,14 @@ Files: design/TODO.md, design/ui-snippets/agent-card.html, DEVLOG.md
 
 ---
 
+### 2026-06-26 09:31:43 — dev/prompts: handoff prompt for parallel "Next up" execution
+
+Wrote `dev/prompts/nextup-parallel-execution.md` — a self-contained brief directing a fresh orchestrator agent to implement all 19 **Next up** items in `design/mockup.html` via a 5-lane parallel plan (git worktrees, not file-splitting). Encodes the collision-aware ordering derived from a footprint audit: Lane A = items 2,5 · B = 6→1 (rename `TURNS`→`TURNS_BD`) · C = 4,18 · D = 14,15,16,17 · E = 7→9→10→11→13→12→3 (serial feed cluster, one generic jump-pill) · then a serial Wave 2 of 8 (skip the `.md-*` dividers item 4 already did) → 19. Includes the merge watch-points (`boot()` ~L4372, Compose footer), item-5 open-decision "don't block" handling, and the mandatory localhost UI-verification + DEVLOG steps. Prompt only — no mockup changes.
+
+Files: dev/prompts/nextup-parallel-execution.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
