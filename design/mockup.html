@@ -531,7 +531,11 @@
     .graph-wrap{ position:relative; }
     .graph-grid{ position:relative; z-index:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:14px; }
     .edge-layer{ position:absolute; inset:0; z-index:1; pointer-events:none; overflow:visible; }
-    .node{ position:relative; display:flex; flex-direction:column; background:var(--secondary-background);
+    /* v10p10 (Next-up #5): cards are FIXED SQUARES (aspect-ratio:1) holding a single-column layout
+       (top meta strip → identity → divider → settings → load bars → activity band → subagents),
+       with the activity band pinned to the bottom (margin-top:auto on .band) and overflow clipped so
+       every card stays the same height regardless of subagent count. */
+    .node{ position:relative; display:flex; flex-direction:column; gap:6px; aspect-ratio:1; overflow:hidden; background:var(--secondary-background);
       border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px;
       cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }
     .node:hover{ transform:translate(2px,2px); box-shadow:none; }
@@ -539,7 +543,9 @@
     .node.selected:hover{ transform:none; box-shadow:var(--shadow); }
     .node-dot{ position:absolute; top:-7px; left:-7px; width:15px; height:15px; border-radius:50%; border:2px solid var(--border); }
     /* v8p9: removed .node-view ("VIEWING" badge) — selection now reads from the card fill */
-    .node-meta{ font-size:8px; font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* v10p10: .node-meta is now a hidden data carrier (model · mode · effort · think) read by repaintAgentPanel;
+       the visible config is the .node-settings chips. Keep it in the DOM but out of the layout. */
+    .node-meta{ display:none; }
     .pbar{ position:relative; flex:1; height:7px; border:2px solid var(--border); border-radius:3px; overflow:hidden; background:var(--surface-3); }
     .pbar > i{ display:block; height:100%; }
     /* v9p7 (A1) · v9p11: cutoff shade — solid translucent gray over the region above the cutoff so the
@@ -547,8 +553,71 @@
        2px muted line marks the cutoff itself. */
     .bar-cut{ position:absolute; top:0; right:0; bottom:0; pointer-events:none; z-index:2;
       border-left:2px solid var(--muted-2); background:rgba(91,95,134,0.30); }
-    .submini{ width:18px; height:18px; border-radius:50%; border:2px solid var(--border); background:var(--secondary-background);
-      display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800; }
+    /* ---- v10p10 (Next-up #5): square agent-card internals (ported from ui-snippets/agent-card.html) ---- */
+    /* full-bleed divider — breaks past the 9px card padding, navy border colour */
+    .node-div{ height:0; border-top:2px solid var(--border); margin:0 -9px; }
+    /* top meta strip: age (left) + status badge (right), in-flow at the very top */
+    .node-meta-strip{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .node-age{ flex:1 1 auto; min-width:0; text-align:left; font-family:'JetBrains Mono',monospace; font-size:7.5px; font-weight:600;
+      color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* status badge in-flow (de-pin the corner-anchored .node-badge when it sits in the meta strip) */
+    .node-meta-strip .node-badge{ position:static; top:auto; right:auto; flex:0 0 auto; }
+    /* identity row: tile + role/name (left), model + opus-only FAST bolt (right, bottom-aligned to name) */
+    .node-id{ display:flex; align-items:flex-end; gap:7px; }
+    .node-id .agtile{ width:26px; height:26px; align-self:center; }
+    .node-idblk{ min-width:0; line-height:1.05; flex:1 1 auto; }
+    .node-role{ font-size:8px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-name{ font-family:'Archivo'; font-weight:900; font-size:11.5px; color:var(--foreground);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-model{ flex:0 0 auto; display:flex; align-items:center; font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:9px; color:var(--foreground); padding-bottom:1px; }   /* bottom-aligns to name via .node-id align-items:flex-end */
+    .node-bolt{ width:11px; height:11px; margin-left:4px; color:var(--warning); }      /* FAST on (opus) */
+    .node-bolt.off{ color:var(--muted-2); opacity:0.45; }                              /* FAST off (opus, inactive) */
+    /* settings: three icon chips (mode · effort · think) spread full width, aligned to the bar rows */
+    .node-settings{ display:flex; align-items:center; justify-content:space-between; }
+    .node-chip{ display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:9px; color:var(--foreground); }
+    .node-chip svg{ width:11px; height:11px; color:var(--muted); flex:0 0 auto; }
+    .node-chip.off{ opacity:0.32; }   /* greyed = overridden by FAST (PROPOSED — open decision a) */
+    /* activity band: Run strip + divider + Marquee, full-bleed, pinned to the bottom directly above subagents.
+       Its top/bottom borders are two of the three dividers; the .node-div inside is the third. */
+    .node-band{ margin:auto -9px 0; border-top:2px solid var(--border); border-bottom:2px solid var(--border); }
+    .node-band .node-div{ margin:0; }   /* the inner divider is already full-bleed within the band */
+    /* Run progress strip — textless, single flat colour (opposite polarity to the load bars → no danger ramp),
+       keys off status: active green · pending warm · idle muted/empty; barber-pole indeterminate when % unknown */
+    .run-strip{ position:relative; height:6px; overflow:hidden; background:var(--surface-3); }
+    .run-strip > i{ display:block; height:100%; width:0; }
+    .run-active  > i{ background:var(--success); }
+    .run-pending > i{ background:var(--warning); }
+    .run-idle{ opacity:0.5; }
+    .run-indet > i{ width:100%; background:var(--success); position:relative; }
+    .run-indet > i::after{ content:''; position:absolute; inset:0;
+      background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
+      animation:run-barber 0.8s linear infinite; }
+    @keyframes run-barber{ to{ background-position:24px 0; } }
+    /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed; pauses on hover */
+    .node-feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:15px; }
+    .node-feed .trk{ white-space:nowrap; font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:600;
+      color:var(--muted); will-change:transform; }
+    .node-feed .trk.a{ animation:node-marquee 9s linear infinite; }
+    .node-feed .trk.b{ position:absolute; top:0; height:100%; display:flex; align-items:center; animation:node-marquee2 9s linear infinite; }
+    .node-feed:hover .trk{ animation-play-state:paused; }
+    @keyframes node-marquee{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-100%); } }
+    @keyframes node-marquee2{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(0); } }
+    .node-feed.idle .trk{ color:var(--muted-2); font-style:italic; animation:none; }   /* idle — static, muted, no scroll */
+    .node-feed.idle .trk.b{ display:none; }
+    /* subagents: reserved fixed-size section · square neutral clickable badges, bold agent-colour numerals.
+       Open decisions: (b) no working/idle encoding — identity only; (e) no click action wired. */
+    .node-subs{ min-height:18px; display:flex; align-items:center; padding-top:1px; }
+    .sbadges{ display:flex; flex-wrap:wrap; gap:5px; }
+    .sbadge{ width:18px; height:18px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+      border:2px solid var(--border); border-radius:3px; background:var(--surface-btn); box-shadow:var(--shadow-sm);
+      font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:900; cursor:pointer;
+      transition:transform .07s, box-shadow .07s; }
+    .sbadge:hover{ transform:translate(1px,1px); box-shadow:none; }
+    .sbadge.more{ color:var(--muted); }
+    .subs-empty{ font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
 
     /* ============================ pickers — Color (Select) + Icon (Combobox), current always visible ============================ */
     .picker{ position:relative; }
@@ -698,18 +767,40 @@
     .fmt-btn svg.ic{ width:14px; height:14px; } .fmt-btn .fmt-lbl{ font-size:11px; font-weight:800; } .fmt-btn svg.cv{ width:11px; height:11px; }
     .fmt-badge{ display:none; min-width:16px; height:16px; padding:0 4px; border:2px solid var(--border); border-radius:3px; background:var(--secondary); color:var(--secondary-foreground); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; }   /* v9p2: teal = "N selected" state signal · v9p14: rounded square */
     .fmt-btn.active .fmt-badge{ display:inline-flex; }
-    .fmt-menu{ position:absolute; z-index:60; width:268px; background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:9px; display:none; }
+    /* v10p10 (Next-up #2): wider popover with graded segmented/toggle axes + STYLE/BEHAVIOR sections + Pace.
+       max-width keeps it on-screen when the Prompt panel is narrow (trigger is left-anchored → grows rightward). */
+    .fmt-menu{ position:absolute; z-index:60; width:340px; max-width:calc(100vw - 24px); background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:10px; display:none; }
     .fmt-menu.up{ bottom:calc(100% + 6px); } .fmt-menu.left{ left:0; }
     .fmt-menu.open{ display:block; }
-    .fmt-group{ padding:5px 1px; } .fmt-group + .fmt-group{ border-top:2px solid var(--rule); margin-top:3px; }
-    .fmt-gh{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+    /* section bands — STYLE (how it reads) vs BEHAVIOR (how it works) */
+    .fmt-section + .fmt-section{ margin-top:9px; padding-top:9px; border-top:2px solid var(--border); }
+    .fmt-sh{ display:flex; align-items:center; gap:6px; margin:0 1px 7px; }
+    .fmt-sh .lbl{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:900; color:var(--foreground); }
+    .fmt-sh .sub{ font-size:8px; font-weight:700; color:var(--muted-2); }
+    .fmt-sh svg{ width:12px; height:12px; color:var(--muted); }
+    /* one axis */
+    .fmt-group{ padding:4px 1px; }
+    .fmt-gh{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
     .fmt-gh .nm{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); }
     .fmt-gh .mode{ font-size:7.5px; font-weight:700; color:var(--muted-2); text-transform:uppercase; }
-    .fmt-pills{ display:flex; flex-wrap:wrap; gap:6px; }
-    .fmt-pill{ font-size:10.5px; font-weight:700; padding:4px 10px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground); cursor:pointer; }
-    .fmt-pill.on{ background:var(--secondary); color:var(--secondary-foreground); }
-    .fmt-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:2px solid var(--border); }
+    /* segmented axes reuse the shared .seg control (single-select, ordered → reads as a gradient).
+       toggle-grid (multi-select, independent) — SAME text+sizing as .seg buttons, just not connected. */
+    .fmt-grid{ display:grid; gap:6px; }
+    .fmt-grid.c2{ grid-template-columns:1fr 1fr; }
+    .fmt-grid.c3{ grid-template-columns:1fr 1fr 1fr; }
+    .tog-cell{ width:100%; padding:6px 6px; font-size:9.5px; font-weight:700; color:var(--muted);
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base);
+      cursor:pointer; transition:all .1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      text-align:center; font-family:inherit; }
+    .tog-cell:hover:not(.on){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+    .tog-cell.on{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+    /* the Pace note — flags it's behavioral and independent of Effort */
+    .fmt-note{ margin-top:6px; font-size:8.5px; line-height:1.45; color:var(--muted); }
+    .fmt-note b{ color:var(--foreground); }
+    .fmt-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:9px; border-top:2px solid var(--border); }
     .fmt-count{ font-size:9px; font-weight:700; color:var(--muted); }
+    .fmt-reset{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+    .fmt-reset:hover{ color:var(--link-hover); }
 
     /* ============================ agent selectors (Source / Target / Filter) — Templates-style list ============================ */
     /* plain section heading + bordered divided list of filled identity rows (no internal filled header bar) */
@@ -2079,136 +2170,316 @@
                 <div class="graph-grid" id="graph-grid">
 
                   <div id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</div></div></div>
-                    <div class="node-meta mb-1.5">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 14:30 · 2h12m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">01 sandy</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt" title="Fast mode: ON (opus only)"></i></div></div>
+                    <div class="node-meta">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip off" title="Reasoning effort — overridden by Fast"><i data-lucide="gauge"></i>high</span>
+                      <span class="node-chip off" title="Extended thinking — overridden by Fast"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:62%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">62%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-emerald)" title="sub-1 (working)">1</div><div class="submini" style="color:var(--ag-emerald);opacity:.5" title="sub-2 (idle)">2</div></div>
+                    <div class="node-band">
+                      <div class="run-strip run-pending"><i style="width:40%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge" style="color:var(--ag-emerald)">1</span><span class="sbadge" style="color:var(--ag-emerald)">2</span></div></div>
                   </div>
 
                   <div id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">synthesizer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 kai</div></div></div>
-                    <div class="node-meta mb-1.5">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-25 09:12 · 1d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="node-idblk"><div class="node-role">synthesizer</div><div class="node-name">01 kai</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-meta">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>edit</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>med</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:34%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">34%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:24%;background:var(--success)"></i></div><span class="nbv">12/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-idle"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">auditor</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 drew</div></div></div>
-                    <div class="node-meta mb-1.5">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="node-idblk"><div class="node-role">auditor</div><div class="node-name">01 drew</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-meta">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>plan</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>low</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:12%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">12%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-pending"><i style="width:35%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;plan ready for review&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;plan ready for review&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">coder</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 max</div></div></div>
-                    <div class="node-meta mb-1.5">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 13:05 · 3h37m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="node-idblk"><div class="node-role">coder</div><div class="node-name">01 max</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-meta">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:48%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">48%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="nbv">22/50</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-amber)" title="sub-1 (working)">1</div></div>
+                    <div class="node-band">
+                      <div class="run-strip run-active"><i style="width:58%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge" style="color:var(--ag-amber)">1</span></div></div>
                   </div>
 
                   <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">researcher</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">02 rowan</div></div></div>
-                    <div class="node-meta mb-1.5">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 11:20 · 5h22m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">02 rowan</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-meta">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>max</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:71%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">71%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:82%;background:var(--danger)"></i></div><span class="nbv">41/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-active run-indet"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">searching codebase&nbsp;&nbsp;·&nbsp;&nbsp;read 18 files&nbsp;&nbsp;·&nbsp;&nbsp;drafting synthesis&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">searching codebase&nbsp;&nbsp;·&nbsp;&nbsp;read 18 files&nbsp;&nbsp;·&nbsp;&nbsp;drafting synthesis&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">tester</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 nova</div></div></div>
-                    <div class="node-meta mb-1.5">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-24 16:40 · 2d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="node-idblk"><div class="node-role">tester</div><div class="node-name">01 nova</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-meta">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>ask</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>med</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:5%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">5%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:6%;background:var(--success)"></i></div><span class="nbv">3/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-idle"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">reviewer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 vega</div></div></div>
-                    <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:02 · 40m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="node-idblk"><div class="node-role">reviewer</div><div class="node-name">01 vega</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>edit</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:88%;background:var(--danger)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">88%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:94%;background:var(--danger)"></i></div><span class="nbv">47/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-pending"><i style="width:45%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;review needs your sign-off&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;review needs your sign-off&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">planner</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 quinn</div></div></div>
-                    <div class="node-meta mb-1.5">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-23 08:15 · 3d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="node-idblk"><div class="node-role">planner</div><div class="node-name">01 quinn</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-meta">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>plan</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>extra</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:22%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">22%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="nbv">9/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-idle"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">docs</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 wren</div></div></div>
-                    <div class="node-meta mb-1.5">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 10:05 · 6h37m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="node-idblk"><div class="node-role">docs</div><div class="node-name">01 wren</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-meta">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>low</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">56%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i></div><span class="nbv">28/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-active"><i style="width:50%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">updating README.md&nbsp;&nbsp;·&nbsp;&nbsp;regenerating API table&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">updating README.md&nbsp;&nbsp;·&nbsp;&nbsp;regenerating API table&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">designer</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 lex</div></div></div>
-                    <div class="node-meta mb-1.5">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:10 · 1h32m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="node-idblk"><div class="node-role">designer</div><div class="node-name">01 lex</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>edit</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:41%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">41%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:38%;background:var(--success)"></i></div><span class="nbv">19/50</span></div>
                     </div>
-                    <div class="mt-auto pt-2 flex gap-1.5"><div class="submini" style="color:var(--ag-magenta)" title="sub-1 (working)">1</div></div>
+                    <div class="node-band">
+                      <div class="run-strip run-active run-indet"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">tuning tokens.css&nbsp;&nbsp;·&nbsp;&nbsp;rebuilding mockup states&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">tuning tokens.css&nbsp;&nbsp;·&nbsp;&nbsp;rebuilding mockup states&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge" style="color:var(--ag-magenta)">1</span></div></div>
                   </div>
 
                   <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">ops</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 sage</div></div></div>
-                    <div class="node-meta mb-1.5">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-22 14:00 · 4d</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="node-idblk"><div class="node-role">ops</div><div class="node-name">01 sage</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-meta">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>med</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:67%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">67%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:72%;background:var(--warning)"></i></div><span class="nbv">36/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-pending"><i style="width:40%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on deploy step&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on deploy step&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge" style="color:var(--ag-teal)">1</span><span class="sbadge" style="color:var(--ag-teal)">2</span><span class="sbadge" style="color:var(--ag-teal)">3</span><span class="sbadge" style="color:var(--ag-teal)">4</span><span class="sbadge more" title="2 more subagents">+2</span></div></div>
                   </div>
 
                   <div id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">analyst</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 io</div></div></div>
-                    <div class="node-meta mb-1.5">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:25 · 17m</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="node-idblk"><div class="node-role">analyst</div><div class="node-name">01 io</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-meta">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>ask</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>off</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:29%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">29%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:28%;background:var(--success)"></i></div><span class="nbv">14/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-idle"><i></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)">
-                    <button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button>
-                    <div class="flex items-center gap-1.5 mb-1"><span class="agtile" style="width:28px;height:28px;color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="leading-tight min-w-0"><div class="text-[8.5px] text-muted font-bold truncate">scribe</div><div class="text-[10.5px] font-heading text-foreground truncate" style="font-weight:900">01 fen</div></div></div>
-                    <div class="node-meta mb-1.5">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
-                    <div class="node-bars mb-1">
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 12:48 · 3h54m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="node-idblk"><div class="node-role">scribe</div><div class="node-name">01 fen</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-meta">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
+                    <div class="node-div"></div>
+                    <div class="node-settings">
+                      <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                      <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>low</span>
+                      <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                    </div>
+                    <div class="node-bars">
                       <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:14%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">14%</span></div>
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:14%;background:var(--success)"></i></div><span class="nbv">7/50</span></div>
                     </div>
+                    <div class="node-band">
+                      <div class="run-strip run-active"><i style="width:30%"></i></div>
+                      <div class="node-div"></div>
+                      <div class="node-feed">
+                        <span class="trk a">transcribing session log&nbsp;&nbsp;·&nbsp;&nbsp;summarising turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">transcribing session log&nbsp;&nbsp;·&nbsp;&nbsp;summarising turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                      </div>
+                    </div>
+                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                 </div>
@@ -3506,20 +3777,55 @@ project CLAUDE.md. Global defaults that travel with you.
     setMode(null);})();   /* v9p3: like Model — panel hidden until selected; both Rewind & Handoff can be toggled off */
 
   /* ===== RESPONSE / FORMAT grouped multi-select ===== */
+  /* v10p10 (Next-up #2): Response popover reworked into graded axes (segmented = ordered single-select,
+     toggle-grid = independent multi-select) split into STYLE (how it reads) vs BEHAVIOR (how it works),
+     plus a Pace dial independent of the agent's Effort tier and a Reasoning-shown axis. Each axis holds a
+     value; sel = live, def = default. The badge counts OVERRIDES (axes changed from default), not raw picks. */
+  const FMT_ICON_TYPE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+  const FMT_ICON_GAUGE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>';
   const FMT_DATA={fmt:[
-    {nm:'Length',mode:'one',opts:['Concise','Elaborate'],sel:['Concise']},
-    {nm:'Altitude',mode:'one',opts:['High-level','Low-level'],sel:[]},
-    {nm:'Register',mode:'one',opts:['Technical','Plain'],sel:[]},
-    {nm:'Structure',mode:'multi',opts:['TL;DR','Numbered list','Bullets','Tables','Prose'],sel:['Bullets']},
-    {nm:'Emphasis',mode:'multi',opts:['Lead with the answer','Cite sources','Skip hedging'],sel:[]}]};
-  function countFmt(id){return FMT_DATA[id].reduce((a,g)=>a+g.sel.length,0);}
-  function renderFmtMenu(id){const menu=document.getElementById(id+'-menu');const groups=FMT_DATA[id];if(!menu)return;
-    menu.innerHTML=groups.map((g,gi)=>'<div class="fmt-group"><div class="fmt-gh"><span class="nm">'+g.nm+'</span><span class="mode">'+(g.mode==='one'?'pick one':'multi')+'</span></div><div class="fmt-pills">'+g.opts.map(o=>'<button class="fmt-pill'+(g.sel.indexOf(o)>=0?' on':'')+'" onclick="togglePill(\''+id+'\','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div></div>').join('')
-      +'<div class="fmt-foot"><span class="fmt-count">'+countFmt(id)+' selected</span><button class="selectall" onclick="clearFmt(\''+id+'\')">Clear all</button></div>';}
-  function togglePill(id,gi,el){const o=el.dataset.o,g=FMT_DATA[id][gi];if(g.mode==='one'){g.sel=(g.sel.indexOf(o)>=0)?[]:[o];}else{const i=g.sel.indexOf(o);if(i>=0)g.sel.splice(i,1);else g.sel.push(o);}renderFmtMenu(id);updateFmt(id);}
-  function clearFmt(id){FMT_DATA[id].forEach(g=>g.sel=[]);renderFmtMenu(id);updateFmt(id);}
+    {name:'Style',sub:'how it reads',icon:FMT_ICON_TYPE,groups:[
+      {nm:'Length',   kind:'seg', opts:['Terse','Brief','Standard','Detailed','Exhaustive'], def:'Standard', sel:'Standard'},
+      {nm:'Altitude', kind:'seg', opts:['High-level','Balanced','Low-level'],                def:'Balanced', sel:'Balanced'},
+      {nm:'Register', kind:'seg', opts:['Technical','Mixed','Plain'],                        def:'Mixed',    sel:'Mixed'},
+      {nm:'Structure',kind:'grid',cols:3,opts:['TL;DR','Numbered','Bullets','Tables','Prose'],def:['Bullets'],sel:['Bullets']},
+      {nm:'Emphasis', kind:'grid',cols:2,opts:['Lead with answer','Cite sources','Skip hedging','Surface assumptions','Give tradeoffs'],def:[],sel:[]}
+    ]},
+    {name:'Behavior',sub:'how it works',icon:FMT_ICON_GAUGE,groups:[
+      {nm:'Pace',kind:'seg',opts:['Snap','Quick','Standard','Careful','Deep'],def:'Standard',sel:'Standard',
+        note:'<b>Independent of the agent’s Effort tier.</b> Effort = how much the model can think; Pace = how hard to work on this reply (verify, iterate, weigh options) before answering.'},
+      {nm:'Reasoning shown',kind:'seg',opts:['Hidden','Key steps','Full'],def:'Hidden',sel:'Hidden'}
+    ]}
+  ]};
+  const fmtGroups=id=>FMT_DATA[id].reduce((a,s)=>a.concat(s.groups),[]);
+  const fmtOver=g=>g.kind==='seg'?g.sel!==g.def:JSON.stringify([...g.sel].sort())!==JSON.stringify([...g.def].sort());
+  function countFmt(id){return fmtGroups(id).filter(fmtOver).length;}
+  function fmtGroupHTML(id,si,gi,g){
+    let body;
+    if(g.kind==='seg'){
+      body='<div class="seg">'+g.opts.map(o=>'<button class="'+(g.sel===o?'active':'')+'" onclick="pickFmtSeg(\''+id+'\','+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
+    }else{
+      body='<div class="fmt-grid c'+(g.cols||2)+'">'+g.opts.map(o=>'<button class="tog-cell'+(g.sel.indexOf(o)>=0?' on':'')+'" onclick="toggleFmtCell(\''+id+'\','+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
+    }
+    return '<div class="fmt-group"><div class="fmt-gh"><span class="nm">'+g.nm+'</span><span class="mode">'+(g.kind==='seg'?'pick one':'multi')+'</span></div>'+body+(g.note?'<div class="fmt-note">'+g.note+'</div>':'')+'</div>';
+  }
+  function renderFmtMenu(id){const menu=document.getElementById(id+'-menu');if(!menu)return;
+    menu.innerHTML=FMT_DATA[id].map((s,si)=>'<div class="fmt-section"><div class="fmt-sh">'+s.icon+'<span class="lbl">'+s.name+'</span><span class="sub">'+s.sub+'</span></div>'+s.groups.map((g,gi)=>fmtGroupHTML(id,si,gi,g)).join('')+'</div>').join('')
+      +'<div class="fmt-foot"><span class="fmt-count">'+countFmt(id)+' changed from default</span><button class="fmt-reset" onclick="clearFmt(\''+id+'\')">Reset</button></div>';}
+  function pickFmtSeg(id,si,gi,el){FMT_DATA[id][si].groups[gi].sel=el.dataset.o;renderFmtMenu(id);updateFmt(id);}
+  function toggleFmtCell(id,si,gi,el){const g=FMT_DATA[id][si].groups[gi],o=el.dataset.o,i=g.sel.indexOf(o);if(i>=0)g.sel.splice(i,1);else g.sel.push(o);renderFmtMenu(id);updateFmt(id);}
+  function clearFmt(id){FMT_DATA[id].forEach(s=>s.groups.forEach(g=>g.sel=g.kind==='seg'?g.def:[...g.def]));renderFmtMenu(id);updateFmt(id);}
   function updateFmt(id){const n=countFmt(id),btn=document.getElementById(id+'-btn');if(btn)btn.classList.toggle('active',n>0);const b=document.getElementById(id+'-badge');if(b)b.textContent=n;}
-  function toggleFmt(id){const menu=document.getElementById(id+'-menu');if(!menu)return;const open=menu.classList.contains('open');closeAllPopups();if(!open){renderFmtMenu(id);menu.classList.add('open');}}
+  /* v10p10: the reworked popover is taller than the old pill menu and the Prompt panel (.pcard-body / .rz-panel)
+     clips overflow, so cap the menu height to the space available above the trigger (it opens upward) and let it
+     scroll internally. Keeps every axis reachable at any panel height in this resizable layout. */
+  function fitFmtMenu(id){const wrap=document.getElementById(id),menu=document.getElementById(id+'-menu');if(!wrap||!menu)return;
+    const tr=wrap.getBoundingClientRect();let clip=wrap.parentElement;
+    while(clip){const cs=getComputedStyle(clip);if(cs.overflowY==='hidden'||cs.overflowY==='auto'||cs.overflow==='hidden')break;clip=clip.parentElement;}
+    const topBound=clip?clip.getBoundingClientRect().top:0;
+    const avail=Math.max(120,Math.round(tr.top-topBound-12));   /* upward space above the trigger, minus a small gap */
+    menu.style.maxHeight=avail+'px';menu.style.overflowY='auto';}
+  function toggleFmt(id){const menu=document.getElementById(id+'-menu');if(!menu)return;const open=menu.classList.contains('open');closeAllPopups();if(!open){renderFmtMenu(id);menu.classList.add('open');fitFmtMenu(id);}}
 
   /* ===== team-graph directed edges ===== */
   const LINKS=[['node-1','node-2',false],['node-1','node-3',false],['node-2','node-4',false],['node-3','node-7',true],['node-4','node-10',false],['node-5','node-1',false]];
