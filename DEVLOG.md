@@ -359,6 +359,44 @@ Files: design/TODO.md
 
 ---
 
+### 2026-06-25 16:50:25 — design/TODO.md: filed 5 Inbox notes into Next up + queued the button-color heuristic
+
+Filed the 5 new Inbox notes into **Next up** as items 4–8 (4 **Mode Toggles → Sliders**; 5 **Failed Message Badge** for Team Feed → Messages; 6 **Stop as Icon Button** — icon-only Stop in History footer + add to Messages footer rightmost; 7 **Summarize in Scratch & Log** — make functional; 8 **Link-to-Prompt Button Sizing** — match footer-button height/format + right-align), disambiguated to the mockup's component/handler names, then cleared the Inbox. Added item 9 **Button-Color Heuristic** capturing the agreed rule (pink = commit-here · teal = hand-off/outbound · cream = quiet local utility · red = destructive · white = fillable-only) plus the concrete deltas: recolor `.icon-btn`/`.mic-btn` white→cream, and Revise (Plans footer) + Reply (Inbox) cream→teal, with the DESIGN.md sync noted. No mockup code changed yet — this only queues the work.
+
+Files: design/TODO.md
+
+---
+
+### 2026-06-25 17:26:50 — Built the Next-up batch (items 1–9) in the mockup
+
+Implemented all of `design/TODO.md` → **Next up** in `design/mockup.html`. #1 **Collapsible Inbox Cards** was already shipped in v10p1 (verified intact, no change). New work: #2 **Pending-badge selects** (statusJump's pending branch now adds `.sel` so the jumped-to Inbox card is checkbox-selected + light-teal filled, not just expanded/flashed); #3 **Link drawer right** (`.drawer` went `position:absolute` in `#pGraph` → `position:fixed` against the app's right edge, top:36/bottom:34, so the whole Team Graph stays visible while linking); #4 **Mode toggles → sliders** (Fast/Thinking/Ultraplan in both Details + Create panels are now stacked slider switches with inline heading labels — `.tog-switch`/`.tog-knob`; ON slides the knob +12px and turns the track teal while the button stays white; gating preserved); #5 **Failed message badge** (`.db-failed` soft-red + fcardHTML active/complete/failed map + a demo `status:'failed'` MSGS entry); #6 **Stop as icon button** (History Stop → `icon-btn icon-btn--danger` icon-only; new `#msg-stop-btn` rightmost in the Messages footer, Messages-only via switchTab; `msgAct('stop')` branch); #7 **Summarize in Scratch & Log** (switchTab shows `#summary-btn` on messages/scratch/log; new `FEED_SUMMARIES` map + `currentFeedTab()` make `toggleSummary` tab-aware; the Messages body is lazily single-sourced via `MSG_SUMMARY_BODY`; overlay closes on every feed tab switch); #8 **Link-to-prompt sizing** (libFootHTML's Link button dropped `btn-sm` → full 30px and moved out of `.doc-foot-l` to right-align before Remove); #9 **Button-color heuristic** (`.icon-btn`/`.mic-btn` white→cream so the neutral tier is one surface; Revise in `planFootHTML` and Reply in `inboxReplyHTML` cream→teal as hand-off actions).
+
+Verified in-browser (Playwright, 0 JS errors) at narrow (1000px) + wide (1440/1920px) with structural checks, real click-throughs (toggle on/off, gated Ultraplan blocked, Stop, pending-jump-selects sandy, summarize per-tab), and a parity reload. Adversarial-review workflow (4 cluster reviewers + per-finding verifiers): items #1–#7 + all regression areas PASS, **0 confirmed defects**; the one flag (`.fmt-btn` is cream) was a verified false alarm — `.fmt-btn` was already cream pre-v9p2 and is not in my diff. Synced DESIGN.md (color ladder → teal=hand-off / cream=unified-neutral incl. icon-only; Mode-toggle slider description; Messages status badges incl. Failed + rightmost Stop; Summarize on Messages/Scratch/Log; History footer Stop icon-only; Pending-select; drawer-right; Library footer Link alignment). Per the Next-up rule, left items 1–9 in place in TODO.md for the human to remove after review.
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-25 17:53:07 — Corrections to the Next-up batch: Mode-toggle sliders + Link-drawer anchor
+
+Two human corrections on the v11 batch. (1) **Mode toggles** — reverted the stacked one-per-row layout back to **one evenly-spaced row** (grid-cols-3) of simplified inline controls (icon · label · switch, no button box), and replaced the bespoke `.tog-switch`/`.tog-knob` with the **shared `.swh` switch** (the Settings MCP/plugin toggle) so they match the slider already in use — extended the `.swh.on` rule to also fire from the parent `.think-tog.on`. (2) **Link Config drawer** — instead of opening fixed against the whole window's right edge, it now opens against the **left edge of the right pane (`#pRight`)**, i.e. immediately to the right of the Team Graph panel it's launched from; moved `#link-drawer` out of `#pGraph` into `#pRight` (absolute, clipped to that pane), flipped the border/shadow and added a `slideInLeft` (slides out from behind the graph). Team Graph stays fully visible either way.
+
+Re-verified in-browser (Playwright, 0 JS errors): toggles on one row with the `.swh` slider (teal-on knob at 20px), no overflow at narrow (250px panel — labels compress toward initials, icons+tooltips carry it) and full labels at wide (480px panel); drawer settles at `#pRight`'s left edge (left=1231 vs graph-right=1229), clears every graph node, fits within the pane at narrow + wide. DESIGN.md updated (Mode-toggle row + shared `.swh`; drawer-right-of-graph anchor).
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-25 18:11:41 — Final tweaks: header info-glyph trails the label + Fast gated to Opus
+
+Two human-requested tweaks. (1) **Panel-header info-glyphs** were drifting to the centre of the header (the `.pcard-head` `justify-content:space-between` was distributing the seeded `.hc-glyph` even though it's inserted right after the `<h3>`); added `margin-right:auto` to `.hc-glyph` so the [label + glyph] pair stays left and the header's right-hand controls (tabs / Link Agents / feed tabs) get pushed to the end. (2) **Fast mode gated to Opus** — `/fast` is an Opus mode, so the Fast toggle is now enabled only when its panel's Model is Opus: added a `fast-tog` class to both Fast toggles, a `gateFast(tabs)` helper (scopes to the panel via `closest('[data-group="mid"]')`, toggles `.gated` + clears `.on` + updates the title when model !== 'opus'), wired it into the model-tab onclick and the per-panel init, and made `toggleFast` no-op when gated (mirrors `toggleUltra`). Default state: Details (Opus) → Fast enabled; Create (Inherit) → Fast gated.
+
+Verified in-browser (0 JS errors): all five visible panel headers show the glyph trailing the label with right-controls at the end; Fast gates/un-gates correctly on model switch (Opus↔Sonnet), the gated click is a no-op, and the Thinking/Ultraplan toggles + model version dropdown are unaffected. DESIGN.md updated (Mode-block gating note covers both Fast→Opus and Ultraplan→Plan; info-glyph "trails immediately after the label").
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

@@ -769,8 +769,12 @@
     select.tpl-select{ cursor:pointer; height:32px; padding:0 9px; }
 
     /* ============================ link drawer (Sheet) ============================ */
-    .drawer{ position:absolute; top:0; right:0; width:266px; height:100%; z-index:30; background:var(--secondary-background); border-left:2px solid var(--border); box-shadow:-6px 0 0 0 rgba(0,24,88,0.08); overflow-y:auto; animation:slideIn .15s ease; }
-    @keyframes slideIn{ from{ transform:translateX(40px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
+    /* v1.x #3 (rev): the Link Config drawer opens against the LEFT edge of the right pane (#pRight) — i.e.
+       immediately to the RIGHT of the Team Graph panel it's launched from — so the whole Team Graph stays
+       visible. It's a child of #pRight, absolutely positioned and clipped to that pane (not the window),
+       and slides in from the left (out from behind the graph). */
+    .drawer{ position:absolute; top:0; left:0; height:100%; width:266px; z-index:30; background:var(--secondary-background); border-right:2px solid var(--border); box-shadow:6px 0 0 0 rgba(0,24,88,0.08); overflow-y:auto; animation:slideInLeft .15s ease; }
+    @keyframes slideInLeft{ from{ transform:translateX(-40px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
     .dir-cyc{ width:30px; height:30px; flex:0 0 auto; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--warning); font-size:15px; font-weight:900; cursor:pointer; box-shadow:var(--shadow-sm); }
     .dir-cyc:hover{ transform:translate(2px,2px); box-shadow:none; }
 
@@ -791,13 +795,16 @@
       background:var(--secondary-background); color:var(--muted); cursor:pointer; box-shadow:var(--shadow-sm); white-space:nowrap;
       transition:transform .07s, box-shadow .07s, background .12s; }
     .think-tog:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .think-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }
+    .think-tog.on{ color:var(--foreground); }   /* v1.x #4 (rev): the shared .swh slider carries the on-state */
     .think-tog svg{ width:12px; height:12px; }
-    /* v1.1: the two mode toggles sit inline (side by side, one 2-col grid) like the Color/Icon pickers.
-       Each fills its cell; the long state label shrinks to fit the narrow Agent-panel half-width. */
-    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:4px; padding:0 4px; min-width:0; }
+    /* v1.x #4 (rev): Mode toggles are SIMPLIFIED INLINE controls — icon + heading label + the shared
+       .swh slider switch, three evenly spaced across one row (grid-cols-3). No button box; the slider
+       reuses the exact Settings switch (.swh, teal-when-on, defined below) so the two stay in sync. */
+    .think-tog.tog-cell{ width:100%; min-width:0; justify-content:center; gap:5px; padding:0; height:auto; border:none; background:transparent; box-shadow:none; text-transform:none; letter-spacing:0; font-size:10px; color:var(--foreground); }
+    .think-tog.tog-cell:hover{ transform:none; box-shadow:none; }
     .think-tog.tog-cell .tt-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
     .think-tog.tog-cell svg{ flex:0 0 auto; }
+    .think-tog.tog-cell .swh{ flex:0 0 auto; }
     /* v1.2: Ultraplan toggle is gated to Plan mode — dimmed + inert unless the Mode seg = Plan */
     .think-tog.gated{ opacity:.4; cursor:not-allowed; }
     .think-tog.gated:hover{ transform:none; box-shadow:var(--shadow-sm); background:var(--secondary-background); }
@@ -861,7 +868,7 @@
 
     /* ============================ v8p6 — mic icon button (voice dictation) — v8p8: lives in the Prompts footer ============================ */
     .mic-btn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:0 0 auto; padding:0;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground);
+      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);   /* v1.x #9: low-emphasis action button → warm cream (neutral tier), not white (which is reserved for fillable inputs/selectors) */
       cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
     .mic-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .mic-btn.rec{ background:var(--danger); color:#fff; }
@@ -871,7 +878,7 @@
        strip, Documents/Assets footers). Labeled buttons (Summarize, Share, Review, Revise, Reject,
        Approve, Stop, Link to prompt) keep their text. */
     .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:0 0 auto; padding:0;
-      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground);
+      border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);   /* v1.x #9: neutral-tier cream (unified with .btn low-emphasis); white stays for fillable inputs/selectors only */
       cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
     .icon-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
     .icon-btn svg{ width:14px; height:14px; }
@@ -883,6 +890,7 @@
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
     .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
     .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
+    .db-failed{ background:var(--danger-soft); color:var(--danger); }   /* v1.x #5: soft-red = the run failed (alongside Active / Complete) */
 
     /* ============================ v9p7 (A3) — Documentation panel (Plan + doc viewers) ============================ */
     /* plan-status badges (reuse the .dbadge shell) */
@@ -910,7 +918,7 @@
     /* v10p1 #9: a no-chrome muted info glyph beside the panel label (no circle/border/fill — the circle
        broke the "rounded squares" rule and mis-centered the icon); vertically centered to the title, it
        just brightens on hover. The data-hc hover-card behavior is unchanged. */
-    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; margin-left:5px; border:none; border-radius:0; background:transparent; color:var(--muted-2); cursor:help; flex:0 0 auto; padding:0; vertical-align:middle; transition:color .12s; }
+    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; margin-left:5px; margin-right:auto; border:none; border-radius:0; background:transparent; color:var(--muted-2); cursor:help; flex:0 0 auto; padding:0; vertical-align:middle; transition:color .12s; }   /* v1.x: margin-right:auto keeps the glyph trailing right after the panel label (h3), pushing the header's right controls to the end — instead of space-between centering it */
     .hc-glyph svg{ width:13px; height:13px; stroke-width:2.5; }
     .hc-glyph:hover,.hc-glyph:focus-visible{ background:transparent; color:var(--foreground); outline:none; }
     [data-hc]:not(.hc-glyph){ cursor:help; }
@@ -1636,7 +1644,7 @@
     /* compact on/off switch (enable/disable · plugins) — teal when on (active-value semantics) */
     .swh{ position:relative; width:40px; height:21px; border:2px solid var(--border); border-radius:11px; background:var(--surface-3); cursor:pointer; flex:0 0 auto; padding:0; transition:background .12s; }
     .swh::after{ content:''; position:absolute; top:1px; left:1px; width:15px; height:15px; border:2px solid var(--border); border-radius:50%; background:var(--secondary-background); transition:left .13s; }
-    .swh.on{ background:var(--secondary); } .swh.on::after{ left:20px; }
+    .swh.on, .think-tog.on .swh{ background:var(--secondary); } .swh.on::after, .think-tog.on .swh::after{ left:20px; }   /* v1.x #4 (rev): Mode toggles reuse the .swh switch; the parent .think-tog.on drives its on-state */
 
     /* plugin skill chips (emulating the VS Code "Manage Plugins" rows) */
     .pl-chips{ display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
@@ -1816,12 +1824,12 @@
 
             <!-- MODE (permission modes + Fast / Think toggles) -->
             <div>
-              <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Fast = /fast · Thinking = extended thinking · Ultraplan = deeper native plan mode, gated to Plan mode.">Mode</label>
+              <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Fast = /fast (gated to Opus) · Thinking = extended thinking · Ultraplan = deeper native plan mode, gated to Plan mode.">Mode</label>
               <div class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
               <div class="grid grid-cols-3 gap-2 mt-2">
-                <button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span></button>
-                <button class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button>
-                <button class="think-tog tog-cell ultra-tog gated" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span></button>
+                <button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span><span class="swh" aria-hidden="true"></span></button>
+                <button class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span><span class="swh" aria-hidden="true"></span></button>
+                <button class="think-tog tog-cell ultra-tog gated" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span><span class="swh" aria-hidden="true"></span></button>
               </div>
             </div>
 
@@ -1928,7 +1936,7 @@
               <div class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-3 gap-2 mt-2"><button class="think-tog tog-cell" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span></button><button class="think-tog tog-cell ultra-tog" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-3 gap-2 mt-2"><button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Fast</span><span class="swh" aria-hidden="true"></span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking</span><span class="swh" aria-hidden="true"></span></button><button class="think-tog tog-cell ultra-tog" onclick="toggleUltra(this)" title="Ultraplan — deeper native plan mode (only applies when Mode = Plan)"><i data-lucide="telescope"></i><span class="tt-lbl">Ultraplan</span><span class="swh" aria-hidden="true"></span></button></div></div>
             <div><label class="ro-label block mb-1.5">Effort</label><div class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
@@ -2121,28 +2129,6 @@
               </div>
             </div>
 
-            <!-- Link Config drawer (Sheet) -->
-            <div id="link-drawer" class="hidden drawer">
-              <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
-              <div class="p-3 space-y-3">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-1.5 min-w-0"><span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">researcher</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</span></span></div>
-                  <button id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="dir-cyc" title="A → B">→</button>
-                  <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
-                </div>
-                <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Inject</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
-                <div><label class="lbl mb-1.5">Payload</label><div class="seg"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
-                <div>
-                  <label class="lbl mb-1.5">End After <span class="text-muted-2 font-semibold normal-case">— no limit unless set</span></label>
-                  <div class="grid grid-cols-3 gap-2">
-                    <div><button class="lim-tog" onclick="toggleLimit(this)">Turns</button><input type="text" class="lim-in" placeholder="50" disabled></div>
-                    <div><button class="lim-tog" onclick="toggleLimit(this)">Time</button><input type="text" class="lim-in" placeholder="30m" disabled></div>
-                    <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
-                  </div>
-                </div>
-                <div class="flex gap-2 pt-1"><button class="btn-main flex-1" onclick="linkSave()">Save</button><button class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div>
-              </div>
-            </div>
           </section>
 
           <div class="rz-handle hstyle" data-orient="v"><span class="rz-grip"><i data-lucide="grip-vertical" class="w-2.5 h-2.5"></i></span></div>
@@ -2289,6 +2275,31 @@ project CLAUDE.md. Global defaults that travel with you.
 
       <!-- ============ RIGHT COLUMN: FEED + PROMPTS (v9p7 A4) ============ -->
       <div class="rz-panel" id="pRight" style="flex:1 1 36%; min-width:340px">
+
+        <!-- Link Config drawer (Sheet) — v1.x #3 (rev): lives in #pRight so it opens against this pane's
+             LEFT edge, i.e. immediately to the RIGHT of the Team Graph, keeping all graph cards visible. -->
+        <div id="link-drawer" class="hidden drawer">
+          <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
+          <div class="p-3 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0"><span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">researcher</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</span></span></div>
+              <button id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="dir-cyc" title="A → B">→</button>
+              <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
+            </div>
+            <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Inject</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
+            <div><label class="lbl mb-1.5">Payload</label><div class="seg"><button class="active" onclick="segPick(this)">Message</button><button onclick="segPick(this)">Transcript</button><button onclick="segPick(this)">Manual</button></div></div>
+            <div>
+              <label class="lbl mb-1.5">End After <span class="text-muted-2 font-semibold normal-case">— no limit unless set</span></label>
+              <div class="grid grid-cols-3 gap-2">
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Turns</button><input type="text" class="lim-in" placeholder="50" disabled></div>
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Time</button><input type="text" class="lim-in" placeholder="30m" disabled></div>
+                <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-1"><button class="btn-main flex-1" onclick="linkSave()">Save</button><button class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div>
+          </div>
+        </div>
+
         <div class="rz-group vertical" id="rzRight">
 
           <!-- FEED -->
@@ -2394,7 +2405,7 @@ project CLAUDE.md. Global defaults that travel with you.
                   <li>Decide rotation strategy: sliding-window vs one-time (reviewer leans one-time for replay safety).</li>
                   <li>Hold the production deploy until the expiry fix merges and staging smoke passes.</li>
                 </ul>
-                <p class="fo-sub">Generated from the 7 selected messages · mock summary</p>
+                <p class="fo-sub">Generated from the selected messages · mock summary</p>
               </div>
             </div>
 
@@ -2418,6 +2429,8 @@ project CLAUDE.md. Global defaults that travel with you.
               </div>
               <button class="send-act is-off" title="Share to selected agents" onclick="sendTo(this)"><i data-lucide="send-horizontal"></i></button>
             </div>
+            <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab -->
+            <button class="icon-btn icon-btn--danger" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
           </div>
         </div>
       </section>
@@ -2549,7 +2562,7 @@ project CLAUDE.md. Global defaults that travel with you.
                 <button class="icon-btn" title="Edit in Compose" onclick="histAct('edit')"><i data-lucide="square-pen"></i></button>
                 <button class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
                 <div class="flex-1"></div>
-                <button class="btn-danger" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square" class="w-3.5 h-3.5"></i>Stop</button>
+                <button class="icon-btn icon-btn--danger" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>
               </div>
             </div>
           </section>
@@ -2902,8 +2915,9 @@ project CLAUDE.md. Global defaults that travel with you.
     }
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');s[g]=t;localStorage.setItem('awl-v8',JSON.stringify(s));
     if(g==='feed'){ const ma=document.getElementById('feed-messages-actions'); if(ma)ma.classList.remove('hidden');
-      const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',t!=='messages');
-      if(t!=='messages'){ const ov=document.getElementById('feed-summary'); if(ov)ov.classList.remove('open'); if(sb)sb.classList.remove('active'); }
+      const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',!(t==='messages'||t==='scratch'||t==='log'));   /* v1.x #7: Summarize available on Messages + Scratch + Log */
+      const stp=document.getElementById('msg-stop-btn'); if(stp)stp.classList.toggle('hidden',t!=='messages');   /* v1.x #6: Stop only on Messages */
+      const ov=document.getElementById('feed-summary'); if(ov)ov.classList.remove('open'); if(sb)sb.classList.remove('active');   /* close any open summary when switching feed tabs */
       drawEdgesSoon(); }
   }
   /* ===== generic interactions (ported from v7p3) ===== */
@@ -3012,8 +3026,8 @@ project CLAUDE.md. Global defaults that travel with you.
     return '<div class="doc-foot-l">'
       +'<button class="icon-btn" onclick="libCopy(\''+host+'\',\''+kind+'\')" title="Copy"><i data-lucide="copy"></i></button>'
       +edit+comment
-      +'<button class="btn-secondary btn-sm" onclick="libLink(\''+host+'\')" title="Attach to a prompt"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>'
       +'</div>'
+      +'<button class="btn-secondary" onclick="libLink(\''+host+'\')" title="Attach to a prompt"><i data-lucide="link" class="w-3 h-3"></i>Link to prompt</button>'   /* v1.x #8: full footer-button height (no btn-sm) + right-aligned — moved out of the left group, before Remove */
       +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
   function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
   function libComment(host){toast('Comment on '+host.replace('asset-','')+' — mock');}
@@ -3164,6 +3178,11 @@ project CLAUDE.md. Global defaults that travel with you.
   /* ===== MODEL button groups ===== */
   const MODELS={inherit:[],opus:['4.8','4.6','4.5','4.1'],sonnet:['4.6','4.5','3.7'],haiku:['4.5','3.5'],fable:['5']};
   const DEFV={opus:'4.8',sonnet:'4.6',haiku:'4.5',fable:'5'};
+  /* v1.x #2: Fast (/fast) is Opus-only — gate a panel's Fast toggle whenever its selected model isn't Opus */
+  function gateFast(tabs){const panel=tabs.closest('[data-group="mid"]');if(!panel)return;const ft=panel.querySelector('.fast-tog');if(!ft)return;
+    const m=((tabs.querySelector('.model-tab.active')||{}).dataset||{}).model;const ok=m==='opus';
+    ft.classList.toggle('gated',!ok);if(!ok)ft.classList.remove('on');
+    ft.title=ok?'Opus fast mode (/fast) — faster responses, slightly lower quality':'Fast mode (/fast) is Opus-only — select Opus to enable';}
   document.querySelectorAll('.model-tabs').forEach(tabs=>{
     const wrap=tabs.parentElement,ver=tabs.nextElementSibling,curEl=wrap.querySelector('#model-current,.model-cur');
     const act=tabs.querySelector('.model-tab.active');
@@ -3173,8 +3192,9 @@ project CLAUDE.md. Global defaults that travel with you.
       ver.innerHTML=vs.map(v=>'<div class="ver-row'+(v===st.ver[st.model]?' sel':'')+'" data-v="'+v+'"><span class="ver-name">'+st.model+'-'+v+'</span><span class="ver-check">✓</span></div>').join('');
       ver.querySelectorAll('.ver-row').forEach(r=>r.onclick=()=>{st.ver[st.model]=r.dataset.v;if(curEl)curEl.textContent=label();ver.classList.remove('open');renderVer();});
       ver.classList.add('open');}
-    tabs.querySelectorAll('.model-tab').forEach(t=>t.onclick=()=>{const m=t.dataset.model;if(st.model===m&&ver.classList.contains('open')){ver.classList.remove('open');return;}st.model=m;tabs.querySelectorAll('.model-tab').forEach(x=>x.classList.toggle('active',x===t));if(curEl)curEl.textContent=label();renderVer();});
+    tabs.querySelectorAll('.model-tab').forEach(t=>t.onclick=()=>{const m=t.dataset.model;if(st.model===m&&ver.classList.contains('open')){ver.classList.remove('open');return;}st.model=m;tabs.querySelectorAll('.model-tab').forEach(x=>x.classList.toggle('active',x===t));if(curEl)curEl.textContent=label();renderVer();gateFast(tabs);});
     if(curEl)curEl.textContent=label();
+    gateFast(tabs);   /* v1.x #2: set the Fast gate from the panel's initial model */
   });
 
   /* ===== CONTEXT breakdown ===== */
@@ -3295,7 +3315,7 @@ project CLAUDE.md. Global defaults that travel with you.
 
   /* ===== v8p6: per-agent thinking toggle (inline with Mode) ===== */
   function toggleThink(b){b.classList.toggle('on');}
-  function toggleFast(b){b.classList.toggle('on');}
+  function toggleFast(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');}   /* v1.x #2: Fast is gated to Opus (see gateFast) */
   /* v1.2: Ultraplan toggle — gated to Plan mode; the gate syncs whenever the Mode seg changes */
   function toggleUltra(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');}
   function syncUltraGate(seg){if(!seg)return;const active=seg.querySelector('button.active');const isPlan=!!active&&active.textContent.trim()==='Plan';
@@ -3306,7 +3326,7 @@ project CLAUDE.md. Global defaults that travel with you.
     const key=el?agKeyFromNode(el.closest('.node')):FOCUS;const a=AG[key];
     if(status==='pending'){switchTab('feed','inbox');                       /* needs your input → that agent's Inbox card */
       const card=key&&document.querySelector('#feed-inbox .fcard[data-agent="'+key+'"]');
-      if(card){card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);LU();}}   /* v10p1 #15: expand + highlight the agent's card, not just switch tabs */
+      if(card){card.classList.add('open');card.classList.add('sel');card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);LU();}}   /* v10p1 #15 + v1.x #2: expand + SELECT (checkbox + light-teal fill) + flash the agent's card, not just switch tabs */
     else if(status==='active'){switchTab('prompt','history');}              /* in-flight → see what's been sent */
     else{switchTab('prompt','compose');if(a&&!a.user)replyTo(a.name);}      /* idle → start a prompt, pre-targeted */
   }
@@ -3396,6 +3416,7 @@ project CLAUDE.md. Global defaults that travel with you.
   function selectMsgCard(el){el.classList.toggle('sel');}
   function msgAct(a){const sel=[...document.querySelectorAll('#feed-messages .rcard.sel')];
     if(a==='copy'&&sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});return;}
+    if(a==='stop'){toast('Stopping the active run…');return;}   /* v1.x #6: Stop the agent's run (mock) */
     /* summarize / share — wired to the runtime in the real build (mock here) */}
 
   /* ===== v9p4: Settings (step-into full-window view) ===== */
@@ -3668,7 +3689,7 @@ resize intact.`,
      then the decision trio (Revise · Reject · Approve) right-justified. (The separate upper strip is gone.) */
   function planFootHTML(p){let right;
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
-    else right='<button class="btn" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
+    else right='<button class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
     return '<div class="plan-foot">'
       +'<button class="icon-btn" onclick="planCopy(\''+p.id+'\')" title="Copy the plan text"><i data-lucide="copy"></i></button>'
       +'<button class="icon-btn" onclick="planAct(\'edit\',\''+p.id+'\')" title="Edit the plan"><i data-lucide="square-pen"></i></button>'
@@ -3718,7 +3739,7 @@ resize intact.`,
   function fcardHTML(o){const a=AG[o.ag];return '<div class="fcard" data-selcard>'
     +'<div class="fcard-head"><button class="card-sel" onclick="toggleCardSel(event,this)" title="Select for a shared action"><i data-lucide="check"></i></button>'
     +'<button class="fcard-exp" onclick="toggleFcard(this)">'
-    +(o.status?'<span class="dbadge db-'+o.status+'">'+(o.status==='active'?'Active':'Complete')+'</span>':'')   /* v10p1 #16: status badge leads the agent icon on received messages (Active green / Complete muted); user-sent keep just the sent tag */
+    +(o.status?'<span class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',failed:'Failed'}[o.status]||'Complete')+'</span>':'')   /* v10p1 #16 + v1.x #5: status badge leads the agent icon on received messages (Active green / Complete muted / Failed red); user-sent keep just the sent tag */
     +badgeHTML(a,true)
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
@@ -3778,7 +3799,11 @@ resize intact.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
-       {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]}
+       {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
+    {ag:'drew',dir:'in',status:'failed',time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
+     blocks:[
+       {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
+       {k:'meta',t:'auto-stop: run ended on error · 0 retries left'}]}
   ];
   const SCRATCH=[
     {ag:'sandy',time:'14:33:07',body:`Posted finding: <b class="text-foreground">Token Expiry Bypass (CRITICAL)</b> — validateToken() accepts expired tokens; refresh issues new tokens indefinitely.`},
@@ -3814,8 +3839,48 @@ resize intact.`,
   function feedAct(a){if(a==='copy'){const sel=[...document.querySelectorAll('.feed-body-wrap .fcard.sel')];
     if(sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});}
     toast(sel.length?('Copied '+sel.length+' card'+(sel.length>1?'s':'')):'Select cards first');}}
-  function toggleSummary(){const ov=document.getElementById('feed-summary');if(!ov)return;const open=ov.classList.toggle('open');const btn=document.getElementById('summary-btn');if(btn)btn.classList.toggle('active',open);
-    if(open){const sel=document.querySelectorAll('#msg-list .fcard.sel').length;const c=document.getElementById('fo-count');if(c)c.textContent=(sel?sel+' selected messages':'all '+MSGS.length+' messages');}LU();}
+  /* v1.x #7: the summary overlay is shared by Messages · Scratch · Log — each tab gets its own mock summary,
+     title and count. The Messages body is captured once from its static HTML so it stays single-sourced. */
+  let MSG_SUMMARY_BODY='';
+  const FEED_SUMMARIES={
+    messages:{title:'Conversation summary',
+      sub:()=>{const sel=document.querySelectorAll('#msg-list .fcard.sel').length;return sel?sel+' selected messages':'all '+MSGS.length+' messages';},
+      body:()=>MSG_SUMMARY_BODY},
+    scratch:{title:'Scratchpad summary',
+      sub:()=>'all '+SCRATCH.length+' scratch posts',
+      body:()=>`<h4>Shared scratchpad — auth remediation</h4>
+        <p><b class="k">researcher-01-sandy</b> posted the headline finding: a <b>critical</b> token-expiry bypass — <code>validateToken()</code> accepts expired tokens and refresh reissues them indefinitely.</p>
+        <h5>Triage</h5>
+        <ul>
+          <li><b class="k">auditor-01-drew</b> confirmed the Critical + High; demoted "no rate limiting" to Medium (behind the gateway throttle).</li>
+          <li><b class="k">synthesizer-01-kai</b> wrote <code># Auth Remediation Plan</code> — Critical → High → Medium with owners + a checklist, ready for approval.</li>
+        </ul>
+        <p class="fo-sub">Generated from all 3 scratch posts · mock summary</p>`},
+    log:{title:'Activity-log summary',
+      sub:()=>'all '+LOG.length+' log entries',
+      body:()=>`<h4>Activity log — last ~12 min</h4>
+        <p>The run kicked off at <b>14:31</b> when <b class="k">you</b> dispatched <b class="k">researcher-01-sandy</b>; the thread fanned out to the auditor, synthesizer, and a deploy gate.</p>
+        <h5>Highlights</h5>
+        <ul>
+          <li><b class="k">sandy</b> started, posted a CRITICAL scratch finding, and fired a link to <b class="k">synthesizer-01</b>; <b class="k">kai</b> committed <code>3f2a1b</code>.</li>
+          <li><b class="k">drew</b> flagged 2 findings.</li>
+        </ul>
+        <h5>Needs you</h5>
+        <ul>
+          <li>2 pending requests — <b class="k">drew</b> permission (14:38) and <b class="k">sandy</b> approval (14:41).</li>
+          <li><b class="k">sage</b> is holding the deploy gate (14:43).</li>
+        </ul>
+        <p class="fo-sub">Generated from all 9 log entries · mock summary</p>`}
+  };
+  function currentFeedTab(){const b=document.querySelector('[data-tab-group="feed"].tab-btn.active');return b?b.dataset.tab:'messages';}
+  function toggleSummary(){const ov=document.getElementById('feed-summary');if(!ov)return;
+    if(!MSG_SUMMARY_BODY){MSG_SUMMARY_BODY=(document.getElementById('fo-body')||{}).innerHTML||'';}   /* grab the static Messages summary once, before any injection */
+    const open=ov.classList.toggle('open');const btn=document.getElementById('summary-btn');if(btn)btn.classList.toggle('active',open);
+    if(open){const s=FEED_SUMMARIES[currentFeedTab()]||FEED_SUMMARIES.messages;
+      const ti=document.querySelector('#feed-summary .fo-title');if(ti)ti.innerHTML='<i data-lucide="sparkles"></i>'+s.title;
+      const c=document.getElementById('fo-count');if(c)c.textContent=s.sub();
+      const bd=document.getElementById('fo-body');if(bd)bd.innerHTML=s.body();}
+    LU();}
 
   /* ===== Inbox (approvals you owe) — data-driven (REQS), expandable + selectable like Log =====
      v10p1 #15: each card collapses to identity + type badge + title; expand reveals the detail + actions.
@@ -3835,7 +3900,7 @@ resize intact.`,
     {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'}
   ];
   function inboxReplyHTML(a){return '<span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>'
-    +'<button class="btn btn-sm" onclick="replyTo(\''+a.name+'\')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}
+    +'<button class="btn-secondary btn-sm" onclick="replyTo(\''+a.name+'\')" title="Reply via Prompts"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* v1.x #9: Reply = teal hand-off (routes to an agent via Prompts) */
   function inboxCardHTML(o){const a=AG[o.ag];const m=REQ_META[o.type];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
       acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,\'Always allowed\')">Always allow</button>'+inboxReplyHTML(a);}

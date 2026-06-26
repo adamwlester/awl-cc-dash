@@ -103,21 +103,34 @@
 1. **Collapsible Inbox Cards:** Make the Team Feed → Inbox cards (`.inbox-card`) collapsible, and wire up the existing (currently non-functional) checkbox to select the card. Collapsed, a card should show down to its title (`.inbox-title`, e.g. "Run bash command" on the first card).
 2. **Pending Badge Selects Card:** Have the "Pending" status badge — which currently opens the Inbox — also select/highlight the relevant Inbox card.
 3. **Link Agents Drawer Right:** Open the Link Agents drawer (`#link-drawer`) on the right, if that's easy to implement, so the Team Graph cards stay visible while it's open.
+4. **Mode Toggles → Sliders:** Change the Agent panel's Mode-block toggles (Fast · Thinking · Ultraplan) from the current fill-state toggles to slider-style switches, each with an inline heading label.
+5. **Failed Message Badge:** Add a "Failed" status badge to the Team Feed → Messages cards, alongside the existing Active and Complete badges.
+6. **Stop as Icon Button:** Change the History footer's "Stop" button (`histAct('stop')`) to a simple icon-only button like the Copy buttons, and add the same Stop icon button to the Messages footer (`feed-messages-actions`) as the rightmost control.
+7. **Summarize in Scratch & Log:** Add the "Summarize" button (`#summary-btn`, currently only in the Team Feed → Messages footer) to the Scratch and Log tab action footers as well, and make it functional in the mockup.
+8. **Link-to-Prompt Button Sizing:** Make the Library footer's "Link to prompt" button (`libFootHTML`) match the height and format of the other footer-action buttons (it can keep its label), and right-align it within that footer.
+9. **Button-Color Heuristic:** Give every footer/strip button one consistent color rule — pink = the single commit action on the surface (Send / Approve / Save / Create / Run); teal = hand-off, i.e. sends the content to another agent or surface (Share / Review / Link to prompt / Load / Revise / Reply); cream (`--surface-btn`) = quiet local utility that acts in place (Copy / Edit / Comment / Retry / Summarize / Always-allow / mic / attach, and all icon-only buttons); red = destructive (Reject / Deny / Remove / Stop); white (`--secondary-background`) stays for fillable inputs and selector triggers only. Concrete deltas vs. today: (a) recolor `.icon-btn` and `.mic-btn` from white to cream so Copy/Edit/Comment/Retry/Remove/mic/attach become neutral-cream; (b) recolor Revise in the Plans footer (`planFootHTML`) and Reply in the Inbox footer (`inboxReplyHTML`) from cream to teal, making the Plans-footer Revise match the already-teal prompt-row Revise. Keep DESIGN.md's teal/cream rows and the icon-only-buttons line in sync (retire "Revise = the single teal action" → "teal = hand-off").
 
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
+- The compose tab needs to include a list of linked docs and assets as well. These should be small cards/badges that look like the cards in the doc and asset nav panel. The should be organized horizontally with cost close "X" to remove them and should be clickable such that if clicked they open in the Library panel.
+- Change the "Failed" badge in Messages to "Error". Include Error as an option in the Inbox cards including an Error status badge. This should use the danger color so we need to rethink the other status colors, including "Pending", which is currently using danger color. Make sure there is a wired example from the agent card badge to the Inbox for the Error status.
+- I want the turns status bar in agent panel to be dropdown like the Context bar, with the same formatting and the content of the dropdown should be a breakdown of how many terns where used for different operations but I am not sure what operations to track.
+
+
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
-- Need to organize the working ui concept better to separate out basic design system stuff (eg color palette) into its own html in a way that plays well with the DESIGN.md or just fully replaces it.
-- We have too many different styled badges in terms of fills and and fonts. We need to refine these down to a hand full of badge styles we use consistently.
-- I want to add hover cards for all the major components both because its helpful and it provides documentation through the design process.
 - Need to change all references to "session" to "project" because that is really what will be reused in terms of a given agent config.
-- Need to add ToDo functionality back into UI eventually.
-- Find a way to to support highlighting words and terms in text and having it defined in context.
+- Want to find a way to have the turns bar in the Agent panel be the same size as the context bar. Maybe we can put it in the same styled surface as the context bar but make that a part of the Rewind/Handoff group. Basically just stacked on top and non interactive. 
 
 ### Big picture
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
+- Need to build in more visual elements in plans like charts, mockups and diagrams
+- Consider including an Artifacts tab in Library
+- Need to come up with a way to support injectable reused snippets into the prompts.
+- Need to add ToDo functionality back into UI eventually.
+- Find a way to to support highlighting words and terms in text and having it defined in context.
+- We need to be able to support multiple plans.
