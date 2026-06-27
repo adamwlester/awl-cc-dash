@@ -26,9 +26,15 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
+from identity import assign_identity
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
+
+# Monotonic counter driving the round-robin agent identity (color/icon/number).
+# Reset on restart, but reconnected sessions keep their PERSISTED identity, and
+# reconnect advances this past their numbers so new agents don't reuse them.
+_identity_ordinal = 0
 
 app = FastAPI(title="AWL Dashboard Sidecar", version="0.3.0")
 app.add_middleware(
@@ -51,7 +57,8 @@ class SessionState:
                  disallowed_tools: list[str] | None = None,
                  permission_rules: dict[str, list[str]] | None = None,
                  enabled_plugins: dict[str, bool] | None = None,
-                 mcp_servers: list[str] | None = None):
+                 mcp_servers: list[str] | None = None,
+                 identity: dict[str, Any] | None = None):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
@@ -65,6 +72,9 @@ class SessionState:
         self.permission_rules = permission_rules
         self.enabled_plugins = enabled_plugins
         self.mcp_servers = mcp_servers
+        # Dashboard-owned identity (role/number/name/color/icon), assigned at
+        # create and surfaced on to_dict so the UI reads it everywhere.
+        self.identity = identity
         self.status: Literal["connecting", "idle", "running", "error", "closed"] = "connecting"
         self.created_at = datetime.now().isoformat()
         self.events: list[dict[str, Any]] = []
@@ -88,6 +98,9 @@ class SessionState:
             "total_turns": self.total_turns,
             "event_count": len(self.events),
             "has_pending_permission": self.pending_permission is not None,
+            # Dashboard-owned identity (role/number/name/color/icon) — the UI
+            # renders agent cards and the Agent panel from this everywhere.
+            "identity": self.identity,
             # The applied per-agent launch config, so a UI can read back what an
             # agent was scoped with. NOTE: under bypassPermissions the
             # `allowed_tools` allow-list is ignored by claude (a known bug) —
@@ -176,6 +189,7 @@ async def start_session(session: SessionState):
         permission_rules=session.permission_rules,
         enabled_plugins=session.enabled_plugins,
         mcp_servers=session.mcp_servers,
+        identity=session.identity,
     )
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
@@ -224,6 +238,7 @@ async def reconnect_sessions():
     bound to that tmux name, then resume event pumping (the transcript replay
     restores history). Records whose tmux session is gone are pruned.
     """
+    global _identity_ordinal
     try:
         import runtime_store
         from drivers.bridge import BridgeDriver
@@ -255,6 +270,11 @@ async def reconnect_sessions():
         if sid in sessions:
             continue
 
+        identity = rec.get("identity")
+        # Keep the round-robin counter ahead of any restored agent's number so a
+        # newly-created agent doesn't reuse a reconnected one's color/number.
+        if isinstance(identity, dict) and isinstance(identity.get("number"), int):
+            _identity_ordinal = max(_identity_ordinal, identity["number"])
         session = SessionState(
             session_id=sid,
             agent_type=None,
@@ -268,6 +288,7 @@ async def reconnect_sessions():
             permission_rules=rec.get("permission_rules"),
             enabled_plugins=rec.get("enabled_plugins"),
             mcp_servers=rec.get("mcp_servers"),
+            identity=identity,
         )
         sessions[sid] = session
         config = DriverConfig(
@@ -281,6 +302,7 @@ async def reconnect_sessions():
             permission_rules=rec.get("permission_rules"),
             enabled_plugins=rec.get("enabled_plugins"),
             mcp_servers=rec.get("mcp_servers"),
+            identity=identity,
         )
         try:
             driver = BridgeDriver(
@@ -307,6 +329,15 @@ async def _on_startup():
 # Request Models
 # ============================================================================
 
+class IdentityInput(BaseModel):
+    """Optional create-time identity overrides. Any field omitted is assigned a
+    default (round-robin color/icon, sequential number, role "Agent")."""
+    role: str | None = None
+    number: int | None = None
+    name: str | None = None
+    color: str | None = None   # hex; default round-robin from the 16 --ag-* tokens
+    icon: str | None = None    # icon name from assets/icons/agents/
+
 class CreateSessionRequest(BaseModel):
     agent_type: str | None = None
     model: str | None = None
@@ -320,6 +351,7 @@ class CreateSessionRequest(BaseModel):
     permission_rules: dict[str, list[str]] | None = None  # {allow,deny,ask}
     enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
     mcp_servers: list[str] | None = None                   # subset; None = global
+    identity: IdentityInput | None = None                  # dashboard-owned id fields
 
 class SendPromptRequest(BaseModel):
     prompt: str
@@ -361,7 +393,14 @@ async def health():
 
 @app.post("/sessions")
 async def create_session(req: CreateSessionRequest):
+    global _identity_ordinal
     session_id = str(uuid.uuid4())[:8]
+    # Resolve the dashboard-owned identity (round-robin color/icon/number, with
+    # any caller-provided overrides), then advance the round-robin counter.
+    identity = assign_identity(
+        req.identity.model_dump() if req.identity else None, _identity_ordinal
+    )
+    _identity_ordinal += 1
     session = SessionState(
         session_id=session_id,
         agent_type=req.agent_type,
@@ -375,6 +414,7 @@ async def create_session(req: CreateSessionRequest):
         permission_rules=req.permission_rules,
         enabled_plugins=req.enabled_plugins,
         mcp_servers=req.mcp_servers,
+        identity=identity,
     )
     sessions[session_id] = session
     logger.info(f"Created session {session_id}")

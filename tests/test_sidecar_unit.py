@@ -17,6 +17,7 @@ if str(_SIDECAR) not in sys.path:
 
 from main import SessionState  # noqa: E402
 from drivers import default_driver_name  # noqa: E402
+from identity import assign_identity, AG_COLORS, AG_ICONS  # noqa: E402
 
 
 def _session():
@@ -103,3 +104,56 @@ def test_explicit_sdk_session_preserved(monkeypatch):
         driver_name="sdk",
     )
     assert s.to_dict()["driver"] == "sdk"
+
+
+# ---------------------------------------------------------------------------
+# Agent identity assignment (sidecar/identity.py)
+# ---------------------------------------------------------------------------
+
+class TestIdentityAssignment:
+    def test_defaults_for_first_agent(self):
+        ident = assign_identity(None, 0)
+        assert ident["role"] == "Agent"
+        assert ident["number"] == 1
+        assert ident["name"] == ""
+        assert ident["color"] == AG_COLORS[0][1]   # round-robin slot 0
+        assert ident["icon"] == AG_ICONS[0]
+        # Color is a real hex value.
+        assert ident["color"].startswith("#") and len(ident["color"]) == 7
+
+    def test_color_and_number_round_robin(self):
+        # Ordinal n -> color slot n%16, number n+1.
+        for n in (1, 5, 15, 16, 17):
+            ident = assign_identity(None, n)
+            assert ident["color"] == AG_COLORS[n % len(AG_COLORS)][1]
+            assert ident["number"] == n + 1
+        # Wraps: ordinal 16 reuses slot 0's color (past-16 uniqueness deferred).
+        assert assign_identity(None, 16)["color"] == assign_identity(None, 0)["color"]
+
+    def test_overrides_are_honored(self):
+        req = {"role": "Reviewer", "number": 7, "name": "Ada",
+               "color": "#123456", "icon": "fox-head"}
+        ident = assign_identity(req, 3)
+        assert ident == {"role": "Reviewer", "number": 7, "name": "Ada",
+                         "color": "#123456", "icon": "fox-head"}
+
+    def test_partial_override_fills_rest(self):
+        ident = assign_identity({"name": "Bob"}, 2)
+        assert ident["name"] == "Bob"
+        assert ident["role"] == "Agent"
+        assert ident["number"] == 3
+        assert ident["color"] == AG_COLORS[2][1]
+
+    def test_icons_are_real_names(self):
+        # The discovered icon set is non-empty and names are bare stems.
+        assert AG_ICONS and all("/" not in n and not n.endswith(".svg")
+                                for n in AG_ICONS)
+
+    def test_identity_surfaced_on_to_dict(self):
+        ident = assign_identity(None, 0)
+        s = SessionState(
+            session_id="s4", agent_type=None, model=None,
+            permission_mode="default", cwd=None, system_prompt=None,
+            driver_name="bridge", identity=ident,
+        )
+        assert s.to_dict()["identity"] == ident

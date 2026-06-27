@@ -531,6 +531,8 @@ class BridgeDriver(AgentDriver):
                     "permission_rules": self.config.permission_rules,
                     "enabled_plugins": self.config.enabled_plugins,
                     "mcp_servers": self.config.mcp_servers,
+                    # Dashboard-owned identity, persisted so it survives restart.
+                    "identity": self.config.identity,
                 })
             except Exception as e:  # pragma: no cover - best effort
                 logger.warning("could not persist runtime record: %s", e)

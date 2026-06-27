@@ -509,6 +509,14 @@ Files: bridge/bridge.py, bridge/transcript.py, sidecar/drivers/bridge.py, sideca
 
 ---
 
+### 2026-06-27 12:05:00 — Minimal agent-identity store (role/number/name/color/icon, persisted)
+
+Added a dashboard-owned per-agent identity so agent cards / the Agent panel have a real identity beyond `agent_type`+`model`. New `sidecar/identity.py`: `assign_identity(requested, ordinal)` resolves `{role, number, name, color, icon}` — **color** round-robin over the 16 `--ag-*` Jewel tokens (`design/tokens.css`, in the mockup's interleaved order so adjacent agents get distinct hues), **icon** round-robin over the 167 `assets/icons/agents/` game-icons, **number** sequential, **role** default "Agent", **name** empty; every field overridable via the create payload. Wired through: `CreateSessionRequest.identity` (new `IdentityInput`) → `SessionState` (holds + surfaces on `to_dict.identity`) → `DriverConfig.identity` (passthrough) → the bridge driver's runtime record (persisted) → `reconnect_sessions` (restores persisted identity and advances the round-robin counter past reconnected numbers so a new agent never reuses a live one's color). A monotonic `_identity_ordinal` drives the round-robin. **DEFERRED per scope:** the past-16 color/icon uniqueness algorithm and human-name pools (past 16, color simply repeats). **Live-verified** (sidecar on bridge, curl): agent 1 → `crimson #aa3a61 / alien-bug / #1`, agent 2 → `emerald #008149 / alien-skull / #2` (round-robin advanced), agent 3 with `{role:Reviewer,name:Ada,color:#112233}` honored (icon still round-robin `alien-stare`); all three persisted in `sessions.json` and surfaced on `GET /sessions`; the **create→send→render→idle→delete** flow still passes (send→idle 4 s, history rendered the reply). +6 hermetic tests; full hermetic suite **92 passed**.
+
+Files: sidecar/identity.py, sidecar/drivers/base.py, sidecar/drivers/bridge.py, sidecar/main.py, tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
