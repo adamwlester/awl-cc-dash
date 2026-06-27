@@ -104,7 +104,8 @@
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
-- Remove Copy ghost icon buttons form History card trigger/header
+- We need some kind of indicator when an agent goes from active to idle and the user has not yet checked the output/response. 
+- Given that we we cannot pull context information while an agent's running we could have context update periodically between runs and also have an option to pull directly possibly just by dropping down the context drop down in the agent panel but then we should probably have some kind of load indicator like a spinning thing so it's clear that it's not loaded but it will be.
 
 ## Scratch
 
