@@ -473,6 +473,14 @@ Files: sidecar/main.py, sidecar/drivers/bridge.py, sidecar/drivers/base.py, brid
 
 ---
 
+### 2026-06-27 09:35:00 — Master functionality-coverage map (whole-surface capability inventory, ranked) — planning doc
+
+Created `dev/notes/coverage-map.md`: the single master checklist inventorying **every capability the intended UI commits to**, each mapped to its backend reality (data needed + source[transcript/screen/synthesized/filesystem] + status; control needed + status; build state). It **extends** the partial capability map from the 07:33 "Bridge data layer" entry out to the **whole** surface — Team Graph, Team Feed, Agent panel, Prompt, Library, Settings, and the cross-cutting features (linking/context-sharing as the defining feature, scratchpad, Embed/Attach, send-queue, lifecycle caps, identity, event-stream architecture, Rewind/Handoff, utility passes). Built by **parallelizing the research** (6 general-purpose agents, one per panel area, each grounded in DESIGN.md + mockup.html for intent and the live sidecar/bridge code + the v5 QA doc for reality, with a shared status taxonomy [`proven`/`derivable-not-built`/`needs-investigation`/`impossible`] and reality-anchors block), then **synthesizing** their structured tables into one document with a single consistent ranking — a **Phase 0→5 MVP build order**, a "backend reality in one screen" summary (proven floor · hard bridge ceilings · the net-new buckets), and a status rollup. Captures the named findings correctly: total context % live from transcript (built); per-category context proven-available-not-built (scrape `/context`, queue til idle, never interrupt); mid-run permission-mode change blocked/under-research; mode·effort·interrupt·permission·resume proven; plus this round's Part 1 builds (mode-at-launch, honest set_mode, /subagents). Key synthesis call: most MVP P0s are "backend proven, frontend not-started" (the live App.tsx is a 2-pane stub), so the MVP is largely a UI build over a proven bridge floor + three foundational backend pieces (aggregated identity-tagged event stream · prompt queue + boundary detection · agent-identity store), after which linking becomes tractable. Planning doc only — no code changed. (Two of the six research agents incidentally spawned their own subagents, an extra live confirmation that the Part-1 `/subagents` machinery holds under real load.)
+
+Files: dev/notes/coverage-map.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
