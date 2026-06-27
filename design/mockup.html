@@ -1144,8 +1144,15 @@
     #inbox-list{ gap:12px; }
     .inbox-sec-head{ display:flex; align-items:center; gap:7px; padding:0 2px 6px; }
     .inbox-sec-lab{ font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
-    .inbox-sec-n{ font-size:8.5px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--muted-2); border:2px solid var(--rule); border-radius:3px; padding:0 5px; line-height:1.5; }
+    /* count badge matches its section label (was a fainter --muted-2/--rule — barely visible) */
+    .inbox-sec-n{ font-size:8.5px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--muted); border:2px solid var(--muted); border-radius:3px; padding:0 5px; line-height:1.5; }
     .inbox-sec-cards{ display:flex; flex-direction:column; gap:8px; }
+    /* Section-heading ramp (label + matching badge): Permission → Warning → Error escalate;
+       Plan + Decision stay the neutral --muted base above. Card left-edge stays Error-only. */
+    .inbox-sec--permission .inbox-sec-lab{ color:var(--inbox-permission); }
+    .inbox-sec--permission .inbox-sec-n{ color:var(--inbox-permission); border-color:var(--inbox-permission); }
+    .inbox-sec--warning .inbox-sec-lab{ color:var(--warning); }
+    .inbox-sec--warning .inbox-sec-n{ color:var(--warning); border-color:var(--warning); }
     .inbox-sec--error .inbox-sec-lab{ color:var(--danger); }
     .inbox-sec--error .inbox-sec-n{ color:var(--danger); border-color:var(--danger); }
     .inbox-card.inbox-card--error{ border-left:6px solid var(--danger); }   /* Error = the alarm; other types stay edge-free (2-class to beat .fcard's border shorthand) */
@@ -4972,7 +4979,7 @@ resize intact.`,
         </ul>
         <h5>Needs you</h5>
         <ul>
-          <li>4 open Inbox requests — <b class="k">sage</b> permission (deploy gate, 14:43), <b class="k">sandy</b> plan to merge (14:41), <b class="k">vega</b> decision on rotation strategy (14:44), and <b class="k">drew</b> error — staging unreachable (14:48).</li>
+          <li>5 open Inbox requests — <b class="k">drew</b> error — staging unreachable (14:48), <b class="k">rowan</b> warning — context window 92% (14:46), <b class="k">sage</b> permission (deploy gate, 14:43), <b class="k">sandy</b> plan to merge (14:41), and <b class="k">vega</b> decision on rotation strategy (14:44).</li>
         </ul>
         <p class="fo-sub">Generated from all 9 log entries · mock summary</p>`}
   };
@@ -4995,10 +5002,11 @@ resize intact.`,
      attention ramp). Approval → Plan. Decision is the AskUserQuestion surface — one question per card.
      Plan cards keep only Review (→ Plans tab) + Reply; approval + agent verdicts live in the Plans tab. */
   const INBOX_SECTIONS=[
+    {type:'error',lab:'Error'},
+    {type:'warning',lab:'Warning'},
     {type:'permission',lab:'Permission'},
     {type:'plan',lab:'Plan'},
-    {type:'decision',lab:'Decision'},
-    {type:'error',lab:'Error'}
+    {type:'decision',lab:'Decision'}
   ];
   function secLabel(t){const s=INBOX_SECTIONS.find(x=>x.type===t);return s?s.lab:t;}
   const REQS=[
@@ -5007,7 +5015,8 @@ resize intact.`,
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
-    {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'}   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
+    {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'},   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
+    {ag:'rowan',type:'warning',time:'14:46',title:'Context window 92% — compaction imminent',body:`rowan is at 92% of its context window. The next turn will trigger auto-compaction, which can drop earlier scratchpad detail. Summarize or hand off now if you want to preserve it.`}   /* Warning = attention-needed, not a hard block: a soft amber-orange heading, no card edge (Error keeps the single alarm edge) */
   ];
   function inboxReplyHTML(){return '<span class="ml-auto" style="width:2px;align-self:stretch;background:var(--border)"></span>'
     +'<button class="btn-secondary btn-sm" onclick="inboxReply(this)" title="Reply via the Editor (quotes the request as a reference block)"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted */
@@ -5018,6 +5027,8 @@ resize intact.`,
       acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
+    else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Warning: attention-needed notice — Acknowledge (clears it) + Reply */
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Acknowledged\')">Acknowledge</button>'+inboxReplyHTML();}
     else{detail='<div class="rc-body inbox-err">'+esc(o.body)+'</div>';   /* Error: inline error text + Retry · Dismiss · Reply (no View, no Forward) */
       acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML();}
     const sub=(o.type==='error'&&o.subtype)?'<span class="inbox-subtype">'+esc(o.subtype)+'</span>':'';

@@ -400,6 +400,14 @@ Files: frontend/src/renderer/App.tsx, DEVLOG.md
 
 ---
 
+### 2026-06-27 04:45:00 — Inbox: 5-section severity ramp (added Warning), heading-label colours, count-badge fix; +token audit
+
+Reworked the Team Feed → Inbox section headings. **Token audit first** (subagent): grepped all 60 `tokens.css` custom properties against `mockup.html`; only the 6 orphaned `--req-*` (+`-soft`) tokens were dead — moved them verbatim under a new `UNUSED` banner at the foot of the `:root` block (move-only, count unchanged). **Then the Inbox change:** added a 5th section type **Warning** and reordered sections most→least urgent — **Error · Warning · Permission · Plan · Decision**. The section **heading label + its matching count badge** now carry an escalating ramp via two new tokens — `--inbox-permission:#7a4e24` (blackish-orange) and `--inbox-warning:#c06a1a` (burnt orange) — with **Error** on `--danger` (red) and **Plan/Decision** on neutral `--muted`; the count badge was switched off the barely-visible `--muted-2`/`--rule` to match its label. Error stays the single alarm (only section with a danger left-edge; Warning + the rest are heading-coloured only). Added a sample `warning`-type REQ (rowan, "context window 92%") + a `warning` render branch (Acknowledge · Reply) so the section actually renders; updated the stale "4 open Inbox requests" digest to 5. **Live-verified headless** (Playwright over http://localhost): computed label colours exact on all 5 sections, tab badge → 5, Warning card expands with correct body + actions (no Error styling), narrow (1100) + wide (2200) extremes both clean, console 0 errors; final headed-size confirm identical. `design/DESIGN.md` synced (Inbox tab section list + controls table + the "typed sections" paragraph — now an escalating heading ramp).
+
+Files: design/tokens.css, design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

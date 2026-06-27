@@ -115,6 +115,12 @@
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
 - Remove the vertical separator/divider in Inbox card footer before Reply
+- Reviewer-chip dropdown needs to have overlay above as do all the footer popover style menus.
+- Gutter does not extend down extends. Also whole doc and last section select should not highlight past last line of text for any Library text stuff
+- Change heading Export to "Copy & Export" 
+- Remove Copy ghost icon buttons form History card trigger/header
+- Integrate warning section in Inbox and include at least one  example agent with pending status that crossed context or turn limit. 
+- With that, include a badge in the same warning color in the Inbox card header (similar to the "Connection" error badge in the Error section card) that indicates max turns with some clear label
 
 ## Scratch
 

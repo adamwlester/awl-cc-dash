@@ -47,12 +47,11 @@
   --warning:#d98a2b;   /* attention / pending */
   --danger:#d23b6a;    /* destructive (Retire, Reject, Stop, Bypass) */
 
-  /* Inbox request-type ramp (reddish → copper) — RETIRED in the P2 Inbox-sections refactor: the Inbox now
-     groups cards by typed section instead of colour-ranking a per-card badge. Tokens retained (not currently
-     referenced) for possible reuse; Error now owns --danger as the single Inbox alarm. */
-  --req-permission:#d23b4a;
-  --req-approval:#cf7a2c;
-  --req-decision:#a9710f;
+  /* Inbox section-heading ramp — the LABEL TEXT (+ its matching count badge) for the
+     three "action-needed" sections, escalating low→high: Permission (blackish-orange) →
+     Warning (--warning) → Error (--danger). Plan + Decision stay neutral (--muted).
+     Only Permission needs a dedicated value — Warning reuses --warning, Error reuses --danger. */
+  --inbox-permission:#a9710f;   /* blackish-orange — the low end of the ramp */
 
   --ag-user:#7b7fa6;   /* User row / idle tone */
 
@@ -79,11 +78,6 @@
 
   /* doc rail: section-select indicator (dark teal) */
   --rail-section:#2f97a6;
-
-  /* Inbox request soft tints (paired with the --req-* text tokens above) — also retired with the ramp; retained, unused */
-  --req-permission-soft:#f6dcd9;
-  --req-approval-soft:var(--warning-soft);           /* same value as --warning-soft, named for the Inbox context */
-  --req-decision-soft:#f0e6cd;
 
   /* link hover (utility text links) */
   --link-hover:#b06d20;
@@ -126,4 +120,18 @@
   --ag-violet:#7152b5;
   --ag-orchid:#8b48a0;
   --ag-magenta:#9e3f84;
+
+  /* ====== UNUSED — not referenced in mockup.html (pending review) ====== */
+
+  /* Inbox request-type ramp (reddish → copper) — RETIRED in the P2 Inbox-sections refactor: the Inbox now
+     groups cards by typed section instead of colour-ranking a per-card badge. Tokens retained (not currently
+     referenced) for possible reuse; Error now owns --danger as the single Inbox alarm. */
+  --req-permission:#d23b4a;
+  --req-approval:#cf7a2c;
+  --req-decision:#a9710f;
+
+  /* Inbox request soft tints (paired with the --req-* text tokens above) — also retired with the ramp; retained, unused */
+  --req-permission-soft:#f6dcd9;
+  --req-approval-soft:var(--warning-soft);           /* same value as --warning-soft, named for the Inbox context */
+  --req-decision-soft:#f0e6cd;
 }
