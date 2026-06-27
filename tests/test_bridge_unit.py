@@ -19,9 +19,11 @@ from bridge.bridge import TmuxBridge, parse_permission_prompt
 from bridge.transcript import _encode_cwd, _resolve_project_dir
 from sidecar.drivers.bridge import (
     derive_context_usage,
+    derive_subagents,
     classify_tool,
     CONTEXT_WINDOW,
 )
+from bridge.bridge import VALID_PERMISSION_MODES
 
 
 # -----------------------------------------------------------------------------
@@ -390,6 +392,158 @@ class TestWorkStepsAndTools:
                                               "cache_creation_input_tokens": 0}, "content": []}},
         ]
         assert derive_context_usage(entries)["tokens"] == 5
+
+
+# -----------------------------------------------------------------------------
+# derive_subagents — the subagent inventory from the parent transcript
+#
+# Entries below mirror the REAL transcript shape captured live (CC 2.1.x): the
+# parent spawns via an `Agent` tool_use, and the result returns as a user
+# tool_result carrying a structured `toolUseResult` (agentId/status/totals) plus
+# a text "agentId: …\n<usage>…</usage>" fallback.
+# -----------------------------------------------------------------------------
+
+class TestDeriveSubagents:
+    def _spawn(self, tuid, *, name="Agent", subagent_type="general-purpose",
+               description="Reply with marker word", prompt="Reply: OK",
+               sidechain=False):
+        block = {"type": "tool_use", "id": tuid, "name": name,
+                 "input": {"description": description, "prompt": prompt,
+                           "subagent_type": subagent_type}}
+        entry = {"type": "assistant", "message": {"id": "m_" + tuid,
+                                                  "content": [block]}}
+        if sidechain:
+            entry["isSidechain"] = True
+        return entry
+
+    def _result(self, tuid, *, agent_id="acbbfd9edd81f32fc", status="completed",
+                tokens=9887, tool_uses=0, duration=2407,
+                model="claude-opus-4-8[1m]", is_error=False, structured=True,
+                text=None):
+        block = {"type": "tool_result", "tool_use_id": tuid}
+        if is_error:
+            block["is_error"] = True
+        if text is not None:
+            block["content"] = [{"type": "text", "text": text}]
+        else:
+            block["content"] = [{"type": "text", "text": "OK"}]
+        entry = {"type": "user", "message": {"content": [block]}}
+        if structured:
+            entry["toolUseResult"] = {
+                "status": status, "agentId": agent_id,
+                "agentType": "general-purpose", "totalTokens": tokens,
+                "totalToolUseCount": tool_uses, "totalDurationMs": duration,
+                "resolvedModel": model,
+            }
+        return entry
+
+    def test_no_subagents(self):
+        entries = [{"type": "user", "message": {"content": "hi"}},
+                   {"type": "assistant",
+                    "message": {"id": "m1", "content": [{"type": "text", "text": "ok"}]}}]
+        assert derive_subagents(entries) == {"count": 0, "subagents": []}
+
+    def test_done_subagent_structured(self):
+        entries = [self._spawn("toolu_1"), self._result("toolu_1")]
+        out = derive_subagents(entries)
+        assert out["count"] == 1
+        sa = out["subagents"][0]
+        assert sa["id"] == "s1"
+        assert sa["tool_use_id"] == "toolu_1"
+        assert sa["agent_id"] == "acbbfd9edd81f32fc"
+        assert sa["type"] == "general-purpose"
+        assert sa["description"] == "Reply with marker word"
+        assert sa["status"] == "done"
+        assert sa["usage"] == {
+            "tokens": 9887, "tool_uses": 0, "duration_ms": 2407,
+            "model": "claude-opus-4-8[1m]",
+        }
+
+    def test_running_subagent_when_no_result_yet(self):
+        # A spawn whose Task hasn't returned is still running — no agent_id/usage.
+        entries = [self._spawn("toolu_1")]
+        sa = derive_subagents(entries)["subagents"][0]
+        assert sa["status"] == "running"
+        assert sa["agent_id"] is None
+        assert sa["usage"] is None
+
+    def test_task_name_also_counts(self):
+        # SDK / older builds name the spawn tool "Task".
+        entries = [self._spawn("toolu_1", name="Task"), self._result("toolu_1")]
+        assert derive_subagents(entries)["count"] == 1
+
+    def test_multiple_spawns_get_ordinal_ids(self):
+        entries = [
+            self._spawn("toolu_1"), self._result("toolu_1"),
+            self._spawn("toolu_2"),  # second still running
+        ]
+        out = derive_subagents(entries)
+        assert [s["id"] for s in out["subagents"]] == ["s1", "s2"]
+        assert out["subagents"][0]["status"] == "done"
+        assert out["subagents"][1]["status"] == "running"
+
+    def test_error_status_from_toolUseResult(self):
+        entries = [self._spawn("toolu_1"),
+                   self._result("toolu_1", status="failed")]
+        assert derive_subagents(entries)["subagents"][0]["status"] == "error"
+
+    def test_error_status_from_is_error_block(self):
+        entries = [self._spawn("toolu_1"),
+                   self._result("toolu_1", structured=False, is_error=True,
+                                text="boom")]
+        assert derive_subagents(entries)["subagents"][0]["status"] == "error"
+
+    def test_text_usage_fallback_when_no_structured_result(self):
+        # Older/SDK builds may omit toolUseResult; the agentId + <usage> text
+        # block in the tool_result content must still yield id + usage.
+        text = ("agentId: deadbeefcafe (use SendMessage with to: 'deadbeefcafe' "
+                "to continue this agent)\n<usage>subagent_tokens: 1234\n"
+                "tool_uses: 5\nduration_ms: 6789</usage>")
+        entries = [self._spawn("toolu_1"),
+                   self._result("toolu_1", structured=False, text=text)]
+        sa = derive_subagents(entries)["subagents"][0]
+        assert sa["status"] == "done"
+        assert sa["agent_id"] == "deadbeefcafe"
+        assert sa["usage"]["tokens"] == 1234
+        assert sa["usage"]["tool_uses"] == 5
+        assert sa["usage"]["duration_ms"] == 6789
+        assert sa["usage"]["model"] is None  # not in the text fallback
+
+    def test_type_falls_back_to_description(self):
+        spawn = self._spawn("toolu_1")
+        del spawn["message"]["content"][0]["input"]["subagent_type"]
+        sa = derive_subagents([spawn])["subagents"][0]
+        assert sa["type"] == "Reply with marker word"
+
+    def test_sidechain_spawn_is_ignored(self):
+        # An Agent tool_use INSIDE a subagent's own (sidechain) work is the
+        # subagent's nested spawn — not one of the PARENT's subagents.
+        entries = [
+            self._spawn("toolu_1"), self._result("toolu_1"),
+            self._spawn("toolu_nested", sidechain=True),
+        ]
+        out = derive_subagents(entries)
+        assert out["count"] == 1
+        assert out["subagents"][0]["tool_use_id"] == "toolu_1"
+
+
+# -----------------------------------------------------------------------------
+# VALID_PERMISSION_MODES — the launch-flag allow-list (Part 1.2)
+# -----------------------------------------------------------------------------
+
+class TestValidPermissionModes:
+    def test_matches_cli_choices(self):
+        # The set claude's `--permission-mode` documents (CC 2.1.x). Drift here
+        # silently drops a real mode at launch, so pin it.
+        assert VALID_PERMISSION_MODES == frozenset({
+            "acceptEdits", "auto", "bypassPermissions", "default",
+            "dontAsk", "plan",
+        })
+
+    def test_covers_sidecar_setmode_enum(self):
+        # Every mode the sidecar's SetModeRequest accepts must be launchable.
+        for mode in ("default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"):
+            assert mode in VALID_PERMISSION_MODES
 
 
 # -----------------------------------------------------------------------------

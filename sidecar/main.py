@@ -458,11 +458,21 @@ async def set_model(session_id: str, req: SetModelRequest):
 
 @app.post("/sessions/{session_id}/mode")
 async def set_mode(session_id: str, req: SetModeRequest):
+    """Set the permission mode on a live session — honestly.
+
+    The bridge driver cannot set the permission mode on a running TUI (it only
+    cycles via Shift+Tab, with no reliable absolute set), so it does NOT advertise
+    `set_mode`; this returns a 400 rather than falsely reporting success (matching
+    `set_fast` / `set_thinking`). The *initial* mode is applied at launch via the
+    `--permission-mode` flag (see the bridge driver). Mid-run mode change is under
+    separate research and intentionally not attempted here.
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if session.driver and session.driver.supports("set_mode"):
-        await session.driver.set_mode(req.mode)
+    if not (session.driver and session.driver.supports("set_mode")):
+        raise HTTPException(status_code=400, detail="Driver has no mode control")
+    await session.driver.set_mode(req.mode)
     session.permission_mode = req.mode
     return {"status": "ok", "mode": req.mode}
 
@@ -536,6 +546,31 @@ async def get_context_usage(session_id: str):
     try:
         usage = await session.driver.get_context_usage()
         return usage or {}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/subagents")
+async def get_subagents(session_id: str):
+    """Surface a session's subagents — presence, count, type, running-vs-done,
+    and usage — derived from the parent agent's transcript.
+
+    The parent transcript records each subagent spawn (an `Agent`/`Task` tool_use
+    carrying type/description/prompt) and its result (carrying the subagent's
+    `agentId` and a usage summary); a spawn with no result yet is still running.
+    Drivers that can't observe subagents (e.g. the SDK driver) return the empty
+    shape rather than erroring.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not session.driver:
+        raise HTTPException(status_code=503, detail="Not connected")
+    if not session.driver.supports("subagents"):
+        return {"count": 0, "subagents": []}
+    try:
+        result = await session.driver.get_subagents()
+        return result or {"count": 0, "subagents": []}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import uuid
 from datetime import datetime
@@ -159,6 +160,172 @@ def derive_context_usage(entries: list[dict]) -> dict:
     }
 
 
+# Subagent spawn tools: this Claude Code build names the tool "Agent"; the Agent
+# SDK / older builds name it "Task". Both spawn one subagent.
+_SUBAGENT_TOOLS = ("Agent", "Task")
+
+# Result statuses that mean the subagent did NOT finish cleanly. Anything else
+# (notably "completed") with a present result reads as done; absence of a result
+# reads as still running.
+_BAD_SUBAGENT_STATUSES = {"error", "failed", "cancelled", "canceled", "interrupted"}
+
+# Fallback parsing of the text Claude Code appends to a subagent's tool_result,
+# used only when the structured ``toolUseResult`` field is absent:
+#   "agentId: <id> (use SendMessage …)\n<usage>subagent_tokens: N\ntool_uses: N\n
+#    duration_ms: N</usage>"
+_AGENTID_RE = re.compile(r"agentId:\s*(?P<agent_id>\S+)")
+_USAGE_RE = re.compile(
+    r"subagent_tokens:\s*(?P<tokens>\d+)\s*"
+    r"tool_uses:\s*(?P<tool_uses>\d+)\s*"
+    r"duration_ms:\s*(?P<duration>\d+)",
+    re.DOTALL,
+)
+
+
+def _flatten_result_text(content: Any) -> str:
+    """Flatten a tool_result ``content`` (string or list of blocks) to text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text") or "")
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(parts)
+    return ""
+
+
+def _subagent_result(entry: dict, block: dict) -> dict:
+    """Extract a subagent's result detail (agent_id, status, usage), structured-first.
+
+    Prefers the entry's structured ``toolUseResult`` (agentId / status / totalTokens
+    / totalToolUseCount / totalDurationMs / resolvedModel); falls back to parsing
+    the ``agentId`` line + ``<usage>`` block out of the tool_result text.
+    """
+    is_error = bool(block.get("is_error"))
+    tur = entry.get("toolUseResult")
+    if isinstance(tur, dict) and tur.get("agentId"):
+        return {
+            "agent_id": tur.get("agentId"),
+            "status_raw": tur.get("status"),
+            "is_error": is_error,
+            "usage": {
+                "tokens": tur.get("totalTokens"),
+                "tool_uses": tur.get("totalToolUseCount"),
+                "duration_ms": tur.get("totalDurationMs"),
+                "model": tur.get("resolvedModel"),
+            },
+        }
+    # Fallback: parse the agentId line + <usage> summary out of the result text.
+    text = _flatten_result_text(block.get("content"))
+    agent_id = None
+    m_id = _AGENTID_RE.search(text)
+    if m_id:
+        agent_id = m_id.group("agent_id")
+    usage: dict[str, Any] = {
+        "tokens": None, "tool_uses": None, "duration_ms": None, "model": None,
+    }
+    m_u = _USAGE_RE.search(text)
+    if m_u:
+        usage["tokens"] = int(m_u.group("tokens"))
+        usage["tool_uses"] = int(m_u.group("tool_uses"))
+        usage["duration_ms"] = int(m_u.group("duration"))
+    return {
+        "agent_id": agent_id,
+        "status_raw": None,
+        "is_error": is_error,
+        "usage": usage,
+    }
+
+
+def _subagent_status(result: dict | None) -> str:
+    """Map a paired result (or None) to running / done / error."""
+    if result is None:
+        return "running"
+    if result["is_error"] or (result.get("status_raw") or "").lower() in _BAD_SUBAGENT_STATUSES:
+        return "error"
+    return "done"
+
+
+def derive_subagents(entries: list[dict]) -> dict:
+    """Derive a parent agent's subagents from its JSONL transcript.
+
+    A subagent is spawned by an ``Agent`` (this CC build) or ``Task`` (SDK/older)
+    ``tool_use`` block on the parent's MAIN line. Its result returns as a matching
+    ``tool_result`` (paired by ``tool_use`` id) carrying a structured
+    ``toolUseResult`` — ``agentId``, ``status``, ``totalTokens``,
+    ``totalToolUseCount``, ``totalDurationMs``, ``resolvedModel`` — and the
+    subagent's own full transcript persists at
+    ``<project>/<parent-uuid>/subagents/agent-<agentId>.jsonl``.
+
+    A spawn with no matching result yet is still ``running``; once the result
+    lands it is ``done`` (or ``error`` if the result is flagged). The ``s1`` /
+    ``s2`` … ids are **dashboard-minted in spawn order** — neither driver mints a
+    stable per-subagent id (subagents are opaque until the Task returns), so this
+    is a synthesized identity, not a read of an existing field.
+
+    Pure function (no live session) so it can be unit-tested directly. Subagent
+    sidechain entries are ignored — only the parent's main-line ``Agent``/``Task``
+    spawn and its result count.
+
+    Returns ``{"count": N, "subagents": [ {id, tool_use_id, agent_id, type,
+    description, prompt, status, usage}, … ]}`` in spawn order.
+    """
+    # 1) Collect spawns (Agent/Task tool_use blocks on the main line), in order.
+    spawns: list[dict] = []
+    for e in entries:
+        if e.get("type") != "assistant" or e.get("isSidechain"):
+            continue
+        for block in (e.get("message") or {}).get("content") or []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            if block.get("name") not in _SUBAGENT_TOOLS:
+                continue
+            inp = block.get("input") or {}
+            spawns.append({
+                "tool_use_id": block.get("id"),
+                "type": inp.get("subagent_type") or inp.get("description"),
+                "description": inp.get("description"),
+                "prompt": inp.get("prompt"),
+            })
+
+    # 2) Index the matching results by tool_use id (only the spawned ids).
+    spawn_ids = {sp["tool_use_id"] for sp in spawns if sp["tool_use_id"] is not None}
+    results: dict[Any, dict] = {}
+    if spawn_ids:
+        for e in entries:
+            if e.get("type") != "user" or e.get("isSidechain"):
+                continue
+            content = (e.get("message") or {}).get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                    continue
+                tuid = block.get("tool_use_id")
+                if tuid is not None and tuid in spawn_ids:
+                    results[tuid] = _subagent_result(e, block)
+
+    # 3) Build the ordered list with dashboard-minted s-ids.
+    subagents = []
+    for i, sp in enumerate(spawns, start=1):
+        res = results.get(sp["tool_use_id"])
+        subagents.append({
+            "id": f"s{i}",
+            "tool_use_id": sp["tool_use_id"],
+            "agent_id": res["agent_id"] if res else None,
+            "type": sp["type"],
+            "description": sp["description"],
+            "prompt": sp["prompt"],
+            "status": _subagent_status(res),
+            "usage": res["usage"] if res else None,
+        })
+
+    return {"count": len(subagents), "subagents": subagents}
+
+
 def _entry_to_event(entry: dict) -> dict | None:
     """Convert a transcript JSONL entry into a frontend event, or None to skip."""
     etype = entry.get("type")
@@ -207,7 +374,7 @@ class BridgeDriver(AgentDriver):
     # were not wired (see set_* methods for the live findings).
     CAPABILITIES = {
         "interrupt", "context", "permission", "resume",
-        "set_model", "set_effort",
+        "set_model", "set_effort", "subagents",
     }
 
     def __init__(
@@ -240,12 +407,18 @@ class BridgeDriver(AgentDriver):
 
     async def start(self) -> None:
         if self._resuming:
-            # Rebind to the still-alive tmux session; do not recreate.
+            # Rebind to the still-alive tmux session; do not recreate. The mode
+            # was applied at the original launch — resume does not relaunch claude.
             await asyncio.to_thread(self._bridge.resume, self._name)
         else:
+            # Apply the session's requested permission mode at launch via the
+            # claude `--permission-mode` flag (the startup-gate clearer in the
+            # bridge handles the bypassPermissions warning gate). An unknown value
+            # is dropped by the bridge and the TUI starts in its default mode.
             await asyncio.to_thread(
                 self._bridge.create, self._name,
                 cwd=self.config.cwd, model=self.config.model,
+                permission_mode=self.config.permission_mode,
             )
         # Best-effort: wait for the Claude Code TUI to finish loading.
         try:
@@ -352,6 +525,18 @@ class BridgeDriver(AgentDriver):
         except Exception:
             return None
         return derive_context_usage(entries)
+
+    async def get_subagents(self) -> Any:
+        """Derive this agent's subagents from its transcript (see ``derive_subagents``).
+
+        Returns the empty shape (rather than erroring) when the transcript can't
+        be read yet — e.g. before the first turn.
+        """
+        try:
+            entries = await asyncio.to_thread(self._bridge.read_log, self._name)
+        except Exception:
+            return {"count": 0, "subagents": []}
+        return derive_subagents(entries)
 
     # --- Session-control commands ---------------------------------------------
     #

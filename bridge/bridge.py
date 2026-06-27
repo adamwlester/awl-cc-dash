@@ -24,6 +24,14 @@ class TmuxBridgeError(Exception):
     pass
 
 
+# Valid values for claude's `--permission-mode` launch flag (CC 2.1.x). An
+# unrecognized value is dropped rather than passed through, so a bad/empty mode
+# just launches the TUI in its default mode instead of erroring on startup.
+VALID_PERMISSION_MODES = frozenset({
+    "acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan",
+})
+
+
 # Lines that look like a numbered menu option, e.g. "❯ 1. Yes" or "  3. No".
 _MENU_OPTION_RE = re.compile(r"^\s*[❯>]?\s*(\d+)\.\s+(.*\S)\s*$")
 # How close to the bottom of the capture the menu's last option must sit to count
@@ -232,7 +240,8 @@ class TmuxBridge:
 
     # --- Core Operations ---
 
-    def create(self, name, cwd=None, model=None, claude_args="", show=False):
+    def create(self, name, cwd=None, model=None, claude_args="", show=False,
+               permission_mode=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Args:
@@ -240,6 +249,12 @@ class TmuxBridge:
             cwd: Working directory. Accepts Windows or WSL paths.
             model: Model to use (e.g. "sonnet", "opus"). Overrides default.
             claude_args: Additional CLI arguments for claude.
+            permission_mode: Initial permission mode for the session, passed as
+                claude's ``--permission-mode`` flag (one of
+                ``VALID_PERMISSION_MODES``). An unrecognized/empty value is
+                ignored so the TUI launches in its default mode. The
+                ``bypassPermissions`` warning gate that this triggers is cleared
+                by ``_clear_startup_gates`` like any other startup gate.
             show: When True, open a visible Windows Terminal tab attached to the
                 new session. Defaults to False: the tmux session runs detached and
                 is fully drivable via capture-pane/send-keys without a window, so
@@ -268,6 +283,13 @@ class TmuxBridge:
         use_model = model or self._default_model
         if use_model:
             parts.extend(["--model", use_model])
+        if permission_mode in VALID_PERMISSION_MODES:
+            parts.extend(["--permission-mode", permission_mode])
+        elif permission_mode:
+            log.warning(
+                "Ignoring unknown permission_mode %r for session '%s' "
+                "(launching in default mode).", permission_mode, name,
+            )
         if claude_args:
             parts.append(claude_args)
 

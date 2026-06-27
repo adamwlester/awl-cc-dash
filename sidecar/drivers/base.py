@@ -97,5 +97,9 @@ class AgentDriver:
     async def get_context_usage(self) -> Any:
         return None
 
+    async def get_subagents(self) -> Any:
+        """Return this agent's subagents (or None if the driver can't observe them)."""
+        return None
+
     async def close(self) -> None:
         return None
