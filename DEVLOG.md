@@ -501,6 +501,14 @@ Files: dev/notes/coverage-map.md, DEVLOG.md
 
 ---
 
+### 2026-06-27 11:55:00 — Fix transcript collision: per-agent transcript via claude `--session-id`
+
+Fixed the collision caveat flagged in the 11:45 entry: `find_transcript` resolved one transcript per cwd, so two agents sharing a dir read each other's transcript (identical `/usage`, wrong `/history`). **Verified the research doc's PID→`~/.claude/sessions/{PID}.json` mapping is DEAD on this build** — 2.1.195 no longer writes those files (newest was Jun 13; two fresh live runs wrote none) — so used the native **`--session-id <uuid>`** flag instead (confirmed in `--help`; print-mode probe: two agents in one cwd with distinct ids wrote two distinct `<id>.jsonl`, each carrying only its own content). `TmuxBridge.create()` now launches with a pinned `--session-id` and tracks it in `_session_uuids`; `find_transcript` resolves each session's own `<id>.jsonl` (and returns None rather than falling through to "newest" when that file isn't written yet, so a co-located sibling can't be cross-read); the legacy newest-file fallback is kept for non-dashboard sessions. For restart-survival the id is persisted in the runtime record and re-registered on resume (`register_session_id`) — deterministic, replacing a fragile `/proc`-cmdline recovery that mangled through `wsl.exe` arg-passing. **Live-verified the normal way**: two real bridge agents in one cwd resolved to distinct transcripts (ALPHA-only / BRAVO-only), and a fresh bridge re-registering the persisted id resolved each correctly. +6 hermetic tests; full hermetic suite **86 passed**.
+
+Files: bridge/bridge.py, bridge/transcript.py, sidecar/drivers/bridge.py, sidecar/main.py, tests/test_bridge_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

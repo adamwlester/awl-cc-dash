@@ -62,16 +62,30 @@ def _resolve_project_dir(bridge, cwd):
     return None
 
 
+def _resolve_session_id(bridge, session_name):
+    """The claude ``--session-id`` (uuid) for a tmux session, or None.
+
+    The bridge records it in ``_session_uuids`` at ``create()``. After a sidecar
+    restart that resumed a still-alive session, the driver re-registers the id
+    (persisted in the runtime record) before reading — so this in-memory map is
+    authoritative for every session the dashboard owns. A session NOT launched by
+    this bridge (no entry) falls through to the legacy newest-file heuristic.
+    """
+    return getattr(bridge, "_session_uuids", {}).get(session_name)
+
+
 def find_transcript(bridge, session_name):
     """Find the JSONL transcript file for a session.
 
     Strategy:
-    1. Get the session's cwd from tmux
-    2. Hash the cwd to find the project directory
-    3. Look for JSONL files matching the session
-
-    Since we may not know the exact session UUID, we search by
-    examining JSONL files for matching sessionId fields.
+    1. Get the session's cwd from tmux → resolve its `~/.claude/projects` subdir.
+    2. Resolve the session's OWN transcript by its claude ``--session-id``: the
+       file is ``<session-id>.jsonl``. This is collision-proof — two agents in
+       the same cwd (same project dir) each resolve to their own file. The id
+       comes from the bridge's in-memory map (set at create) or, after a resume,
+       is recovered from the live process args (see ``_resolve_session_id``).
+    3. Only when the id is unknown (a session not launched by this bridge) fall
+       back to the legacy single-file / newest-file heuristic.
 
     Args:
         bridge: TmuxBridge instance (for running WSL commands).
@@ -98,7 +112,21 @@ def find_transcript(bridge, session_name):
     if not project_dir:
         return None
 
-    # List JSONL files in the project directory
+    # Resolve THIS session's transcript by its known session id. When the id is
+    # known but the file doesn't exist yet (e.g. before the first turn), return
+    # None rather than fall through to "newest" — newest could be a co-located
+    # sibling's transcript, which is exactly the collision we're fixing.
+    sid = _resolve_session_id(bridge, session_name)
+    if sid:
+        candidate = f"{project_dir}/{sid}.jsonl"
+        try:
+            hit = bridge._run(f"test -f '{candidate}' && echo OK || true")
+        except Exception:
+            hit = ""
+        return candidate if hit.strip() == "OK" else None
+
+    # --- Legacy fallback (unknown session id) --------------------------------
+    # Only reached for sessions this bridge didn't launch with --session-id.
     try:
         files = bridge._run(f"ls {project_dir}/*.jsonl 2>/dev/null || true")
     except Exception:

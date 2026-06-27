@@ -286,6 +286,7 @@ async def reconnect_sessions():
             driver = BridgeDriver(
                 config, session.handle_event,
                 resume_name=tmux_name, session_id=sid,
+                claude_session_id=rec.get("claude_session_id"),
             )
             session.driver = driver
             await driver.start()  # resume() path — rebinds, doesn't recreate

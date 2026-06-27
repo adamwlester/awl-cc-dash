@@ -13,6 +13,7 @@ import subprocess
 import shutil
 import time
 import re
+import uuid
 from .paths import is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN
 
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
@@ -137,6 +138,11 @@ class TmuxBridge:
         self._default_cwd = default_cwd
         self._default_model = default_model
         self._on_windows = is_windows()
+        # tmux session name -> the claude `--session-id` (uuid) we launched it
+        # with. The transcript file is named `<session-id>.jsonl`, so this is how
+        # `find_transcript` resolves a session's OWN transcript even when several
+        # agents share a cwd (and thus a project dir). See create()/transcript.py.
+        self._session_uuids: dict[str, str] = {}
 
     # --- Low-level execution ---
 
@@ -269,7 +275,7 @@ class TmuxBridge:
 
     def create(self, name, cwd=None, model=None, claude_args="", show=False,
                permission_mode=None, allowed_tools=None, disallowed_tools=None,
-               settings=None, mcp_config=None):
+               settings=None, mcp_config=None, session_id=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -282,6 +288,16 @@ class TmuxBridge:
             cwd: Working directory. Accepts Windows or WSL paths.
             model: Model to use (e.g. "sonnet", "opus"). Overrides default.
             claude_args: Additional CLI arguments for claude (raw passthrough).
+            session_id: The claude ``--session-id`` (a uuid) to launch with. When
+                omitted a fresh uuid is generated. Claude names the session's
+                transcript ``<session-id>.jsonl``, so pinning the id is what lets
+                ``find_transcript`` resolve THIS agent's own transcript even when
+                several agents share a cwd (same project dir). This replaces the
+                old "newest .jsonl in the project dir" heuristic, which silently
+                cross-read co-located agents. (The research doc's PID→
+                ``~/.claude/sessions/{PID}.json`` mapping was verified DEAD on
+                this build — 2.1.195 no longer writes those files — so the
+                native ``--session-id`` flag is used instead.)
             permission_mode: Initial permission mode for the session, passed as
                 claude's ``--permission-mode`` flag (one of
                 ``VALID_PERMISSION_MODES``). An unrecognized/empty value is
@@ -332,6 +348,10 @@ class TmuxBridge:
         # tool specs / file paths containing spaces, parens, or globs survive the
         # bash -> tmux -> sh layering intact.
         argv = [CLAUDE_BIN]
+        # Pin a known session id so this agent's transcript is `<id>.jsonl`,
+        # resolvable by find_transcript even when co-located agents share a dir.
+        claude_session_id = session_id or str(uuid.uuid4())
+        argv += ["--session-id", claude_session_id]
         use_model = model or self._default_model
         if use_model:
             argv += ["--model", use_model]
@@ -373,6 +393,10 @@ class TmuxBridge:
         if name not in sessions:
             raise TmuxBridgeError(f"Session '{name}' was not created. Check WSL/tmux state.")
 
+        # Remember the session id so find_transcript can resolve this agent's own
+        # transcript directly (it is `<session-id>.jsonl`).
+        self._session_uuids[name] = claude_session_id
+
         # Open a visible Windows Terminal tab only when explicitly requested.
         # Auto-opening steals desktop focus and routes the user's keystrokes into
         # the session mid-task, so the tab is opt-in (see the `show` arg).
@@ -391,7 +415,26 @@ class TmuxBridge:
             "name": name,
             "cwd": resolved_cwd,
             "pid": sessions[name].get("pid"),
+            "session_id": claude_session_id,
         }
+
+    def session_id_for(self, name):
+        """The claude ``--session-id`` this bridge launched ``name`` with, or None.
+
+        Populated by ``create()`` (and by ``register_session_id`` on resume).
+        """
+        return self._session_uuids.get(name)
+
+    def register_session_id(self, name, session_id):
+        """Re-register a session's claude id on a fresh bridge after a resume.
+
+        A bridge that merely *resumed* a still-alive tmux session (e.g. after a
+        sidecar restart) never ran ``create()`` and so has no in-memory id. The
+        sidecar persists the id in its runtime record and calls this on reconnect
+        so ``find_transcript`` resolves the session's own ``<id>.jsonl`` again.
+        """
+        if session_id:
+            self._session_uuids[name] = session_id
 
     def _clear_startup_gates(self, name, timeout=45, interval=0.5):
         """Clear the folder-trust and bypass-mode gates, then wait for idle.
@@ -549,6 +592,7 @@ class TmuxBridge:
         """
         self._require_session(name)
         self._tmux(f"kill-session -t '{name}'")
+        self._session_uuids.pop(name, None)
         # Best-effort: remove any per-agent launch config materialized for this
         # session (no-op when none was written).
         try:

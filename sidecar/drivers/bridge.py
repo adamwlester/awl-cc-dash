@@ -410,6 +410,7 @@ class BridgeDriver(AgentDriver):
         *,
         resume_name: str | None = None,
         session_id: str | None = None,
+        claude_session_id: str | None = None,
     ) -> None:
         super().__init__(config, on_event)
         from bridge import TmuxBridge  # type: ignore[import-not-found]
@@ -419,6 +420,10 @@ class BridgeDriver(AgentDriver):
         self._name = resume_name or f"awl-{uuid.uuid4().hex[:8]}"
         self._resuming = resume_name is not None
         self._session_id = session_id
+        # The claude --session-id (uuid) that names this agent's transcript file.
+        # Set by create() (read back from the bridge) or, on resume, passed in
+        # from the persisted runtime record and re-registered with the bridge.
+        self._claude_session_id = claude_session_id
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
@@ -467,7 +472,7 @@ class BridgeDriver(AgentDriver):
         All blocking work (MCP registry read + tmux create) runs here so
         ``start()`` can offload it to a thread in one hop.
         """
-        self._bridge.create(
+        info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
             model=self.config.model,
@@ -477,12 +482,20 @@ class BridgeDriver(AgentDriver):
             settings=self._build_settings(),
             mcp_config=self._build_mcp_config(),
         )
+        # Remember the launched claude session id so it can be persisted for
+        # restart-survival (resume re-registers it so transcript resolution holds).
+        self._claude_session_id = (info or {}).get("session_id") or \
+            self._bridge.session_id_for(self._name)
 
     async def start(self) -> None:
         if self._resuming:
             # Rebind to the still-alive tmux session; do not recreate. All launch
             # config (mode, tools, permission rules, plugins, MCP) was applied at
-            # the original launch — resume does not relaunch claude.
+            # the original launch — resume does not relaunch claude. Re-register
+            # the persisted claude session id so find_transcript resolves THIS
+            # session's own <id>.jsonl (a fresh bridge has no in-memory map).
+            if self._claude_session_id:
+                self._bridge.register_session_id(self._name, self._claude_session_id)
             await asyncio.to_thread(self._bridge.resume, self._name)
         else:
             # Apply ALL per-agent launch config (permission mode + tool gates +
@@ -508,6 +521,9 @@ class BridgeDriver(AgentDriver):
                     "model": self.config.model,
                     "permission_mode": self.config.permission_mode,
                     "cwd": self.config.cwd,
+                    # The claude --session-id naming this agent's transcript, so a
+                    # restarted sidecar resolves the right <id>.jsonl on resume.
+                    "claude_session_id": self._claude_session_id,
                     # Applied per-agent launch config — kept for readback after a
                     # sidecar restart (reconnect rebinds, it does not relaunch).
                     "allowed_tools": self.config.allowed_tools,

@@ -16,7 +16,13 @@ recorded (see .scratch/bridge-diagnostic-*.md appendix A4/A5/A6).
 """
 
 from bridge.bridge import TmuxBridge, parse_permission_prompt
-from bridge.transcript import _encode_cwd, _resolve_project_dir
+from bridge.transcript import (
+    _encode_cwd,
+    _resolve_project_dir,
+    _resolve_session_id,
+    find_transcript,
+)
+from bridge.paths import WSL_CLAUDE_PROJECTS
 from sidecar.drivers.bridge import (
     derive_context_usage,
     derive_subagents,
@@ -773,6 +779,91 @@ class TestResolveProjectDir:
     def test_returns_none_when_no_match(self):
         b = _FakeBridge(test_dir_ok=False, listing="-totally-unrelated\n")
         assert _resolve_project_dir(b, "/mnt/c/x/y") is None
+
+
+# -----------------------------------------------------------------------------
+# transcript SESSION resolution — each agent reads its OWN <session-id>.jsonl
+# (the collision fix: co-located agents share a project dir, so "newest" would
+# cross-read; --session-id pins each to a distinct file).
+# -----------------------------------------------------------------------------
+
+class _FakeTranscriptBridge:
+    """Bridge stub for find_transcript / session-id resolution.
+
+    Canned cwd (fast-path project dir), an in-memory ``_session_uuids`` map, and a
+    set of existing transcript files.
+    """
+
+    def __init__(self, *, session_uuids=None, cwd="/home/lester/proj",
+                 existing_files=None):
+        self._session_uuids = session_uuids or {}
+        self._cwd = cwd
+        self._existing = set(existing_files or [])
+        self.calls = []
+
+    @property
+    def project_dir(self):
+        return f"{WSL_CLAUDE_PROJECTS}/{_encode_cwd(self._cwd)}"
+
+    def _tmux(self, cmd, **_kw):
+        self.calls.append(cmd)
+        if "pane_current_path" in cmd:
+            return self._cwd
+        return ""
+
+    def _run(self, cmd, **_kw):
+        self.calls.append(cmd)
+        if cmd.startswith("test -d"):
+            return "OK\n"  # project dir resolves via fast path
+        if cmd.startswith("test -f"):
+            path = cmd.split("'")[1]
+            return "OK\n" if path in self._existing else "\n"
+        if cmd.startswith("ls -t"):
+            return (sorted(self._existing)[-1] + "\n") if self._existing else ""
+        if cmd.startswith("ls "):  # legacy listing
+            return ("\n".join(sorted(self._existing)) + "\n") if self._existing else ""
+        return ""
+
+
+class TestSessionIdResolution:
+    SID_A = "6c61e972-624e-47cb-a509-7b6ff708a1db"
+    SID_B = "1a40cbfa-7f37-4f3d-b904-42e60e67cebc"
+
+    def test_in_memory_id_wins(self):
+        b = _FakeTranscriptBridge(session_uuids={"agentA": self.SID_A})
+        assert _resolve_session_id(b, "agentA") == self.SID_A
+
+    def test_unknown_session_resolves_none(self):
+        b = _FakeTranscriptBridge()
+        assert _resolve_session_id(b, "nope") is None
+
+    def test_colocated_agents_resolve_distinct_files(self):
+        # Two agents, same cwd (same project dir), each pinned to its own file.
+        b = _FakeTranscriptBridge(session_uuids={"a": self.SID_A, "b": self.SID_B})
+        b._existing = {
+            f"{b.project_dir}/{self.SID_A}.jsonl",
+            f"{b.project_dir}/{self.SID_B}.jsonl",
+        }
+        ta = find_transcript(b, "a")
+        tb = find_transcript(b, "b")
+        assert ta == f"{b.project_dir}/{self.SID_A}.jsonl"
+        assert tb == f"{b.project_dir}/{self.SID_B}.jsonl"
+        assert ta != tb
+
+    def test_known_id_missing_file_returns_none_not_newest(self):
+        # The id is known but its file isn't written yet; a co-located sibling's
+        # file DOES exist. We must NOT hand back the sibling's transcript.
+        b = _FakeTranscriptBridge(session_uuids={"a": self.SID_A})
+        b._existing = {f"{b.project_dir}/{self.SID_B}.jsonl"}  # sibling only
+        assert find_transcript(b, "a") is None
+
+    def test_unknown_id_falls_back_to_newest(self):
+        # A session this bridge didn't launch (no in-memory id): legacy
+        # newest-file behavior is preserved for non-dashboard sessions.
+        b = _FakeTranscriptBridge()
+        only = f"{b.project_dir}/{self.SID_A}.jsonl"
+        b._existing = {only}
+        assert find_transcript(b, "legacy") == only
 
 
 # -----------------------------------------------------------------------------
