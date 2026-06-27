@@ -118,6 +118,7 @@
 - Need a string search feature for text fields.
 - Need to turn compact into a multiselect with the 5 built in options.
 - Need to track compaction history in context dropdown. Count and what type and when based on turns and time. Maybe put in the rewind/handoff list
+- Output options should include tldr tables with tests/checks and emojis signaling status.
 
 
 ### Big picture
