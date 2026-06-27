@@ -181,7 +181,7 @@ Rendered:
 
 ## Task Lists
 
-Checkbox lists using `[ ]` (unchecked) and `[x]` (checked). They render as checkboxes (display only in the preview).
+Checkbox lists use `[ ]` (unchecked) and `[x]` (checked).
 
 ```markdown
 - [x] Completed task
@@ -189,11 +189,7 @@ Checkbox lists using `[ ]` (unchecked) and `[x]` (checked). They render as check
 - [ ] Another to do
 ```
 
-Rendered:
-
-- [x] Completed task
-- [ ] Pending task
-- [ ] Another to do
+Note: the bare built-in preview does not render these as checkboxes; it shows the literal `[ ]` text. Checkbox rendering requires the Markdown Checkboxes extension (bundled in the GitHub Markdown Preview pack), and even then the boxes are display only, never clickable. See the companion VS Code survey for details.
 
 ---
 

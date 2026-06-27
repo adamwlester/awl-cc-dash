@@ -114,7 +114,7 @@
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
-- Remove the vertical separator/divider in Inbox card footer before Reply
+
 
 ## Scratch
 

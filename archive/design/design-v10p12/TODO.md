@@ -86,35 +86,93 @@
 
 > Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
 
-1. **Error run state (4th state):** Add Error alongside active/idle/pending on the Team Graph cards. Create an `.nb-error` badge — solid `--danger` fill, white (inverse) text — matching the other run-state badges (`.nb-idle/active/pending`, ~1031). Put at least one demo agent into the error state: `nb-error` badge "Error", a red run-strip, and a node-feed line like "run failed — see Inbox". Clicking the Error badge routes to Inbox: add an `'error'` branch to `statusJump()` (~4186) mirroring the `'pending'` branch (opens/flashes that agent's Inbox card). Also restyle the Message-card status badge `.db-error` (~1109) from its current soft-red-fill/red-text to a **solid `--danger` fill + inverse text**, so it matches the other status badges; the existing demo error card (drew / ECONNREFUSED, ~4821) picks this up automatically. Document Error as the 4th run state in DESIGN.md (the status-badge line ~5150 + run-state notes) and the inline comment at ~598.
+```
+FOLLOW-UP BATCH — design/mockup.html (+ DESIGN.md sync; tokens.css unchanged)
+Builds on the A–L batch. Verify per CLAUDE.md (see end).
 
-2. **Dividers stay put on hover/select:** Today, selecting certain cards/rows/lines makes a navy divider line disappear (it gets repainted to match the fill). Stop that — every navy divider line stays navy in **every** state, with the hover (cream) and select (teal) fills showing **behind** it. Affected: the header/body divider on an expanded+selected Feed/Messages card; the divider between two stacked selected rows; the navy line between the editor's line-number gutter and the text (on both the light-teal line/section selection and the dark-teal comment-highlight). Keep all selection/hover fills and all click/select behaviour exactly as-is — the only change is "lines no longer hide."
+═══ PART 1 — REVIEW FIXES (post-build audit) ═══
+R1  Remove orphaned .card-sel CSS (mockup L1382–1385). Dead since History dropped the
+    checkbox (item I) + toggleCardSel was removed.
+R2  DESIGN.md doc-editor line (L300) still says "plain tan … selection rail" — note
+    item F's re-added navy (--border) horizontal rail-row dividers.
+R3  DESIGN.md (optional, J3): the Compose "Attachments" section heading (#16) is still
+    undocumented at L141 — add a one-line note or drop J3.
+R4  Last round skipped the headed parity pass (reasoned away). This round, after the
+    headless drive, ACTUALLY run one headed pass at narrow + wide.
 
-3. **Subagent footer → accordion drawer:** Replace the +N floating popover with an in-flow accordion in the agent-card footer, like the Inbox cards: the footer is the trigger with a chevron action icon on the right (toggleFcard-style). Collapsed shows only the first row of subagent badges (chevron right); open grows the footer downward to reveal the remaining badges wrapped onto new rows (chevron down); state sticks (toggle, not a hover popover). Vertically centre the first (always-visible) row in the trigger. Only show the chevron/drawer when there's more than one row. Keep the status-fill badges and the per-badge stopPropagation.
+═══ PART 2 — NEW CHANGE REQUESTS ═══
 
-4. **Editor gutter extends to the bottom:** The line-number gutter/rail currently stops at the last line, leaving dead space below. Extend the empty rail track (tan background + navy divider) down to the bottom of the visible editor so it doesn't stop abruptly. Do **not** fabricate line numbers for the empty space — real numbers stop at the last file line; only the empty track continues.
+— SUBAGENT BADGES (.sbadge / .sbadges / .node-subs — one element group; do together) —
 
-5. **Fix the reviewer-chip dropdown:** In Plans, the Reviewer chip dropdown opens then instantly closes. Cause: the global click-closer (~5182) doesn't exempt the reviewer chip, so its own click re-closes the just-opened menu. Fix: add `&& !e.target.closest('.rev-chip')` to that handler's guard (matching how `.exp` / `.src-dd` / etc. are exempted).
+1.  STATUS-FILL BADGES, NO DOT. Remove the leading run-state dot (.sdot). Instead FILL
+    the badge with the run-state status colour and use BOLD INVERSE (white) text — exactly
+    the larger status badge treatment (.node-badge .nb-*: --success active / --warning
+    pending / --muted idle, color:#fff). The id (s1/s2…) stays as the label, now bold
+    white on the status fill. (The +N overflow badge stays neutral — it's a count, not a
+    status.) Supersedes A2's "leading dot + navy-ink id."
 
-6. **One share/export dropdown (consolidate):** Merge the standalone link dropdown (Embed/Attach) into the Output Export dropdown so there's a single share control. New menu, in order — heading **"Export"**: Copy selected · Export selected → file; heading **"Add to prompt"**: Embed in prompt · Attach as file. Remove "Cut selected" entirely (menu item ~2928/3083 + the cut wiring ~4348) and rename the old "Cut & export" heading to "Export". Build it once and reuse across Feed, History, Plans, Documents. (Items 7–10 depend on this.)
+2.  NO-WRAP, EXPANDABLE FOOTER. Badges currently flex-WRAP to multiple rows
+    (.sbadges{flex-wrap:wrap}). Keep them on ONE row: show the first run that fits + the
+    +N count badge, with the rest revealed on expand.
+    NOTE: the subagent strip is "reserved at fixed size" so all cards stay uniform squares
+    — an in-place accordion would grow the card and break that. PREFER a popover off the
+    +N badge (preserves card height); if you expand in place, cap it so the square-card
+    grid still reads uniform.
 
-7. **Embed-in-prompt always available when something's selected:** Enable "Embed in prompt" whenever anything is selected — single or multiple, whole card or sub-block/line/section (gating becomes `enEmbed = !!kind`, ~3722; today it's part-only). This requires the embed action (eaEmbed / eaEmbedFeed, ~3733/3739) to also embed **whole** selections (full card/doc text), not just sub-blocks — wire that too, or Embed enables but does nothing on a whole-card select. Attach stays whole-only.
+3.  CLICK ISOLATION. Clicking a subagent badge must NOT select/activate the parent card
+    (.node). The badge is intentionally unwired (A5), so the click bubbles to the card's
+    select handler — stop propagation so a badge click does nothing to the card.
 
-8. **Attach as file → real saved file:** When "Attach as file" runs, auto-name a file, **create it in Library → Documents** (reuse the addDocPaste pattern, ~3592), drop a path/link chip into the prompt pointing at that saved doc, then switch to Compose and **reveal** the attachment. (Distinct from "Export → file", which only creates the doc and stays put.)
+— FEED / MESSAGES —
 
-9. **Retire the standalone link dropdown:** Once it's merged into Export (item 6), delete the separate link dropdown (`.ea-dd`) from the Team Feed strip (~2933) and the History strip (~3087); clean up the orphaned `embedAttachHTML` / `.ea-dd` references.
+4.  MESSAGES CONTENT FILLS THE CARD SURFACE (finishes C). Rail+rows still inset on
+    left/right/bottom (only top flush). Cause: shared .fcard-body{padding:0 10px 9px 10px}
+    (L1395) still applies to Messages. Add a Messages-only override (.msgcard .fcard-body
+    {padding:0}) so the rail panel reaches all four edges; text breathing room comes from
+    each row's own cell padding. OVERRIDES C1's "keep .fcard-body padding." Messages ONLY
+    — Scratch/Log/Inbox keep their body padding (no rail).
 
-10. **Plans & Documents use the merged Export dropdown:** Replace the standalone link dropdown in the Plans footer (~4639) and Documents footer (~3572) with the merged Export dropdown (item 6), **left-aligned** and placed **before the reviewer chip**. Plans footer becomes [Export][reviewer chip] on the left, with the right group staying [Revise][Reject][Approve]. Documents footer: drop the leading spacer so Export sits left; Remove stays at the right.
+5.  HISTORY HEADER DIVIDER. History cards are missing the divider below the header that
+    Scratch/Log show — make them match. All feed cards draw it via .fcard-body
+    border-top:2px var(--border); confirm in-browser why History's isn't reading — likely
+    the selection-seam recolor (.fcard.sel .fcard-body → --select, L1402) on a pre-selected
+    demo card, or a collapsed/expanded-state difference. Fix so History matches Scratch/Log
+    in the same state.
 
-11. **Delete agent button:** Add a "Delete agent" button to the **right** of "Retire agent" (~2289). Style it as a **new solid-red-fill + white (inverse) text** variant (Retire stays as-is — its red-text-on-cream is already the softer danger, so the two read distinctly). Delete completely wipes all records of the agent within reason — **configuration and transcripts** are sufficient — and removes it from the roster/graph plus any links. Because it's irreversible, gate it behind a confirm step (type-to-confirm or a "this can't be undone" dialog), like the existing Retire confirm flow (~4077).
+— DROPDOWNS —
 
+6.  LINK DROPDOWN — GATE + CHEVRON. (a) Disable the .ea-dd trigger until there's a
+    selection (today it opens nothing on an empty click — dead). (b) Add a chevron
+    (chevron-down) beside the link icon, matching the Export trigger, so it reads as a
+    dropdown. (Supersedes "link-icon-only.")
+
+7.  OUTPUT EXPORT — TRIM TO 3 + GATE. Drop the two "whole feed / whole history" items;
+    keep only the selection actions: Copy selected · Cut selected · Export selected → file.
+    Disable the Export trigger when nothing is selected. Apply to BOTH #feed-exp and #hist-exp.
+
+8.  "EXPORT SELECTED → FILE" → DOCUMENTS + PASTE. Re-wire that action (feed + History):
+    instead of the mock toast, switch to Library → Documents and trigger the Add-document
+    (Paste) workflow with the selection's content.
+
+9.  ADD-DOCUMENT (PASTE) WORKFLOW. Create a new Documents row with an editable DUMMY name,
+    opened with the inline RENAME active on creation so the name can be typed immediately.
+    (This is what #8 hands off to.)
+
+VERIFY (CLAUDE.md): drive headless over http://localhost — resize narrow+wide, click every
+touched control + both card states (badge status-fill / click isolation / overflow expand,
+Messages fill, History divider, both gated dropdowns, the 3-item Export, the
+Export→Documents→Paste chain + new-doc rename) — THEN one real headed parity pass. Keep
+DESIGN.md in sync (subagent badges = status-fill bold-text no-dot + expandable overflow —
+RE-SYNC the just-written "leading dot + navy id" line; Export selection-only; link-dd chevron
++ disabled-when-empty; Add-doc paste flow). Leave Next-up items in place; log DEVLOG.
+```
 
 
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
-- Remove the vertical separator/divider in Inbox card footer before Reply
+
 
 ## Scratch
 
@@ -143,4 +201,3 @@
 - Need to support a mode where agents can track real time desktop activity.
 - Need to standardize our badge sizes better.
 - Need to decide what subagent info we want access to and where we access it. Related, what does clicking the subagent icon on agent cards do?
-- Need to confirm that the current UI components etc translate to neobrutalism.dev. Acceptable if they do not, but leaning towards using a consistent library for maintinence.

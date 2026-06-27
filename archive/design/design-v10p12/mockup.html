@@ -465,18 +465,16 @@
     .rz-panel + .rz-handle.hstyle + .rz-panel .pcard-head{ } /* (handle owns the divider line) */
 
     /* ============================ Button (mirrors neobrutalism Button variants) ============================ */
-    .btn,.btn-main,.btn-secondary,.btn-danger,.btn-danger-solid,.btn-ghost{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    .btn,.btn-main,.btn-secondary,.btn-danger,.btn-ghost{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
       height:30px; padding:0 12px; font-size:11px; font-weight:var(--font-weight-heading); cursor:pointer;
       border:2px solid var(--border); border-radius:var(--radius-base); color:var(--foreground);
       background:var(--surface-btn); box-shadow:var(--shadow-sm); transition:transform .07s ease, box-shadow .07s ease, background .12s; white-space:nowrap; }   /* v9p2: cream neutral (btn-main/secondary override below) */
-    .btn:hover,.btn-main:hover,.btn-secondary:hover,.btn-danger:hover,.btn-danger-solid:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .btn:active,.btn-main:active,.btn-secondary:active,.btn-danger:active,.btn-danger-solid:active{ transform:translate(2px,2px); box-shadow:none; }
+    .btn:hover,.btn-main:hover,.btn-secondary:hover,.btn-danger:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .btn:active,.btn-main:active,.btn-secondary:active,.btn-danger:active{ transform:translate(2px,2px); box-shadow:none; }
     .btn-main{ background:var(--main); color:var(--main-foreground); }
     .btn-secondary{ background:var(--secondary); color:var(--secondary-foreground); }
     .btn-danger{ color:var(--danger); }
     .btn-danger:hover{ background:var(--danger-soft); }
-    .btn-danger-solid{ background:var(--danger); color:#fff; }   /* R-batch item 11: solid-red Delete-agent variant — irreversible wipe (distinct from btn-danger's softer red-text-on-cream Retire) */
-    .btn-danger-solid:hover{ background:var(--danger); filter:brightness(.92); }
     .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; height:auto; padding:4px 6px; }
     .btn-ghost:hover{ background:rgba(0,24,88,0.06); }
     .btn-sm{ height:25px; padding:0 9px; font-size:10px; }
@@ -542,7 +540,7 @@
 
     /* ============================ Team Graph node ============================ */
     .graph-wrap{ position:relative; }
-    .graph-grid{ position:relative; z-index:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:14px; align-items:start; }   /* R-batch item 3: align-items:start so a card whose subagent drawer is open (taller than a square) grows its row without stretching its square row-mates */
+    .graph-grid{ position:relative; z-index:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:14px; }
     .edge-layer{ position:absolute; inset:0; z-index:1; pointer-events:none; overflow:visible; }
     /* v10p10 (Next-up #5): cards are FIXED SQUARES (aspect-ratio:1) holding a single-column layout
        (top meta strip → identity → divider → settings → load bars → activity band → subagents),
@@ -596,14 +594,12 @@
        Its top/bottom borders are two of the three dividers; the .node-div inside is the third. */
     .node-band{ margin:auto -9px 0; border-top:2px solid var(--border); border-bottom:2px solid var(--border); }
     .node-band .node-div{ margin:0; }   /* the inner divider is already full-bleed within the band */
-    /* Run progress strip — textless, single flat colour (opposite polarity to the load bars for the live states),
-       keys off status: active green · pending warm · idle muted/empty · error danger (R-batch item 1 — the 4th run
-       state: a solid full-width danger bar for a halted/failed run); barber-pole indeterminate when % unknown */
+    /* Run progress strip — textless, single flat colour (opposite polarity to the load bars → no danger ramp),
+       keys off status: active green · pending warm · idle muted/empty; barber-pole indeterminate when % unknown */
     .run-strip{ position:relative; height:6px; overflow:hidden; background:var(--surface-3); }
     .run-strip > i{ display:block; height:100%; width:0; }
     .run-active  > i{ background:var(--success); }
     .run-pending > i{ background:var(--warning); }
-    .run-error   > i{ background:var(--danger); width:100%; }   /* R-batch item 1: run errored — solid danger fill (the 4th run state), static (no barber-pole — it's halted, not working) */
     .run-idle{ opacity:0.5; }
     .run-indet > i{ width:100%; background:var(--success); position:relative; }
     .run-indet > i::after{ content:''; position:absolute; inset:0;
@@ -621,22 +617,14 @@
     @keyframes node-marquee2{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(0); } }
     .node-feed.idle .trk{ color:var(--muted-2); font-style:italic; animation:none; }   /* idle — static, muted, no scroll */
     .node-feed.idle .trk.b{ display:none; }
-    /* subagents: RECTANGULAR clickable id-badges, each FILLED with the sub's run-state status colour + BOLD INVERSE
-       (white) id text — the exact .node-badge .nb-* treatment (--success active / --warning pending / --muted idle,
-       #fff ink). The id (s1/s2…) is the label, not a count. A badge click is isolated from the parent card
-       (stopPropagation); the click action itself is still unwired (open decision e).
-       R-batch item 3: the strip is an IN-FLOW ACCORDION DRAWER (replaces the old +N popover). Collapsed shows only
-       the first row of badges (vertically centred in the trigger) + a chevron on the right; clicking the strip
-       toggles it OPEN, which grows the card downward (.node.subs-open drops the square) to reveal the remaining
-       badges wrapped onto new rows. State sticks (a toggle, not a hover popover). The chevron + drawer appear only
-       when the badges wrap past one row (.has-more, set by JS measuring wrap). One open card grows its grid row;
-       siblings stay square (.graph-grid is align-items:start). */
-    .node-subs{ min-height:18px; display:flex; align-items:flex-start; padding-top:1px; }
-    .subs-acc{ flex:1 1 auto; min-width:0; display:flex; align-items:flex-start; gap:5px; }
-    .subs-acc.has-more{ cursor:pointer; }
-    .subs-badges{ flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:5px;
-      max-height:16px; overflow:hidden; }   /* COLLAPSED: clip to one badge row (16px) */
-    .subs-acc.open .subs-badges{ max-height:none; overflow:visible; }
+    /* subagents: reserved fixed-size section · RECTANGULAR clickable id-badges. Each badge is FILLED with the
+       sub's run-state status colour and carries BOLD INVERSE (white) id text — the exact .node-badge .nb-*
+       treatment (--success active / --warning pending / --muted idle, #fff ink). The id (s1/s2…) is the label,
+       not a count. ONE row, no wrap: the run that fits + a neutral +N overflow badge (a count, kept neutral)
+       that opens a popover with the rest, preserving the card's fixed square height. A badge click is isolated
+       from the parent card (stopPropagation); the click action itself is still unwired (open decision e). */
+    .node-subs{ min-height:18px; display:flex; align-items:center; padding-top:1px; }
+    .sbadges{ display:flex; flex-wrap:nowrap; align-items:center; gap:5px; min-width:0; }
     .sbadge{ height:16px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; padding:0 5px;
       border:2px solid var(--border); border-radius:3px; background:var(--surface-btn);
       font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:900; color:var(--foreground); cursor:pointer;
@@ -646,16 +634,15 @@
     .sbadge.sb-active{ background:var(--success); color:#fff; }
     .sbadge.sb-pending{ background:var(--warning); color:#fff; }
     .sbadge.sb-idle{ background:var(--muted); color:#fff; }
-    /* chevron action icon (right of the first row, toggleFcard-style) — shown only when the badges wrap (.has-more);
-       points right collapsed, rotates 90° to point down when open */
-    .subs-chev{ flex:0 0 auto; display:none; align-items:center; justify-content:center; width:16px; height:16px; padding:0;
-      border:none; background:transparent; color:var(--muted); cursor:pointer; }
-    .subs-acc.has-more .subs-chev{ display:inline-flex; }
-    .subs-chev:hover{ color:var(--foreground); }
-    .subs-chev svg{ width:14px; height:14px; transition:transform .12s; }
-    .subs-acc.open .subs-chev svg{ transform:rotate(90deg); }
-    .node.subs-open{ aspect-ratio:auto; }   /* item 3: an open subagent drawer grows the card past its fixed square */
-    .subs-empty{ align-self:center; font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
+    .sbadge.more{ background:var(--surface-btn); color:var(--muted); }   /* +N overflow stays neutral — a count, not a status */
+    /* overflow popover off the +N badge — preserves the fixed card height (no in-place accordion). Lives inside
+       the bottom subagent strip and opens upward; the card is tall enough that the short popover isn't clipped. */
+    .subs-more{ position:relative; flex:0 0 auto; display:inline-flex; }
+    .subs-pop{ display:none; position:absolute; bottom:calc(100% + 6px); right:0; z-index:60;
+      background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base);
+      box-shadow:var(--shadow); padding:6px; flex-direction:row; flex-wrap:wrap; gap:5px; width:max-content; max-width:140px; }
+    .subs-more.open .subs-pop{ display:flex; }
+    .subs-empty{ font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
 
     /* ============================ pickers — Color (Select) + Icon (Combobox), current always visible ============================ */
     .picker{ position:relative; }
@@ -784,7 +771,6 @@
     .tl-ic svg{ width:14px; height:14px; }
     .tl-phead{ padding:7px 10px; border-bottom:2px solid var(--border); background:var(--surface-3); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
     .tl-confirm{ display:none; align-items:center; gap:7px; margin:8px; padding:7px 9px; border-radius:var(--radius-base); background:var(--success-soft); border:2px solid var(--success); color:var(--success-text); font-size:10px; font-weight:700; }
-    .foot-confirm--danger{ background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }   /* R-batch item 11: the irreversible Delete confirm reads as severe (danger), vs Retire's success-soft confirm */
     .tri-tabs{ display:flex; flex-shrink:0; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; timeline opens as a separate popout below */
     .tri-tab{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:800; padding:6px 0; color:var(--muted); background:transparent; border:none; border-right:2px solid var(--border); cursor:pointer; }
     .tri-tab:last-child{ border-right:none; }
@@ -969,8 +955,6 @@
     .att-card-ic{ width:12px; height:12px; flex:0 0 auto; color:var(--muted); }
     .att-card-nm{ flex:1 1 auto; min-width:0; font-size:9.5px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
     .att-card-nm:hover{ color:var(--link-hover); text-decoration:underline; }
-    .att-card.att-flash{ animation:attFlash 1s ease; }   /* R-batch item 8: flash a freshly attached chip when Attach-as-file reveals it on Compose */
-    @keyframes attFlash{ 0%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} 30%{ box-shadow:0 0 0 4px var(--secondary);} 100%{ box-shadow:var(--shadow-sm);} }
     .att-card-cite{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:3px; }
     .att-card-cite:hover{ color:var(--secondary-foreground); background:var(--secondary-dim); }
     .att-card-cite svg{ width:11px; height:11px; }
@@ -982,11 +966,11 @@
     .lib-edit-head{ display:flex; align-items:center; gap:5px; margin-bottom:6px; }
     .lib-edit-lab{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
 
-    /* ============================ the merged Export control (R-batch items 6-10) ============================ */
-    /* ONE dropdown (.exp.ea-dd, data-eahost) reused across feed / hist / doc-* / plan / asset — replaces the old
-       separate Output Export + Embed/Attach controls. Two sections: "Export" (Copy selected · Export selected → file)
-       and "Add to prompt" (Embed in prompt · Attach as file). Selection-gated per item by eaUpdate(); built by
-       expMenuHTML(). The .ea-dd class + eaSend wiring are kept so all existing selection-change callers still work. */
+    /* ============================ P4a — the Embed/Attach control (replaces Share + Link-to-prompt) ============================ */
+    /* Selection-gated: a section/line/block selection → Embed; a whole-doc/title selection or an Asset/whole
+       feed card(s) → Attach. Now a link-icon dropdown (.ea-dd, modeled on Output Export .exp) whose menu offers
+       only the mode the current selection allows — see embedAttachHTML(). (The old .ea-grp/.ea-mode/.ea-act chip
+       trio it replaced has been removed.) */
 
     /* ============================ P4c — the Review chip (single-agent reviewer select + icon-only send) ============================ */
     .rev-chip{ display:inline-flex; align-items:stretch; height:30px; position:relative; border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
@@ -1047,7 +1031,6 @@
     .nb-pending{ background:var(--warning); color:#fff; }
     .nb-active{ background:var(--success); color:#fff; }
     .nb-idle{ background:var(--muted); color:#fff; }   /* v1.1: solid slate-gray fill + white text, matching the active/pending badges */
-    .nb-error{ background:var(--danger); color:#fff; }   /* R-batch item 1: Error — the 4th run state. Solid danger fill + inverse text, matching the active/idle/pending solid badges. */
     .node-think{ font-weight:800; } /* thinking on/off chip inside node-meta */
 
     /* ============================ v8p6 — combobox (single-select + custom text) — Role ============================ */
@@ -1123,7 +1106,7 @@
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
     .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
     .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
-    .db-error{ background:var(--danger); color:#fff; }   /* R-batch item 1: Error run errored (alongside Active / Complete) — now a SOLID danger fill + inverse text, matching the graph status badges (.nb-error) and db-active, not the old soft-red/red-text */
+    .db-error{ background:var(--danger-soft); color:var(--danger); }   /* P2: soft-red = the run errored (alongside Active / Complete) — Error owns the danger colour */
 
     /* ============================ v9p7 (A3) — Documentation panel (Plan + doc viewers) ============================ */
     /* plan-status badges (reuse the .dbadge shell) */
@@ -1367,7 +1350,7 @@
     .vrow.no-cmt .v-cmt{ opacity:.25; }
 
     /* plan expanded = outline/feedback nav rail + line-numbered body */
-    .plan-rev{ display:flex; gap:9px; margin-top:9px; max-height:346px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). */
+    .plan-rev{ display:flex; gap:9px; margin-top:9px; }
     .plan-nav{ flex:0 0 132px; display:flex; flex-direction:column; min-width:0; }
     .nav-tabs{ display:flex; gap:4px; margin-bottom:6px; }
     .nav-tab{ flex:1; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding:4px 0; text-align:center;
@@ -1384,6 +1367,7 @@
     .ol-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
     .ol-c{ font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:var(--muted); flex:0 0 auto; }
     .plan-main{ flex:1 1 auto; min-width:0; }
+    .plan-main .md{ max-height:300px; }
     /* feedback cards (the comment detail, in the nav rail's Feedback mode) */
     .fb-list{ display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; }
     .fb-card{ border:2px solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:6px 7px; }
@@ -1417,11 +1401,12 @@
     /* D (JUMP): an expanded feed/history card body caps its height + scrolls internally so one long card can't
        dominate the tab; its jump pills (attached on open in toggleFcard) show when it overflows + is scrolled away. */
     .fcard.open .fcard-body{ display:block; max-height:340px; overflow-y:auto; }
-    /* R-batch item 2: a selected card's header→body divider STAYS NAVY in every state — the --select fill
-       shows BEHIND the navy line, not repainting it. This retires the old Messages-only seam-blend
-       (.msgcard.sel used to recolour this divider to the band fill); now Messages matches Scratch/Log/
-       Inbox/History — every navy structural divider stays navy on hover/select (the base .fcard-body
-       border-top:2px solid var(--border) is left untouched). */
+    /* A8 selection seam (Messages only): a selected+expanded MESSAGES card paints one --select band
+       (header → contiguous rail), so recolour the body's navy top divider to the band fill so the
+       highlight reads as one unbroken band instead of being sliced by a navy line. Scratch/Log/Inbox/
+       History keep their navy header divider even when selected — the header/body separator stays a
+       structural rule there (R-batch item 5: History now matches Scratch/Log in every state). */
+    .msgcard.sel .fcard-body{ border-top-color:var(--select); }
     .fcard.open .fcard-prev{ display:none; }
     .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
     /* v1.2: History attachment chip (count) in the card header + click-to-open popover (History only) */
@@ -1468,11 +1453,10 @@
     .mrail{ flex:0 0 auto; width:34px; align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding:7px 0 0; cursor:pointer; border:none; border-right:2px solid var(--border); border-radius:0; background:var(--surface-3); }
     .msg-turn{ font-weight:900; font-size:12px; color:var(--foreground); }   /* turn number in the doc-title style (mirrors Library .md-h1) */
     /* SELECTION = light teal (--select), the universal select fill (no pink): rail cell + content the SAME teal.
-       R-batch item 2: the navy rail/text divider (the rail's border-right) and the navy hairline BETWEEN two
-       stacked selected rows (.mrow + .mrow border-top) STAY NAVY — the teal fill shows behind them, no longer
-       blended away. Only the backgrounds are recoloured now; the navy structural lines are left intact. */
-    .mrow.bsel .mrail{ background:var(--select); }
+       Blend the rail/text divider on select so there's no seam between rail and text. */
+    .mrow.bsel .mrail{ background:var(--select); border-right-color:var(--select); }
     .mrow.bsel .mrow-c{ background:var(--select); }
+    .mrow.bsel + .mrow.bsel{ border-top-color:var(--select); }   /* A7: a contiguous run of selected rows reads as ONE unbroken teal band — recolour the navy hairline BETWEEN two adjacent selected rows to the band fill (no seam) */
     /* HOVER (lights AFTER .bsel so a hover preview reads over selection): a block rail lights its own row cream;
        the empty title rail lights EVERY row cream (it select-alls). */
     .mrail:hover{ background:var(--background); }
@@ -1515,7 +1499,7 @@
     .exp-mi .lead{ display:flex; flex-direction:column; min-width:0; line-height:1.25; }
     .exp-mi .lead b{ font-size:10.5px; font-weight:800; color:var(--foreground); }
     .exp-mi .lead .sub{ font-size:9px; color:var(--muted); }
-    /* (R-batch item 6: the .fcard.cut-out fly-out was removed with the "Cut selected" action in the export consolidation) */
+    .fcard.cut-out{ opacity:0; transform:translateX(-10px); transition:opacity .16s, transform .16s; }
 
     /* ============================ A12 + A3 — generic Jump-to-End pill (ONE control for every scroll region) ============================ */
     /* A small floating pill in the corner of a scroll region; appears only when scrolled away from that edge, snaps to
@@ -1642,10 +1626,8 @@
     .md-rail:hover{ background:var(--background); color:var(--foreground); }
     .md-rail .rn{ font-size:9.5px; }
     /* A4: rail-based selection (line / section / whole-doc) = light teal (--select), no pink; the rail cell + the
-       content share the teal fill. R-batch item 2: the navy gutter/text separator (border-right) and the navy
-       per-row divider (border-bottom) STAY NAVY — the teal fill shows behind them (the old seam-blend that
-       recoloured them to --select is removed; only the backgrounds + ink recolour now). */
-    .md-row.rsel .md-rail,.md-row.rsel-sec .md-rail{ background:var(--select); color:var(--foreground); }
+       content read as ONE teal band — the rail/gutter separator recolours to the band fill so no navy line slices it (selection-seam rule). */
+    .md-row.rsel .md-rail,.md-row.rsel-sec .md-rail{ background:var(--select); border-right-color:var(--select); border-bottom-color:var(--select); color:var(--foreground); }
     .md-row.rsel,.md-row.rsel-sec{ background:var(--select); }
     .rd{ display:inline-flex; align-items:center; gap:2px; height:14px; padding:0 3px; border:1.5px solid var(--border); border-radius:3px; background:var(--secondary-background); }   /* v9p14: rounded square */
     .rd svg{ width:9px; height:9px; } .rd .rd-n{ font-size:8px; font-weight:800; color:var(--foreground); }
@@ -1728,7 +1710,7 @@
     /* the Comment control is now a plain icon button; greyed (but still clickable → toast) until a line/
        section is selected */
     .cmt-btn.is-off{ opacity:.5; }
-    .plan-main .md{ max-height:none; min-height:0; }   /* R-batch item 4: cap moved to .plan-rev — .md now flex-fills the capped row (and scrolls internally past it) so .md-fill carries the rail track to the editor's bottom */
+    .plan-main .md{ max-height:320px; }
 
     /* v9p14c: "Mark as" verdict dropdown inside the comment composer */
     .vdd{ position:relative; display:inline-flex; }
@@ -1742,10 +1724,9 @@
 
     /* A4: the feedback/badge highlight (click a Feedback card → its section) = DARK TEAL (--rail-section) — the one
        place dark teal is used now, distinct from the user's light-teal (--select) line/section selection. White ink
-       (--icon-fg) for legibility on the saturated fill. R-batch item 2: the navy gutter/text + per-row dividers
-       STAY NAVY here too — the dark-teal fill shows behind them (the old seam-blend recolour is removed). */
+       (--icon-fg) for legibility on the saturated fill; the rail separator recolours to the band fill (selection-seam). */
     .md-row.fbhl, .md-row.fbhl-sec{ background:var(--rail-section); }
-    .md-row.fbhl .md-rail, .md-row.fbhl-sec .md-rail{ background:var(--rail-section); color:var(--icon-fg); }
+    .md-row.fbhl .md-rail, .md-row.fbhl-sec .md-rail{ background:var(--rail-section); border-right-color:var(--rail-section); border-bottom-color:var(--rail-section); color:var(--icon-fg); }
     .md-row.fbhl .md-line, .md-row.fbhl-sec .md-line{ color:var(--icon-fg); }
 
     /* ============================ A4 — Plans/Documents editor rail: layout · hover preview · filler · title box ============================ */
@@ -2305,8 +2286,7 @@
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
-          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:8px"><button class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
-
+          <div data-group="mid-foot" id="mid-foot-details" class="flex"><button class="btn-danger w-full" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button></div>
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main" onclick="createAgent()">Create agent</button><button class="btn px-3" onclick="resetCreate()">Reset</button><button class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
@@ -2381,7 +2361,7 @@
                   </div>
 
                   <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)">
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button class="node-badge nb-error" onclick="event.stopPropagation();statusJump('error',this)" title="Error — run failed · open Inbox">Error</button></div>
+                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="node-idblk"><div class="node-role">auditor</div><div class="node-name">01 drew</div></div><div class="node-model">haiku 4.5</div></div>
                     <div class="node-meta">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
@@ -2395,11 +2375,11 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-error"><i></i></div>
+                      <div class="run-strip run-pending"><i style="width:35%"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
-                        <span class="trk a">run failed — see Inbox&nbsp;&nbsp;·&nbsp;&nbsp;staging unreachable (ECONNREFUSED)&nbsp;&nbsp;·&nbsp;&nbsp;</span>
-                        <span class="trk b">run failed — see Inbox&nbsp;&nbsp;·&nbsp;&nbsp;staging unreachable (ECONNREFUSED)&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;plan ready for review&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                        <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;plan ready for review&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
@@ -2427,7 +2407,7 @@
                         <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span></div></div>
                   </div>
 
                   <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)">
@@ -2571,7 +2551,7 @@
                         <span class="trk b">tuning tokens.css&nbsp;&nbsp;·&nbsp;&nbsp;rebuilding mockup states&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span><span class="sbadge sb-active" title="subagent s2 — active" onclick="event.stopPropagation()">s2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span><span class="sbadge sb-active" title="subagent s2 — active" onclick="event.stopPropagation()">s2</span></div></div>
                   </div>
 
                   <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)">
@@ -2643,7 +2623,7 @@
                         <span class="trk b">transcribing session log&nbsp;&nbsp;·&nbsp;&nbsp;summarising turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span><span class="sbadge sb-active" title="subagent s2 — active" onclick="event.stopPropagation()">s2</span><span class="sbadge sb-pending" title="subagent s3 — pending" onclick="event.stopPropagation()">s3</span><span class="sbadge sb-idle" title="subagent s4 — idle" onclick="event.stopPropagation()">s4</span><span class="sbadge sb-active" title="subagent s5 — active" onclick="event.stopPropagation()">s5</span><span class="sbadge sb-idle" title="subagent s6 — idle" onclick="event.stopPropagation()">s6</span><span class="sbadge sb-pending" title="subagent s7 — pending" onclick="event.stopPropagation()">s7</span><span class="sbadge sb-active" title="subagent s8 — active" onclick="event.stopPropagation()">s8</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div class="node-subs"><div class="sbadges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span><span class="sbadge sb-active" title="subagent s2 — active" onclick="event.stopPropagation()">s2</span><span class="sbadge sb-pending" title="subagent s3 — pending" onclick="event.stopPropagation()">s3</span><span class="sbadge sb-idle" title="subagent s4 — idle" onclick="event.stopPropagation()">s4</span><span class="subs-more"><span class="sbadge more" title="2 more subagents — click to view" onclick="event.stopPropagation();toggleSubsPop(this)">+2</span><div class="subs-pop"><span class="sbadge sb-active" title="subagent s5 — active" onclick="event.stopPropagation()">s5</span><span class="sbadge sb-idle" title="subagent s6 — idle" onclick="event.stopPropagation()">s6</span></div></span></div></div>
                   </div>
 
                 </div>
@@ -2939,10 +2919,23 @@ project CLAUDE.md. Global defaults that travel with you.
         <div class="pcard-foot px-2 py-2.5" id="feed-messages-actions">
           <div class="flex items-center gap-2 flex-wrap">   <!-- P4a: wraps at narrow so the wider Embed/Attach control never overflows -->
             <button class="icon-btn" id="feed-selall-btn" title="Select / deselect all cards in this tab" onclick="feedSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- G2: select/deselect-all on every feed tab -->
-            <!-- R-batch items 6-10: ONE merged Export control (Export: Copy · Export→file · Add to prompt: Embed · Attach), mounted from expMenuHTML('feed') on boot — replaces the separate Output Export + Embed/Attach dropdowns -->
-            <span data-expmount="feed"></span>
+            <!-- Output Export — folds in the old per-card Copy; selection-only (Copy / Cut / Export-to-file selected), gated until something is selected (R-batch item 7) -->
+            <div class="exp" id="feed-exp"><button class="exp-btn" title="Export output…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+              <div class="exp-menu">
+                <div class="exp-h">Copy</div>
+                <button class="exp-mi" onclick="feedExport('copy-sel')"><i data-lucide="copy"></i><span class="lead"><b>Copy selected</b><span class="sub">the selected card(s) to the clipboard</span></span></button>
+                <div class="exp-h">Cut &amp; export</div>
+                <button class="exp-mi" onclick="feedExport('cut-sel')"><i data-lucide="scissors"></i><span class="lead"><b>Cut selected</b><span class="sub">copy, then drop the card(s) from the feed</span></span></button>
+                <button class="exp-mi" onclick="feedExport('file-sel')"><i data-lucide="file-down"></i><span class="lead"><b>Export selected → file</b><span class="sub">new doc in Library → Documents</span></span></button>
+              </div></div>
             <button class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
+            <!-- H1: link-icon-only dropdown (Embed in prompt / Attach as file), selection-gated; replaces the Embed/Attach chip trio -->
+            <div class="exp ea-dd" data-eahost="feed"><button class="exp-btn" title="Add the selection to the prompt…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="link" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+              <div class="exp-menu exp-menu--right">
+                <button class="exp-mi ea-mi" data-eamode="embed" onclick="eaSend(this)" disabled><i data-lucide="quote"></i><span class="lead"><b>Embed in prompt</b><span class="sub">drop a frozen quoted block into the Editor</span></span></button>
+                <button class="exp-mi ea-mi" data-eamode="attach" onclick="eaSend(this)" disabled><i data-lucide="paperclip"></i><span class="lead"><b>Attach as file</b><span class="sub">add a path-reference chip to the Editor</span></span></button>
+              </div></div>
             <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab -->
             <button class="icon-btn icon-btn--danger" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
           </div>
@@ -3081,9 +3074,22 @@ project CLAUDE.md. Global defaults that travel with you.
             <div class="pcard-foot px-2 py-2.5 hidden" id="prompt-history-actions">
               <div class="flex items-center gap-2 flex-wrap">
                 <button class="icon-btn" id="hist-selall-btn" title="Select / deselect all prompts" onclick="histSelectAll(this)"><i data-lucide="list-checks"></i></button>
-                <!-- R-batch items 6-10: ONE merged Export control (Export: Copy · Export→file · Add to prompt: Embed · Attach), mounted from expMenuHTML('hist') on boot — replaces the separate Output Export + Embed/Attach dropdowns -->
-                <span data-expmount="hist"></span>
+                <!-- I3: Output Export for History (#hist-list) -->
+                <div class="exp" id="hist-exp"><button class="exp-btn" title="Export prompts…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+                  <div class="exp-menu">
+                    <div class="exp-h">Copy</div>
+                    <button class="exp-mi" onclick="histExport('copy-sel')"><i data-lucide="copy"></i><span class="lead"><b>Copy selected</b><span class="sub">the selected prompt(s) to the clipboard</span></span></button>
+                    <div class="exp-h">Cut &amp; export</div>
+                    <button class="exp-mi" onclick="histExport('cut-sel')"><i data-lucide="scissors"></i><span class="lead"><b>Cut selected</b><span class="sub">copy, then drop the prompt(s)</span></span></button>
+                    <button class="exp-mi" onclick="histExport('file-sel')"><i data-lucide="file-down"></i><span class="lead"><b>Export selected → file</b><span class="sub">new doc in Library → Documents</span></span></button>
+                  </div></div>
                 <div class="flex-1"></div>
+                <!-- I3: link-dd (Embed/Attach) for History -->
+                <div class="exp ea-dd" data-eahost="hist"><button class="exp-btn" title="Add the selection to the prompt…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="link" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+                  <div class="exp-menu exp-menu--right">
+                    <button class="exp-mi ea-mi" data-eamode="embed" onclick="eaSend(this)" disabled><i data-lucide="quote"></i><span class="lead"><b>Embed in prompt</b><span class="sub">drop a frozen quoted block into the Editor</span></span></button>
+                    <button class="exp-mi ea-mi" data-eamode="attach" onclick="eaSend(this)" disabled><i data-lucide="paperclip"></i><span class="lead"><b>Attach as file</b><span class="sub">add a path-reference chip to the Editor</span></span></button>
+                  </div></div>
                 <button class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
                 <button class="icon-btn icon-btn--danger" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>
               </div>
@@ -3561,10 +3567,9 @@ project CLAUDE.md. Global defaults that travel with you.
     +'<button class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
     +'<button class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
     +'<button class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
-  /* P3 (#119): the footer drops Copy·Edit·Comment (now in the Editor header). R-batch item 10: the merged Export
-     control sits LEFT (the old leading spacer is dropped); Remove stays at the right. */
+  /* P3 (#119): the footer drops Copy·Edit·Comment (now in the Editor header) — keeps only Link-to-prompt + Remove. */
   function libFootHTML(host,kind){
-    return expMenuHTML(host)+'<span class="flex-1"></span>'
+    return '<span class="flex-1"></span>'+embedAttachHTML(host)   /* P4a: "Link to prompt" → the Embed/Attach control */
       +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
   function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
   function libRemove(host,kind){if(kind==='asset'){const id=host.replace('asset-','');const i=ASSETS.findIndex(x=>x.id===id);if(i<0)return;const nm=ASSETS[i].name;ASSETS.splice(i,1);if(assetSel===id)assetSel=ASSETS.length?ASSETS[0].id:'';renderAssets();toast('Removed '+nm);return;}
@@ -3580,23 +3585,23 @@ project CLAUDE.md. Global defaults that travel with you.
       ASSETS.push({id:id,name:'pasted-'+n+'.png',path:'.scratch/pasted-'+n+'.png',meta:'PNG · clipboard · 64 KB',created:'now',edited:'now',grad:'linear-gradient(135deg,var(--ag-teal),var(--ag-citron))'});
       assetSel=id;renderAssets();toast('Pasted image → pasted-'+n+'.png');}
     else addDocPaste('',null);}   /* R-batch item 9: paste → a new Documents row with an editable dummy name, opened with inline rename active */
-  /* R-batch items 8/9: SILENT doc creation — builds a new Documents row + editor pane (the same wiring renderDocs()
-     uses) from content + a name, WITHOUT switching tabs or opening rename. Returns {key,name,path}. Used by both
-     addDocPaste (Export → file / Add-menu Paste, which then lands you in Documents) and the merged control's
-     "Attach as file" (item 8, which saves the doc then reveals a chip in Compose). */
+  /* R-batch item 9: the Add-document (Paste) workflow — builds a new Documents row + editor pane (the same
+     wiring renderDocs() uses), selects it, and opens the inline RENAME so the dummy name can be typed over
+     immediately. Item 8 routes the feed/History "Export selected → file" selection content here. */
   let docPasteSeq=0;
-  function createDoc(content,suggestedName){
-    const pane=document.getElementById('doc-documents');if(!pane)return {key:'',name:suggestedName||'',path:suggestedName||''};
+  function addDocPaste(content,suggestedName){
+    const pane=document.getElementById('doc-documents');if(!pane)return;
+    switchTab('doc','documents');   /* item 8: land in Library → Documents */
     const nav=pane.querySelector('.docnav'),main=pane.querySelector('.docmain'),addwrap=nav?nav.querySelector('.docnav-addwrap'):null;
-    if(!nav||!main||!addwrap)return {key:'',name:suggestedName||'',path:suggestedName||''};
-    const key='pasted-'+(++docPasteSeq),name=suggestedName||('untitled-'+docPasteSeq+'.md'),path='.scratch/'+name;
+    if(!nav||!main||!addwrap)return;
+    const key='pasted-'+(++docPasteSeq),name=suggestedName||('untitled-'+docPasteSeq+'.md');
     const row=document.createElement('div');row.className='docnav-row';row.setAttribute('role','button');row.tabIndex=0;row.dataset.doc=key;
     row.setAttribute('onclick',"docPick(this,'"+key+"')");
     row.innerHTML='<i data-lucide="'+fileTypeIcon(name)+'" class="docnav-ic"></i>'
       +'<span class="docnav-lab"><span class="docnav-name">'+esc(name)+'</span><span class="docnav-path">.scratch/</span></span>'+navActsHTML();
     nav.insertBefore(row,addwrap);
     const dd=document.createElement('div');dd.className='docdoc';dd.dataset.doc=key;
-    dd.innerHTML='<div class="doc-header"><span class="dh-path">'+esc(path)+'</span><span class="dh-dates"><b>Created</b> now&nbsp;&nbsp;<b>Edited</b> now</span></div>'
+    dd.innerHTML='<div class="doc-header"><span class="dh-path">.scratch/'+esc(name)+'</span><span class="dh-dates"><b>Created</b> now&nbsp;&nbsp;<b>Edited</b> now</span></div>'
       +'<div data-libhead="doc-'+key+'" data-libkind="doc"></div>'
       +'<div class="doc-view-host" id="doc-'+key+'-view" style="flex:1 1 auto;min-height:0"></div>'
       +'<textarea class="doc-edit in" id="doc-'+key+'-edit" style="display:none"></textarea>'
@@ -3605,16 +3610,8 @@ project CLAUDE.md. Global defaults that travel with you.
     const ta=document.getElementById('doc-'+key+'-edit');if(ta)ta.value=content||'';
     const hs=dd.querySelector('[data-libhead]');if(hs)hs.innerHTML=editHeadHTML("libCopy('doc-"+key+"','doc')","docEdit(this,'"+key+"')",'doc-'+key,'doc-edit-btn','doc-'+key+'-edit');
     const fs=dd.querySelector('[data-libfoot]');if(fs)fs.innerHTML=libFootHTML('doc-'+key,'doc');
-    renderDocView(key);LU();
-    return {key:key,name:name,path:path};
-  }
-  /* Export → file / Add-menu Paste: create the doc, then SWITCH to Documents, select it, and open inline RENAME. */
-  function addDocPaste(content,suggestedName){
-    const d=createDoc(content,suggestedName);if(!d.key)return;
-    switchTab('doc','documents');
-    const pane=document.getElementById('doc-documents');const row=pane&&pane.querySelector('.docnav-row[data-doc="'+d.key+'"]');
-    if(row){docPick(row,d.key);const pencil=row.querySelector('.docnav-acts .ghost-ic');if(pencil)navRename({stopPropagation(){}},pencil);}
-    LU();
+    renderDocView(key);docPick(row,key);LU();
+    const pencil=row.querySelector('.docnav-acts .ghost-ic');if(pencil)navRename({stopPropagation(){}},pencil);   /* open inline rename on creation */
   }
   function navRename(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');const lab=row.querySelector('.docnav-name');if(!lab||row.querySelector('.docnav-name-edit'))return;
     const cur=lab.textContent;const inp=document.createElement('input');inp.className='docnav-name-edit';inp.value=cur;
@@ -3626,22 +3623,10 @@ project CLAUDE.md. Global defaults that travel with you.
   function navDelete(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');if(!row)return;
     if(row.classList.contains('assetnav-row'))libRemove('asset-'+row.dataset.asset,'asset');else libRemove('doc-'+row.dataset.doc,'doc');}
 
-  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open,.add-menu.open,.exp.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}   /* R-batch item 3: the subagent accordion (.subs-acc.open) is a STICKY toggle, not a popup — intentionally NOT closed here */
+  function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open,.vpop.open,.att-pop.open,.add-menu.open,.exp.open,.subs-more.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));}
   /* R-batch item 2: the subagent +N overflow badge opens a popover listing the hidden subs (preserves the
      card's fixed square height — no in-place expansion). Click is already isolated from the card select. */
-  /* R-batch item 3: subagent accordion drawer. has-more is set when the badges wrap past one row (recomputed on
-     load + resize, since wrap depends on the card's width). Clicking the strip toggles the drawer open and grows
-     the card (.node.subs-open); state sticks. A badge's own stopPropagation keeps a badge click isolated from both
-     the drawer and card-select. scrollHeight reports the FULL content height (ignores the collapsed max-height clip),
-     so it's a reliable wrap test whether the drawer is open or not. */
-  function initSubsAcc(){document.querySelectorAll('.node-subs .subs-acc').forEach(acc=>{
-    const b=acc.querySelector('.subs-badges');if(!b)return;
-    const wraps=b.scrollHeight>20;   /* >1 badge row (16px + tolerance) */
-    acc.classList.toggle('has-more',wraps);
-    if(!wraps){acc.classList.remove('open');const n=acc.closest('.node');if(n)n.classList.remove('subs-open');}
-  });}
-  function subsTrig(e,el){const acc=el.closest('.subs-acc');if(!acc||!acc.classList.contains('has-more'))return;   /* one row → no drawer; let the click bubble up to select the node */
-    e.stopPropagation();const open=acc.classList.toggle('open');const n=acc.closest('.node');if(n)n.classList.toggle('subs-open',open);LU();}
+  function toggleSubsPop(btn){const w=btn.closest('.subs-more');if(!w)return;const open=w.classList.contains('open');closeAllPopups();if(!open)w.classList.add('open');}
 
   /* ===== Compose placeholders + merged Templates (v10p1 #22) ===== */
   let phSel=null;
@@ -3718,19 +3703,11 @@ project CLAUDE.md. Global defaults that travel with you.
      content). The link icon sends in whichever mode the selection enables; the other mode greys. */
   let attSeq=100;
   function nextAttId(){return 'att-'+(++attSeq);}
-  /* R-batch items 6-10: ONE merged Export control (replaces the separate Output-Export .exp + Embed/Attach .ea-dd).
-     Two sections — "Export" (Copy selected · Export selected → file) and "Add to prompt" (Embed in prompt · Attach as
-     file) — Cut is gone. Reused across feed / hist / doc-* / plan / asset hosts (data-eahost). Selection-gating
-     (eaUpdate) enables each item per the current selection. Kept the .ea-dd class + eaSend wiring so every existing
-     selection-change caller keeps working; data-eamode now carries the four actions. */
-  function expMenuHTML(host){return '<div class="exp ea-dd" data-eahost="'+esc(host)+'"><button class="exp-btn" title="Export · add to prompt…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>'
-    +'<div class="exp-menu">'
-    +'<div class="exp-h">Export</div>'
-    +'<button class="exp-mi ea-mi" data-eamode="copy" onclick="eaSend(this)" disabled><i data-lucide="copy"></i><span class="lead"><b>Copy selected</b><span class="sub">the selection to the clipboard</span></span></button>'
-    +'<button class="exp-mi ea-mi" data-eamode="file" onclick="eaSend(this)" disabled><i data-lucide="file-down"></i><span class="lead"><b>Export selected → file</b><span class="sub">new doc in Library → Documents</span></span></button>'
-    +'<div class="exp-h">Add to prompt</div>'
+  /* H1: link-icon-ONLY dropdown modeled on Output Export (.exp). MENU items are the actions with clear names + helper text; selection-gating disables the mode the selection can't use (no more toggle labels → fixes the old 'clicking Embed/Attach label fired attach' bug). data-eahost on the wrapper keeps host wiring; eaUpdate() flips the menu items. */
+  function embedAttachHTML(host){return '<div class="exp ea-dd" data-eahost="'+esc(host)+'"><button class="exp-btn" title="Add the selection to the prompt…" onclick="event.stopPropagation();toggleExport(this)"><i data-lucide="link" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>'
+    +'<div class="exp-menu exp-menu--right">'
     +'<button class="exp-mi ea-mi" data-eamode="embed" onclick="eaSend(this)" disabled><i data-lucide="quote"></i><span class="lead"><b>Embed in prompt</b><span class="sub">drop a frozen quoted block into the Editor</span></span></button>'
-    +'<button class="exp-mi ea-mi" data-eamode="attach" onclick="eaSend(this)" disabled><i data-lucide="paperclip"></i><span class="lead"><b>Attach as file</b><span class="sub">save it as a doc + add a path chip to the Editor</span></span></button>'
+    +'<button class="exp-mi ea-mi" data-eamode="attach" onclick="eaSend(this)" disabled><i data-lucide="paperclip"></i><span class="lead"><b>Attach as file</b><span class="sub">add a path-reference chip to the Editor</span></span></button>'
     +'</div></div>';}
   function eaSelKind(host){
     if(host==='feed'){if(document.querySelector('#msg-list .msgcard.sel'))return 'whole';if(document.querySelector('#msg-list .mrow.bsel'))return 'part';
@@ -3740,50 +3717,25 @@ project CLAUDE.md. Global defaults that travel with you.
     if(host==='hist'){return document.querySelector('#hist-list .fcard.sel')?'whole':null;}
     if(host.indexOf('asset-')===0)return 'whole';   /* an Asset is always attachable as a file */
     const sel=SELby[host];if(!sel)return null;return sel.kind==='all'?'whole':'part';}
-  /* R-batch items 6-10: gate every item of the merged Export control per the current selection.
-     Embed = any selection (item 7); Attach = whole-only; Copy / Export-to-file = whole card(s) on feed/hist,
-     any line/section/doc selection in the editor (doc/plan); Assets are Attach-only (an image isn't copyable-as-
-     text, embeddable as a quote, or a .md). The trigger enables if ANY item does. */
-  function eaUpdate(host){const grp=document.querySelector('.ea-dd[data-eahost="'+host+'"]');if(!grp)return;
-    const isAsset=host.indexOf('asset-')===0, isFeedHist=(host==='feed'||host==='hist');
-    const kind=eaSelKind(host);
-    const enEmbed=!isAsset&&!!kind, enAttach=kind==='whole';
-    const enCopy=isAsset?false:(isFeedHist?kind==='whole':!!kind), enFile=enCopy;
-    const set=(mode,on)=>{const b=grp.querySelector('[data-eamode="'+mode+'"]');if(b)b.disabled=!on;};
-    set('copy',enCopy);set('file',enFile);set('embed',enEmbed);set('attach',enAttach);
-    const btn=grp.querySelector('.exp-btn');if(btn)btn.disabled=!(enCopy||enFile||enEmbed||enAttach);}
+  function eaUpdate(host){if(typeof expGate==='function')expGate();   /* R-batch item 7: every selection change re-gates the Output Export trigger too */
+    const grp=document.querySelector('.ea-dd[data-eahost="'+host+'"]');if(!grp)return;
+    const kind=eaSelKind(host);const enEmbed=kind==='part',enAttach=kind==='whole';
+    const em=grp.querySelector('[data-eamode="embed"]'),at=grp.querySelector('[data-eamode="attach"]'),btn=grp.querySelector('.exp-btn');
+    em.disabled=!enEmbed;at.disabled=!enAttach;
+    if(btn)btn.disabled=!kind;grp.dataset.eamode=enEmbed?'embed':(enAttach?'attach':'');}
   function eaUpdateAll(){document.querySelectorAll('.ea-dd[data-eahost]').forEach(g=>eaUpdate(g.dataset.eahost));}
   function eaSend(btn){const grp=btn.closest('.ea-dd');if(!grp||btn.disabled)return;const host=grp.dataset.eahost;closeAllPopups();
-    const mode=btn.dataset.eamode;
-    if(mode==='copy')expCopy(host);else if(mode==='file')expFile(host);else if(mode==='embed')eaEmbed(host);else if(mode==='attach')eaAttach(host);}
+    const mode=btn.dataset.eamode||grp.dataset.eamode;if(!mode){toast('Select something to share first');return;}
+    if(mode==='embed')eaEmbed(host);else eaAttach(host);}
   function libSourceLabel(host){
     if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');return 'Library → Documents · '+(dd?dd.textContent.split('/').pop():host);}
     const p=PLANS.find(x=>x.id===host);if(p)return 'Library → Plans · '+p.title;return 'Library';}
-  function editorSelText(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return '';
-    const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
-    return rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();}
-  /* R-batch item 6: Copy / Export-to-file for the merged control. feed/hist reuse feedExport/histExport (whole
-     cards); editor hosts (doc-* or plan) act on the selected line/section/doc text. */
-  function expCopy(host){if(host==='feed')return feedExport('copy-sel');if(host==='hist')return histExport('copy-sel');
-    const txt=editorSelText(host);if(!txt){toast('Select something first');return;}
-    if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});toast('Copied the selection');}
-  function expFile(host){if(host==='feed')return feedExport('file-sel');if(host==='hist')return histExport('file-sel');
-    const txt=editorSelText(host);if(!txt){toast('Select something first');return;}
-    const base=(host.indexOf('doc-')===0?host.replace('doc-',''):host);
-    const fname=base+'-export-'+(new Date().toTimeString().slice(0,5).replace(':',''))+'.md';
-    addDocPaste(txt,fname);toast('Exported the selection → Documents · '+fname);}
   function eaEmbed(host){
-    if(host==='feed'){if(eaSelKind('feed')==='part')return eaEmbedFeed();return embedWholeCards('feed');}   /* item 7: a block run embeds the blocks; a whole feed card embeds its full text */
-    if(host==='hist')return embedWholeCards('hist');   /* item 7: History whole-card embed (was a no-op before) */
-    const sel=SELby[host];if(!sel)return;const text=editorSelText(host);
+    if(host==='feed')return eaEmbedFeed();
+    const sel=SELby[host];if(!sel)return;const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return;
+    const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
+    const text=rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();
     insertEmbed(libSourceLabel(host)+' · '+sel.label,text,"switchTab('doc','"+(host.indexOf('doc-')===0?'documents':'plan')+"')");}
-  /* item 7: embed each selected WHOLE feed/History card as a frozen quoted block (full card text via cardText) */
-  function embedWholeCards(host){const root=host==='hist'?document.getElementById('hist-list'):activeFeedList();if(!root)return;
-    const cards=[...root.querySelectorAll('.fcard.sel')];if(!cards.length)return;
-    cards.forEach(c=>{const txt=cardText(c);if(!txt)return;let src;
-      if(host==='hist')src='Prompts → History';
-      else{const o=c.classList.contains('msgcard')?MSGS[+c.dataset.msgi]:null;const a=o?AG[o.ag]:null;src=a?('Team Feed · '+a.role+' '+a.name):'Team Feed';}
-      insertEmbed(src,txt,host==='hist'?"switchTab('prompt','history')":"switchTab('feed','messages')");});}
   function eaEmbedFeed(){const rows=[...document.querySelectorAll('#msg-list .mrow.bsel')].filter(r=>!r.classList.contains('mrow--title'));if(!rows.length)return;
     const card=rows[0].closest('.msgcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
     /* A7: multi-select → embed the combined text of every selected block (in document order) as one quoted block */
@@ -3795,33 +3747,27 @@ project CLAUDE.md. Global defaults that travel with you.
     switchTab('prompt','compose');
     f.insertAdjacentHTML('beforeend',blockHTML('embed',{source:src,body:esc(text),srcAction:srcAction,clamp:text.length>220,kindLabel:'embed'}));
     if(window.lucide&&lucide.createIcons)lucide.createIcons();toast('Embedded into the Editor');}
-  /* R-batch item 8: "Attach as file" SAVES the selection as a real file, drops a path chip into the prompt, then
-     switches to Compose and reveals the chip. Materialized content (feed messages, History prompts) is written to a
-     NEW Library → Documents doc (silent createDoc — distinct from "Export → file", which leaves you IN Documents);
-     content that already has a real file (Assets, Documents, Plans) is chipped at its own path. */
   function eaAttach(host){
     if(host==='feed')return eaAttachFeed();
     if(host==='hist'){const cards=[...document.querySelectorAll('#hist-list .fcard.sel')];if(!cards.length)return;
-      cards.forEach((c,k)=>{const txt=cardText(c);const fname='history-'+(new Date().toTimeString().slice(0,5).replace(':',''))+(cards.length>1?'-'+(k+1):'')+'.md';const d=createDoc(txt,fname);addAttachment({id:nextAttId(),name:d.name,path:d.path,type:'doc'});});
-      revealAttachment();toast('Attached '+cards.length+' prompt'+(cards.length>1?'s':'')+' → saved to Documents');return;}
+      cards.forEach((c,k)=>addAttachment({id:nextAttId(),name:'history-'+(k+1)+'.md',path:'/tmp/awl/history-'+(k+1)+'.md',type:'temp'}));
+      toast('Attached '+cards.length+' prompt'+(cards.length>1?'s':'')+' — materialized to a temp file');return;}
     let name,path,type='doc';
     if(host.indexOf('asset-')===0){const a=ASSETS.find(x=>'asset-'+x.id===host);if(!a)return;name=a.name;path=a.path;type='asset';}
     else if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');path=dd?dd.textContent:host;name=path.split('/').pop();type='doc';}
     else {const p=PLANS.find(x=>x.id===host);if(!p)return;name=p.file;path='~/.claude/plans/'+p.file;type='doc';}
-    addAttachment({id:nextAttId(),name:name,path:path,type:type});revealAttachment();toast('Attached '+name+' — path reference in the prompt');}
+    addAttachment({id:nextAttId(),name:name,path:path,type:type});toast('Attached '+name+' — path reference + a "read this" instruction');}
   /* A9: active feed list (Messages/Scratch/Log/Inbox) — the visible one drives the shared select-to-act strip */
   function activeFeedList(){const t=currentFeedTab();return document.getElementById({messages:'msg-list',scratch:'scratch-list',log:'log-list',inbox:'inbox-list'}[t]||'msg-list');}
   function eaAttachFeed(){
+    const msgCards=[...document.querySelectorAll('#msg-list .msgcard.sel')];
+    if(msgCards.length){msgCards.forEach(card=>{const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];const t=o.time.replace(/:/g,'');
+        addAttachment({id:nextAttId(),name:a.name+'-msg-'+t+'.md',path:'/tmp/awl/feed-'+a.name+'-'+t+'.md',type:'temp'});});
+      toast('Attached '+msgCards.length+' message'+(msgCards.length>1?'s':'')+' — materialized to a temp file');return;}
+    /* A9: Scratch/Log/Inbox selected cards attach as materialized temp files too */
     const list=activeFeedList();const tab=currentFeedTab();const cards=list?[...list.querySelectorAll('.fcard.sel')]:[];if(!cards.length)return;
-    cards.forEach((card,k)=>{const txt=cardText(card);let base;
-      if(card.classList.contains('msgcard')){const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];base=a.name+'-msg-'+o.time.replace(/:/g,'');}
-      else base=tab+'-'+(k+1);
-      const d=createDoc(txt,base+'.md');addAttachment({id:nextAttId(),name:d.name,path:d.path,type:'doc'});});
-    revealAttachment();toast('Attached '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' → saved to Documents');}
-  /* item 8: end the attach flow on Compose with the new chip flashed so the user sees it land */
-  function revealAttachment(){switchTab('prompt','compose');const strip=document.getElementById('attach-strip');if(!strip)return;
-    const last=strip.querySelector('.att-card:last-child');if(!last)return;
-    last.scrollIntoView({block:'nearest',inline:'nearest'});last.classList.remove('att-flash');void last.offsetWidth;last.classList.add('att-flash');setTimeout(()=>last.classList.remove('att-flash'),1000);}
+    cards.forEach((card,k)=>{addAttachment({id:nextAttId(),name:tab+'-'+(k+1)+'.md',path:'/tmp/awl/feed-'+tab+'-'+(k+1)+'.md',type:'temp'});});
+    toast('Attached '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' — materialized to a temp file');}
 
   /* ============================ P4b — inline citations ============================ */
   /* From a chip's link icon, with the cursor in the prose, insert a citation pill carrying the attachment's
@@ -3902,7 +3848,7 @@ project CLAUDE.md. Global defaults that travel with you.
     const cr=document.getElementById('det-created');if(cr&&a.created)cr.textContent=a.created;
     const nb=n.querySelector('.node-badge');const db=document.getElementById('det-badge');
     if(nb&&db){const cl=[...nb.classList].find(c=>/^nb-/.test(c))||'nb-idle';db.className='node-badge '+cl+' det-badge';db.textContent=nb.textContent;
-      const st=cl==='nb-pending'?'pending':(cl==='nb-active'?'active':(cl==='nb-error'?'error':'idle'));db.setAttribute('onclick','statusJump(\''+st+'\')');db.title=nb.title;}   /* R-batch item 1: map nb-error → the 'error' jump (→ Inbox) too */
+      const st=cl==='nb-pending'?'pending':(cl==='nb-active'?'active':'idle');db.setAttribute('onclick','statusJump(\''+st+'\')');db.title=nb.title;}
     const meta=((n.querySelector('.node-meta')||{}).textContent||'').replace(/\s+/g,' ').trim();const parts=meta.split('·').map(s=>s.trim());
     const mc=document.getElementById('model-current');if(mc&&parts[0])mc.textContent=parts[0];
     setSegActive('mode-seg',parts[1]);setSegActive('effort-seg',parts[2]);
@@ -4128,27 +4074,14 @@ project CLAUDE.md. Global defaults that travel with you.
     const desc=root.querySelector('textarea');if(desc){desc.value='';if(desc.classList.contains('autosize'))autosize(desc);}
     root.querySelectorAll('[data-msel]').forEach(m=>{m._sel=new Set();buildMsel(m);});toast('Create form reset');}
   function cancelCreate(){switchTab('mid','details');}
-  /* Shared inline confirm for the Details footer (Retire + R-batch item 11 Delete). Hides the WHOLE button row
-     (so the confirm reads cleanly next to a two-button footer) and restores it on cancel/confirm. */
-  function footConfirm(opts){const foot=document.getElementById('mid-foot-details');if(!foot)return;
-    if(foot.querySelector('.foot-confirm'))return;
-    const btns=[...foot.querySelectorAll('button')];btns.forEach(b=>b.style.display='none');
-    const restore=()=>{c.remove();btns.forEach(b=>b.style.display='');};
-    const c=document.createElement('div');c.className='tl-confirm foot-confirm'+(opts.danger?' foot-confirm--danger':'');c.style.display='flex';c.style.width='100%';c.style.alignItems='center';c.style.gap='8px';
-    c.innerHTML='<span>'+opts.msg+'</span>';
-    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=restore;
-    const go=document.createElement('button');go.className=opts.goClass+' btn-sm';go.innerHTML=opts.goLabel;go.onclick=()=>{restore();opts.onGo();};
+  function retireAgent(btn){const foot=document.getElementById('mid-foot-details');if(!foot)return;const a=AG[FOCUS]||{name:'this agent',role:''};
+    if(foot.querySelector('.retire-confirm'))return;btn.style.display='none';
+    const c=document.createElement('div');c.className='tl-confirm retire-confirm';c.style.display='flex';c.style.width='100%';c.style.alignItems='center';
+    c.innerHTML='<span>Retire '+a.role+' · '+a.name+'? This ends the session.</span>';
+    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.remove();btn.style.display='';};
+    const go=document.createElement('button');go.className='btn-danger btn-sm';go.innerHTML='<i data-lucide="power" class="w-3.5 h-3.5"></i>Retire';
+    go.onclick=()=>{c.remove();btn.style.display='';toast('Retired '+a.name);const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node){node.style.opacity='.4';node.style.filter='grayscale(1)';}};
     c.appendChild(cancel);c.appendChild(go);foot.appendChild(c);LU();}
-  function retireAgent(btn){const a=AG[FOCUS]||{name:'this agent',role:''};
-    footConfirm({msg:'Retire '+a.role+' · '+a.name+'? This ends the session.',goClass:'btn-danger',goLabel:'<i data-lucide="power" class="w-3.5 h-3.5"></i>Retire',
-      onGo:()=>{toast('Retired '+a.name);const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node){node.style.opacity='.4';node.style.filter='grayscale(1)';}}});}
-  /* R-batch item 11: permanently delete the focused agent — wipes its config + transcripts and removes it from the
-     roster/graph (and would drop any links). Irreversible, so it's gated behind the same inline confirm, worded as
-     "can't be undone" and confirmed with the solid-red Delete button. */
-  function deleteAgent(btn){const a=AG[FOCUS]||{name:'this agent',role:''};
-    footConfirm({danger:true,msg:'Permanently delete '+a.role+' · '+a.name+'? This wipes its configuration and transcripts and removes it from the roster, graph, and any links — this can\'t be undone.',
-      goClass:'btn-danger-solid',goLabel:'<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete',
-      onGo:()=>{toast('Deleted '+a.name+' — configuration + transcripts wiped');const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node)node.remove();}});}
   (function(){const acc=document.getElementById('hist-acc');
     function setMode(m){ // m = 'rewind' | 'handoff' | null (null = nothing selected → hide the panel)
       document.querySelectorAll('#hist-tabs .tri-tab').forEach(x=>x.classList.toggle('active',x.dataset.tri===m));
@@ -4252,7 +4185,7 @@ project CLAUDE.md. Global defaults that travel with you.
   /* ===== v8p6: graph status badge → jump to the relevant surface, scoped to the focused agent ===== */
   function statusJump(status,el){
     const key=el?agKeyFromNode(el.closest('.node')):FOCUS;const a=AG[key];
-    if(status==='pending'||status==='error'){switchTab('feed','inbox');     /* needs your input (pending) / run failed (error) → that agent's Inbox card (R-batch item 1: Error routes here too, mirroring pending) */
+    if(status==='pending'){switchTab('feed','inbox');                       /* needs your input → that agent's Inbox card */
       const card=key&&document.querySelector('#feed-inbox .fcard[data-agent="'+key+'"]');
       if(card){card.classList.add('open');card.classList.add('sel');card.scrollIntoView({block:'nearest',behavior:'smooth'});card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);LU();if(typeof eaUpdate==='function')eaUpdate('feed');}}   /* v10p1 #15 + v1.x #2: expand + SELECT (light-teal fill) + flash the agent's card; re-gate the feed Output Export + link-dd now that an Inbox card is selected (R-batch items 6a/7 — switchTab gated while nothing was selected yet) */
     else if(status==='active'){switchTab('prompt','history');}              /* in-flight → see what's been sent */
@@ -4408,10 +4341,11 @@ project CLAUDE.md. Global defaults that travel with you.
     const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));cards.forEach(c=>c.classList.toggle('sel',!allOn));eaUpdate('hist');}
   /* I3: Output Export for History (parallel to feedExport) */
   function histExport(mode){closeAllPopups();const root=document.getElementById('hist-list');if(!root)return;
-    const cards=[...root.querySelectorAll('.fcard.sel')];   /* selection-only */
+    const cards=[...root.querySelectorAll('.fcard.sel')];   /* selection-only now (R-batch item 7 dropped the whole-history modes) */
     if(!cards.length){toast('Select prompts first');return;}
     const txt=cards.map(c=>{const b=c.querySelector('.fcard-full');return b?b.textContent.trim():'';}).filter(Boolean).join('\n\n');
     if(mode==='copy-sel'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});toast('Copied '+cards.length+' prompt'+(cards.length>1?'s':''));return;}
+    if(mode==='cut-sel'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});cards.forEach(c=>c.classList.add('cut-out'));setTimeout(()=>cards.forEach(c=>c.remove()),180);toast('Cut '+cards.length+' prompt'+(cards.length>1?'s':'')+' — copied, then removed');return;}
     if(mode==='file-sel'){const n=cards.length;const fname='history-export-'+(new Date().toTimeString().slice(0,5).replace(':',''))+'.md';addDocPaste(txt,fname);   /* R-batch item 8: route to Library → Documents + the Add-document (Paste) workflow */
       toast('Exported '+n+' prompt'+(n>1?'s':'')+' → Documents · '+fname);}}
 
@@ -4694,15 +4628,15 @@ resize intact.`,
         +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
         +'<div class="fb-mid">'+verdictBadgeHTML(f.verdict)+'<span class="sel-badge">§ '+f.sec+'</span></div>'
         +(f.comment?'<div class="fb-cmt">'+esc(f.comment)+'</div>':'')+'</div>';}).join('')+'</div>';}
-  /* R-batch item 10: the Plans footer leads with the merged Export control, then the single-agent Review chip (both
-     left-aligned); the right action group is just the decision trio (Revise · Reject · Approve). The right group
-     wraps (Approve drops to its own line, still right-aligned) so nothing clips at narrow widths. */
+  /* A4: the Plans footer keeps the single-agent Review chip as the ONLY left-aligned action; the Embed/Attach (Link)
+     chip moved into the right action group LEADING Revise, then the decision trio (Revise · Reject · Approve). The
+     right group wraps (Approve drops to its own line, still right-aligned) so nothing clips at narrow widths. */
   function planFootHTML(p){let right;
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
     else right='<button class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
-    return '<div class="plan-foot">'   /* item 10: [Export][reviewer chip] left · [Revise·Reject·Approve] right */
-      +expMenuHTML(p.id)+reviewChipHTML(p.id)
-      +'<div class="plan-foot-right">'+right+'</div></div>';}
+    return '<div class="plan-foot">'   /* A4: reviewer chip alone on the left; Embed/Attach leads the right group */
+      +reviewChipHTML(p.id)
+      +'<div class="plan-foot-right">'+embedAttachHTML(p.id)+right+'</div></div>';}
   /* 3-row header: [owner badge · title · state] / [feedback badges · steps done] / [filename · created/edited] */
   function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);
     const done=p.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
@@ -4922,25 +4856,33 @@ resize intact.`,
      capped max-height gets the scroll-to-end pill; jumpUpdate primes its show/hide + position immediately. */
   function toggleFcard(btn){const c=btn.closest('.fcard');if(!c)return LU();c.classList.toggle('open');
     if(c.classList.contains('open')){const b=c.querySelector('.fcard-body');if(b){attachJump(b);jumpUpdate(b);}}LU();}
-  /* Export (Copy / Export-to-file) for the merged control's feed + History hosts — selection-only: copy the selected
-     card(s) to the clipboard, or export them → a new Library → Documents doc via createDoc (R-batch items 6 + 8).
-     Cut was removed in the consolidation (item 6). */
+  /* Output Export — folds in the old per-card Copy; selection-only (R-batch item 7): copy the selection to the
+     clipboard, "cut" (copy + drop the selected card(s)), or "export" the selection → a new Library → Documents
+     doc via the Add-document (Paste) workflow (R-batch item 8). */
   function cardText(c){
     /* a Messages card's body is the contiguous rail (title + message + blocks), so gather every row's content —
        grabbing only the first .fcard-full would capture just the "Turn N" title. Other feed/history cards have a
-       single body block. (Used by Copy selected + Embed/Attach + the Export selected → file content.) */
+       single body block. (Used by Copy/Cut selected + the Export selected → file content for R-batch item 8.) */
     if(c.classList.contains('msgcard')){const rows=[...c.querySelectorAll('.mrow-c')].map(r=>r.textContent.trim()).filter(Boolean);if(rows.length)return rows.join('\n');}
     const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent.trim():'';}
   function toggleExport(btn){if(btn.disabled)return;const wrap=btn.closest('.exp');if(!wrap)return;const open=wrap.classList.contains('open');closeAllPopups();if(!open)wrap.classList.add('open');}
-  /* (R-batch item 6: the separate expGate() that gated #feed-exp / #hist-exp is gone — the merged control's single
-     trigger is gated by eaUpdate(host), which folds in copy/file/embed/attach.) */
+  /* R-batch item 7: gate the Output Export trigger (feed + History) — disabled until at least one WHOLE card is
+     selected. Gated on .fcard.sel (exactly what feedExport/histExport act on), NOT eaSelKind — the link-dd also
+     enables on a Messages block-only selection (→ Embed), but Output Export only operates on whole cards. */
+  function expGate(){const fl=activeFeedList();const feedSel=fl?fl.querySelectorAll('.fcard.sel').length>0:false;
+    const fb=document.querySelector('#feed-exp .exp-btn');if(fb)fb.disabled=!feedSel;
+    const hl=document.getElementById('hist-list');const histSel=hl?hl.querySelectorAll('.fcard.sel').length>0:false;
+    const hb=document.querySelector('#hist-exp .exp-btn');if(hb)hb.disabled=!histSel;}
   function feedExport(mode){closeAllPopups();
     const list=activeFeedList();const tab=currentFeedTab();
-    const cards=list?[...list.querySelectorAll('.fcard.sel')]:[];   /* selection-only */
+    const cards=list?[...list.querySelectorAll('.fcard.sel')]:[];   /* selection-only now (R-batch item 7 dropped the whole-feed modes) */
     if(!cards.length){toast('Select cards first');return;}
     const txt=cards.map(cardText).filter(Boolean).join('\n\n');
     if(mode==='copy-sel'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});
       toast('Copied '+cards.length+' '+tab+' card'+(cards.length>1?'s':''));return;}
+    if(mode==='cut-sel'){if(navigator.clipboard)navigator.clipboard.writeText(txt).catch(()=>{});
+      cards.forEach(c=>c.classList.add('cut-out'));setTimeout(()=>cards.forEach(c=>c.remove()),180);
+      toast('Cut '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' — copied, then removed');return;}
     if(mode==='file-sel'){const n=cards.length;const fname=tab+'-export-'+(new Date().toTimeString().slice(0,5).replace(':',''))+'.md';
       addDocPaste(txt,fname);   /* R-batch item 8: route to Library → Documents + the Add-document (Paste) workflow with the selection content */
       toast('Exported '+n+' '+tab+' card'+(n>1?'s':'')+' → Documents · '+fname);return;}}
@@ -5205,7 +5147,7 @@ resize intact.`,
   /* pure-documentation content (no clickable links inside — routing stays on the real controls) */
   const HC={
     'Agent':"The selected agent — its identity, config, and live run state. Details (config + Context/Turns + Rewind/Handoff timeline) · Create (new-agent wizard) · Console (raw CLI feed + slash-command runner).",
-    'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending/error), a subagent strip, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
+    'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending), subagent dots, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
     'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
     'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Messages (team traffic; Type = direction, Content = tool detail; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Permission · Plan · Decision · Error sections; its badge is the fleet total).",
     'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. From (single) sets who it's sent as; To (multi, led by the Scratch row) sets who receives it. Compose · Templates · History, with From/To persisting across all three.",
@@ -5221,7 +5163,6 @@ resize intact.`,
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
-    document.querySelectorAll('[data-expmount]').forEach(m=>{m.outerHTML=expMenuHTML(m.dataset.expmount);});   /* R-batch items 6/9: mount the merged Export control into the Feed + History footers (static markup carries a placeholder span) */
     renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();eaUpdateAll();
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
@@ -5234,13 +5175,11 @@ resize intact.`,
     seedHoverCards();
     initResizers();updateFmt('fmt');initEditorMics();LU();drawEdgesSoon();
     initJumpPills();
-    initSubsAcc();   /* R-batch item 3: detect subagent-strip wrap (→ chevron/drawer) on load */
-    {const gg=document.getElementById('graph-grid');if(gg&&window.ResizeObserver)new ResizeObserver(()=>initSubsAcc()).observe(gg);else window.addEventListener('resize',initSubsAcc);}   /* recompute wrap on any graph-grid resize (splitter drag OR window resize), falling back to the window event */
   }
   if(document.readyState!=='loading')boot();else window.addEventListener('DOMContentLoaded',boot);
   window.addEventListener('load',()=>{autosizeAll();drawEdgesSoon();LU();});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{autosizeAll();drawEdgesSoon();});
-  document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.rev-chip')&&!e.target.closest('.vtally')&&!e.target.closest('.exp'))closeAllPopups();});   /* R-batch item 5: exempt .rev-chip — its menu carries the .src-pop class, so without this the chip's own opening click bubbled here and closeAllPopups() instantly re-closed the just-opened reviewer menu */
+  document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.vtally')&&!e.target.closest('.exp'))closeAllPopups();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){closeSettings();}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();}}});
   setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
   /* live-reload on save (design iteration) */
