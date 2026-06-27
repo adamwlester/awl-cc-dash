@@ -416,6 +416,30 @@ Files: bridge/transcript.py, tests/test_bridge_unit.py, frontend/src/renderer/Ap
 
 ---
 
+### 2026-06-27 06:25:00 — Inbox ramp colours finalized: reuse --warning/--danger, one dedicated Permission token
+
+Revised the Inbox heading ramp values from the earlier 04:45 entry's placeholders to reuse existing semantic tokens (per user direction — no new signal colours minted). **Audited `var(--warning)` first**: 39 uses, load-bearing (Pending status badges `.sb-pending`/`.nb-pending` with white text, every Context/Turns health-bar mid-zone via `ctxColor()`, the `.v-revise` verdict colour, the set-warn banner border, the "N pending" legend dot) — so it can't be darkened for text without muddying all of those. Resolution: **Error reuses `--danger`, Warning reuses `--warning`** (the existing amber #d98a2b — user accepted its softer-as-text read over minting a near-duplicate), and **only Permission keeps a dedicated token** — retargeted `--inbox-permission` #7a4e24 → **#a9710f** (the old `--req-decision` value, the user's "blackish-orange") and **deleted the now-unused `--inbox-warning`**. Final ramp: Error `--danger` red → Warning `--warning` amber → Permission `--inbox-permission` ochre → Plan/Decision neutral `--muted`; each section's colour drives its label + the trailing count badge's outline + counter text. **Live-verified headless** (Playwright, http://localhost): computed colours exact on all 5 sections (#d23b6a / #d98a2b / #a9710f / #5b5f86), Warning vs Permission visibly distinct (amber brighter than ochre), narrow (1100) clean. `DESIGN.md` updated (removed the stale "`--inbox-warning` distinct from `--warning`" note; now documents the reuse).
+
+Files: design/tokens.css, design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-27 06:55:00 — TODO.md: filed 6 Inbox-bucket notes into a fresh Next up (incl. the gutter "item 4" finding)
+
+Triaged the `design/TODO.md` Inbox bucket into the now-cleared **Next up** queue (human emptied it first). Verified each against the live mockup before filing (per the doc's "verify first" rule): the jump-pill dead-selector bug I'd flagged earlier is **already fixed** (`JUMP_SELECTOR` uses the real `.md` scroller, ~4293) so it was not re-added; the Warning section + colour ramp are **already built**, so its note was trimmed to the remaining gap. Filed **6 items**: (1) Warning card header badge ("Max turns"/limit) mirroring the Error "Connection" badge — generalise the `type==='error'`-only subtype render (~5034) + add a `--warning`/`--warning-soft` variant of `.inbox-subtype` (~1159) + a pending limit-crossed example; with the inbox token mapping (label+count badge: Error `--danger` / Warning `--warning` / Permission `--inbox-permission` / Plan·Decision `--muted`) integrated. (2) remove the navy divider before Reply in `inboxReplyHTML()` (~5012). (3) **gutter "item 4" finding** — the `.md-fill` filler rail already extends but is invisible (tan-on-cream); raise contrast + seed a short doc. (4) clamp editor selection so it doesn't highlight past the last text line (~1655). (5) footer popover menus (`.rev-pop`/`.ea-dd`/`.vpop`) as a raised, unclipped overlay. (6) rename the Export menu heading → "Copy & Export" (`expMenuHTML`, ~3735). **Held & flagged** the 7th note ("remove Copy ghost buttons from History header") — no Copy ghost button exists in `histCardHTML` (only Edit), so it's parked in the Inbox bucket pending clarification. No mockup/DESIGN.md change — backlog triage only.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-27 07:05:00 — Moved archive/mvp → archive/_human-only/mvp (deny-read)
+
+Relocated the retired MVP snapshot (`frontend/`, `sidecar/`, `requirements.txt`, `start-mvp.bat`) from `archive/mvp/` into a new `archive/_human-only/mvp/`, putting it behind the same human-only deny-read fence as `dev/notes/_human-only/`. Added matching `Read(./archive/_human-only/**)` + `Read(./archive/_human-only)` deny rules to `.claude/settings.json`. Files relocated verbatim; the folder stays tracked in git (deny-read only, not gitignored).
+
+Files: .claude/settings.json, archive/_human-only/mvp/** (moved from archive/mvp/**), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

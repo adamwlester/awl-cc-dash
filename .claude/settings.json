@@ -32,7 +32,9 @@
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)",
       "Read(./dev/notes/_human-only/**)",
-      "Read(./dev/notes/_human-only)"
+      "Read(./dev/notes/_human-only)",
+      "Read(./archive/_human-only/**)",
+      "Read(./archive/_human-only)"
     ],
     "ask": [
       "Bash(git push *)",
