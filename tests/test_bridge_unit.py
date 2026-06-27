@@ -16,6 +16,7 @@ recorded (see .scratch/bridge-diagnostic-*.md appendix A4/A5/A6).
 """
 
 from bridge.bridge import TmuxBridge, parse_permission_prompt
+from bridge.transcript import _encode_cwd, _resolve_project_dir
 from sidecar.drivers.bridge import derive_context_usage, CONTEXT_WINDOW
 
 
@@ -379,3 +380,73 @@ class TestRuntimeStore:
         rs = self._store(tmp_path, monkeypatch)
         rs.save_record({"tmux_name": "awl-x"})
         assert rs.all_records() == []
+
+
+# -----------------------------------------------------------------------------
+# transcript project-dir resolution — Claude Code's cwd→dir-name encoding
+# -----------------------------------------------------------------------------
+
+class TestEncodeCwd:
+    def test_replaces_slashes(self):
+        # Plain mount path: every "/" -> "-" (regression baseline).
+        assert _encode_cwd("/mnt/c/Users/lester") == "-mnt-c-Users-lester"
+
+    def test_replaces_dots_not_just_slashes(self):
+        # The bug: a dotted segment must encode the "." as "-" too, so a leading
+        # dot after a slash yields a DOUBLE dash. Confirmed live against the real
+        # dir Claude Code created.
+        assert (
+            _encode_cwd("/mnt/c/foo/awl-cc-dash/.scratch/dottest")
+            == "-mnt-c-foo-awl-cc-dash--scratch-dottest"
+        )
+
+    def test_preserves_literal_dashes_and_digits(self):
+        assert _encode_cwd("/home/lester/awl-fin-0f97b358") == "-home-lester-awl-fin-0f97b358"
+
+    def test_underscore_and_space_become_dash(self):
+        assert _encode_cwd("/a/b_c d") == "-a-b-c-d"
+
+
+class _FakeBridge:
+    """Minimal bridge stub recording shell commands and returning canned output."""
+
+    def __init__(self, test_dir_ok=False, listing=""):
+        self._test_dir_ok = test_dir_ok
+        self._listing = listing
+        self.calls = []
+
+    def _run(self, cmd, **_kw):
+        self.calls.append(cmd)
+        if cmd.startswith("test -d"):
+            return "OK\n" if self._test_dir_ok else "\n"
+        if cmd.startswith("ls -1"):
+            return self._listing
+        return ""
+
+
+class TestResolveProjectDir:
+    def test_fast_path_when_dir_exists(self):
+        b = _FakeBridge(test_dir_ok=True)
+        got = _resolve_project_dir(b, "/mnt/c/x/.scratch")
+        assert got is not None and got.endswith("/-mnt-c-x--scratch")
+        # Fast path returns before listing the projects dir.
+        assert not any(c.startswith("ls -1") for c in b.calls)
+
+    def test_falls_back_to_real_listing_match(self):
+        # Encoded dir not found by `test -d`; resolve via the real listing.
+        real = "-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash--scratch-dottest"
+        b = _FakeBridge(test_dir_ok=False, listing=f"-other-proj\n{real}\n")
+        cwd = "/mnt/c/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash/.scratch/dottest"
+        got = _resolve_project_dir(b, cwd)
+        assert got is not None and got.endswith("/" + real)
+
+    def test_collapsed_match_is_tolerant(self):
+        # Even if the real dir collapsed consecutive separators, a dash-collapsed
+        # comparison still resolves it.
+        b = _FakeBridge(test_dir_ok=False, listing="-mnt-c-x-scratch\n")
+        got = _resolve_project_dir(b, "/mnt/c/x/.scratch")  # encodes to -mnt-c-x--scratch
+        assert got is not None and got.endswith("/-mnt-c-x-scratch")
+
+    def test_returns_none_when_no_match(self):
+        b = _FakeBridge(test_dir_ok=False, listing="-totally-unrelated\n")
+        assert _resolve_project_dir(b, "/mnt/c/x/y") is None

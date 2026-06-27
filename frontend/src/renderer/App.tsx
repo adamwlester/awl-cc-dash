@@ -314,7 +314,7 @@ function SessionList({ sessions, activeId, onSelect, onCreate, onDelete }: {
                 {s.agent_type || 'session'}-{s.session_id}
               </div>
               <div style={{ fontSize: 9, color: C.t3, fontFamily: 'monospace' }}>
-                {s.model || 'default'} · ${s.total_cost_usd.toFixed(3)}
+                {s.model || 'default'}
               </div>
             </div>
             <button onClick={(e) => { e.stopPropagation(); onDelete(s.session_id) }}

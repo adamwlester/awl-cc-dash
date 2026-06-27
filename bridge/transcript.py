@@ -14,7 +14,52 @@ This module finds and parses these transcripts.
 """
 
 import json
+import re
 from .paths import WSL_CLAUDE_PROJECTS
+
+
+def _encode_cwd(cwd):
+    """Encode a cwd the way Claude Code names its transcript project dir.
+
+    Claude Code replaces every non-alphanumeric character in the absolute cwd
+    with a single dash — this covers '/', '.', '_', spaces, etc., not just '/'.
+    e.g. /mnt/c/Users/lester/.scratch -> -mnt-c-Users-lester--scratch
+    """
+    return re.sub(r"[^a-zA-Z0-9]", "-", cwd)
+
+
+def _resolve_project_dir(bridge, cwd):
+    """Resolve the ~/.claude/projects subdir for a session's cwd.
+
+    The encoding is lossy (many distinct chars collapse to '-'), so rather than
+    trust a reconstructed name blindly we confirm it against the real directory
+    names under projects/. Falls back to a dash-collapsed match so we still
+    resolve even if Claude Code's encoding differs in some edge case (e.g.
+    consecutive separators). Returns the WSL path to the project dir, or None.
+    """
+    encoded = _encode_cwd(cwd)
+    base = WSL_CLAUDE_PROJECTS
+
+    # Fast path: the encoded directory exists as-is.
+    try:
+        hit = bridge._run(f"test -d '{base}/{encoded}' && echo OK || true")
+    except Exception:
+        hit = ""
+    if hit.strip() == "OK":
+        return f"{base}/{encoded}"
+
+    # Derive from the real listing: match the encoded cwd against actual dir
+    # names, comparing dash-collapsed forms for robustness.
+    try:
+        listing = bridge._run(f"ls -1 {base} 2>/dev/null || true")
+    except Exception:
+        return None
+    names = [n.strip() for n in listing.strip().split("\n") if n.strip()]
+    target = re.sub(r"-+", "-", encoded)
+    for name in names:
+        if re.sub(r"-+", "-", name) == target:
+            return f"{base}/{name}"
+    return None
 
 
 def find_transcript(bridge, session_name):
@@ -45,15 +90,13 @@ def find_transcript(bridge, session_name):
 
     if not cwd:
         return None
+    cwd = cwd.strip()
 
-    # Claude Code hashes the project dir as the directory name under projects/
-    # The format is the path with / replaced by - and leading - stripped
-    # e.g. /mnt/c/Users/lester -> -mnt-c-Users-lester
-    project_hash = cwd.replace("/", "-")
-    if project_hash.startswith("-"):
-        project_hash = project_hash  # keep leading dash, that's the format
-
-    project_dir = f"{WSL_CLAUDE_PROJECTS}/{project_hash}"
+    # Find the projects/ subdir Claude Code uses for this cwd (matches its full
+    # non-alphanumeric→'-' encoding, verified against the real dir listing).
+    project_dir = _resolve_project_dir(bridge, cwd)
+    if not project_dir:
+        return None
 
     # List JSONL files in the project directory
     try:

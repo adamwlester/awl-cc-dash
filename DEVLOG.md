@@ -408,6 +408,14 @@ Files: design/tokens.css, design/mockup.html, design/DESIGN.md, DEVLOG.md
 
 ---
 
+### 2026-06-27 05:10:00 — bridge: robust transcript project-dir resolution (full non-alphanumeric encoding) + unit tests
+
+Fixed `find_transcript` mis-deriving the `~/.claude/projects/` subdir for cwds containing non-slash punctuation. Claude Code encodes a cwd into its project-dir name by replacing **every** non-alphanumeric char with `-` (so `.scratch` → `--scratch`, dots/underscores/spaces too), but the old code only swapped `/`. New `_encode_cwd()` does the full `[^a-zA-Z0-9]→-` substitution; new `_resolve_project_dir()` confirms the encoded name against the real `ls` listing (fast `test -d` path first, then a dash-collapsed fallback match) and returns `None` cleanly when nothing matches. Added 8 hermetic unit tests (`TestEncodeCwd`, `TestResolveProjectDir` with a `_FakeBridge` stub) — suite green (37 passed). Also dropped the per-session `$total_cost_usd` line from the frontend SessionList row (now shows just the model). Logged here to satisfy the every-change rule; committed alongside the bridge fix.
+
+Files: bridge/transcript.py, tests/test_bridge_unit.py, frontend/src/renderer/App.tsx, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
