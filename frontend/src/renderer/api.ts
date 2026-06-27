@@ -163,4 +163,10 @@ export const api = {
     postJSON(`/sessions/${id}/permission`, { approve }),
   iconUrl: (icon: string, color: string) =>
     `${API}/assets/agent-icons/${encodeURIComponent(icon)}.svg?color=${encodeURIComponent(color)}`,
+  // Settings registry reads (read-only; the proven endpoints).
+  settingsMcp: (project?: string) =>
+    getJSON<{ user: any[]; project: any[] }>(`/settings/mcp${project ? `?project=${encodeURIComponent(project)}` : ''}`),
+  settingsPlugins: () => getJSON<{ installed: any[]; marketplaces: any[] }>('/settings/plugins'),
+  settingsConfig: (project?: string) =>
+    getJSON<any>(`/settings/config${project ? `?project=${encodeURIComponent(project)}` : ''}`),
 }

@@ -525,6 +525,14 @@ Files: frontend/src/renderer/{App,AgentPanel,AgentTile,PromptPanel,Splitter,Team
 
 ---
 
+### 2026-06-27 13:08:00 — UI stretch: Settings step-into view (proven registry reads)
+
+The core three-pane UI landed clean and verified, so wired the stretch: a **Settings step-into view** (new `Settings.tsx`) opened from a **title-bar gear**, replacing the 3-pane body and returning on Close (the title bar + footer stay). Four tabs over the **proven read endpoints**, read-only: **Usage** (`/usage` — fleet total tokens + per-agent table joined with identity for tile/role/name, each with model/tokens/ctx%/turns; the plan/limits band is honestly noted absent, API-only); **MCP** (`/settings/mcp`, user/project scope segment — each server's name, enabled pill, transport, command/url, and **masked env keys**); **Plugins** (`/settings/plugins` — installed name@marketplace · version · scope · enabled pill + the marketplaces list); **Config** (`/settings/config`, global/project scope segment — model/effort [tagged **Live**], permission-mode/sandbox/plans-dir [tagged **New session**], permissions.allow/deny/ask, env, hooks, + the CLAUDE.md paths, with a standing global-edit warning that writes are gated/later). Added `settingsMcp`/`settingsPlugins`/`settingsConfig` to the api client. **Reads only** — the enable/disable toggles and the confirm-gated global edit are explicitly a later run (surfaced, not faked). **Setups** tab omitted (no blueprint store exists) and **Delete (permanent wipe)** still deferred (Retire only — no wipe backend). **Live-verified headed** (Playwright over http://localhost): the gear opens Settings; all four tabs render real WSL-side data (25.7K fleet tokens; 13 user MCP servers with masked env; 5 installed plugins + 5 marketplaces; global config model=opus/effort=medium with Live/New-session tags + CLAUDE.md paths); Close returns to the 3-pane.
+
+Files: frontend/src/renderer/Settings.tsx, frontend/src/renderer/api.ts, frontend/src/renderer/App.tsx, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

@@ -20,6 +20,7 @@ import { TeamGraph } from './TeamGraph'
 import { AgentPanel } from './AgentPanel'
 import { TeamFeed } from './TeamFeed'
 import { PromptPanel } from './PromptPanel'
+import { Settings } from './Settings'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
@@ -48,6 +49,7 @@ export function App() {
   const [health, setHealth] = useState<{ ok: boolean; version: string }>({ ok: false, version: '' })
   const [agentTab, setAgentTab] = useState<'details' | 'create'>('details')
   const [creating, setCreating] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [nowMs, setNowMs] = useState(Date.now())
   const mountedAt = useRef(Date.now())
   const sessionsRef = useRef<Session[]>([])
@@ -190,9 +192,14 @@ export function App() {
         {health.ok
           ? <Chip bg={C.successSoft} fg={C.successText}>● Connected</Chip>
           : <Chip bg={C.dangerSoft} fg={C.danger}>● Sidecar offline</Chip>}
+        <button className="nb-btn" title="Settings" onClick={() => setSettingsOpen(o => !o)}
+          style={{ fontSize: 13, lineHeight: 1, padding: '2px 7px', borderRadius: 5, border: `2px solid ${C.border}`, background: settingsOpen ? C.card : C.main, color: C.mainFg, cursor: 'pointer', boxShadow: C.shadowSm }}>⚙</button>
       </div>
 
-      {/* ===== Body: three columns ===== */}
+      {/* ===== Body: Settings step-into replaces the 3-pane when open ===== */}
+      {settingsOpen ? (
+        <Settings sessions={sessions} project={selected?.cwd || null} onClose={() => setSettingsOpen(false)} />
+      ) : (
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* Left — Agent panel */}
         <div style={{ width: leftW, flexShrink: 0, borderRight: 'none', overflow: 'hidden' }}>
@@ -235,6 +242,7 @@ export function App() {
           </div>
         </div>
       </div>
+      )}
 
       {/* ===== Footer ===== */}
       <div style={{ height: 28, minHeight: 28, background: C.surface, borderTop: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 14, flexShrink: 0, fontSize: 10, fontWeight: 700, color: C.t3 }}>
