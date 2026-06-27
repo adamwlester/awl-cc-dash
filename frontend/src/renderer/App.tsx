@@ -85,6 +85,16 @@ function formatCode(text: string): string {
   return escapeHtml(text).replace(/`([^`]+)`/g, `<code style="background:${C.codeBg};color:${C.t1};border:1.5px solid ${C.rule};padding:1px 4px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11px">$1</code>`)
 }
 
+// Message content can be a list of typed blocks (the SDK shape) OR a bare string:
+// the bridge driver replays a user's own prompt straight from the transcript as
+// `content: "<prompt text>"`. Normalize to blocks so EventRenderer can always
+// .map over it — a bare string becomes one text block, never a crash.
+function toBlocks(content: any): any[] {
+  if (Array.isArray(content)) return content
+  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content }] : []
+  return []
+}
+
 // ============================================================================
 // Event Components
 // ============================================================================
@@ -217,7 +227,7 @@ function EventRenderer({ event }: { event: SDKEvent }) {
   if (sdk === 'AssistantMessage') {
     // Sidecar flattens message attrs to the top level (event.content); keep the
     // older data.message.content shape as a fallback.
-    const content = event.content || event.data?.message?.content || []
+    const content = toBlocks(event.content ?? event.data?.message?.content)
     return (
       <>
         {content.map((block: any, i: number) => {
@@ -234,7 +244,7 @@ function EventRenderer({ event }: { event: SDKEvent }) {
   if (sdk === 'UserMessage') {
     // Sidecar flattens message attrs to the top level (event.content); keep the
     // older data.message.content shape as a fallback.
-    const content = event.content || event.data?.message?.content || []
+    const content = toBlocks(event.content ?? event.data?.message?.content)
     return (
       <>
         {content.map((block: any, i: number) => {
