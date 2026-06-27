@@ -44,6 +44,16 @@ class DriverConfig:
     permission_mode: str = "acceptEdits"
     cwd: Optional[str] = None
     system_prompt: Optional[str] = None
+    # Per-agent launch config (applied AT LAUNCH only — a running TUI can't be
+    # re-scoped). allowed/disallowed tools -> --allowedTools/--disallowedTools;
+    # permission_rules {allow,deny,ask} + enabled_plugins {"id": bool} ->
+    # injected via a per-agent --settings file; mcp_servers (a chosen subset, or
+    # None to inherit the global registry) -> a per-agent --mcp-config.
+    allowed_tools: Optional[list[str]] = None
+    disallowed_tools: Optional[list[str]] = None
+    permission_rules: Optional[dict[str, list[str]]] = None
+    enabled_plugins: Optional[dict[str, bool]] = None
+    mcp_servers: Optional[list[str]] = None
 
 
 EventCallback = Callable[[dict[str, Any]], None]

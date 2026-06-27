@@ -69,6 +69,21 @@ WSL_CLAUDE_DIR = f"{WSL_HOME}/.claude"
 WSL_CLAUDE_PROJECTS = f"{WSL_CLAUDE_DIR}/projects"
 WSL_CLAUDE_SESSIONS = f"{WSL_CLAUDE_DIR}/sessions"
 
+# The WSL-side user config the bridge AGENTS actually read (user-scope MCP
+# servers live here, distinct from the Windows file `mcp_sync` copies FROM).
+WSL_USER_CLAUDE_JSON = f"{WSL_HOME}/.claude.json"
+# Global (user-scope) settings the WSL agents read.
+WSL_SETTINGS_JSON = f"{WSL_CLAUDE_DIR}/settings.json"
+# Plugin registry files (user/project/local plugins + marketplaces).
+WSL_PLUGINS_DIR = f"{WSL_CLAUDE_DIR}/plugins"
+WSL_INSTALLED_PLUGINS = f"{WSL_PLUGINS_DIR}/installed_plugins.json"
+WSL_KNOWN_MARKETPLACES = f"{WSL_PLUGINS_DIR}/known_marketplaces.json"
+
+# Where per-agent launch config (settings.json / mcp.json) is materialized, one
+# subdir per tmux session name. WSL-reachable so claude's --settings/--mcp-config
+# launch flags resolve it; kept out of ~/.claude so it never pollutes real config.
+WSL_AWL_DIR = f"{WSL_HOME}/.awl-agents"
+
 # Windows Claude config accessible from WSL
 WIN_CLAUDE_JSON = "/mnt/c/Users/lester/.claude.json"
 

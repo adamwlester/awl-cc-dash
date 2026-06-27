@@ -46,7 +46,12 @@ app.add_middleware(
 class SessionState:
     def __init__(self, session_id: str, agent_type: str | None, model: str | None,
                  permission_mode: str, cwd: str | None, system_prompt: str | None,
-                 driver_name: str | None = None):
+                 driver_name: str | None = None,
+                 allowed_tools: list[str] | None = None,
+                 disallowed_tools: list[str] | None = None,
+                 permission_rules: dict[str, list[str]] | None = None,
+                 enabled_plugins: dict[str, bool] | None = None,
+                 mcp_servers: list[str] | None = None):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
@@ -54,6 +59,12 @@ class SessionState:
         self.cwd = cwd
         self.system_prompt = system_prompt
         self.driver_name = driver_name
+        # Per-agent launch config (applied at create time; surfaced on to_dict).
+        self.allowed_tools = allowed_tools
+        self.disallowed_tools = disallowed_tools
+        self.permission_rules = permission_rules
+        self.enabled_plugins = enabled_plugins
+        self.mcp_servers = mcp_servers
         self.status: Literal["connecting", "idle", "running", "error", "closed"] = "connecting"
         self.created_at = datetime.now().isoformat()
         self.events: list[dict[str, Any]] = []
@@ -77,6 +88,17 @@ class SessionState:
             "total_turns": self.total_turns,
             "event_count": len(self.events),
             "has_pending_permission": self.pending_permission is not None,
+            # The applied per-agent launch config, so a UI can read back what an
+            # agent was scoped with. NOTE: under bypassPermissions the
+            # `allowed_tools` allow-list is ignored by claude (a known bug) —
+            # `disallowed_tools` / permission_rules.deny are the reliable blocks.
+            "launch_config": {
+                "allowed_tools": self.allowed_tools,
+                "disallowed_tools": self.disallowed_tools,
+                "permission_rules": self.permission_rules,
+                "enabled_plugins": self.enabled_plugins,
+                "mcp_servers": self.mcp_servers,
+            },
         }
 
     def push_event(self, event: dict[str, Any]):
@@ -149,6 +171,11 @@ async def start_session(session: SessionState):
         permission_mode=session.permission_mode,
         cwd=session.cwd,
         system_prompt=session.system_prompt,
+        allowed_tools=session.allowed_tools,
+        disallowed_tools=session.disallowed_tools,
+        permission_rules=session.permission_rules,
+        enabled_plugins=session.enabled_plugins,
+        mcp_servers=session.mcp_servers,
     )
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
@@ -236,6 +263,11 @@ async def reconnect_sessions():
             cwd=rec.get("cwd"),
             system_prompt=None,
             driver_name="bridge",
+            allowed_tools=rec.get("allowed_tools"),
+            disallowed_tools=rec.get("disallowed_tools"),
+            permission_rules=rec.get("permission_rules"),
+            enabled_plugins=rec.get("enabled_plugins"),
+            mcp_servers=rec.get("mcp_servers"),
         )
         sessions[sid] = session
         config = DriverConfig(
@@ -244,6 +276,11 @@ async def reconnect_sessions():
             permission_mode=rec.get("permission_mode", "acceptEdits"),
             cwd=rec.get("cwd"),
             system_prompt=None,
+            allowed_tools=rec.get("allowed_tools"),
+            disallowed_tools=rec.get("disallowed_tools"),
+            permission_rules=rec.get("permission_rules"),
+            enabled_plugins=rec.get("enabled_plugins"),
+            mcp_servers=rec.get("mcp_servers"),
         )
         try:
             driver = BridgeDriver(
@@ -276,6 +313,12 @@ class CreateSessionRequest(BaseModel):
     cwd: str | None = None
     system_prompt: str | None = None
     driver: str | None = None  # "sdk" | "bridge"; None -> AWL_DRIVER, else default "bridge"
+    # Per-agent launch config (applied at create time only — see DriverConfig).
+    allowed_tools: list[str] | None = None
+    disallowed_tools: list[str] | None = None
+    permission_rules: dict[str, list[str]] | None = None  # {allow,deny,ask}
+    enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
+    mcp_servers: list[str] | None = None                   # subset; None = global
 
 class SendPromptRequest(BaseModel):
     prompt: str
@@ -326,6 +369,11 @@ async def create_session(req: CreateSessionRequest):
         cwd=req.cwd,
         system_prompt=req.system_prompt,
         driver_name=req.driver,
+        allowed_tools=req.allowed_tools,
+        disallowed_tools=req.disallowed_tools,
+        permission_rules=req.permission_rules,
+        enabled_plugins=req.enabled_plugins,
+        mcp_servers=req.mcp_servers,
     )
     sessions[session_id] = session
     logger.info(f"Created session {session_id}")
@@ -573,6 +621,120 @@ async def get_subagents(session_id: str):
         return result or {"count": 0, "subagents": []}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Settings registry reads (workspace-level; read-only this run)
+# ============================================================================
+#
+# These surface the REAL MCP / plugin / config state the bridge AGENTS see,
+# read from the WSL-side files/CLI via a shared TmuxBridge (the same cat/CLI-
+# over-WSL mechanism mcp_sync uses). Reads only — enable/disable toggles and the
+# gated global-edit writes are a later run. `?project=<path>` (Windows or WSL)
+# scopes the project-level reads; omit it for user/global scope only.
+
+_registry_bridge = None
+
+
+def _get_registry_bridge():
+    """A shared TmuxBridge for read-only WSL registry/config reads."""
+    global _registry_bridge
+    if _registry_bridge is None:
+        import sys as _sys
+        from pathlib import Path as _Path
+        repo_root = str(_Path(__file__).resolve().parents[1])
+        if repo_root not in _sys.path:
+            _sys.path.insert(0, repo_root)
+        from bridge import TmuxBridge  # type: ignore[import-not-found]
+        _registry_bridge = TmuxBridge()
+    return _registry_bridge
+
+
+@app.get("/settings/mcp")
+async def settings_mcp(project: str | None = None):
+    """MCP server registry by scope (user / project), each with enabled state."""
+    from bridge.registry import read_mcp_registry  # type: ignore[import-not-found]
+    try:
+        return await asyncio.to_thread(read_mcp_registry, _get_registry_bridge(), project)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/settings/plugins")
+async def settings_plugins():
+    """Installed plugins (authoritative enabled state) + known marketplaces."""
+    from bridge.registry import read_plugins  # type: ignore[import-not-found]
+    try:
+        return await asyncio.to_thread(read_plugins, _get_registry_bridge())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/settings/config")
+async def settings_config(project: str | None = None):
+    """Config-tab readouts (model/mode/sandbox/hooks/env/CLAUDE.md/plans/perms),
+    global + project scope, each field tagged Live vs New-session."""
+    from bridge.registry import read_config  # type: ignore[import-not-found]
+    try:
+        return await asyncio.to_thread(read_config, _get_registry_bridge(), project)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Usage (token / context aggregate)
+# ============================================================================
+
+@app.get("/usage")
+async def get_usage():
+    """Token/context aggregate for the Usage tab + the footer token pill.
+
+    Per-agent context (tokens/window/percent/work_steps/tool_total) from every
+    driver that supports it, plus fleet totals. The window is model-aware now
+    (200K default, 1M for 1M-context models). Per-agent cost stays out of scope
+    (the bridge emits none). Plan / rate-limit windows are intentionally NOT here
+    — the clean source is the OAuth credentials + live API, not the transcript
+    (see the run's verify-and-report).
+    """
+    agents = []
+    fleet_tokens = 0
+    for sid, session in sessions.items():
+        entry: dict[str, Any] = {
+            "session_id": sid,
+            "model": session.model,
+            "status": session.status,
+            "tokens": None,
+            "window": None,
+            "percent": None,
+            "work_steps": None,
+            "tool_total": None,
+        }
+        if session.driver and session.driver.supports("context"):
+            try:
+                usage = await session.driver.get_context_usage()
+            except Exception:
+                usage = None
+            if usage:
+                entry.update({
+                    "tokens": usage.get("tokens"),
+                    "window": usage.get("window"),
+                    "percent": usage.get("percent"),
+                    "work_steps": usage.get("work_steps"),
+                    "tool_total": usage.get("tool_total"),
+                    "model": usage.get("model") or session.model,
+                })
+                fleet_tokens += usage.get("tokens") or 0
+        agents.append(entry)
+
+    return {
+        "agents": agents,
+        "fleet": {
+            "agent_count": len(agents),
+            "total_tokens": fleet_tokens,
+        },
+        # The status-footer token pill jumps to Usage; this is its value.
+        "token_pill": fleet_tokens,
+    }
 
 
 # ============================================================================

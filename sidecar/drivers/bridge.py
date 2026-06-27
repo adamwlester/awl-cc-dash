@@ -39,10 +39,31 @@ _STATE_TO_STATUS = {
     # the session's pending flag flips), not folded into "running".
 }
 
-# Claude Code's overall context window. Context % is the latest assistant
-# entry's input + cache-read + cache-creation tokens over this window — no
-# `/context` call needed (proven in the bridge diagnostic).
-CONTEXT_WINDOW = 1_000_000
+# Context % is the latest assistant entry's input + cache-read + cache-creation
+# tokens over the model's context window — no `/context` call needed (proven in
+# the bridge diagnostic). The window is MODEL-DEPENDENT: 200K for most models,
+# 1M only for the 1M-context variants (recon's confirmed mapping). The
+# authoritative source is the statusline payload's `context_window_size`
+# (see the Usage research); this transcript-side heuristic keys off the model id.
+DEFAULT_CONTEXT_WINDOW = 200_000
+CONTEXT_WINDOW_1M = 1_000_000
+# Model ids known to carry a 1M-token context window beyond the `1m` name marker.
+_KNOWN_1M_MODELS: frozenset[str] = frozenset()
+
+
+def context_window_for_model(model: str | None) -> int:
+    """Context-window size (tokens) for a model id.
+
+    1M for 1M-context variants (model id contains ``1m`` or is in
+    ``_KNOWN_1M_MODELS``); 200K for everything else. Falls back to the 200K
+    default for an unknown/missing model.
+    """
+    if not model:
+        return DEFAULT_CONTEXT_WINDOW
+    m = model.lower()
+    if "1m" in m or m in _KNOWN_1M_MODELS:
+        return CONTEXT_WINDOW_1M
+    return DEFAULT_CONTEXT_WINDOW
 
 # Tool-name → by-tool category for the Turns breakdown the Agent panel shows
 # (design: Read/search · Edit · Bash · MCP · Subagent · Web). The native tool
@@ -111,14 +132,17 @@ def derive_context_usage(entries: list[dict]) -> dict:
         and ``tool_total``.
     """
     tokens = 0
+    model = None
     for entry in reversed(entries):
         if entry.get("type") == "assistant" and not entry.get("isSidechain"):
-            usage = (entry.get("message") or {}).get("usage") or {}
+            msg = entry.get("message") or {}
+            usage = msg.get("usage") or {}
             tokens = (
                 (usage.get("input_tokens") or 0)
                 + (usage.get("cache_read_input_tokens") or 0)
                 + (usage.get("cache_creation_input_tokens") or 0)
             )
+            model = msg.get("model")
             break
 
     turns = sum(
@@ -148,10 +172,12 @@ def derive_context_usage(entries: list[dict]) -> dict:
                 tools[classify_tool(block.get("name"))] += 1
     tool_total = sum(tools.values())
 
-    percent = round(tokens / CONTEXT_WINDOW * 100, 2) if CONTEXT_WINDOW else 0.0
+    window = context_window_for_model(model)
+    percent = round(tokens / window * 100, 2) if window else 0.0
     return {
         "tokens": tokens,
-        "window": CONTEXT_WINDOW,
+        "window": window,
+        "model": model,
         "percent": percent,
         "turns": turns,
         "work_steps": work_steps,
@@ -405,21 +431,66 @@ class BridgeDriver(AgentDriver):
     def tmux_name(self) -> str:
         return self._name
 
+    def _build_settings(self) -> dict | None:
+        """Per-agent --settings payload: permission rules + plugin enablement.
+
+        ``permission_rules`` {allow,deny,ask} -> ``permissions`` (deny is the
+        reliable hard-block in all modes); ``enabled_plugins`` {"id": bool} ->
+        ``enabledPlugins`` (per-agent plugin enable/disable — live-verified).
+        Returns None when neither is set (no --settings file is written).
+        """
+        settings: dict[str, Any] = {}
+        rules = self.config.permission_rules or {}
+        perms = {k: list(rules[k]) for k in ("allow", "deny", "ask") if rules.get(k)}
+        if perms:
+            settings["permissions"] = perms
+        if self.config.enabled_plugins:
+            settings["enabledPlugins"] = dict(self.config.enabled_plugins)
+        return settings or None
+
+    def _build_mcp_config(self) -> dict | None:
+        """Per-agent --mcp-config payload for a chosen server subset.
+
+        None -> inherit the global MCP registry (no --mcp-config). A list (even
+        empty) -> a strict ``{"mcpServers": {...}}`` of just those servers.
+        """
+        if self.config.mcp_servers is None:
+            return None
+        from bridge.registry import build_agent_mcp_config  # type: ignore[import-not-found]
+        return build_agent_mcp_config(
+            self._bridge, self.config.mcp_servers, project_cwd=self.config.cwd,
+        )
+
+    def _create_session(self) -> None:
+        """Sync: build the per-agent launch config and spawn the tmux session.
+
+        All blocking work (MCP registry read + tmux create) runs here so
+        ``start()`` can offload it to a thread in one hop.
+        """
+        self._bridge.create(
+            self._name,
+            cwd=self.config.cwd,
+            model=self.config.model,
+            permission_mode=self.config.permission_mode,
+            allowed_tools=self.config.allowed_tools,
+            disallowed_tools=self.config.disallowed_tools,
+            settings=self._build_settings(),
+            mcp_config=self._build_mcp_config(),
+        )
+
     async def start(self) -> None:
         if self._resuming:
-            # Rebind to the still-alive tmux session; do not recreate. The mode
-            # was applied at the original launch — resume does not relaunch claude.
+            # Rebind to the still-alive tmux session; do not recreate. All launch
+            # config (mode, tools, permission rules, plugins, MCP) was applied at
+            # the original launch — resume does not relaunch claude.
             await asyncio.to_thread(self._bridge.resume, self._name)
         else:
-            # Apply the session's requested permission mode at launch via the
-            # claude `--permission-mode` flag (the startup-gate clearer in the
-            # bridge handles the bypassPermissions warning gate). An unknown value
-            # is dropped by the bridge and the TUI starts in its default mode.
-            await asyncio.to_thread(
-                self._bridge.create, self._name,
-                cwd=self.config.cwd, model=self.config.model,
-                permission_mode=self.config.permission_mode,
-            )
+            # Apply ALL per-agent launch config (permission mode + tool gates +
+            # permission rules + plugin enablement + MCP scope) via the claude
+            # launch flags — the only point a TUI reads them. The startup-gate
+            # clearer handles the bypassPermissions warning gate; an unknown mode
+            # is dropped and the TUI starts in its default mode.
+            await asyncio.to_thread(self._create_session)
         # Best-effort: wait for the Claude Code TUI to finish loading.
         try:
             await asyncio.to_thread(self._bridge.wait_idle, self._name, 60, 1.0)
@@ -437,6 +508,13 @@ class BridgeDriver(AgentDriver):
                     "model": self.config.model,
                     "permission_mode": self.config.permission_mode,
                     "cwd": self.config.cwd,
+                    # Applied per-agent launch config — kept for readback after a
+                    # sidecar restart (reconnect rebinds, it does not relaunch).
+                    "allowed_tools": self.config.allowed_tools,
+                    "disallowed_tools": self.config.disallowed_tools,
+                    "permission_rules": self.config.permission_rules,
+                    "enabled_plugins": self.config.enabled_plugins,
+                    "mcp_servers": self.config.mcp_servers,
                 })
             except Exception as e:  # pragma: no cover - best effort
                 logger.warning("could not persist runtime record: %s", e)

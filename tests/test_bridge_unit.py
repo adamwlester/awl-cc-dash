@@ -21,7 +21,9 @@ from sidecar.drivers.bridge import (
     derive_context_usage,
     derive_subagents,
     classify_tool,
-    CONTEXT_WINDOW,
+    context_window_for_model,
+    DEFAULT_CONTEXT_WINDOW,
+    CONTEXT_WINDOW_1M,
 )
 from bridge.bridge import VALID_PERMISSION_MODES
 
@@ -205,11 +207,12 @@ class TestDeriveContextUsage:
 
     def test_context_tokens_and_percent_from_latest_assistant(self):
         # Shape from diagnostic A7: 2 + 23080 + 240 = 23,322.
+        # The _assistant helper's model is "claude-x" -> the 200K default window.
         entries = [self._assistant(2, 23080, 240)]
         result = derive_context_usage(entries)
         assert result["tokens"] == 23322
-        assert result["window"] == CONTEXT_WINDOW
-        assert result["percent"] == round(23322 / 1_000_000 * 100, 2)  # 2.33
+        assert result["window"] == DEFAULT_CONTEXT_WINDOW
+        assert result["percent"] == round(23322 / 200_000 * 100, 2)  # 11.66
 
     def test_uses_latest_assistant_not_earlier(self):
         entries = [
@@ -247,7 +250,8 @@ class TestDeriveContextUsage:
         result = derive_context_usage([])
         assert result == {
             "tokens": 0,
-            "window": CONTEXT_WINDOW,
+            "window": DEFAULT_CONTEXT_WINDOW,  # no model -> 200K default
+            "model": None,
             "percent": 0.0,
             "turns": 0,
             "work_steps": 0,
@@ -255,6 +259,21 @@ class TestDeriveContextUsage:
                       ("read", "edit", "bash", "mcp", "subagent", "web", "other")},
             "tool_total": 0,
         }
+
+    def test_window_is_model_aware(self):
+        # 200K for a normal model; 1M only for a 1M-context model id.
+        assert context_window_for_model("claude-sonnet-4-6") == DEFAULT_CONTEXT_WINDOW
+        assert context_window_for_model(None) == DEFAULT_CONTEXT_WINDOW
+        assert context_window_for_model("claude-sonnet-4-6-1m") == CONTEXT_WINDOW_1M
+        # The window in the result follows the latest assistant entry's model.
+        entries = [self._assistant(1, 999_999, 0)]  # model "claude-x" -> 200K
+        assert derive_context_usage(entries)["window"] == DEFAULT_CONTEXT_WINDOW
+        one_m = {"type": "assistant", "message": {
+            "model": "claude-opus-4-1m", "id": "m1",
+            "usage": {"input_tokens": 500_000}}}
+        r = derive_context_usage([one_m])
+        assert r["window"] == CONTEXT_WINDOW_1M
+        assert r["percent"] == 50.0  # 500K / 1M
 
 
 # -----------------------------------------------------------------------------
@@ -754,3 +773,190 @@ class TestResolveProjectDir:
     def test_returns_none_when_no_match(self):
         b = _FakeBridge(test_dir_ok=False, listing="-totally-unrelated\n")
         assert _resolve_project_dir(b, "/mnt/c/x/y") is None
+
+
+# -----------------------------------------------------------------------------
+# Settings registry reads (bridge/registry.py) — hermetic via a canned runner
+# -----------------------------------------------------------------------------
+
+import json as _json
+import shlex as _shlex
+
+from bridge.registry import (
+    read_mcp_registry,
+    read_plugins,
+    read_config,
+    build_agent_mcp_config,
+)
+from bridge.paths import (
+    WSL_USER_CLAUDE_JSON,
+    WSL_SETTINGS_JSON,
+    WSL_KNOWN_MARKETPLACES,
+)
+
+
+class _CannedRunner:
+    """Stand-in for TmuxBridge._run: serves canned file contents + plugin JSON.
+
+    Matches the exact command shapes registry.py emits: ``cat <path> 2>/dev/null
+    || true``, ``test -e <path> && echo 1 || echo 0``, and the ``plugin list
+    --json`` CLI. Unknown files read as empty (missing).
+    """
+
+    def __init__(self, files=None, plugin_list_json="[]"):
+        self.files = files or {}
+        self.plugin_list_json = plugin_list_json
+
+    def _run(self, cmd, **_kw):
+        toks = _shlex.split(cmd)
+        if toks and toks[0] == "cat":
+            return self.files.get(toks[1], "")
+        if toks[:2] == ["test", "-e"]:
+            return "1" if toks[2] in self.files else "0"
+        if "plugin" in cmd and "list" in cmd and "--json" in cmd:
+            return self.plugin_list_json
+        return ""
+
+
+class TestReadMcpRegistry:
+    def test_user_and_project_scopes_with_enable_state(self):
+        runner = _CannedRunner(files={
+            WSL_USER_CLAUDE_JSON: _json.dumps({"mcpServers": {
+                "github": {"command": "npx", "args": ["-y", "gh-mcp"],
+                           "env": {"TOKEN": "secret"}},
+                "exa": {"type": "http", "url": "https://exa/mcp"},
+            }}),
+            "/mnt/c/proj/.mcp.json": _json.dumps({"mcpServers": {
+                "local-a": {"command": "node"},
+                "local-b": {"command": "node"},
+            }}),
+            "/mnt/c/proj/.claude/settings.json": _json.dumps({
+                "disabledMcpjsonServers": ["local-b"],
+                "enableAllProjectMcpServers": True,
+            }),
+        })
+        reg = read_mcp_registry(runner, project_cwd="/mnt/c/proj")
+        user = {s["name"]: s for s in reg["user"]}
+        assert set(user) == {"github", "exa"}
+        assert user["github"]["enabled"] is True and user["github"]["scope"] == "user"
+        # Secret VALUES never surface — only the env key names.
+        assert user["github"]["env_keys"] == ["TOKEN"]
+        assert user["exa"]["transport"] == "http"
+        proj = {s["name"]: s for s in reg["project"]}
+        assert proj["local-a"]["enabled"] is True   # enableAll
+        assert proj["local-b"]["enabled"] is False  # explicit disable wins
+
+    def test_no_project_cwd_means_user_only(self):
+        runner = _CannedRunner(files={
+            WSL_USER_CLAUDE_JSON: _json.dumps({"mcpServers": {"exa": {}}}),
+        })
+        reg = read_mcp_registry(runner)
+        assert [s["name"] for s in reg["user"]] == ["exa"]
+        assert reg["project"] == []
+
+
+class TestBuildAgentMcpConfig:
+    def test_selects_subset_and_skips_unknown(self):
+        runner = _CannedRunner(files={
+            WSL_USER_CLAUDE_JSON: _json.dumps({"mcpServers": {
+                "github": {"command": "a"}, "exa": {"command": "b"},
+                "slack": {"command": "c"},
+            }}),
+        })
+        cfg = build_agent_mcp_config(runner, ["exa", "nope"])
+        assert cfg == {"mcpServers": {"exa": {"command": "b"}}}
+
+    def test_empty_selection_is_strict_none(self):
+        runner = _CannedRunner(files={
+            WSL_USER_CLAUDE_JSON: _json.dumps({"mcpServers": {"exa": {}}}),
+        })
+        assert build_agent_mcp_config(runner, []) == {"mcpServers": {}}
+
+
+class TestReadPlugins:
+    def test_installed_from_cli_json_plus_marketplaces(self):
+        runner = _CannedRunner(
+            plugin_list_json=_json.dumps([
+                {"id": "superpowers@superpowers-marketplace", "version": "5.0.7",
+                 "scope": "project", "enabled": False,
+                 "installPath": "/x", "installedAt": "2026"},
+            ]),
+            files={WSL_KNOWN_MARKETPLACES: _json.dumps({
+                "superpowers-marketplace": {
+                    "source": {"source": "github", "repo": "obra/superpowers-marketplace"},
+                    "installLocation": "/m"},
+            })},
+        )
+        out = read_plugins(runner)
+        p = out["installed"][0]
+        assert p["name"] == "superpowers" and p["marketplace"] == "superpowers-marketplace"
+        assert p["enabled"] is False and p["version"] == "5.0.7"
+        assert out["marketplaces"][0]["repo"] == "obra/superpowers-marketplace"
+
+    def test_handles_empty_cli(self):
+        out = read_plugins(_CannedRunner(plugin_list_json=""))
+        assert out["installed"] == [] and out["marketplaces"] == []
+
+
+class TestReadConfig:
+    def test_global_and_project_fields_and_tenor(self):
+        runner = _CannedRunner(files={
+            WSL_SETTINGS_JSON: _json.dumps({
+                "model": "opus", "effortLevel": "medium", "tui": "fullscreen",
+                "theme": "dark-ansi",
+            }),
+            "/mnt/c/proj/.claude/settings.json": _json.dumps({
+                "permissions": {"allow": ["Read(/**)"], "deny": ["Bash(rm *)"],
+                                "defaultMode": "acceptEdits"},
+                "enableAllProjectMcpServers": True,
+                "plansDirectory": "./.claude/plans",
+            }),
+            "/mnt/c/proj/CLAUDE.md": "x",
+        })
+        cfg = read_config(runner, project_cwd="/mnt/c/proj")
+        assert cfg["global"]["model"] == "opus"
+        assert cfg["global"]["effort"] == "medium"
+        assert cfg["project"]["permissions"]["deny"] == ["Bash(rm *)"]
+        assert cfg["project"]["permissionMode"] == "acceptEdits"
+        assert cfg["project"]["plansDirectory"] == "./.claude/plans"
+        assert cfg["tenor"]["model"] == "Live"
+        assert cfg["tenor"]["permissionMode"] == "New session"
+        # CLAUDE.md existence is reported (project file present in canned FS).
+        proj_md = [m for m in cfg["claudeMd"] if m["scope"] == "project"][0]
+        assert proj_md["exists"] is True
+
+    def test_project_none_when_no_cwd(self):
+        runner = _CannedRunner(files={WSL_SETTINGS_JSON: _json.dumps({"model": "opus"})})
+        cfg = read_config(runner)
+        assert cfg["project"] is None
+        assert cfg["global"]["model"] == "opus"
+
+
+# -----------------------------------------------------------------------------
+# Per-agent --settings building (BridgeDriver._build_settings / _build_mcp_config)
+# -----------------------------------------------------------------------------
+
+from sidecar.drivers.bridge import BridgeDriver
+from sidecar.drivers.base import DriverConfig
+
+
+def _driver(**cfg):
+    return BridgeDriver(DriverConfig(**cfg), lambda e: None)
+
+
+class TestBuildLaunchConfig:
+    def test_permission_rules_and_plugins_compose_into_settings(self):
+        d = _driver(
+            permission_rules={"deny": ["Bash"], "ask": ["Read(/etc/**)"], "allow": []},
+            enabled_plugins={"superpowers@superpowers-marketplace": True},
+        )
+        s = d._build_settings()
+        assert s["permissions"] == {"deny": ["Bash"], "ask": ["Read(/etc/**)"]}
+        assert s["enabledPlugins"] == {"superpowers@superpowers-marketplace": True}
+
+    def test_no_per_agent_settings_returns_none(self):
+        assert _driver()._build_settings() is None
+
+    def test_mcp_none_inherits_global(self):
+        # mcp_servers unset -> None -> no --mcp-config (inherit the global registry).
+        assert _driver()._build_mcp_config() is None

@@ -8,11 +8,12 @@ running from Windows, or directly when running inside WSL.
 
 import json
 import logging
+import shlex
 import subprocess
 import shutil
 import time
 import re
-from .paths import is_windows, win_to_wsl, WSL_CLAUDE_DIR, CLAUDE_BIN
+from .paths import is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN
 
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
@@ -205,6 +206,32 @@ class TmuxBridge:
             return win_to_wsl(path)
         return path
 
+    def _write_agent_config(self, name, filename, data):
+        """Materialize a per-agent launch-config file to a WSL-reachable path.
+
+        Used for the ``--settings`` / ``--mcp-config`` files built at create
+        time. The JSON is piped via stdin (``cat > file``) rather than embedded
+        in the command, so a large payload (many MCP servers / permission rules)
+        cannot blow past Windows' ~32 KB command-line limit — the same pattern
+        ``mcp_sync`` uses.
+
+        Args:
+            name: Session name (one config subdir per session).
+            filename: e.g. ``settings.json`` or ``mcp.json``.
+            data: A JSON-serializable dict.
+
+        Returns:
+            The WSL path the file was written to (suitable for a launch flag).
+        """
+        agent_dir = f"{WSL_AWL_DIR}/{name}"
+        path = f"{agent_dir}/{filename}"
+        self._run(f"mkdir -p {shlex.quote(agent_dir)}")
+        self._run(
+            f"cat > {shlex.quote(path)}",
+            stdin_data=json.dumps(data, indent=2),
+        )
+        return path
+
     def _open_wt_tab(self, name):
         """Open a Windows Terminal tab attached to a tmux session.
 
@@ -241,20 +268,43 @@ class TmuxBridge:
     # --- Core Operations ---
 
     def create(self, name, cwd=None, model=None, claude_args="", show=False,
-               permission_mode=None):
+               permission_mode=None, allowed_tools=None, disallowed_tools=None,
+               settings=None, mcp_config=None):
         """Spawn a named tmux session running the Claude Code TUI.
+
+        Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
+        (the only point a claude process reads them) via native flags, exactly
+        like ``permission_mode`` — the bridge cannot change any of them on a
+        running TUI.
 
         Args:
             name: Session name (used as tmux session name).
             cwd: Working directory. Accepts Windows or WSL paths.
             model: Model to use (e.g. "sonnet", "opus"). Overrides default.
-            claude_args: Additional CLI arguments for claude.
+            claude_args: Additional CLI arguments for claude (raw passthrough).
             permission_mode: Initial permission mode for the session, passed as
                 claude's ``--permission-mode`` flag (one of
                 ``VALID_PERMISSION_MODES``). An unrecognized/empty value is
                 ignored so the TUI launches in its default mode. The
                 ``bypassPermissions`` warning gate that this triggers is cleared
                 by ``_clear_startup_gates`` like any other startup gate.
+            allowed_tools: Optional list of tool specs to allow, passed as
+                ``--allowedTools`` (comma-joined). NOTE: live-verified that the
+                allow-list is IGNORED under ``bypassPermissions`` (a known claude
+                bug) — use ``disallowed_tools`` for a hard block in every mode.
+            disallowed_tools: Optional list of tool specs to deny, passed as
+                ``--disallowedTools`` (comma-joined). This is the RELIABLE
+                hard-block: the named tools are removed from the agent's toolset
+                in all modes, bypass included (live-verified on 2.1.195).
+            settings: Optional settings dict (e.g. ``{"permissions": {...},
+                "enabledPlugins": {...}}``) materialized to a per-agent WSL file
+                and passed as ``--settings``. ``permissions.deny`` hard-blocks;
+                ``enabledPlugins`` enables/disables installed plugins per-agent.
+            mcp_config: Optional MCP config dict (``{"mcpServers": {...}}``)
+                materialized to a per-agent WSL file and passed as
+                ``--mcp-config`` together with ``--strict-mcp-config`` (the agent
+                sees ONLY these servers). Pass ``{"mcpServers": {}}`` for none;
+                pass ``None`` (the default) to inherit the global MCP registry.
             show: When True, open a visible Windows Terminal tab attached to the
                 new session. Defaults to False: the tmux session runs detached and
                 is fully drivable via capture-pane/send-keys without a window, so
@@ -276,28 +326,44 @@ class TmuxBridge:
             )
 
         resolved_cwd = self._resolve_cwd(cwd)
-        cwd_flag = f" -c '{resolved_cwd}'" if resolved_cwd else ""
 
-        # Build the claude launch command
-        parts = [CLAUDE_BIN]
+        # Build the claude launch argv. Each token is shell-quoted, then the whole
+        # command is quoted once more for the tmux `new-session '<cmd>'` slot, so
+        # tool specs / file paths containing spaces, parens, or globs survive the
+        # bash -> tmux -> sh layering intact.
+        argv = [CLAUDE_BIN]
         use_model = model or self._default_model
         if use_model:
-            parts.extend(["--model", use_model])
+            argv += ["--model", use_model]
         if permission_mode in VALID_PERMISSION_MODES:
-            parts.extend(["--permission-mode", permission_mode])
+            argv += ["--permission-mode", permission_mode]
         elif permission_mode:
             log.warning(
                 "Ignoring unknown permission_mode %r for session '%s' "
                 "(launching in default mode).", permission_mode, name,
             )
-        if claude_args:
-            parts.append(claude_args)
+        if allowed_tools:
+            argv += ["--allowedTools", ",".join(allowed_tools)]
+        if disallowed_tools:
+            argv += ["--disallowedTools", ",".join(disallowed_tools)]
+        # Per-agent settings + MCP selection are written to WSL files and passed
+        # by path (dodges the ~32KB Windows command-line limit; same stdin/cat>
+        # pattern as mcp_sync). Files are written BEFORE the session launches.
+        if settings:
+            settings_path = self._write_agent_config(name, "settings.json", settings)
+            argv += ["--settings", settings_path]
+        if mcp_config is not None:
+            mcp_path = self._write_agent_config(name, "mcp.json", mcp_config)
+            argv += ["--mcp-config", mcp_path, "--strict-mcp-config"]
 
-        claude_cmd = " ".join(parts)
+        claude_cmd = " ".join(shlex.quote(a) for a in argv)
+        if claude_args:
+            claude_cmd += " " + claude_args  # raw passthrough (legacy)
 
         # Create detached tmux session
+        cwd_part = f" -c {shlex.quote(resolved_cwd)}" if resolved_cwd else ""
         self._run(
-            f"tmux new-session -d -s '{name}'{cwd_flag} '{claude_cmd}'",
+            f"tmux new-session -d -s {shlex.quote(name)}{cwd_part} {shlex.quote(claude_cmd)}",
             timeout=15,
         )
 
@@ -483,6 +549,12 @@ class TmuxBridge:
         """
         self._require_session(name)
         self._tmux(f"kill-session -t '{name}'")
+        # Best-effort: remove any per-agent launch config materialized for this
+        # session (no-op when none was written).
+        try:
+            self._run(f"rm -rf {shlex.quote(f'{WSL_AWL_DIR}/{name}')}")
+        except TmuxBridgeError:
+            pass
         return {"status": "closed", "name": name}
 
     def shutdown(self):
