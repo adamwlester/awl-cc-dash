@@ -16,6 +16,7 @@ if str(_SIDECAR) not in sys.path:
     sys.path.insert(0, str(_SIDECAR))
 
 from main import SessionState  # noqa: E402
+from drivers import default_driver_name  # noqa: E402
 
 
 def _session():
@@ -59,3 +60,46 @@ def test_status_enum_untouched_by_permission_events():
     assert s.status == "running"
     s.handle_event({"type": "permission_resolved"})
     assert s.status == "running"
+
+
+# ---------------------------------------------------------------------------
+# Default driver selection
+#
+# Policy: `bridge` is the primary path the dashboard is built around, so an
+# unnamed session must run on `bridge`. `sdk` is a reserved, explicit-only
+# backup engine. These guard the default (and that explicit `sdk` still works).
+# ---------------------------------------------------------------------------
+
+def test_default_driver_is_bridge_when_unset(monkeypatch):
+    # Nothing named (no AWL_DRIVER, no per-session driver) -> the primary path.
+    monkeypatch.delenv("AWL_DRIVER", raising=False)
+    assert default_driver_name() == "bridge"
+
+
+def test_awl_driver_env_still_selects_sdk(monkeypatch):
+    # sdk stays reachable as an explicit choice (case/whitespace tolerant).
+    monkeypatch.setenv("AWL_DRIVER", " SDK ")
+    assert default_driver_name() == "sdk"
+
+
+def test_unnamed_session_reports_bridge(monkeypatch):
+    # The API surface (to_dict, used by /health and session listing) reports the
+    # default for a not-yet-connected session that named no driver.
+    monkeypatch.delenv("AWL_DRIVER", raising=False)
+    s = SessionState(
+        session_id="s2", agent_type=None, model=None,
+        permission_mode="default", cwd=None, system_prompt=None,
+        driver_name=None,
+    )
+    assert s.to_dict()["driver"] == "bridge"
+
+
+def test_explicit_sdk_session_preserved(monkeypatch):
+    # Per-session sdk selection is preserved regardless of the default/env.
+    monkeypatch.delenv("AWL_DRIVER", raising=False)
+    s = SessionState(
+        session_id="s3", agent_type=None, model=None,
+        permission_mode="default", cwd=None, system_prompt=None,
+        driver_name="sdk",
+    )
+    assert s.to_dict()["driver"] == "sdk"

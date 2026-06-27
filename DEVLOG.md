@@ -312,6 +312,54 @@ Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
 
 ---
 
+### 2026-06-26 15:48:04 — Queued follow-up review+change batch (R1–R4 + 9 requests) into TODO.md "Next up"
+
+Added a follow-up implementation batch to `design/TODO.md` **Next up** (the human had already cleared the completed A–L block, so the section was empty). The batch captures the post-build audit of the A–L / 9a work plus new requests gathered this session. **PART 1 — review fixes R1–R4:** remove orphaned `.card-sel` CSS (dead since History dropped the checkbox); note item F's re-added navy rail-row dividers on the DESIGN.md doc-editor line; optional Attachments-heading (#16) note; and actually run the headed parity pass next round (it was reasoned away last time). **PART 2 — 9 change requests:** subagent badges → status-colour fill + bold inverse text, no dot (supersedes A2), no-wrap expandable overflow, and click-isolation from the parent card; Messages content filling the card surface (finishes C — drop the residual Messages-only `.fcard-body` padding); History header divider to match Scratch/Log; link-icon dropdown gated-when-empty + a chevron; Output Export trimmed to the 3 "selected" actions + gated; "Export selected → file" routed to Library → Documents + the Add-document (Paste) workflow; and that paste workflow creating an editable-named row with inline rename active. Spec/queue only — nothing implemented yet.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 16:30:00 — UI-behavior v5: inserted per-question TL;DR lines (pure-insertion pass)
+
+Added a one-line `_**TL;DR — … Presumed: …**_` summary to the end of each of the 33 questions in `dev/notes/agent-qa/ui-behavior-questions-2026-06-26-v5.md`, immediately after each question's `Assumed:` paragraph (after Q30's Stop sub-note; before the `---` divider for the eight section-final questions). Pure insertion — no existing heading, option, Assumed line, divider, or blank line was altered. Verified 33 TL;DR lines present and each placed before its next-question heading / section divider.
+
+Files: dev/notes/agent-qa/ui-behavior-questions-2026-06-26-v5.md, DEVLOG.md
+
+---
+
+### 2026-06-26 16:31:00 — Follow-up batch (R1 + items 1–9) shipped in mockup.html (+ DESIGN.md sync; headed-verified + adversarial review)
+
+Implemented the full FOLLOW-UP BATCH from `design/TODO.md` "Next up" in `design/mockup.html`. **R1:** removed the dead `.card-sel` CSS. **Subagent badges (1–3):** `.sbadge` dropped the leading `.sdot` and is now FILLED with its run-state status colour + bold white id (new `.sb-active`/`.sb-pending`/`.sb-idle` reusing the `.nb-*` tokens; `+N` stays neutral); `.sbadges` is `flex-wrap:nowrap` and the `+N` opens a `.subs-pop` popover (`toggleSubsPop`, added to `closeAllPopups`) rather than growing the square card; every badge + the `+N` trigger `stopPropagation` so a badge click no longer selects the parent `.node`. **Feed/Messages (4–5):** `.msgcard .fcard-body{padding:0}` so the Messages rail fills all four edges (Scratch/Log/Inbox keep their inset); scoped the selection-seam recolor to `.msgcard.sel` so History/Scratch/Log/Inbox keep their navy header divider when selected (fixes the missing History divider; Messages still reads as one teal band). **Dropdowns (6–7):** chevron added to all three `ea-dd` link triggers (feed/hist/`embedAttachHTML`) + a `.exp-btn:disabled` style; both Output Export menus trimmed to the 3 selection actions (whole-feed/history dropped); new `expGate()` disables `#feed-exp`/`#hist-exp` until a whole card is selected, wired through `eaUpdate`/`switchTab`/boot. **Export→Documents (8–9):** `feedExport`/`histExport` `file-sel` now route to a new `addDocPaste()` that builds a real Documents nav-row + editor pane (wired like `renderDocs`) with the selection content and opens inline rename immediately; the Add-menu Paste action uses the same; `cardText` now returns a Messages card's full content (not just "Turn N"). **DESIGN.md synced** (R2 navy rail-row dividers, R3 Compose "Attachments" heading, + subagent/Messages/History/dropdown/Paste intent). **Verification:** drove the rendered UI in a **headed** browser at wide (1680) + narrow (1120) — 0 JS errors; every item exercised (status-fill badges, `+N` popover unclipped + click-isolated, Messages edge-fill, History navy divider, gated+chevroned link-dd, 3-item gated Export, Export→Documents→Paste→rename chain). A 5-agent adversarial review workflow then caught one real bug — `statusJump('pending')` selected an Inbox card without re-gating the feed Export/link-dd → fixed with a trailing `eaUpdate('feed')` — plus cleanups (removed dead `selectHistCard`/`selectMsgCard`, simplified now-dead `allCards`/`wantSel` branches, refreshed two stale comments, and made a doc rename also update the pane header path); all re-verified. Next-up items left in place in `TODO.md` for the human to remove after review.
+
+Files: design/mockup.html, design/DESIGN.md, DEVLOG.md
+
+---
+
+### 2026-06-26 17:15:00 — Queued the round-10 cumulative change batch (11 items) into TODO.md "Next up"
+
+Filed the next reviewed change batch into `design/TODO.md` **Next up** (section was empty — prior follow-up batch already cleared by the human). Eleven items, settled with the human over this session: (1) **Error as a 4th run state** — new `.nb-error` solid-danger/inverse badge, one demo error agent, Error-badge → Inbox via a `statusJump('error')` branch, plus restyling the existing Message-card `.db-error` badge from soft-red/red-text to solid-fill/inverse to match the other status badges, with DESIGN.md docs; (2) **dividers stay navy on hover/select** — stop recolouring the header/body, adjacent-row, and editor-gutter divider lines to the fill (fills still show behind them); (3) **subagent footer → accordion drawer** (chevron toggle, first row always visible, vertically centred) replacing the +N popover; (4) **editor gutter extends to the bottom** (empty track only, no fabricated numbers); (5) **reviewer-chip dropdown fix** (whitelist `.rev-chip` in the global click-closer); (6–10) **share/export consolidation** — merge the Embed/Attach link dropdown into one Output Export menu (Cut removed, headings "Export" / "Add to prompt"), Embed enabled whenever anything is selected, Attach-as-file creates a real Library→Documents file + prompt link + reveal, remove the standalone link dropdown from Feed/History, and repoint Plans/Documents at the merged dropdown (left-aligned, before the reviewer chip); (11) **Delete agent button** to the right of Retire — new solid-red-fill/inverse style, irreversible wipe of config + transcripts (+ roster/graph/links), behind a confirm step. Spec/queue only — nothing implemented yet.
+
+Files: design/TODO.md, DEVLOG.md
+
+---
+
+### 2026-06-26 19:09:07 — Sidecar default driver flipped sdk → bridge
+
+Flipped the no-driver-named default in `default_driver_name()` from `sdk` to `bridge`, per policy that bridge is the primary path and sdk is a reserved explicit-only engine. This is a real behavior change for the shipped app: `start-dashboard.bat` sets no `AWL_DRIVER` and the frontend sends no `driver` field, so unnamed sessions (and `/health`/session listing's reported driver) now resolve to `bridge` instead of `sdk`. `sdk` stays selectable via `AWL_DRIVER=sdk` or the per-session `driver` field; the *unknown*-driver error path still falls back to `sdk` (out of scope). Updated the now-stale "sdk is the no-driver-named fallback" docstrings in `drivers/__init__.py`, `drivers/sdk.py`, and `main.py`, and added 4 hermetic default-selection tests. Ran `pytest tests/ -m "not integration and not slow"` → **36 passed, 33 deselected** (live tmux/WSL2 suites). Flag: project `CLAUDE.md` still calls sdk the "no-driver-named fallback" — now lags the code; left unedited pending the human's call.
+
+Files: sidecar/drivers/__init__.py, sidecar/drivers/sdk.py, sidecar/main.py, tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
+### 2026-06-26 19:14:43 — Doc sync: bridge-as-default reflected across CLAUDE.md, DESIGN.md, agent-qa note
+
+Followed the driver-default flip by updating the prose docs that still called `sdk` the no-driver-named fallback (the prior entry had flagged CLAUDE.md). The CLAUDE.md `sidecar/` row and `design/DESIGN.md` "What it physically is" now state that `bridge` is the default when no driver is named and `sdk` is an explicit-only backup reserved for specific non-interactive tasks; the current `dev/notes/agent-qa/ui-behavior-questions-2026-06-26-v5.md` QA note's selection-order claims (lines 8, 31) were corrected from `→ "sdk"` to `→ "bridge"`. Surgical edits only — the sdk = backup/limited-use framing is preserved. `archive/*` and prior DEVLOG entries left verbatim (historical / append-only).
+
+Files: CLAUDE.md, design/DESIGN.md, dev/notes/agent-qa/ui-behavior-questions-2026-06-26-v5.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

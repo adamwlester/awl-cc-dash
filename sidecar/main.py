@@ -5,10 +5,11 @@ Multi-turn agent sessions behind a pluggable driver seam.
 
 Each session is backed by an `AgentDriver` (see `drivers/`): the `bridge` driver
 runs a real Claude Code TUI session in tmux/WSL2 — the primary path the dashboard
-is built around — while the `sdk` driver runs an in-process Claude Agent SDK
-subprocess as the no-driver-named fallback / backup engine. Select with the
-`AWL_DRIVER` env var (`sdk` | `bridge`) or per-session via the create request's
-`driver` field.
+is built around, and the default when no driver is named — while the `sdk` driver
+runs an in-process Claude Agent SDK subprocess as a backup / limited-use engine
+reserved for specific non-interactive tasks. Select with the `AWL_DRIVER` env var
+(`sdk` | `bridge`) or per-session via the create request's `driver` field; with
+neither, sessions run on `bridge`.
 The sidecar itself is driver-agnostic.
 """
 
@@ -274,7 +275,7 @@ class CreateSessionRequest(BaseModel):
     permission_mode: str = "acceptEdits"
     cwd: str | None = None
     system_prompt: str | None = None
-    driver: str | None = None  # "sdk" | "bridge"; None -> AWL_DRIVER / default
+    driver: str | None = None  # "sdk" | "bridge"; None -> AWL_DRIVER, else default "bridge"
 
 class SendPromptRequest(BaseModel):
     prompt: str

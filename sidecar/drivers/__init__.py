@@ -1,15 +1,19 @@
 """Session drivers for the AWL sidecar.
 
 The dashboard is built around the `bridge` driver (a real Claude Code TUI in
-tmux/WSL2) — that is the primary, intended path. The `sdk` driver (in-process
-Claude Agent SDK) is a backup / limited-use engine, and is also what
-`create_driver()` lands on when no driver is named (see below): it's the
-code-level fallback, not the strategic default.
+tmux/WSL2) — that is the primary, intended path and the default when no driver
+is named (see below). The `sdk` driver (in-process Claude Agent SDK) is a
+backup / limited-use engine reserved for specific non-interactive tasks; it is
+never the implicit default — select it explicitly.
 
 `create_driver()` picks the implementation. Selection order:
   1. explicit `driver_name` argument (e.g. from the create-session request),
   2. the `AWL_DRIVER` environment variable,
-  3. fallback `"sdk"` (the in-process Claude Agent SDK path) when neither is set.
+  3. default `"bridge"` when neither is set.
+
+(An explicitly-named *unknown* driver still falls back to `sdk` rather than
+crashing the session — see `create_driver`. This is the error path, not the
+"nothing named" path, which now lands on `bridge`.)
 
 Driver modules are imported lazily so selecting `sdk` never imports the bridge
 (and vice-versa) — each has different runtime requirements.
@@ -25,11 +29,12 @@ __all__ = ["AgentDriver", "DriverConfig", "EventCallback", "create_driver", "def
 
 
 def default_driver_name() -> str:
-    # `"sdk"` here is the no-driver-named *fallback*, not the strategic default:
-    # the product is built around the `bridge` driver (set AWL_DRIVER=bridge to
-    # use it). It stays `sdk` so the working-MVP UI keeps running even without a
-    # WSL2/tmux environment.
-    return (os.environ.get("AWL_DRIVER") or "sdk").strip().lower()
+    # `"bridge"` is the default when no driver is named: the product is built
+    # around the `bridge` driver (a real Claude Code TUI in tmux/WSL2), so an
+    # unnamed session runs on it. `sdk` is the in-process backup / limited-use
+    # engine reserved for specific non-interactive tasks — select it explicitly
+    # with `AWL_DRIVER=sdk` or the per-session `driver` field.
+    return (os.environ.get("AWL_DRIVER") or "bridge").strip().lower()
 
 
 def create_driver(
