@@ -37,9 +37,16 @@ Each capability is one row:
 ### ✅ Proven / built today — the bridge foundation an MVP rides on
 
 - **Controls (live-verified):** `model` (`/model`), `effort` (`/effort`), `interrupt`/Stop (Ctrl+C), **permission round-trip** (approve=Enter / deny=Escape — **binary**, no always-allow), **resume/reconnect** (survives a sidecar restart via `runtime_store`), and — **new this round** — **permission mode AT LAUNCH** (`claude --permission-mode`, bypass gate auto-cleared).
-- **Data (live, from the transcript via `GET /context`):** **total context %** (cumulative `input+cache_read+cache_creation` ÷ a hardcoded 1,000,000 window, from the latest main-line assistant entry), **work-step count**, and the **by-tool Turns breakdown** (read/edit/bash/mcp/subagent/web/other + total).
-- **Endpoints new this round:** **`GET /sessions/{id}/subagents`** (subagent presence/count/type/running-vs-done/usage, paired from the parent transcript; live-verified), and **honest `set_mode`** (HTTP 400 on bridge instead of a false "ok").
+- **Data (live, from the transcript via `GET /context`):** **total context %** (cumulative `input+cache_read+cache_creation` ÷ a **model-aware window** — 200K default, 1M only for 1M-context models — from the latest main-line assistant entry), **work-step count**, and the **by-tool Turns breakdown** (read/edit/bash/mcp/subagent/web/other + total).
+- **Endpoints new earlier:** **`GET /sessions/{id}/subagents`** (subagent presence/count/type/running-vs-done/usage, paired from the parent transcript; live-verified), and **honest `set_mode`** (HTTP 400 on bridge instead of a false "ok").
 - **The working flow:** `create → send → render (assistant/user content blocks) → idle → delete` round-trips cleanly on the bridge default.
+
+### ✅ Built this round (2026-06-27 — additive backend, all bridge-first & live-verified)
+
+- **Per-agent launch config (applied AT LAUNCH via native flags — a running TUI can't be re-scoped).** Extended `DriverConfig`/`CreateSessionRequest`/`TmuxBridge.create()`/`SessionState.to_dict` with: **allowed/disallowed tools** (`--allowedTools`/`--disallowedTools`), a **permission-rules object** {allow,deny,ask} and **per-agent plugin enablement** {`"id@mkt"`: bool} (both injected via a per-agent `--settings` file written to a WSL path), and **per-agent MCP scope** (a chosen server subset → a per-agent `--mcp-config` + `--strict-mcp-config`). The applied config is surfaced on `to_dict.launch_config`. **Live-proven through the dashboard:** an agent came up with `Bash=no` (disallowedTools), `Glob=no` (settings.deny), `Read/Edit=yes`; scoped to **only `exa`** via `/mcp`; and with **superpowers skills present** via enabledPlugins. **Load-bearing caveat (live-confirmed):** `--allowedTools` is IGNORED under `bypassPermissions` (a claude bug) — `--disallowedTools` / `permissions.deny` are the reliable hard-blocks.
+- **Settings registry READ endpoints** (`GET /settings/mcp`, `/settings/plugins`, `/settings/config`; `?project=<path>` scopes the project reads). Real WSL-side data via a new `bridge/registry.py`: MCP servers user+project with enabled state (env **values masked** to `env_keys`); installed plugins (authoritative `enabled` from `claude plugin list --json`) + marketplaces; Config global+project (model/effort/mode/sandbox/env/hooks/perms/plansDirectory/CLAUDE.md), each field tagged **Live vs New-session**. Reads only — toggles/writes are a later run.
+- **Usage aggregate** (`GET /usage`): per-agent tokens/window/percent/work_steps + **fleet totals** + the footer **token pill** value. Reuses `derive_context_usage` (now **model-aware**: 200K default, 1M for 1M-context models).
+- **The working flow still passes** post-change (vanilla `create→send→render→idle→delete` round-trip re-verified).
 
 ### ⛔ Hard ceilings on bridge (do not promise these)
 
@@ -60,7 +67,7 @@ Each capability is one row:
 6. **Inbox raise-paths beyond Permission** — Error/Stall detection (screen pattern-match + watchdog), Warning (limit watchdog), Decision (`AskUserQuestion` interception), Plan (plan-file/plan-mode detection).
 7. **Lifecycle caps** (`max_turns` / context-%) — no field, no enforcement today.
 8. **Persistent stores** with nothing backing them: History prompt-log, "last command" (Retry), Plans review side-store, templates, assets/media, Setups blueprints, the agent **identity registry**.
-9. **Settings** — file-registry **reads** (MCP/Plugins/Config are derivable from `~/.claude.json`, `installed_plugins.json`, `~/.claude` + `.claude` settings) + **gated writes** + the Usage token rollup.
+9. **Settings** — file-registry **reads** ✅ BUILT this round (MCP/Plugins/Config from `~/.claude.json`, `claude plugin list --json`, `~/.claude` + `.claude` settings via `bridge/registry.py`); the Usage token rollup ✅ BUILT (`/usage`). Still net-new: **gated writes** (enable/disable toggles, the confirm-gated global edit) and the Usage **plan/limits** band (see Part-4 report: OAuth-credential tier is local, but live rate-limit windows are API-only). Plus **per-agent scope** (which tools/plugins/MCP an agent may use) ✅ BUILT at launch — a different axis from the global registry, exactly as DESIGN separates them.
 10. **Per-category context breakdown** — proven-available **only** by sending `/context` to the TUI and parsing the table it writes (queue it until the agent is idle — never interrupt a run); plus **Compact** (`/compact` round-trip) and per-turn attribution.
 11. **Utility-LLM passes** (Revise / Summarize) — a cheap fixed model, the explicit candidate for the **sdk** in-process path.
 
@@ -192,7 +199,7 @@ Phases are a **dependency-ordered build sequence**, not strict priority buckets 
 | Band1 — No./Name/Description edit | identity fields (synthesized · `proven`) | edit/save (`not-started`) | not-started | no edit endpoint | P1 |
 | Band1 — Model readback + edit (mid-run) | model (transcript · `proven`) | `/model` set (`proven`) | partial | `set_model`; `/model`; readback clean (07:33) | P0 |
 | Band1 — Skills multi-select | skills files (filesystem · `derivable-not-built`) | edit/save (`not-started`) | not-started | no skills enumeration | P2 |
-| Band1 — Tools multi-select | native CC tool set (none · `derivable-not-built`) | edit/save (`not-started`) | not-started | no per-agent tool scoping backend | P2 |
+| Band1 — Tools multi-select | native CC tool set (none · `proven`) | per-agent allow/deny AT LAUNCH (`proven`) | partial | `create(allowed_tools/disallowed_tools)`; `--allowedTools`/`--disallowedTools`; live-verified; bypass-allowlist bug → deny is the hard-block | P2 |
 | Band1 — Color / Icon pickers | identity (synthesized · `proven`) | edit/save (`not-started`) | not-started | palettes client; >16 uniqueness net-new (QA Q33) | P1 |
 | Band1 — Role-from-agent.md prepopulation (Create) | agent.md front-matter (filesystem · `derivable-not-built`) | populate-on-pick (`not-started`) | not-started | net-new agent.md read | P2 |
 | Band2 — Mode segmented (Plan/Ask/Edit/Auto/Bypass) | permission-mode readback (transcript · `proven`) | mid-run set (`impossible` on bridge — 400; `proven` on sdk) | partial | `set_mode` honest 400; sdk has it; DEVLOG 09:15 | P0 |
@@ -280,7 +287,7 @@ Phases are a **dependency-ordered build sequence**, not strict priority buckets 
 
 ## Settings
 
-> No `/settings`, `/usage`, `/mcp`, `/plugins`, or `/config` route exists in `main.py` today; the bridge `CAPABILITIES` cover only `interrupt/context/permission/resume/set_model/set_effort/subagents`. Every Settings control in the mockup is a scripted `toast()`. **The cleanest near-term wins are reads** — the registries are derivable from existing files (`~/.claude.json` is already `cat`-read by `mcp_sync` in `bridge/mcp.py`; `installed_plugins.json`; `~/.claude` + `.claude` settings).
+> **Reads are now BUILT** (this round): `GET /settings/mcp`, `/settings/plugins`, `/settings/config`, and `GET /usage` serve real WSL-side data via `bridge/registry.py` (the same `cat`-over-WSL mechanism `mcp_sync` uses). The bridge `CAPABILITIES` still cover only `interrupt/context/permission/resume/set_model/set_effort/subagents` (those are *session* controls; Settings reads are workspace-level and don't gate on a driver). **What remains net-new:** the **writes** — enable/disable toggles and the confirm-gated global edit — plus the Usage **plan/limits** band.
 
 | Capability | Data needed (source · status) | Control needed (status) | Build | Evidence | MVP |
 |---|---|---|---|---|---|
@@ -288,26 +295,26 @@ Phases are a **dependency-ordered build sequence**, not strict priority buckets 
 | Setups — capture current (agents + links + subagents → blueprint) | live roster + link graph (synthesized · `derivable-not-built` agents; `needs-investigation` links — zero backend) | Save → write blueprint (`not-started`) | not-started | QA Q31; linking net-new | P1 |
 | Setups — Load → spawn fresh tab-less agents + recreate links | blueprint (filesystem · `derivable-not-built`) | spawn-many bridge sessions **tab-less** + recreate links (`not-started`) | not-started | QA Q31 (tab-less rule); `create_session` one-at-a-time | P1 |
 | Setups — delete a setup | — | delete blueprint (`not-started`) | not-started | mockup Delete, no handler | P2 |
-| **Usage** — account band (auth/email/org/plan) | account/plan info (synthesized · `needs-investigation` — `/status` scrape) | — | not-started | not exposed today | P2 |
-| Usage — limits band (session/weekly % + resets) | rate-limit windows (synthesized · `needs-investigation` — `/status` scrape) | — | not-started | QA intro; DESIGN /stats·/status | P2 |
-| Usage — token consumption Σ (this session) | per-agent transcript usage aggregate (transcript · `derivable-not-built`) | — | partial | `/context` tokens; cross-session roll-up net-new | P1 |
+| **Usage** — account band (auth/email/org/plan) | plan/tier IS local (filesystem · `derivable-not-built`) | — | not-started | `~/.claude/.credentials.json` `claudeAiOauth.{subscriptionType,rateLimitTier}` + `~/.claude.json oauthAccount.{emailAddress,organizationName,organizationRateLimitTier}` — readable, not yet surfaced (Part-4 report) | P2 |
+| Usage — limits band (session/weekly % + resets) | live rate-limit windows (API · `needs-investigation`) | — | not-started | NOT in local files — the % bars/resets are fetched live from the API (agent-dashboard reads them from OAuth creds + API). Decision pending (Part-4 report) | P2 |
+| Usage — token consumption Σ (this session) | per-agent + fleet usage aggregate (transcript · `proven`) | — | built | `GET /usage` (per-agent + fleet totals + token pill); model-aware window; live-verified | P1 |
 | Usage — Day/Week scope toggle | historical token totals (synthesized · `needs-investigation` — no time-series store) | switch window (`derivable-not-built`, UI) | not-started | mockup Day/Week static | P2 |
 | Usage — by-driver / per-MCP attribution | per-category context (transcript · `derivable-not-built`) | — | not-started | categorization net-new; QA Q11a | P2 |
 | Usage — cost / $ spend | **none — out of scope** (`impossible`) | — | not-started | `total_cost_usd`=0; DESIGN out-of-scope | P3 |
 | **MCP** — scope segment (user/project) | active scope (UI · `proven`) | switch scope (`derivable-not-built`, UI) | not-started | DESIGN MCP scope | P1 |
-| MCP — server registry (user: `~/.claude.json mcpServers`) | MCP defs (filesystem · `derivable-not-built`) | — | partial | `bridge/mcp.py` already reads it (to translate, not surface) | P1 |
-| MCP — server registry (project: `.mcp.json`) | project MCP defs (filesystem · `derivable-not-built`) | — | not-started | DESIGN scope note | P1 |
+| MCP — server registry (user: `~/.claude.json mcpServers`) | MCP defs (filesystem · `proven`) | — (read) | built | `GET /settings/mcp` → `registry.read_mcp_registry`; env values masked; live-verified (13 servers) | P1 |
+| MCP — server registry (project: `.mcp.json`) | project MCP defs + enable flags (filesystem · `proven`) | — (read) | built | `read_mcp_registry` project scope (enableAll/enabled/disabledMcpjsonServers) | P1 |
 | MCP — health band (connected/OK per server) | live connection state (synthesized · `needs-investigation` — `/mcp` scrape; `mcp_sync` is translation, not health) | — | not-started | anchor: not a live health API | P2 |
 | MCP — OAuth health per server | per-server OAuth state (synthesized · `needs-investigation`) | — | not-started | `/mcp` scrape candidate | P2 |
 | MCP — enable/disable (park) a server | enabled-state (filesystem · `derivable-not-built` read) | toggle → write config (`not-started`) | not-started | enable/disable writes net-new | P1 |
 | MCP — add a project server | — | write `.mcp.json` (`not-started`) | not-started | net-new write | P2 |
 | **Plugins** — scope segment (user/project/local) | active scope (UI · `proven`) | switch scope (`derivable-not-built`, UI) | not-started | DESIGN scope | P1 |
 | Plugins — marketplaces list | marketplace registry (filesystem · `derivable-not-built`) | — | not-started | net-new read | P2 |
-| Plugins — installed list (name@mkt, version, skills, enabled) | installed-plugin records (filesystem · `derivable-not-built`) | — | partial | read `installed_plugins.json` derivable | P1 |
-| Plugins — enable/disable | enabled-state (filesystem · `derivable-not-built` read) | toggle → write (`not-started`) | not-started | writes net-new | P1 |
+| Plugins — installed list (name@mkt, version, skills, enabled) | installed-plugin records (filesystem · `proven`) | — (read); per-agent enable AT LAUNCH (`proven`) | built | `GET /settings/plugins` → `read_plugins` (`claude plugin list --json` = authoritative enabled); per-agent enable via `--settings enabledPlugins` live-verified | P1 |
+| Plugins — enable/disable | enabled-state (filesystem · `proven` read) | global toggle → write (`not-started`); per-agent toggle AT LAUNCH (`proven`) | partial | read built; **per-agent** enable via `--settings enabledPlugins` live-proven; **global** toggle = a settings write (later run) | P1 |
 | Plugins — remove / search | — | uninstall write (`not-started`); filter (`derivable-not-built`, UI) | not-started | mockup handlers stubbed | P2 |
 | **Config** — scope segment (global/project) | active scope (UI · `proven`) | switch scope (`derivable-not-built`, UI) | not-started | DESIGN scope | P1 |
-| Config — default model + available models | `~/.claude` settings (filesystem · `derivable-not-built`) | edit (global) → confirm-gated write (`not-started`) | not-started | reads derivable; global writes net-new | P1 |
+| Config — default model + available models | `~/.claude` settings (filesystem · `proven` read) | edit (global) → confirm-gated write (`not-started`) | partial | `GET /settings/config` reads global+project (Live/New-session tagged); global writes still net-new | P1 |
 | Config — effort (Live · `/effort`) | effort value (filesystem · `derivable-not-built` read) | per-session set exists; **global write** net-new | partial | `set_effort` endpoint; global-write net-new | P1 |
 | Config — extended thinking (Live) | thinking state (filesystem · `derivable-not-built` read) | edit thinking (`not-started` — `/thinking` absent) | not-started | `set_thinking` not in bridge caps; QA intro | P2 |
 | Config — permission mode (read; New-session) | mode value (filesystem · `derivable-not-built` read) | set mode (`needs-investigation` — no absolute set; **initial** applied at launch) | partial | `set_mode` 400; mode-at-launch (09:15) | P1 |
@@ -320,7 +327,7 @@ Phases are a **dependency-ordered build sequence**, not strict priority buckets 
 | Config — global-edit confirm gate | — | confirm gate guarding every `~/.claude` write (`not-started`) | not-started | DESIGN "global edits are gated" | P1 |
 | Cross-cutting — read-only vs editable separation | n/a (presentation) | — | not-started | DESIGN rule | P1 |
 | Cross-cutting — global-registry vs per-agent scope separation | n/a (model boundary) | — | not-started | DESIGN ("owns global registry, not per-agent") | P1 |
-| Footer — token-usage pill → jumps to Usage | same token aggregate as Usage (transcript · `derivable-not-built`) | click → open Settings('usage') (`derivable-not-built`, UI nav) | not-started | reuses `/context`; DESIGN footer shortcut | P1 |
+| Footer — token-usage pill → jumps to Usage | fleet token aggregate (transcript · `proven`) | click → open Settings('usage') (`derivable-not-built`, UI nav) | partial | `GET /usage` `token_pill` (value built; the click-nav is frontend) | P1 |
 
 ## Cross-Cutting
 

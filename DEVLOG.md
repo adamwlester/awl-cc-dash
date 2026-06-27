@@ -493,6 +493,14 @@ Files: bridge/paths.py, bridge/bridge.py, bridge/registry.py, sidecar/drivers/ba
 
 ---
 
+### 2026-06-27 11:52:00 — coverage-map: reflect this round's built backend (per-agent config, Settings reads, Usage)
+
+Updated `dev/notes/coverage-map.md` to mark what the 11:45 builds moved off the not-started/partial pile. Added a **"✅ Built this round"** block to the one-screen summary (per-agent permissions/MCP/plugins at launch + the bypass-allowlist caveat; the three `/settings/*` reads; `/usage`; the model-aware window) and corrected the prior "hardcoded 1,000,000 window" line. Rewrote bucket #9 (Settings) and the Settings-section intro (the "no /settings route exists" note is now false — reads are built; what's net-new is the **writes** + the Usage plan/limits band). Flipped the changed rows: Agent-panel **Tools multi-select** (per-agent allow/deny at launch, `partial`); Settings **MCP user/project registry** (`built`), **Plugins installed list** + **enable/disable** (read built; per-agent enable via `--settings enabledPlugins` proven; global toggle still a write), **Config default-model** (read built; global write net-new), **Usage token Σ** (`built`), **footer token pill** (value built). Refined the **Usage account/limits** rows with the Part-4 source finding: plan/tier IS local (`~/.claude/.credentials.json claudeAiOauth` + `~/.claude.json oauthAccount`), but the live rate-limit %/resets are **API-only**, not in any local file. Doc only.
+
+Files: dev/notes/coverage-map.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
