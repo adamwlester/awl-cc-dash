@@ -440,6 +440,15 @@ Files: .claude/settings.json, archive/_human-only/mvp/** (moved from archive/mvp
 
 ---
 
+### 2026-06-27 07:33:00 — Bridge data layer: transcript work-step count + by-tool Turns breakdown (additive); control surface + capability map confirmed live
+
+Extended `derive_context_usage` (additive, no frontend/render-path change) so the already-curl-proven `/context` endpoint now also serves **`work_steps`** — the agentic-work-step count the `--max-turns`/Lifecycle cap actually limits (distinct main-line assistant `message.id`; a streamed thinking+tool split shares one id → counts once) — plus a **`tools`** by-tool breakdown (read/edit/bash/mcp/subagent/web/other) from `tool_use` blocks, with `tool_total`. The old `turns` field (user string-content = *prompt rounds*) is kept for compat but documented as the wrong unit (it's also polluted by slash-command/meta entries). Subagent sidechains are excluded from every count. **Fixed a real classifier bug found live**: this Claude Code build spawns subagents via the **`Agent`** tool (not `Task`), so the Subagent slice was mis-bucketed as "other" — now both `Agent` and `Task` map to subagent. +13 hermetic tests (57 pass). Live-verified end-to-end on a real bridge agent (no `AWL_DRIVER`): `/context` matched the transcript exactly through tool work, a subagent spawn, and a sidecar restart (`subagent:1`, `other:1`=ToolSearch, `bash:3`, `tool_total:7`).
+Control surface re-confirmed live (real tmux effect, not just HTTP): **model/effort/interrupt/permission(round-trip)/resume = work**; **mode = silent stub** (HTTP 200 + reports `plan` while the TUI stays `accept edits on`); **fast/thinking = honest HTTP 400**. Capability findings (report-only, nothing built): **subagent detection is fully derivable** — the parent transcript records the `Agent` spawn (type/description/prompt) + a result with `agentId` and a `<usage>` summary (subagent_tokens/tool_uses/duration), and the subagent's full transcript persists at `<project>/<parent-uuid>/subagents/agent-<id>.jsonl`; **context-per-category is scrape-only** via the `/context` TUI grid (Memory/Skills/Messages/Free space/MCP/Custom agents…), not in the transcript (aggregate tokens only) → design decision; **config readback**: model + permission-mode are clean from the transcript, effort/fast are intermittent screen-scrape, thinking not recoverable. (`design/mockup.html` shows modified in the tree — that's the parallel design session's work, deliberately left unstaged.)
+
+Files: sidecar/drivers/bridge.py, tests/test_bridge_unit.py
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

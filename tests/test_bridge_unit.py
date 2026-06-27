@@ -17,7 +17,11 @@ recorded (see .scratch/bridge-diagnostic-*.md appendix A4/A5/A6).
 
 from bridge.bridge import TmuxBridge, parse_permission_prompt
 from bridge.transcript import _encode_cwd, _resolve_project_dir
-from sidecar.drivers.bridge import derive_context_usage, CONTEXT_WINDOW
+from sidecar.drivers.bridge import (
+    derive_context_usage,
+    classify_tool,
+    CONTEXT_WINDOW,
+)
 
 
 # -----------------------------------------------------------------------------
@@ -239,7 +243,153 @@ class TestDeriveContextUsage:
 
     def test_empty(self):
         result = derive_context_usage([])
-        assert result == {"tokens": 0, "window": CONTEXT_WINDOW, "percent": 0.0, "turns": 0}
+        assert result == {
+            "tokens": 0,
+            "window": CONTEXT_WINDOW,
+            "percent": 0.0,
+            "turns": 0,
+            "work_steps": 0,
+            "tools": {b: 0 for b in
+                      ("read", "edit", "bash", "mcp", "subagent", "web", "other")},
+            "tool_total": 0,
+        }
+
+
+# -----------------------------------------------------------------------------
+# work_steps + by-tool breakdown (the Turns metric)
+# -----------------------------------------------------------------------------
+
+class TestClassifyTool:
+    def test_read_search_family(self):
+        for n in ("Read", "Glob", "Grep", "LS", "NotebookRead"):
+            assert classify_tool(n) == "read"
+
+    def test_edit_family(self):
+        for n in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+            assert classify_tool(n) == "edit"
+
+    def test_bash_family(self):
+        for n in ("Bash", "BashOutput", "KillShell"):
+            assert classify_tool(n) == "bash"
+
+    def test_mcp_prefix(self):
+        assert classify_tool("mcp__playwright__browser_click") == "mcp"
+        assert classify_tool("mcp__github__create_issue") == "mcp"
+
+    def test_subagent_and_web(self):
+        # This Claude Code build spawns subagents via "Agent" (live-verified);
+        # the SDK / older builds use "Task". Both are the subagent slice.
+        assert classify_tool("Agent") == "subagent"
+        assert classify_tool("Task") == "subagent"
+        assert classify_tool("WebFetch") == "web"
+        assert classify_tool("WebSearch") == "web"
+
+    def test_toolsearch_is_other(self):
+        # The deferred-tool loader that precedes an Agent spawn is a meta-tool,
+        # not subagent work — it must not inflate the subagent slice.
+        assert classify_tool("ToolSearch") == "other"
+
+    def test_unknown_and_missing_are_other(self):
+        assert classify_tool("TodoWrite") == "other"
+        assert classify_tool("ExitPlanMode") == "other"
+        assert classify_tool(None) == "other"
+        assert classify_tool("") == "other"
+
+
+class TestWorkStepsAndTools:
+    def _asst(self, mid, blocks):
+        return {"type": "assistant", "message": {"id": mid, "content": blocks}}
+
+    def _text(self, t="ok"):
+        return {"type": "text", "text": t}
+
+    def _tool(self, name):
+        return {"type": "tool_use", "name": name, "input": {}}
+
+    def _thinking(self):
+        return {"type": "thinking", "thinking": "…"}
+
+    def _user_prompt(self, t):
+        return {"type": "user", "message": {"content": t}}
+
+    def test_mirrors_real_transcript(self):
+        # Mirrors the live bridge-diag transcript: 3 prompts, 5 distinct
+        # assistant message.ids (one streamed across two lines), tools = 1 Bash
+        # + 2 Write. work_steps must be 5 (not 10 lines, not 3 prompts).
+        entries = [
+            self._user_prompt("run a bash command"),
+            self._asst("m1", [self._thinking()]),          # streamed line 1 of m1
+            self._asst("m1", [self._tool("Bash")]),        # streamed line 2 of m1
+            {"type": "user", "message": {"content": [{"type": "tool_result"}]}},
+            self._asst("m2", [self._text()]),
+            self._user_prompt("write note.txt"),
+            self._asst("m3", [self._tool("Write")]),
+            {"type": "user", "message": {"content": [{"type": "tool_result"}]}},
+            self._asst("m4", [self._text()]),
+            self._user_prompt("write second.txt"),
+            self._asst("m5", [self._tool("Write")]),
+        ]
+        r = derive_context_usage(entries)
+        assert r["work_steps"] == 5
+        assert r["turns"] == 3  # legacy prompt-round count, for contrast
+        assert r["tools"]["bash"] == 1
+        assert r["tools"]["edit"] == 2
+        assert r["tool_total"] == 3
+
+    def test_streamed_split_counts_once(self):
+        # Two JSONL lines sharing one message.id = one inference = one work step.
+        entries = [
+            self._asst("same", [self._thinking()]),
+            self._asst("same", [self._text()]),
+        ]
+        assert derive_context_usage(entries)["work_steps"] == 1
+
+    def test_entries_without_id_count_individually(self):
+        # Defensive: id-less assistant entries each count as their own step.
+        entries = [
+            {"type": "assistant", "message": {"content": [self._text()]}},
+            {"type": "assistant", "message": {"content": [self._text()]}},
+        ]
+        assert derive_context_usage(entries)["work_steps"] == 2
+
+    def test_sidechain_entries_are_excluded(self):
+        # A subagent's own (sidechain) inferences and tools must NOT inflate the
+        # parent's counts — only the parent's Task tool_use (main line) counts.
+        entries = [
+            self._asst("parent1", [self._tool("Task")]),       # parent spawns subagent
+            {"type": "assistant", "isSidechain": True,
+             "message": {"id": "sub1", "content": [self._tool("Bash")]}},
+            {"type": "assistant", "isSidechain": True,
+             "message": {"id": "sub2", "content": [self._text()]}},
+            self._asst("parent2", [self._text()]),             # parent resumes
+        ]
+        r = derive_context_usage(entries)
+        assert r["work_steps"] == 2          # parent1, parent2 — not the 2 sidechains
+        assert r["tools"]["subagent"] == 1   # the Task call
+        assert r["tools"]["bash"] == 0       # subagent's Bash excluded
+        assert r["tool_total"] == 1
+
+    def test_multiple_tools_in_one_message(self):
+        entries = [self._asst("m", [self._tool("Read"), self._tool("Read"),
+                                    self._tool("mcp__x__y")])]
+        r = derive_context_usage(entries)
+        assert r["work_steps"] == 1
+        assert r["tools"]["read"] == 2
+        assert r["tools"]["mcp"] == 1
+        assert r["tool_total"] == 3
+
+    def test_context_tokens_skip_sidechain(self):
+        # The latest *main-line* assistant usage drives context %, not a trailing
+        # subagent sidechain entry.
+        entries = [
+            {"type": "assistant",
+             "message": {"id": "p", "usage": {"input_tokens": 5, "cache_read_input_tokens": 0,
+                                              "cache_creation_input_tokens": 0}, "content": []}},
+            {"type": "assistant", "isSidechain": True,
+             "message": {"id": "s", "usage": {"input_tokens": 999, "cache_read_input_tokens": 0,
+                                              "cache_creation_input_tokens": 0}, "content": []}},
+        ]
+        assert derive_context_usage(entries)["tokens"] == 5
 
 
 # -----------------------------------------------------------------------------

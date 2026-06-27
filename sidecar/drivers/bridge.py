@@ -43,28 +43,75 @@ _STATE_TO_STATUS = {
 # `/context` call needed (proven in the bridge diagnostic).
 CONTEXT_WINDOW = 1_000_000
 
+# Tool-name → by-tool category for the Turns breakdown the Agent panel shows
+# (design: Read/search · Edit · Bash · MCP · Subagent · Web). The native tool
+# set is fixed; any MCP tool is prefixed ``mcp__``; anything unmatched (TodoWrite,
+# ExitPlanMode, …) falls to "other" so the buckets always sum to tool_total.
+# (The design's "Coordinating" slice is a dashboard-synthesized cross-agent
+# concept the bridge can't know from one transcript, so it is NOT derived here.)
+_TOOL_CATEGORY = {
+    "Read": "read", "Glob": "read", "Grep": "read", "LS": "read",
+    "NotebookRead": "read",
+    "Edit": "edit", "Write": "edit", "MultiEdit": "edit", "NotebookEdit": "edit",
+    "Bash": "bash", "BashOutput": "bash", "KillBash": "bash", "KillShell": "bash",
+    # Subagent spawn tool: this Claude Code build names it "Agent" (live-verified
+    # — it writes the subagent's full transcript to <parent-uuid>/subagents/
+    # agent-<id>.jsonl and returns a tool_result with the subagent's usage); the
+    # Agent SDK / older builds name it "Task". Both count as one subagent step.
+    "Agent": "subagent", "Task": "subagent",
+    "WebFetch": "web", "WebSearch": "web",
+}
+_TOOL_BUCKETS = ("read", "edit", "bash", "mcp", "subagent", "web", "other")
+
+
+def classify_tool(name: str | None) -> str:
+    """Map a Claude Code tool-use name to a Turns-breakdown category.
+
+    Any ``mcp__*`` tool is "mcp"; the native set maps via ``_TOOL_CATEGORY``;
+    everything else (including a missing name) is "other".
+    """
+    if not name:
+        return "other"
+    if name.startswith("mcp__"):
+        return "mcp"
+    return _TOOL_CATEGORY.get(name, "other")
+
 
 def derive_context_usage(entries: list[dict]) -> dict:
-    """Derive overall context usage and turn count from transcript entries.
+    """Derive context usage, work-step count, and tool breakdown from a transcript.
 
-    Pure function (no live session) so it can be unit-tested directly.
+    Pure function (no live session) so it can be unit-tested directly. Subagent
+    (``isSidechain``) entries are excluded from every count — they are the
+    subagent's own turns/tools, not the parent agent's (the parent's single
+    ``Task`` tool_use, which lives on the main line, is what counts as one
+    "subagent" step for the parent).
 
       * context tokens = ``input_tokens + cache_read_input_tokens +
-        cache_creation_input_tokens`` on the LATEST assistant entry's
-        ``message.usage`` (this is the cumulative context, not a per-turn delta).
-      * turn count = number of ``user`` entries whose ``message.content`` is a
-        plain string (real prompts), excluding entries carrying tool_results
-        (whose content is a list of blocks).
+        cache_creation_input_tokens`` on the LATEST main-line assistant entry's
+        ``message.usage`` (cumulative context, not a per-turn delta).
+      * ``work_steps`` = number of distinct main-line assistant inferences
+        (distinct ``message.id``; a streamed response split across several JSONL
+        lines shares one id, so it counts once). This is the agentic work-step
+        unit the ``--max-turns`` / Lifecycle auto-stop cap actually limits — the
+        Turns bar's numerator.
+      * ``tools`` = by-tool-category counts of every main-line ``tool_use`` block
+        (the Agent panel's by-tool Turns breakdown).
+      * ``turns`` = legacy prompt-round count: ``user`` entries whose content is a
+        plain string. Kept for backward-compatibility, but it is a *prompt-round*
+        count (and is polluted by slash-command/meta string entries), NOT the
+        work-step unit — prefer ``work_steps``.
 
     Args:
         entries: Parsed JSONL transcript entries (as from ``read_log``).
 
     Returns:
-        dict with ``tokens``, ``window``, ``percent`` (0–100, 2dp), ``turns``.
+        dict with ``tokens``, ``window``, ``percent`` (0–100, 2dp), ``turns``
+        (legacy prompt rounds), ``work_steps``, ``tools`` (per-category counts),
+        and ``tool_total``.
     """
     tokens = 0
     for entry in reversed(entries):
-        if entry.get("type") == "assistant":
+        if entry.get("type") == "assistant" and not entry.get("isSidechain"):
             usage = (entry.get("message") or {}).get("usage") or {}
             tokens = (
                 (usage.get("input_tokens") or 0)
@@ -80,12 +127,35 @@ def derive_context_usage(entries: list[dict]) -> dict:
         and isinstance((e.get("message") or {}).get("content"), str)
     )
 
+    # Work steps = distinct main-line assistant inferences; tool breakdown =
+    # every main-line tool_use block bucketed by category. One pass over the
+    # transcript, skipping subagent sidechains.
+    seen_ids: set = set()
+    work_steps = 0
+    tools = {bucket: 0 for bucket in _TOOL_BUCKETS}
+    for e in entries:
+        if e.get("type") != "assistant" or e.get("isSidechain"):
+            continue
+        msg = e.get("message") or {}
+        # Entries without a message.id (rare) each count as their own step.
+        key = msg.get("id") or f"__noid_{id(e)}"
+        if key not in seen_ids:
+            seen_ids.add(key)
+            work_steps += 1
+        for block in msg.get("content") or []:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                tools[classify_tool(block.get("name"))] += 1
+    tool_total = sum(tools.values())
+
     percent = round(tokens / CONTEXT_WINDOW * 100, 2) if CONTEXT_WINDOW else 0.0
     return {
         "tokens": tokens,
         "window": CONTEXT_WINDOW,
         "percent": percent,
         "turns": turns,
+        "work_steps": work_steps,
+        "tools": tools,
+        "tool_total": tool_total,
     }
 
 
