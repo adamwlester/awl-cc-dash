@@ -156,6 +156,20 @@ function TextBlock({ text }: { text: string }) {
   )
 }
 
+// The user's own prompt, echoed into the feed. On the bridge driver a `user`
+// transcript entry replays the human's prompt as a bare string (becomes a single
+// text block via toBlocks); on the SDK path a UserMessage only ever carries tool
+// results, so this never fires there. Styled distinctly (pink left accent + "You"
+// label) so a prompt reads apart from assistant text.
+function UserPromptBlock({ text }: { text: string }) {
+  return (
+    <div style={{ background: C.card, border: `2px solid ${C.border}`, borderLeft: `4px solid ${C.main}`, borderRadius: 5, boxShadow: C.shadowSm, padding: '6px 12px', marginBottom: 8 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: C.t5, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>You</div>
+      <div style={{ fontSize: 12, lineHeight: 1.6, color: C.t2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</div>
+    </div>
+  )
+}
+
 function ThinkingBlock({ thinking }: { thinking: string }) {
   const [expanded, setExpanded] = useState(false)
   return (
@@ -248,8 +262,15 @@ function EventRenderer({ event }: { event: SDKEvent }) {
     return (
       <>
         {content.map((block: any, i: number) => {
-          if (block.type === 'tool_result' && block.content) {
-            return <ToolResultCard key={i} content={block.content} />
+          // A `user` entry is either the human's prompt (a text block, from the
+          // bridge replaying message.content as a string) or tool results.
+          if (block.type === 'text' && block.text?.trim()) {
+            return <UserPromptBlock key={i} text={block.text} />
+          }
+          // Render tool results even when output is empty (a tool can succeed
+          // with no stdout) — `?? ''` keeps the falsy-content case visible.
+          if (block.type === 'tool_result') {
+            return <ToolResultCard key={i} content={block.content ?? ''} />
           }
           return null
         })}
@@ -331,6 +352,15 @@ function EventFeed({ events, status, sessionId }: { events: SDKEvent[], status: 
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 50)
   }, [])
 
+  // Does the feed actually have anything visible? Status/permission events are
+  // stored in history but render nothing, so `events.length` overcounts. On a
+  // fresh bridge session those bookkeeping events would otherwise suppress the
+  // "Session ready" hint and leave the feed blank — gate on renderable events.
+  const hasRenderable = events.some(e =>
+    e.sdk_type === 'AssistantMessage' || e.sdk_type === 'UserMessage' ||
+    e.sdk_type === 'RateLimitEvent' || e.subtype === 'init' || e.type === 'result'
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ height: 36, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', gap: 8, flexShrink: 0 }}>
@@ -357,7 +387,7 @@ function EventFeed({ events, status, sessionId }: { events: SDKEvent[], status: 
             Select or create a session to begin.
           </div>
         )}
-        {sessionId && events.length === 0 && status !== 'running' && (
+        {sessionId && !hasRenderable && status !== 'running' && (
           <div style={{ fontSize: 11, color: C.t5, textAlign: 'center', marginTop: 60 }}>
             Session ready. Send a prompt below.
           </div>

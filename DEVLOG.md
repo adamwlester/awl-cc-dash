@@ -392,6 +392,14 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-06-26 21:09:52 — Frontend renders correctly on the bridge driver: 3 SDK-shape fixes (App.tsx), live-verified
+
+Closed out the remaining SDK-shape assumptions in `frontend/src/renderer/App.tsx` so a normally-launched dashboard runs bridge agents cleanly. (1) **User prompts now echo** — the `UserMessage` branch only rendered `tool_result` blocks, silently dropping the bridge's string-content prompt replay; added a `UserPromptBlock` (pink left-accent + "You" label) for `text` blocks. (2) **No blank fresh-session feed** — non-rendering `status_change` events inflated `events.length`, suppressing the "Session ready" hint; gated it on a new `hasRenderable` predicate (assistant/user/result/init/rate_limit) instead of raw length. (3) **Empty tool output no longer dropped** — loosened the `&& block.content` guard to render `tool_result`s with falsy content (`?? ''`). Live-verified through the real UI (headless Playwright) against a sidecar started normally (no `AWL_DRIVER`, `/health` → `bridge`): created an agent with no driver named → came up on `bridge` (real tmux, no tab); prompts echo beside responses; a clean end-to-end round-trip (UI send → `user` string + `assistant` PONG render, status returns to idle); narrow (720) and wide (1680) both render correctly. An adversarial 3-lens audit (workflow) cross-confirmed the fix set. **Reported, not changed** (architectural / out-of-lane): bridge `total_cost_usd` is always 0 → SessionList shows `$0.000` (bridge transcript exposes no USD cost — needs a design call: hide / "n/a" / show context-%); and `bridge/transcript.py:find_transcript` only does `cwd.replace("/", "-")` while Claude Code also maps `.`→`-`, so a cwd containing a dot (e.g. `.scratch`) mis-hashes the project dir and finds no transcript (one-line bridge-layer fix, surfaced during testing).
+
+Files: frontend/src/renderer/App.tsx, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
