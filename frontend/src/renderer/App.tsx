@@ -1,610 +1,271 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-
-// Sidecar URL — injected via preload or hardcoded for browser testing
-const API = (window as any).awl?.sidecarUrl || 'http://127.0.0.1:7690'
-
 // ============================================================================
-// Types
+// AWL Multi-Agent Dashboard — the three-pane shell
+// ----------------------------------------------------------------------------
+// Title bar · three resizable columns (Agent | Team Graph/Library | Team
+// Feed/Prompt) · status footer. Owns the global state + polling and wires the
+// proven bridge endpoints into the panels. Selection drives the app: clicking a
+// Team Graph card focuses that agent in the Agent panel, Feed, and Prompt.
+//
+// Honest scope: Library (middle-bottom) is a placeholder (needs file endpoints);
+// the Console tab, Scratch/Log feeds, the non-Permission Inbox sections, linking,
+// send-timing, and Settings are absent (each needs net-new backend) — see the
+// per-panel notes. Everything rendered is backed by a proven endpoint.
 // ============================================================================
 
-interface Session {
-  session_id: string
-  status: string
-  model: string | null
-  agent_type: string | null
-  permission_mode: string
-  total_cost_usd: number
-  total_turns: number
-  event_count: number
-  created_at: string
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { C, FONT, timeAgo } from './tokens'
+import { api, type Session, type SDKEvent, type ContextUsage, type CreatePayload } from './api'
+import { Splitter } from './Splitter'
+import { TeamGraph } from './TeamGraph'
+import { AgentPanel } from './AgentPanel'
+import { TeamFeed } from './TeamFeed'
+import { PromptPanel } from './PromptPanel'
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+function fmtTokens(n: number): string {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
+  return String(n)
 }
 
-interface SDKEvent {
-  type: string
-  subtype?: string
-  sdk_type?: string
-  timestamp?: string
-  data?: any
-  [key: string]: any
-}
-
-// ============================================================================
-// Colors
-// ============================================================================
-
-// Neobrutalism light-theme palette — values mirror design/tokens.css (the single
-// source of truth). Existing keys are remapped onto design tokens; a few keys are
-// added (main/select/btn/rule/codeBg/shadows + soft status tints) so the same
-// component styles can speak the design language. See design/DESIGN.md.
-const C = {
-  // Surfaces — three warm surfaces + a button tint + a hairline
-  bg: '#fef6e4',        // --background  canvas / panel bodies / scroll wells
-  surface: '#f5ecd9',   // --surface-3  chrome: panel headers, footers, toolbars
-  card: '#ffffff',      // --secondary-background  cards
-  input: '#ffffff',     // form inputs (white, like cards)
-  btn: '#fbf5e8',       // --surface-btn  low-emphasis action buttons
-  codeBg: '#f5ecd9',    // inline code / code blocks (--surface-3)
-  rule: '#d8cfb8',      // --rule  hairline between rows
-  // Border + ink (2px navy everywhere)
-  border: '#001858',    // --border
-  borderH: '#001858',   // --border (kept for column / title-bar dividers)
-  dim: '#a9dde7',       // --select  light-teal selection fill
-  // Text ramp
-  t1: '#001858', t2: '#001858',          // --foreground  primary ink / headings / body
-  t3: '#5b5f86', t4: '#5b5f86',          // --muted
-  t5: '#9a93b4',                          // --muted-2  faint (timestamps, placeholders)
-  // Accents — pink=primary · teal=secondary · cream=low-emphasis · red=danger
-  main: '#f582ae',      // --main  PRIMARY (Send · New · badges · title bar)
-  mainFg: '#001858',    // --main-foreground / --secondary-foreground  ink on accents
-  select: '#a9dde7',    // --select  selection fill (light teal)
-  teal: '#8bd3dd',      // --secondary  secondary / active / selected ring
-  gold: '#d98a2b',      // --warning  attention / cost
-  coral: '#d23b6a',     // --danger  stop / error / offline
-  sage: '#2f9e6f',      // --success  running / connected
-  blush: '#f582ae',     // accent slot → pink
-  // Soft status containers (Material-3 "container" roles) for connectivity pills
-  successSoft: '#e7f5ee', successText: '#1f6f4d',
-  dangerSoft: '#fbe7ee',
-  warnSoft: '#f6e6cf', warnText: '#9a6710',
-  // Hard offset shadows (no blur) — raised / interactive elements only
-  shadow: '4px 4px 0 0 #001858', shadowSm: '2px 2px 0 0 #001858',
-}
-
-// Agent colors assigned round-robin — the design "Jewel" family (--ag-* in tokens.css)
-const AGENT_COLORS = ['#aa3a61', '#008370', '#008149', '#9d5400', '#7152b5', '#9e3f84', '#0076ab', '#aa4600']
-
-// ============================================================================
-// Utility
-// ============================================================================
-
-function escapeHtml(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function formatCode(text: string): string {
-  return escapeHtml(text).replace(/`([^`]+)`/g, `<code style="background:${C.codeBg};color:${C.t1};border:1.5px solid ${C.rule};padding:1px 4px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11px">$1</code>`)
-}
-
-// Message content can be a list of typed blocks (the SDK shape) OR a bare string:
-// the bridge driver replays a user's own prompt straight from the transcript as
-// `content: "<prompt text>"`. Normalize to blocks so EventRenderer can always
-// .map over it — a bare string becomes one text block, never a crash.
-function toBlocks(content: any): any[] {
-  if (Array.isArray(content)) return content
-  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content }] : []
-  return []
-}
-
-// ============================================================================
-// Event Components
-// ============================================================================
-
-function ToolCallCard({ block }: { block: any }) {
-  const [expanded, setExpanded] = useState(false)
-  const input = block.input || {}
-  const summary = input.command || input.file_path || input.pattern || input.query || JSON.stringify(input).slice(0, 100)
-  const full = JSON.stringify(input, null, 2)
-
+function Chip({ children, bg, fg }: { children: React.ReactNode; bg: string; fg: string }) {
   return (
-    <div style={{ background: C.card, border: `2px solid ${C.border}`, borderLeft: `4px solid ${C.teal}`, borderRadius: 5, boxShadow: C.shadowSm, padding: '8px 12px', marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: C.t1, fontWeight: 800, fontSize: 11 }}>◆ {block.name}</span>
-        {block.id && <span style={{ fontSize: 9, color: C.t5, fontFamily: 'monospace' }}>{block.id.slice(0, 8)}</span>}
-      </div>
-      <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: C.t3, marginTop: 2, wordBreak: 'break-word' }}>{summary}</div>
-      {full.length > 100 && (
-        <>
-          <div onClick={() => setExpanded(!expanded)} style={{ fontSize: 10, color: C.t5, cursor: 'pointer', marginTop: 4 }}>
-            {expanded ? '▾ Collapse' : '▸ Full input'}
-          </div>
-          {expanded && (
-            <pre style={{ fontSize: 9, color: C.t3, background: C.codeBg, border: `1.5px solid ${C.rule}`, padding: 8, borderRadius: 3, marginTop: 4, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{full}</pre>
-          )}
-        </>
-      )}
-    </div>
+    <span style={{ fontSize: 9.5, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: bg, color: fg, border: `2px solid ${C.border}`, whiteSpace: 'nowrap' }}>
+      {children}
+    </span>
   )
 }
-
-function ToolResultCard({ content }: { content: any }) {
-  const [expanded, setExpanded] = useState(false)
-  let text = ''
-  if (typeof content === 'string') text = content
-  else if (Array.isArray(content)) text = content.map((c: any) => c.text || c.content || '').join('\n')
-  else text = JSON.stringify(content, null, 2)
-
-  const lines = text.split('\n')
-  const preview = lines.slice(0, 6).join('\n')
-
-  return (
-    <div style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 5, boxShadow: C.shadowSm, padding: '6px 12px', marginBottom: 8, fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: C.t3, maxHeight: expanded ? 300 : undefined, overflow: expanded ? 'auto' : undefined }}>
-      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{expanded ? text : preview}</pre>
-      {lines.length > 6 && (
-        <div onClick={() => setExpanded(!expanded)} style={{ fontSize: 10, color: C.t5, cursor: 'pointer', marginTop: 4 }}>
-          {expanded ? '▾ Collapse' : `▸ Show all (${lines.length} lines)`}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TextBlock({ text }: { text: string }) {
-  return (
-    <div style={{ padding: '4px 0', marginBottom: 6, fontSize: 12, lineHeight: 1.65, color: C.t2 }}
-      dangerouslySetInnerHTML={{ __html: formatCode(text).replace(/\n/g, '<br>') }}
-    />
-  )
-}
-
-// The user's own prompt, echoed into the feed. On the bridge driver a `user`
-// transcript entry replays the human's prompt as a bare string (becomes a single
-// text block via toBlocks); on the SDK path a UserMessage only ever carries tool
-// results, so this never fires there. Styled distinctly (pink left accent + "You"
-// label) so a prompt reads apart from assistant text.
-function UserPromptBlock({ text }: { text: string }) {
-  return (
-    <div style={{ background: C.card, border: `2px solid ${C.border}`, borderLeft: `4px solid ${C.main}`, borderRadius: 5, boxShadow: C.shadowSm, padding: '6px 12px', marginBottom: 8 }}>
-      <div style={{ fontSize: 9, fontWeight: 800, color: C.t5, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>You</div>
-      <div style={{ fontSize: 12, lineHeight: 1.6, color: C.t2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</div>
-    </div>
-  )
-}
-
-function ThinkingBlock({ thinking }: { thinking: string }) {
-  const [expanded, setExpanded] = useState(false)
-  return (
-    <div style={{ background: C.card, border: `2px dashed ${C.border}`, borderRadius: 5, padding: '6px 12px', marginBottom: 8 }}>
-      <div onClick={() => setExpanded(!expanded)} style={{ fontSize: 10, color: C.t5, cursor: 'pointer' }}>
-        {expanded ? '▾' : '▸'} Thinking ({thinking.length} chars)
-      </div>
-      {expanded && (
-        <div style={{ fontSize: 10, color: C.t4, fontStyle: 'italic', marginTop: 4, maxHeight: 200, overflow: 'auto', lineHeight: 1.5 }}>{thinking}</div>
-      )}
-    </div>
-  )
-}
-
-function SystemInitCard({ data }: { data: any }) {
-  const [expanded, setExpanded] = useState(false)
-  const model = data?.model || '?'
-  const mode = data?.permissionMode || '?'
-  const tools = Array.isArray(data?.tools) ? data.tools.length : '?'
-
-  return (
-    <div style={{ background: C.card, border: `2px dashed ${C.border}`, borderRadius: 5, padding: '8px 12px', marginBottom: 8 }}>
-      <div onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer', fontSize: 10, color: C.t5 }}>
-        {expanded ? '▾' : '▸'} Session init — {model} · {mode} · {tools} tools
-      </div>
-      {expanded && (
-        <pre style={{ fontSize: 9, color: C.t3, marginTop: 6, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-          {JSON.stringify(data, null, 2).slice(0, 3000)}
-        </pre>
-      )}
-    </div>
-  )
-}
-
-function ResultBar({ event }: { event: SDKEvent }) {
-  const d = event.data || event
-  const cost = d.total_cost_usd || 0
-  const turns = d.num_turns || 0
-  const duration = d.duration_ms || 0
-  return (
-    <div style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 5, padding: '6px 12px', marginBottom: 8, fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: C.t3, display: 'flex', gap: 16 }}>
-      <span style={{ color: C.gold, fontWeight: 800 }}>${cost.toFixed(4)}</span>
-      <span>{turns} turns</span>
-      <span>{(duration / 1000).toFixed(1)}s</span>
-    </div>
-  )
-}
-
-function RateLimitBanner() {
-  return (
-    <div style={{ background: C.warnSoft, border: `2px solid ${C.border}`, borderRadius: 5, padding: '6px 12px', marginBottom: 8, fontSize: 10, fontWeight: 700, color: C.warnText }}>
-      ⏳ Rate limit — Claude is waiting before retrying
-    </div>
-  )
-}
-
-function EventRenderer({ event }: { event: SDKEvent }) {
-  const sdk = event.sdk_type || ''
-  const sub = event.subtype || ''
-
-  // Skip hook noise
-  if (sub === 'hook_started' || sub === 'hook_response') return null
-  if (event.type === 'status_change') return null
-
-  // System init
-  if (sub === 'init') return <SystemInitCard data={event.data || {}} />
-
-  // Assistant message
-  if (sdk === 'AssistantMessage') {
-    // Sidecar flattens message attrs to the top level (event.content); keep the
-    // older data.message.content shape as a fallback.
-    const content = toBlocks(event.content ?? event.data?.message?.content)
-    return (
-      <>
-        {content.map((block: any, i: number) => {
-          if (block.type === 'tool_use') return <ToolCallCard key={i} block={block} />
-          if (block.type === 'text' && block.text?.trim()) return <TextBlock key={i} text={block.text} />
-          if (block.type === 'thinking' && block.thinking) return <ThinkingBlock key={i} thinking={block.thinking} />
-          return null
-        })}
-      </>
-    )
-  }
-
-  // User message (tool results)
-  if (sdk === 'UserMessage') {
-    // Sidecar flattens message attrs to the top level (event.content); keep the
-    // older data.message.content shape as a fallback.
-    const content = toBlocks(event.content ?? event.data?.message?.content)
-    return (
-      <>
-        {content.map((block: any, i: number) => {
-          // A `user` entry is either the human's prompt (a text block, from the
-          // bridge replaying message.content as a string) or tool results.
-          if (block.type === 'text' && block.text?.trim()) {
-            return <UserPromptBlock key={i} text={block.text} />
-          }
-          // Render tool results even when output is empty (a tool can succeed
-          // with no stdout) — `?? ''` keeps the falsy-content case visible.
-          if (block.type === 'tool_result') {
-            return <ToolResultCard key={i} content={block.content ?? ''} />
-          }
-          return null
-        })}
-      </>
-    )
-  }
-
-  // Result
-  if (event.type === 'result') return <ResultBar event={event} />
-
-  // Rate limit
-  if (sdk === 'RateLimitEvent') return <RateLimitBanner />
-
-  return null
-}
-
-// ============================================================================
-// Session List (Left Panel)
-// ============================================================================
-
-function SessionList({ sessions, activeId, onSelect, onCreate, onDelete }: {
-  sessions: Session[]
-  activeId: string | null
-  onSelect: (id: string) => void
-  onCreate: () => void
-  onDelete: (id: string) => void
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ height: 36, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', justifyContent: 'space-between', flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sessions</span>
-        <button className="nb-btn" onClick={onCreate} style={{ background: C.main, color: C.mainFg, border: `2px solid ${C.border}`, borderRadius: 5, boxShadow: C.shadowSm, padding: '3px 10px', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>+ New</button>
-      </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 6 }}>
-        {sessions.map((s, i) => (
-          <div key={s.session_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, borderRadius: 5, border: `2px solid ${C.border}`, background: s.session_id === activeId ? C.select : C.card, boxShadow: s.session_id === activeId ? C.shadow : C.shadowSm, cursor: 'pointer' }}
-            onClick={() => onSelect(s.session_id)}>
-            <div style={{ width: 9, height: 9, borderRadius: '50%', border: `2px solid ${C.border}`, background: s.status === 'running' ? C.sage : s.status === 'error' ? C.coral : C.t5, flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {s.agent_type || 'session'}-{s.session_id}
-              </div>
-              <div style={{ fontSize: 9, color: C.t3, fontFamily: 'monospace' }}>
-                {s.model || 'default'}
-              </div>
-            </div>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(s.session_id) }}
-              style={{ background: 'none', border: 'none', color: C.t5, fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '0 2px' }}
-              title="Close session">×</button>
-          </div>
-        ))}
-        {sessions.length === 0 && (
-          <div style={{ fontSize: 10, color: C.t5, textAlign: 'center', marginTop: 24, lineHeight: 1.6 }}>
-            No sessions.<br />Click "+ New" to start.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// Event Feed (Right Panel)
-// ============================================================================
-
-function EventFeed({ events, status, sessionId }: { events: SDKEvent[], status: string, sessionId: string | null }) {
-  const feedRef = useRef<HTMLDivElement>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-
-  useEffect(() => {
-    if (autoScroll && feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight
-    }
-  }, [events, autoScroll])
-
-  const handleScroll = useCallback(() => {
-    if (!feedRef.current) return
-    const { scrollTop, scrollHeight, clientHeight } = feedRef.current
-    setAutoScroll(scrollHeight - scrollTop - clientHeight < 50)
-  }, [])
-
-  // Does the feed actually have anything visible? Status/permission events are
-  // stored in history but render nothing, so `events.length` overcounts. On a
-  // fresh bridge session those bookkeeping events would otherwise suppress the
-  // "Session ready" hint and leave the feed blank — gate on renderable events.
-  const hasRenderable = events.some(e =>
-    e.sdk_type === 'AssistantMessage' || e.sdk_type === 'UserMessage' ||
-    e.sdk_type === 'RateLimitEvent' || e.subtype === 'init' || e.type === 'result'
-  )
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ height: 36, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', gap: 8, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Event Feed</span>
-        {sessionId && <span style={{ fontSize: 10, color: C.t3, fontFamily: 'monospace' }}>{sessionId}</span>}
-        <div style={{ flex: 1 }} />
-        <span style={{
-          fontSize: 9.5, padding: '2px 8px', borderRadius: 5, fontWeight: 800, border: `2px solid ${C.border}`,
-          background: status === 'running' ? C.successSoft : status === 'error' ? C.dangerSoft : C.surface,
-          color: status === 'running' ? C.successText : status === 'error' ? C.coral : C.t3,
-        }}>
-          {status === 'running' ? '● Running' : status === 'error' ? '● Error' : '○ Idle'}
-        </span>
-      </div>
-      <div ref={feedRef} onScroll={handleScroll} style={{ flex: 1, overflow: 'auto', padding: 12 }}>
-        {events.map((event, i) => <EventRenderer key={i} event={event} />)}
-        {status === 'running' && (
-          <div style={{ padding: '4px 0' }}>
-            <span style={{ display: 'inline-block', width: 6, height: 14, background: C.border, borderRadius: 1, animation: 'blink 1s infinite' }} />
-          </div>
-        )}
-        {!sessionId && (
-          <div style={{ fontSize: 11, color: C.t5, textAlign: 'center', marginTop: 60 }}>
-            Select or create a session to begin.
-          </div>
-        )}
-        {sessionId && !hasRenderable && status !== 'running' && (
-          <div style={{ fontSize: 11, color: C.t5, textAlign: 'center', marginTop: 60 }}>
-            Session ready. Send a prompt below.
-          </div>
-        )}
-      </div>
-      {!autoScroll && events.length > 0 && (
-        <div className="nb-btn" onClick={() => { setAutoScroll(true); feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' }) }}
-          style={{ position: 'absolute', bottom: 80, right: 20, background: C.teal, color: C.mainFg, fontSize: 10, fontWeight: 800, padding: '4px 10px', border: `2px solid ${C.border}`, borderRadius: 5, boxShadow: C.shadowSm, cursor: 'pointer', zIndex: 10 }}>
-          ↓ New events
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Prompt Composer
-// ============================================================================
-
-function PromptComposer({ sessionId, status, onSend, onInterrupt }: {
-  sessionId: string | null, status: string, onSend: (prompt: string) => void, onInterrupt: () => void
-}) {
-  const [prompt, setPrompt] = useState('')
-
-  const handleSend = () => {
-    if (!prompt.trim() || !sessionId || status === 'running') return
-    onSend(prompt.trim())
-    setPrompt('')
-  }
-
-  return (
-    <div style={{ borderTop: `2px solid ${C.border}`, padding: 12, background: C.surface, display: 'flex', gap: 8, flexShrink: 0 }}>
-      <textarea
-        className="nb-in"
-        value={prompt}
-        onChange={e => setPrompt(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-        placeholder={sessionId ? 'Type a prompt... (Enter to send, Shift+Enter for newline)' : 'Create a session first'}
-        disabled={!sessionId}
-        style={{
-          flex: 1, background: C.input, border: `2px solid ${C.border}`, borderRadius: 5,
-          padding: '8px 12px', color: C.t2, fontSize: 12, fontFamily: '"JetBrains Mono", monospace',
-          resize: 'none', height: 56, outline: 'none',
-        }}
-      />
-      {status === 'running' ? (
-        <button className="nb-btn" onClick={onInterrupt} style={{
-          background: C.btn, color: C.coral, border: `2px solid ${C.border}`, boxShadow: C.shadowSm,
-          borderRadius: 5, padding: '0 16px', fontSize: 11, fontWeight: 800, cursor: 'pointer', alignSelf: 'stretch',
-        }}>Stop</button>
-      ) : (
-        <button className="nb-btn" onClick={handleSend} disabled={!sessionId || !prompt.trim()} style={{
-          background: !sessionId || !prompt.trim() ? C.btn : C.main,
-          color: C.mainFg, border: `2px solid ${C.border}`, boxShadow: C.shadowSm,
-          borderRadius: 5, padding: '0 20px', fontSize: 11, fontWeight: 800,
-          cursor: !sessionId || !prompt.trim() ? 'default' : 'pointer', alignSelf: 'stretch', opacity: !sessionId || !prompt.trim() ? 0.4 : 1,
-        }}>Send</button>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Main App
-// ============================================================================
 
 export function App() {
   const [sessions, setSessions] = useState<Session[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [events, setEvents] = useState<SDKEvent[]>([])
-  const [status, setStatus] = useState('idle')
-  const [sidecarOk, setSidecarOk] = useState(false)
+  const [ctx, setCtx] = useState<ContextUsage | null>(null)
+  const [usageBy, setUsageBy] = useState<Record<string, { percent: number | null; work_steps: number | null }>>({})
+  const [subagentsBy, setSubagentsBy] = useState<Record<string, any[]>>({})
+  const [tokenPill, setTokenPill] = useState(0)
+  const [health, setHealth] = useState<{ ok: boolean; version: string }>({ ok: false, version: '' })
+  const [agentTab, setAgentTab] = useState<'details' | 'create'>('details')
+  const [creating, setCreating] = useState(false)
+  const [nowMs, setNowMs] = useState(Date.now())
+  const mountedAt = useRef(Date.now())
+  const sessionsRef = useRef<Session[]>([])
+  sessionsRef.current = sessions
 
-  // Health check
+  // Resizable layout sizes (px); middle column + bottom panels flex.
+  const [leftW, setLeftW] = useState(330)
+  const [rightW, setRightW] = useState(440)
+  const [graphH, setGraphH] = useState(360)
+  const [feedH, setFeedH] = useState(320)
+
+  const selected = sessions.find(s => s.session_id === selectedId) || null
+
+  // ---- "ago" tick ----------------------------------------------------------
+  useEffect(() => {
+    const i = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(i)
+  }, [])
+
+  // ---- health --------------------------------------------------------------
   useEffect(() => {
     const check = async () => {
-      try {
-        const res = await fetch(`${API}/health`)
-        setSidecarOk(res.ok)
-      } catch { setSidecarOk(false) }
+      const h = await api.health()
+      setHealth({ ok: !!h, version: h?.version || '' })
     }
     check()
     const i = setInterval(check, 5000)
     return () => clearInterval(i)
   }, [])
 
-  // Poll for session list
+  // ---- roster + usage (all agents) -----------------------------------------
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch(`${API}/sessions`)
-        if (res.ok) setSessions(await res.json())
-      } catch { /* sidecar down */ }
-    }
-    poll()
-    const i = setInterval(poll, 2000)
-    return () => clearInterval(i)
-  }, [])
-
-  // Poll for events when a session is active
-  useEffect(() => {
-    if (!activeId) { setEvents([]); setStatus('idle'); return }
     let cancelled = false
     const poll = async () => {
-      while (!cancelled) {
-        try {
-          const [evRes, sRes] = await Promise.all([
-            fetch(`${API}/sessions/${activeId}/history`),
-            fetch(`${API}/sessions/${activeId}`),
-          ])
-          if (evRes.ok) setEvents(await evRes.json())
-          if (sRes.ok) {
-            const s = await sRes.json()
-            setStatus(s.status)
-          }
-        } catch { /* sidecar down */ }
-        await new Promise(r => setTimeout(r, 800))
+      const [ss, us] = await Promise.all([api.sessions(), api.usage()])
+      if (cancelled) return
+      if (ss) setSessions(ss)
+      if (us) {
+        const by: Record<string, { percent: number | null; work_steps: number | null }> = {}
+        for (const a of us.agents) by[a.session_id] = { percent: a.percent, work_steps: a.work_steps }
+        setUsageBy(by)
+        setTokenPill(us.token_pill || 0)
       }
     }
     poll()
+    const i = setInterval(poll, 2000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [])
+
+  // ---- subagents (all agents) — slower cadence so the per-agent read_log
+  // fan-out doesn't pile onto the 2s roster/usage poll and saturate the
+  // sidecar's WSL-subprocess thread pool (each read_log spawns wsl.exe).
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      const ss = sessionsRef.current
+      if (!ss.length) { setSubagentsBy({}); return }
+      const entries = await Promise.all(
+        ss.map(async s => [s.session_id, (await api.subagents(s.session_id))?.subagents || []] as const)
+      )
+      if (!cancelled) setSubagentsBy(Object.fromEntries(entries))
+    }
+    poll()
+    const i = setInterval(poll, 4500)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [])
+
+  // Clear a stale selection if the agent vanished (retired elsewhere).
+  useEffect(() => {
+    if (selectedId && sessions.length && !sessions.some(s => s.session_id === selectedId)) {
+      setSelectedId(null)
+    }
+  }, [sessions, selectedId])
+
+  // ---- focused agent: message stream + context -----------------------------
+  useEffect(() => {
+    if (!selectedId) { setEvents([]); setCtx(null); return }
+    let cancelled = false
+    const loop = async () => {
+      while (!cancelled) {
+        const [hist, c] = await Promise.all([api.history(selectedId), api.context(selectedId)])
+        if (cancelled) break
+        if (hist) setEvents(hist)
+        setCtx(c)
+        await new Promise(r => setTimeout(r, 900))
+      }
+    }
+    loop()
     return () => { cancelled = true }
-  }, [activeId])
+  }, [selectedId])
 
-  const createSession = async () => {
-    try {
-      const res = await fetch(`${API}/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permission_mode: 'acceptEdits' }),
-      })
-      const session = await res.json()
-      setActiveId(session.session_id)
-      setEvents([])
-    } catch (e) {
-      console.error('Failed to create session:', e)
+  // ---- handlers ------------------------------------------------------------
+  const onCreate = useCallback(async (payload: CreatePayload) => {
+    setCreating(true)
+    const s = await api.create(payload)
+    setCreating(false)
+    if (s) {
+      // Optimistically add to the roster so the "clear stale selection" effect
+      // doesn't immediately drop this freshly-selected agent before the next
+      // roster poll catches up (a race that left the new agent unselected).
+      setSessions(prev => prev.some(x => x.session_id === s.session_id) ? prev : [...prev, s])
+      setSelectedId(s.session_id); setAgentTab('details'); setEvents([])
     }
-  }
+  }, [])
 
-  const deleteSession = async (id: string) => {
-    try {
-      await fetch(`${API}/sessions/${id}`, { method: 'DELETE' })
-      if (activeId === id) { setActiveId(null); setEvents([]) }
-    } catch { /* ignore */ }
-  }
+  const onRetire = useCallback(async () => {
+    if (!selectedId) return
+    await api.retire(selectedId)
+    setSelectedId(null)
+  }, [selectedId])
 
-  const sendPrompt = async (prompt: string) => {
-    if (!activeId) return
-    try {
-      await fetch(`${API}/sessions/${activeId}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      })
-    } catch (e) {
-      console.error('Failed to send:', e)
-    }
-  }
+  const onSend = useCallback(async (prompt: string) => {
+    if (!selectedId) return
+    await api.send(selectedId, prompt)
+  }, [selectedId])
 
-  const interrupt = async () => {
-    if (!activeId) return
-    try {
-      await fetch(`${API}/sessions/${activeId}/interrupt`, { method: 'POST' })
-    } catch { /* ignore */ }
-  }
+  const onStop = useCallback(async () => { if (selectedId) await api.interrupt(selectedId) }, [selectedId])
+  const onSetModel = useCallback(async (m: string) => { if (selectedId && m) await api.setModel(selectedId, m) }, [selectedId])
+  const onSetEffort = useCallback(async (e: string) => { if (selectedId) await api.setEffort(selectedId, e) }, [selectedId])
+  const onAnswer = useCallback(async (id: string, approve: boolean) => { await api.answerPermission(id, approve) }, [])
+
+  // ---- footer counts -------------------------------------------------------
+  const subCount = Object.values(subagentsBy).reduce((a, l) => a + l.length, 0)
+  const active = sessions.filter(s => s.status === 'running' && !s.has_pending_permission).length
+  const pending = sessions.filter(s => s.has_pending_permission).length
+  const errored = sessions.filter(s => s.status === 'error').length
+  const idle = sessions.length - active - pending - errored
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.t1, fontFamily: "'Archivo', sans-serif", overflow: 'hidden' }}>
-      {/* Title Bar */}
-      <div style={{ height: 36, background: C.main, borderBottom: `2px solid ${C.borderH}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, flexShrink: 0, WebkitAppRegion: 'drag' as any }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', border: `2px solid ${C.border}`, background: C.coral }} />
-          <div style={{ width: 10, height: 10, borderRadius: '50%', border: `2px solid ${C.border}`, background: C.gold }} />
-          <div style={{ width: 10, height: 10, borderRadius: '50%', border: `2px solid ${C.border}`, background: C.sage }} />
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 800, color: C.mainFg }}>AWL Dashboard</span>
-        <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 5, background: C.card, color: C.t1, border: `2px solid ${C.border}`, fontFamily: 'monospace', fontWeight: 800 }}>v0.2</span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.t1, fontFamily: FONT, overflow: 'hidden' }}>
+      {/* ===== Title bar ===== */}
+      <div style={{ height: 36, minHeight: 36, background: C.main, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: C.mainFg }}>AWL Multi-Agent Dashboard</span>
+        <Chip bg={C.card} fg={C.t1}>v{health.version || '0.3'}</Chip>
+        <Chip bg={C.card} fg={C.t1}>{sessions.length} agents</Chip>
         <div style={{ flex: 1 }} />
-        {!sidecarOk && (
-          <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 5, background: C.dangerSoft, color: C.coral, border: `2px solid ${C.border}`, fontWeight: 800 }}>
-            Sidecar offline
-          </span>
-        )}
-        {sidecarOk && (
-          <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 5, background: C.successSoft, color: C.successText, border: `2px solid ${C.border}`, fontWeight: 800 }}>
-            Connected
-          </span>
-        )}
+        <Chip bg={C.card} fg={C.t3}>{new Date(nowMs).toLocaleTimeString()}</Chip>
+        <Chip bg={C.card} fg={C.t3}>WSL2</Chip>
+        <Chip bg={C.card} fg={C.t3}>tmux</Chip>
+        {health.ok
+          ? <Chip bg={C.successSoft} fg={C.successText}>● Connected</Chip>
+          : <Chip bg={C.dangerSoft} fg={C.danger}>● Sidecar offline</Chip>}
       </div>
 
-      {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left: Sessions */}
-        <div style={{ width: 220, borderRight: `2px solid ${C.borderH}`, background: C.bg, flexShrink: 0 }}>
-          <SessionList sessions={sessions} activeId={activeId} onSelect={setActiveId} onCreate={createSession} onDelete={deleteSession} />
+      {/* ===== Body: three columns ===== */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        {/* Left — Agent panel */}
+        <div style={{ width: leftW, flexShrink: 0, borderRight: 'none', overflow: 'hidden' }}>
+          <AgentPanel session={selected} ctx={ctx} tab={agentTab} onTab={setAgentTab}
+            onSetModel={onSetModel} onSetEffort={onSetEffort} onRetire={onRetire}
+            onCreate={onCreate} creating={creating} nowMs={nowMs} />
         </div>
+        <Splitter orientation="vertical" onDelta={(d) => setLeftW(w => clamp(w + d, 240, 560))} />
 
-        {/* Right: Event Feed + Prompt */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-          <EventFeed events={events} status={status} sessionId={activeId} />
-          <PromptComposer sessionId={activeId} status={status} onSend={sendPrompt} onInterrupt={interrupt} />
+        {/* Middle — Team Graph over Library placeholder */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ height: graphH, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ height: 34, minHeight: 34, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Team Graph</span>
+            </div>
+            <TeamGraph sessions={sessions} usageBy={usageBy} subagentsBy={subagentsBy as any}
+              selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setAgentTab('details') }} nowMs={nowMs} />
+          </div>
+          <Splitter orientation="horizontal" onDelta={(d) => setGraphH(h => clamp(h + d, 150, 900))} />
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ height: 34, minHeight: 34, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Library</span>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', padding: 16, background: C.bg, color: C.t5, fontSize: 11, lineHeight: 1.6 }}>
+              <b style={{ color: C.t3 }}>Plans · Documents · Assets</b> — not built this run.<br />
+              The Library needs net-new file endpoints (read/edit plan &amp; doc files, the review side-store, asset media). Surfaced here, deliberately deferred.
+            </div>
+          </div>
         </div>
+        <Splitter orientation="vertical" onDelta={(d) => setRightW(w => clamp(w - d, 320, 720))} />
+
+        {/* Right — Team Feed over Prompt */}
+        <div style={{ width: rightW, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ height: feedH, flexShrink: 0, overflow: 'hidden' }}>
+            <TeamFeed session={selected} events={events} sessions={sessions} onAnswer={onAnswer} />
+          </div>
+          <Splitter orientation="horizontal" onDelta={(d) => setFeedH(h => clamp(h + d, 150, 900))} />
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <PromptPanel session={selected} events={events} onSend={onSend} onStop={onStop} />
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Footer ===== */}
+      <div style={{ height: 28, minHeight: 28, background: C.surface, borderTop: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 14, flexShrink: 0, fontSize: 10, fontWeight: 700, color: C.t3 }}>
+        <span>{sessions.length} agents</span>
+        <span>{subCount} subagents</span>
+        <span style={{ color: C.success }}>{active} active</span>
+        <span>{idle} idle</span>
+        <span style={{ color: C.warning }}>{pending} pending</span>
+        {errored > 0 && <span style={{ color: C.danger }}>{errored} error</span>}
+        <span>session {timeAgo(new Date(mountedAt.current).toISOString(), nowMs)}</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 5, background: C.main, color: C.mainFg, border: `2px solid ${C.border}` }}>
+          Σ {fmtTokens(tokenPill)} tokens
+        </span>
       </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        textarea::placeholder { color: ${C.t5}; }
-        /* Neobrutalism press: raised at rest, slides into its hard shadow on hover/active */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @keyframes awlblink { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+        @keyframes awlbarber { from { background-position: 0 0 } to { background-position: 22px 0 } }
+        .awl-barber { background-image: repeating-linear-gradient(45deg, ${C.success} 0 8px, #8fe0bd 8px 16px); background-size: 22px 22px; animation: awlbarber .6s linear infinite; }
         .nb-btn { transition: transform .07s ease, box-shadow .07s ease; }
-        .nb-btn:hover:not(:disabled), .nb-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none !important; }
+        .nb-btn:hover:not(:disabled), .nb-btn:active:not(:disabled) { transform: translate(2px,2px); box-shadow: none !important; }
         .nb-in:focus { box-shadow: ${C.shadowSm}; }
-        /* Palette-matched scrollbars (mirrors design tokens) */
+        textarea::placeholder, input::placeholder { color: ${C.t5}; }
         ::-webkit-scrollbar { width: 9px; height: 9px; }
         ::-webkit-scrollbar-track { background: ${C.surface}; border-left: 2px solid ${C.border}; }
         ::-webkit-scrollbar-thumb { background: ${C.t3}; border: 2px solid ${C.border}; }
         ::-webkit-scrollbar-thumb:hover { background: ${C.teal}; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        select.nb-in { -webkit-appearance: none; appearance: none; }
       `}</style>
     </div>
   )

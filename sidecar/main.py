@@ -16,12 +16,15 @@ The sidecar itself is driver-agnostic.
 import asyncio
 import json
 import logging
+import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -91,6 +94,7 @@ class SessionState:
             "agent_type": self.agent_type,
             "model": self.model,
             "permission_mode": self.permission_mode,
+            "cwd": self.cwd,
             "driver": self.driver.name if self.driver else (self.driver_name or default_driver_name()),
             "status": self.status,
             "created_at": self.created_at,
@@ -98,6 +102,10 @@ class SessionState:
             "total_turns": self.total_turns,
             "event_count": len(self.events),
             "has_pending_permission": self.pending_permission is not None,
+            # The parsed detail of a pending tool-permission prompt (question +
+            # options), so the Inbox can render the request for any agent, not
+            # just the focused one. None when nothing is pending.
+            "permission_request": self.pending_permission,
             # Dashboard-owned identity (role/number/name/color/icon) — the UI
             # renders agent cards and the Agent panel from this everywhere.
             "identity": self.identity,
@@ -720,6 +728,40 @@ async def settings_config(project: str | None = None):
         return await asyncio.to_thread(read_config, _get_registry_bridge(), project)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Agent identity icons (recolorable game-icon tiles)
+# ============================================================================
+#
+# Serves the existing `assets/icons/agents/*.svg` set so the renderer can draw
+# each agent's identity tile. A `?color=#rrggbb` query recolors the icon's
+# full-bleed background rect to the agent's color (the white glyph stays a
+# knockout) — the recolorable-tile treatment the mockup uses. Read-only; serves
+# files the repo already ships (not a data/feature endpoint).
+
+_ICONS_DIR = Path(__file__).resolve().parents[1] / "assets" / "icons" / "agents"
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+# The full-bleed background rect every game-icon opens with (default black fill).
+_ICON_BG_PATH = '<path d="M0 0h512v512H0z"/>'
+
+
+@app.get("/assets/agent-icons/{name}")
+async def agent_icon(name: str, color: str | None = None):
+    safe = name if name.endswith(".svg") else f"{name}.svg"
+    if "/" in safe or "\\" in safe or ".." in safe:
+        raise HTTPException(status_code=404, detail="Not found")
+    path = _ICONS_DIR / safe
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Icon not found")
+    svg = path.read_text(encoding="utf-8")
+    # Recolor only when a valid hex is given (guards against SVG injection).
+    if color and _HEX_RE.match(color):
+        svg = svg.replace(
+            _ICON_BG_PATH, f'<path d="M0 0h512v512H0z" fill="{color}"/>', 1
+        )
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ============================================================================
