@@ -384,6 +384,14 @@ Files: frontend/src/renderer/App.tsx, DEVLOG.md
 
 ---
 
+### 2026-06-26 20:01:43 — CLAUDE.md: bridge UI end-to-end path now marked proven (was "unproven")
+
+Updated the `sidecar/` row in `CLAUDE.md` to reflect the live-verification above. The row had claimed the bridge was "live-verified below the UI … only the end-to-end path *through the dashboard UI* is still unproven" — which the 19:48:20 pass disproved. Reworded that clause to **"now proven end-to-end through the dashboard UI"** (create with no driver named → `bridge` → real tmux session, no tab → live turns render in the feed), noting the verifying pass also caught & fixed the `EventRenderer` string-content crash. No other major doc needed changes: `DESIGN.md` carries design intent, not run-state, and made no such "unproven" claim.
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
