@@ -583,6 +583,22 @@ Files: design/mockup.html, DEVLOG.md
 
 ---
 
+### 2026-06-29 20:05:00 — User-icon rendering options gallery (pre-decision) → design/ui-snippets/
+
+Built a standalone review gallery `design/ui-snippets/user-icon-options.html` (self-contained, inline data URIs) showing 6 ways to render the human user avatar on the `--ag-user` slate tile, each at the actual UI sizes (24–40px) + enlarged (96/200px): **A** tight-crop pure-white stencil, **B** same with soft edges, **C** pure-white + navy keyline, **D** white + navy shadows (2-tone, most identifiable), **E** looser crop, **REF** the current graded baseline. No mockup changes yet — awaiting the user's pick. Two follow-ups already scoped for when they decide: (1) inline the chosen treatment into `design/mockup.html`; (2) one-line badge fix — `.badge.ag-user-badge .agtile` ([mockup.html:1373](design/mockup.html#L1373)) uses the `background` shorthand which wipes the avatar `background-image` in the card badges (Messages/History/etc.), so it currently shows just the slate fill; switching it to `background-color` lets the avatar render in every user badge. Generator: `.scratch/avatar/make_options.py`.
+
+Files: design/ui-snippets/user-icon-options.html, DEVLOG.md
+
+---
+
+### 2026-06-29 20:30:00 — User-icon: option C (pure-white + navy keyline) inlined + badge fill fix (avatar now in ALL user badges)
+
+Picked option C with a looser crop. Regenerated the screenprint as a 1-bit pure-white stencil + a thin navy keyline on a **compromise crop** `(45,13,246,214)` — the midpoint of the tight A–D crop and the looser E crop — so the **head is no longer clipped**; inlined it as the `.agtile--me` data URI in `design/mockup.html` (replacing the prior graded one). Also fixed the badge bug the user flagged: `.badge.ag-user-badge .agtile` ([mockup.html:1373](design/mockup.html#L1373)) used the `background` **shorthand**, which wiped the avatar's `background-image`, so user badges inside cards (Messages / History / To-From) showed only the slate fill — switched it to `background-color`, so the photo now renders in **every** user badge. Verified headless @1480px: the FROM/TO tile and the Messages "HUMAN User" card badge now show the face (pure-white stencil, full head, legible ~24–32px); agent badges still show their game-icons. Generator: `.scratch/avatar/make_C_comp.py`.
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
