@@ -14,7 +14,10 @@ import shutil
 import time
 import re
 import uuid
-from .paths import is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN
+from .paths import (
+    is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN,
+    parse_default_gateway, sidecar_base_url,
+)
 
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
@@ -143,6 +146,10 @@ class TmuxBridge:
         # `find_transcript` resolves a session's OWN transcript even when several
         # agents share a cwd (and thus a project dir). See create()/transcript.py.
         self._session_uuids: dict[str, str] = {}
+        # Cached Windows-host IP reachable from inside WSL (the default gateway).
+        # "" = resolved-but-none; None = not yet resolved. Stable within a WSL
+        # boot, so resolved once and reused for every agent's hook URL.
+        self._host_ip: str | None = None
 
     # --- Low-level execution ---
 
@@ -990,6 +997,33 @@ class TmuxBridge:
             model: Model name (e.g. "sonnet", "opus", "haiku").
         """
         self._default_model = model
+
+    def wsl_host_ip(self):
+        """The Windows-host IP reachable from inside WSL2 (the default gateway).
+
+        In WSL2's default NAT networking the in-WSL ``localhost`` does NOT reach
+        the host and ``host.docker.internal`` lands on the LAN IP (firewall-blocked
+        from WSL) — both live-verified in the OD-02 hook spike — so an agent's
+        HTTP hook must POST to this gateway address. Resolved once per WSL boot
+        and cached. Returns the dotted-quad, or ``None`` if it can't resolve.
+        """
+        if self._host_ip is not None:
+            return self._host_ip or None
+        try:
+            out = self._run("ip route show default", timeout=10)
+        except Exception:
+            out = ""
+        self._host_ip = parse_default_gateway(out) or ""
+        return self._host_ip or None
+
+    def sidecar_hook_base_url(self, port=None):
+        """The WSL-reachable sidecar base URL (``http://<host>:<port>``) the
+        per-agent hooks POST to, or ``None`` if the host gateway can't be
+        resolved (hooks are then omitted and launch still succeeds)."""
+        ip = self.wsl_host_ip()
+        if port is None:
+            return sidecar_base_url(ip)
+        return sidecar_base_url(ip, port=port)
 
     def mcp_sync(self):
         """Sync MCP server config from Windows .claude.json into WSL.

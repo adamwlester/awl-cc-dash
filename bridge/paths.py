@@ -61,6 +61,41 @@ def wsl_to_win(path):
     return path
 
 
+def parse_default_gateway(ip_route_output):
+    """Extract the default-route gateway IP from ``ip route show default`` output.
+
+    In WSL2's default (NAT) networking the default gateway IS the Windows host as
+    seen from inside WSL — so this is the host-reachable address an in-WSL agent's
+    HTTP hook must POST to (``localhost`` from WSL2 does not reach the host, and
+    ``host.docker.internal`` resolves to the LAN IP which the host firewall blocks
+    from WSL — both live-verified in the OD-02 spike). The IP changes across WSL
+    restarts, so callers resolve it at launch rather than hardcoding it.
+
+    Returns the dotted-quad string, or ``None`` when there is no default route.
+    """
+    if not ip_route_output:
+        return None
+    m = re.search(r"^default\s+via\s+(\d+\.\d+\.\d+\.\d+)\b",
+                  ip_route_output, re.MULTILINE)
+    return m.group(1) if m else None
+
+
+# The sidecar's port (FastAPI/uvicorn). The hook URL the agents POST to is
+# http://<wsl-host-gateway>:<SIDECAR_PORT>/internal/hooks/... .
+SIDECAR_PORT = 7690
+
+
+def sidecar_base_url(host_ip, port=SIDECAR_PORT):
+    """Build the WSL-reachable sidecar base URL from a resolved host IP.
+
+    ``None`` host -> ``None`` (the caller couldn't resolve the gateway; the hook
+    config is then omitted so launch still succeeds — hooks are best-effort).
+    """
+    if not host_ip:
+        return None
+    return f"http://{host_ip}:{port}"
+
+
 # WSL home directory for the default user
 WSL_HOME = "/home/lester"
 

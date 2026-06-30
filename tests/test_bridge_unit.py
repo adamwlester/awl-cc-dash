@@ -22,7 +22,7 @@ from bridge.transcript import (
     _resolve_session_id,
     find_transcript,
 )
-from bridge.paths import WSL_CLAUDE_PROJECTS
+from bridge.paths import WSL_CLAUDE_PROJECTS, parse_default_gateway, sidecar_base_url
 from sidecar.drivers.bridge import (
     derive_context_usage,
     derive_subagents,
@@ -1085,3 +1085,33 @@ class TestEntryToEventAnchor:
 
     def test_non_message_entry_skipped(self):
         assert _entry_to_event({"type": "file-history-snapshot"}) is None
+
+
+# -----------------------------------------------------------------------------
+# WSL2 -> Windows-host gateway resolution (the hook URL must be host-reachable;
+# localhost from WSL2 does NOT reach the host — live-verified in the OD-02 spike).
+# -----------------------------------------------------------------------------
+
+class TestDefaultGatewayParse:
+    def test_parses_gateway_ip(self):
+        out = "default via 172.26.112.1 dev eth0 proto kernel \n"
+        assert parse_default_gateway(out) == "172.26.112.1"
+
+    def test_parses_with_extra_routes(self):
+        out = (
+            "default via 192.168.64.1 dev eth0 proto kernel metric 100\n"
+            "172.17.0.0/16 dev docker0 proto kernel scope link\n"
+        )
+        assert parse_default_gateway(out) == "192.168.64.1"
+
+    def test_empty_returns_none(self):
+        assert parse_default_gateway("") is None
+        assert parse_default_gateway(None) is None
+
+    def test_no_default_route_returns_none(self):
+        assert parse_default_gateway("172.17.0.0/16 dev docker0 scope link\n") is None
+
+    def test_sidecar_base_url_formats_host_and_port(self):
+        assert sidecar_base_url("172.26.112.1") == "http://172.26.112.1:7690"
+        assert sidecar_base_url("10.0.0.5", port=8000) == "http://10.0.0.5:8000"
+        assert sidecar_base_url(None) is None

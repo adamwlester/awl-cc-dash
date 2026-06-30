@@ -16,6 +16,7 @@ The sidecar itself is driver-agnostic.
 import asyncio
 import json
 import logging
+import os
 import re
 import uuid
 from collections import deque
@@ -32,6 +33,7 @@ from sse_starlette.sse import EventSourceResponse
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
 from identity import assign_identity
 import eventbus
+import hookbus
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -462,8 +464,10 @@ class SendPromptRequest(BaseModel):
     # OD-02 send-timing disposition. `queue` (the polite default) waits for the
     # turn AND the existing queue; `next` jumps ahead at the next idle; `now`
     # interrupts the current run and delivers immediately; `hold` stages for
-    # manual release. (`inject` = mid-run via the hook channel — spike-gated.)
-    disposition: Literal["now", "next", "queue", "hold"] = "queue"
+    # manual release; `inject` = true mid-run delivery via the OD-02 hook channel
+    # (spike-proven on the installed build — lands at the next tool boundary
+    # without stopping the turn; if the agent is idle it lands on its next run).
+    disposition: Literal["now", "next", "queue", "hold", "inject"] = "queue"
 
 class SetModelRequest(BaseModel):
     model: str
@@ -583,6 +587,22 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     session = sessions[session_id]
     if not session.driver:
         raise HTTPException(status_code=503, detail="Session not connected yet")
+
+    # `inject` rides the OD-02 hook channel, not the prompt queue: it's pushed to
+    # the agent mid-turn at its next tool boundary (no stop). Queue it on the
+    # durable inbox and surface a synthesized feed event (the inject text is not
+    # written to the agent's JSONL transcript, so the sidecar owns its visibility).
+    if req.disposition == "inject":
+        inj = hookbus.enqueue_inject(session_id, req.prompt, kind="inject",
+                                     source=req.source)
+        session.push_event({
+            "type": "inject", "text": req.prompt, "kind": "inject",
+            "inject_id": inj["id"],
+            "timestamp": datetime.now().isoformat(),
+            "source": req.source,
+            "recipients": req.recipients if req.recipients is not None else [session_id],
+        })
+        return {"status": "injected", "session_id": session_id, "inject_id": inj["id"]}
 
     entry = {
         "id": str(uuid.uuid4())[:8],
@@ -706,6 +726,65 @@ async def get_merged_history(since: int | None = None,
     return eventbus.replay(since=since,
                            sources=_parse_csv(source),
                            recipients=_parse_csv(recipient))
+
+
+# ============================================================================
+# OD-02 hook channel — inbox-drain endpoints (the bridge points each agent's
+# PostToolUse + Stop HTTP hooks here, keyed by ?agent=<sidecar-session-id>).
+# Spike-proven: a PostToolUse `additionalContext` reply lands mid-turn on the
+# installed build. Durable + ack-on-2xx: an inject leaves the inbox only when it
+# is handed back in this 200 response; a failed/timed-out hook (non-blocking on
+# the build) leaves it pending for the next boundary.
+# ============================================================================
+
+def _surface_delivered_injects(agent_id: str, injects: list[dict[str, Any]]) -> None:
+    """Push a synthesized 'delivered' feed event per drained inject (best-effort,
+    never fails the 2xx ack)."""
+    session = sessions.get(agent_id)
+    if not session:
+        return
+    for inj in injects:
+        try:
+            session.push_event({
+                "type": "inject_delivered",
+                "text": inj.get("text", ""),
+                "kind": inj.get("kind", "inject"),
+                "inject_id": inj.get("id"),
+                "timestamp": datetime.now().isoformat(),
+                "source": inj.get("source") or "system",
+                "recipients": [agent_id],
+            })
+        except Exception:  # pragma: no cover - never break the ack
+            pass
+
+
+@app.post("/internal/hooks/post-tool-use/{agent}")
+async def hook_post_tool_use(agent: str):
+    """PostToolUse drain: hand back ALL pending injects (active + passive) as one
+    `additionalContext` block so a running agent receives them mid-turn at the
+    next tool boundary. Empty -> `{}` (a 2xx no-op).
+
+    ``agent`` is a PATH param (the sidecar session id the bridge baked into the
+    hook URL) — claude's http-hook client does not reliably forward a query
+    string, so the id rides the path.
+    """
+    injects = hookbus.drain(agent)
+    if injects:
+        logger.info("hook drain post-tool-use agent=%s delivered=%d", agent, len(injects))
+    _surface_delivered_injects(agent, injects)
+    return hookbus.post_tool_use_output(injects)
+
+
+@app.post("/internal/hooks/stop/{agent}")
+async def hook_stop(agent: str):
+    """Stop backstop: for the no-tool-call turn, surface only ACTIVE injects via
+    `decision:"block"` so a pure-text turn still catches them at turn-end. Passive
+    `context` injects are left pending (blocking Stop would force a continuation)."""
+    injects = hookbus.drain(agent, kinds={"inject"})
+    if injects:
+        logger.info("hook drain stop agent=%s delivered=%d", agent, len(injects))
+    _surface_delivered_injects(agent, injects)
+    return hookbus.stop_output(injects)
 
 
 @app.post("/sessions/{session_id}/interrupt")
@@ -1002,4 +1081,11 @@ async def get_usage():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=7690, log_level="info")
+    # OD-02: bind WSL-reachable by default so in-WSL agents' HTTP hooks reach the
+    # sidecar over the host gateway IP (127.0.0.1 is NOT reachable from WSL2 — see
+    # the hook spike). On a single-user laptop this exposes the dev port on the
+    # LAN; override with AWL_SIDECAR_HOST=127.0.0.1 to keep it loopback-only (the
+    # hook channel then degrades — injects stay pending — but everything else
+    # works).
+    host = os.environ.get("AWL_SIDECAR_HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=7690, log_level="info")

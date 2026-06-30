@@ -927,6 +927,23 @@ Files: design/tokens.css, design/styles.css, design/behavior.js, design/mockup.h
 
 ---
 
+### 2026-06-30 20:30:00 — backend: OD-02 hook channel SHIPPED + spike PASS + foundation live-verified
+
+Ran the prerequisite-#1 **OD-02 hook spike** live on the installed build (claude **2.1.195**) and it **PASSES** — so per the prompt I shipped the full hook functionality (unblocks OD-05 Inject, OD-09 Plan/Decision, OD-17 live scratchpad). Findings, each proven by driving a real tmux agent (serialized, throwaway cwd):
+- **Inject lands mid-turn.** A `PostToolUse` hook returning `hookSpecificOutput.additionalContext` is surfaced by the agent **in the same turn** — proven first with a static `command` hook (Step A), then end-to-end through a real **`http`** hook + the sidecar drain (Step B): the agent echoed the injected sentinel mid-turn and the sidecar logged `hook drain post-tool-use … delivered=1`. Both `http` and `command` hook types fire and reach the host; `http`'s returned `additionalContext` injects too.
+- **WSL2→host URL.** `localhost`/`host.docker.internal` are NOT reachable from WSL2 (NAT mode); the **default-gateway IP** is (firewall permits the WSL vEthernet). New `bridge.paths.parse_default_gateway` + `TmuxBridge.wsl_host_ip()`/`sidecar_hook_base_url()` resolve it at launch. The sidecar now binds **0.0.0.0** by default (`AWL_SIDECAR_HOST`) so the in-WSL hook can reach it.
+- **Gotcha fixed:** claude's http-hook client does **not** forward a query string — the agent id rides the URL **path** (`/internal/hooks/post-tool-use/{agent}`), not `?agent=`. (This was the lone Step-B failure; path-param fixed it.)
+
+Built: new `sidecar/hookbus.py` — durable per-agent inject inbox (kinds `inject`=active / `context`=passive), `drain` (ack-on-2xx; Stop drains active-only so passive scratchpad never force-continues a turn), and the exact PostToolUse/Stop output builders (10k-cap). New sidecar endpoints `POST /internal/hooks/post-tool-use/{agent}` + `/stop/{agent}` (drain + synthesized `inject_delivered` feed event). `send_prompt` gained the **`inject`** disposition → routes to the hook inbox (not the prompt queue) + a synthesized `inject` feed event (injects aren't written to the JSONL). The bridge driver auto-injects the per-agent PostToolUse+Stop hooks at launch (gated by `AWL_DISABLE_HOOKS`).
+
+Also **live-verified the Tier-1 foundation** through the same real agent: the merged `GET /events` stream (OD-01/22 envelope id/agent_id/seq/source/recipients present; live SSE delivering) and the **OD-02 queue idle-flush** on a real `generating→idle` boundary — both PASS.
+
+Verified: **+21 hermetic tests** (`tests/test_hookbus_unit.py` 12; bridge gateway-parse 5; sidecar inject-disposition + drain-endpoints 4) → **167 hermetic green**; plus the live spikes above. No `design/` touched.
+
+Files: sidecar/hookbus.py (new), sidecar/main.py, sidecar/drivers/bridge.py, bridge/bridge.py, bridge/paths.py, tests/test_hookbus_unit.py (new), tests/test_bridge_unit.py, tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

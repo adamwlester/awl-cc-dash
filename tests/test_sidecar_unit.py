@@ -387,3 +387,75 @@ class TestPromptQueue:
         assert s.driver.interrupted == 1               # Now interrupts the run
         assert s.prompt_queue[0]["prompt"] == "x"      # waits at head for idle-flush
         assert s.driver.sent == []
+
+
+import hookbus  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _clean_hookbus():
+    hookbus.reset()
+    yield
+    hookbus.reset()
+
+
+class TestInjectDisposition:
+    """OD-02 `inject` disposition routes to the hook inbox, NOT the prompt queue,
+    and surfaces a synthesized feed event (the inject isn't in the JSONL)."""
+
+    def test_inject_enqueues_to_hookbus_not_queue(self):
+        s = _session(); s.driver = _FakeDriver(); s.status = "running"
+        main.sessions["s1"] = s
+        try:
+            r = asyncio.run(main.send_prompt(
+                "s1", main.SendPromptRequest(
+                    prompt="peer touched foo.py", disposition="inject",
+                    source="coder-02")))
+        finally:
+            main.sessions.pop("s1", None)
+        assert r["status"] == "injected"
+        # not on the prompt queue, not sent to the driver
+        assert len(s.prompt_queue) == 0
+        assert s.driver.sent == []
+        # waiting on the durable inbox for the next tool boundary
+        pend = hookbus.pending("s1")
+        assert [i["text"] for i in pend] == ["peer touched foo.py"]
+        assert pend[0]["source"] == "coder-02"
+        # and a feed event was synthesized
+        assert any(e["type"] == "inject" for e in s.events)
+
+
+class TestHookDrainEndpoints:
+    def test_post_tool_use_drains_and_acks(self):
+        s = _session(); main.sessions["s1"] = s
+        try:
+            hookbus.enqueue_inject("s1", "hello mid-turn", source="user")
+            out = asyncio.run(main.hook_post_tool_use(agent="s1"))
+            ctx = out["hookSpecificOutput"]["additionalContext"]
+            assert "hello mid-turn" in ctx
+            # acked: a second drain is an empty no-op
+            assert asyncio.run(main.hook_post_tool_use(agent="s1")) == {}
+            # delivered event surfaced on the feed
+            assert any(e["type"] == "inject_delivered" for e in s.events)
+        finally:
+            main.sessions.pop("s1", None)
+
+    def test_post_tool_use_empty_is_noop(self):
+        assert asyncio.run(main.hook_post_tool_use(agent="nobody")) == {}
+
+    def test_stop_only_blocks_for_active_injects(self):
+        main.sessions["s1"] = _session()
+        try:
+            hookbus.enqueue_inject("s1", "passive", kind="context")
+            # nothing active -> Stop is a no-op, passive stays pending
+            assert asyncio.run(main.hook_stop(agent="s1")) == {}
+            assert [i["text"] for i in hookbus.pending("s1")] == ["passive"]
+            # an active inject -> Stop blocks with the reason
+            hookbus.enqueue_inject("s1", "answer me", kind="inject")
+            out = asyncio.run(main.hook_stop(agent="s1"))
+            assert out["decision"] == "block"
+            assert "answer me" in out["reason"]
+            # the passive one is still NOT consumed by the Stop drain
+            assert [i["text"] for i in hookbus.pending("s1")] == ["passive"]
+        finally:
+            main.sessions.pop("s1", None)

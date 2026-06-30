@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import sys
 import uuid
@@ -448,13 +449,51 @@ class BridgeDriver(AgentDriver):
     def tmux_name(self) -> str:
         return self._name
 
+    def _build_hook_settings(self) -> dict | None:
+        """OD-02 hook channel — the per-agent PostToolUse + Stop HTTP hooks.
+
+        Points each agent at the sidecar's inbox-drain endpoints (keyed by THIS
+        agent's sidecar session id) over the WSL-reachable host gateway URL — the
+        spike-proven path that delivers a queued inject mid-turn. PostToolUse
+        drains at the next tool boundary; Stop backstops the no-tool-call turn.
+        Returns None (hooks omitted, launch still succeeds) when hooks are
+        disabled, the session id isn't bound yet, or the host gateway can't
+        resolve. Set ``AWL_DISABLE_HOOKS=1`` to opt out fleet-wide.
+        """
+        if os.environ.get("AWL_DISABLE_HOOKS") == "1" or not self._session_id:
+            return None
+        try:
+            base = self._bridge.sidecar_hook_base_url()
+        except Exception:
+            base = None
+        if not base:
+            return None
+        agent = self._session_id
+        # agent id rides the PATH (claude's http-hook client doesn't reliably
+        # forward a query string — verified in the OD-02 spike).
+        return {
+            "hooks": {
+                "PostToolUse": [{"matcher": "", "hooks": [{
+                    "type": "http",
+                    "url": f"{base}/internal/hooks/post-tool-use/{agent}",
+                    "timeout": 5,
+                }]}],
+                "Stop": [{"matcher": "", "hooks": [{
+                    "type": "http",
+                    "url": f"{base}/internal/hooks/stop/{agent}",
+                    "timeout": 5,
+                }]}],
+            }
+        }
+
     def _build_settings(self) -> dict | None:
-        """Per-agent --settings payload: permission rules + plugin enablement.
+        """Per-agent --settings payload: permission rules + plugins + hooks.
 
         ``permission_rules`` {allow,deny,ask} -> ``permissions`` (deny is the
         reliable hard-block in all modes); ``enabled_plugins`` {"id": bool} ->
-        ``enabledPlugins`` (per-agent plugin enable/disable — live-verified).
-        Returns None when neither is set (no --settings file is written).
+        ``enabledPlugins`` (per-agent plugin enable/disable — live-verified); plus
+        the OD-02 ``hooks`` block (the inject channel). Returns None when nothing
+        is set (no --settings file is written).
         """
         settings: dict[str, Any] = {}
         rules = self.config.permission_rules or {}
@@ -463,6 +502,9 @@ class BridgeDriver(AgentDriver):
             settings["permissions"] = perms
         if self.config.enabled_plugins:
             settings["enabledPlugins"] = dict(self.config.enabled_plugins)
+        hooks = self._build_hook_settings()
+        if hooks:
+            settings.update(hooks)
         return settings or None
 
     def _build_mcp_config(self) -> dict | None:
