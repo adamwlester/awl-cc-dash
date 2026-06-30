@@ -38,12 +38,12 @@
 | OD-13 | Subagent integration model 🎨 | 3 Feature | OPEN | ◆ | decided |
 | OD-14 | Permissions — binary approve/deny (no "Always allow") 🎨 | 3 Feature | OPEN / BLOCKED | ◆ | decided |
 | OD-15 | Library — v1 read+render, project-scoped (OD-23) 🎨 | 3 Feature | OPEN / BLOCKED | ◆ | decided |
-| OD-16 | Prompt extras (Embed/Attach/Templates/Revise/Send-as) | 3 Feature | OPEN | ◆ | open |
-| OD-17 | Shared scratchpad — project `.awl/scratchpad.md` (OD-23) | 3 Feature | DECIDED‑UNBUILT | ▶ | decided |
-| OD-18 | Settings writes + account/usage limits | 3 Feature | OPEN | ◆ | open |
-| OD-19 | Agent permanent Delete vs Retire | 3 Feature | DECIDED‑UNBUILT | ▶ | open |
-| OD-20 | Console surface + slash-command runner | 3 Feature | OPEN | ◆ | open |
-| OD-21 | Static mockup → React migration + library choice | 4 Strategic | OPEN | ✚ | open |
+| OD-16 | Prompt extras — full mockup set, no cut (solve plumbing) 🎨 | 3 Feature | OPEN | ◆ | decided |
+| OD-17 | Shared scratchpad — always-live auto-read channel (`.awl/`, OD-23) | 3 Feature | DECIDED‑UNBUILT | ▶ | decided |
+| OD-18 | Settings — write everything feasible + account & usage bands 🎨 | 3 Feature | OPEN | ◆ | decided |
+| OD-19 | Retire + Delete both in v1 (hard-wipe private, tombstone shared) | 3 Feature | DECIDED‑UNBUILT | ▶ | decided |
+| OD-20 | Console — adopt design (per-agent tab + slash-runner IN); wire backend 🎨 | 3 Feature | OPEN | ◆ | decided |
+| OD-21 | React port + library choice — PARKED (revisit at churn→zero) | 4 Strategic | OPEN | ✚ | decided |
 | OD-22 | Message addressing schema (source + recipients[]) | 1 Foundation | DECIDED‑UNBUILT | ▶ | decided |
 | OD-23 | Storage & scoping model (3 homes; dev `projects/`) | 1 Foundation | OPEN | ▶ | decided |
 
@@ -215,15 +215,33 @@
 - **Source:** QA Q24/Q25/Q26/Q27; coverage-map Prompt.
 - **Recommended:** v1 = **Embed** (settled, just needs a write path) + History basics; **defer Attach/citations** until WSL↔Windows path normalization is solved; do **Revise/Summarize via the sdk path** when the utility-LLM lands; Templates + Send-as-agent later.
 - **Confidence:** ◆ Leaning — Embed-first is well-supported; the rest is sequencing against unsolved plumbing (Attach paths are a genuine open problem).
-- **Decision:** _(unset)_
+- **Decision:** **Include the full prompt-composition surface from the mockup — nothing cut.** Per this doc's purpose, it records *what we want*; the plumbing each piece needs is **work to solve**, not a reason to defer. The set, each tagged with the plumbing it requires:
+  - **Editor + inserted-block primitive** — the contenteditable Editor holds free prose + three block variants (`embed` / `template` / `citation`, card-outline boundary). Frontend; **Send** serializes the blocks into the outgoing prompt text.
+  - **Embed** — drops a frozen "from \<source\>" block (doc section / feed-block run / whole card/doc) into the Editor with click-to-source. Needs a **write path** from the Library/feed strip into the Editor (the merged Export control's *Add to prompt → Embed*).
+  - **Attach** — attachment-chip strip above the Editor; whole-doc/asset/card → a chip (real path for on-disk files, a materialized `/tmp/…` for feed content). **Load-bearing solve:** **file materialization + Windows↔WSL2 path normalization** — the one genuinely hard piece; **solve it** (the bridge's `mcp_sync` config-rewrite is the precedent), don't dodge it.
+  - **Citations** — inline `citation` pills inserted from an attachment's link icon; you can only cite something already attached; deleting a citation leaves the attachment, deleting an attachment **cascades** to its citations. Built **with** Attach (same payload).
+  - **Templates** — single-select dropdown (None + saved) + fill-input; picking inserts a `template` block with placeholder pills (filled/unfilled). **Storage per OD-23 = the dashboard runtime store** (reusable / project-agnostic — templates are tool-level reusable data, like Setups); project-specific templates may later live in `<project>/.awl/`.
+  - **Revise** (scope chip: Grammar · Language · Refactor, default Grammar) and **Summarize** (messages slide-over) — both run as **`sdk`-driver utility-LLM passes** (the non-interactive in-process Claude Agent SDK engine reserved exactly for this; **not** the bridge). This is the SDK support that must be wired.
+  - **Send-as-agent** — compose/dispatch a prompt attributed **from** a chosen agent (the shared sub-header's Source/Target). Wire format rides the **OD-22** `source` + `recipients[]` schema, delivered via the **OD-02** queue.
+  - **Response-format popover** — a per-prompt **preamble** (TLDR / Structure groups) prepended to the outgoing prompt. Frontend.
+  - **Plus:** **Voice mic** (Editor-header dictation) · **History tab** (past prompts, multi-select, **Retry** / Stop, Edit — rides the OD-02 queue + a prompt-history store) · the **merged Export control** (Copy · Export→file · Embed · Attach).
+  - **Build order (dependencies, not cuts):** the two solves that gate the rest are **Attach's path-normalization** (unlocks Attach + Citations + materialized-content embeds) and the **`sdk` utility-LLM pass** (unlocks Revise + Summarize); Templates needs the OD-23 store; Send-as-agent needs OD-22; the Editor / inserted-blocks / preamble / mic are frontend that can land early.
+  - **🎨 design-layer:** the Editor, blocks, Templates, attachment-strip, and Export-control UI are `design/` edits — land after the component-system refactor is confirmed done + per-item approval. The backend plumbing (path-normalization, the sdk passes, the template store) is **free to build now**.
 
 ### OD-17 · Shared scratchpad — `DECIDED‑UNBUILT`
+- **Correction note (2026-06-30):** this **reverses** the earlier *no-auto-read* policy. The `Decided:` / `Recommended:` / `Confidence:` lines below are kept **verbatim as the pre-correction record** (per the leave-`Recommended`-as-is rule); the **Decision** now carries the corrected model — the scratchpad is an **always-current, auto-read** live channel, delivered as a bounded per-agent delta.
 - **Decided:** append API + attribution + a WSL-reachable materialized `.md`; **v1 policy = agents do NOT auto-read** (explicit-send only).
 - **Open/net-new:** all of it is unbuilt; revisit auto-read later; same path-normalization caveat as Attach.
 - **Source:** QA Q21/Q22; coverage-map Cross-Cutting.
 - **Recommended:** confirm **v1 = write-in / read-out only** (agents post; they read only when explicitly sent); build the append API + attribution + WSL-reachable `scratchpad.md`.
 - **Confidence:** ▶ Confident — the auto-read policy was explicitly decided (QA Q22).
-- **Decision:** **Confirmed v1 = write-in / read-out only.** Agents **post** to the scratchpad (append API + per-post **attribution** + timestamp); they **read only when content is explicitly sent** to them — **no auto-read** (QA Q22). **Storage per OD-23:** the scratchpad is **project** data, materialized as **`<project>/.awl/scratchpad.md`** — a real `.md` inside the project repo (the agents' `cwd`), so it's **WSL-reachable** and travels with the project. Build = the append/attribution endpoint over that file. **Same WSL2↔Windows path-normalization caveat as Attach (OD-16).** Auto-read is **revisitable later** — a read-*policy* change, not a storage change.
+- **Decision (corrected 2026-06-30):** The scratchpad is the team's **always-current shared comms channel** — every agent **auto-reads** it (reversing the old explicit-send-only policy). Delivered as a **per-agent delta off a read watermark** so context stays bounded: each agent keeps a last-read pointer into the append-log and receives only **new posts past that pointer**, which then advances (the **same watermark mechanism as OD-06** shared-context). Prior history is **not** re-sent — it already sits in the agent's own transcript; the agent actively "sees" only what's new.
+  - **Live mid-run push (option b — chosen):** new posts are pushed to **running** agents **mid-run**, injected at the next tool boundary via the **OD-02 hook channel** (PostToolUse `additionalContext`, Stop-hook backstop), as **passive context that does not trigger a turn**. This is the point: an agent learns *while working* that a peer just touched the same area — an **early collision signal**. *(Rides the OD-02 inject hook — the same spike-gated path as Inject/Plan/Decision. **Fallback:** if that hook doesn't prove out on the installed build, delivery degrades to **start-of-run** injection — no hook needed — so the feature can't get stuck.)*
+  - **Idle agents catch up at run-start:** mid-run push only reaches agents currently in a turn; an idle agent has no tool boundary, so it picks up everything past its watermark **when it next runs**. Net: live push to the running, start-of-run catch-up for the rest — one watermark, two delivery moments.
+  - **First run = full board:** with no watermark yet, an agent's first read delivers the **entire current scratchpad** (full snapshot), then deltas thereafter.
+  - **Includes the agent's own posts** in its delta — so it sees its notes **positioned in the shared timeline** relative to peers. (Reading never emits a post, so there's no echo loop.)
+  - **No delta cap:** always the full diff since last read, however large — deliberately **not** managed in v1 (revisit a cap/rollup only if it proves necessary).
+  - **Write side unchanged:** agents **post** via the append API with per-post **attribution** + timestamp; posts carry `recipients:[scratch]` (OD-22). **Storage** = `<project>/.awl/scratchpad.md` (OD-23), WSL-reachable; same Windows↔WSL2 path-normalization as Attach (OD-16).
 
 ### OD-18 · Settings writes + account/usage — `OPEN`
 - **Question:** reads are built. Decide: **gated writes** (enable/disable toggles, confirm-gated global edit); surfacing the **account band** (email/org/plan — local & readable); and the **usage limits band** (session/weekly % + resets) which is **API-only, not in local files** — fetch it live or omit? Plus **Setups** save / load-spawn-many (tab-less) store.
@@ -231,7 +249,13 @@
 - **Recommended:** build **gated writes** (toggles + confirm-gated global edit) and surface the **account band** from local creds; **defer the live limits band** in v1 (it adds an API dependency for a cosmetic band) — show tier from local creds only.
 - **Confidence:** ◆ Leaning — the limits-band live-fetch is explicitly "decision pending"; my lean is to defer it, but it's a real call.
 - **Storage (resolved per OD-23):** the **Setups** save / load-spawn-many (tab-less) store lives in the **dashboard runtime store** (`sidecar/runtime/`, alongside identity + sessions) — reusable and **project-agnostic**, not per-project. *(A Setup carries only the roster per OD-23 — agents, roles/models/identities, links — no docs and no project baked in.)*
-- **Decision:** _(unset — **storage piece resolved per OD-23 above**; still open: **gated writes** (toggles + confirm-gated global edit), the **account band** from local creds, and the **usage-limits band** live-fetch-vs-omit)_
+- **Decision:** **Make the Settings surface fully interactive — expose a write for everything the engine can actually set, read-display the rest.**
+  - **Writes (the principle: if it's feasible to set, you can set it):** the Settings tabs (**Config · MCP · Plugins**) become **editable**, not view-only — toggles, add/remove/enable, and config edits write to the real Claude Code files (`~/.claude` user-global and `<project>/.claude` project scope). **Per-agent scoping** (an agent's MCP servers, plugins, tools, permission rules) is **surfaced in the Create form / Agent panel** too — today it's accepted at create but not exposed (coverage-map B6/G7). All writes are **confirm-gated** (a plain confirm, heavier for global/destructive edits) — interactive, not foot-gun-y.
+  - **Feasibility boundary (marked honestly, never faked):** **mid-run permission-mode stays engine-BLOCKED** (OD-14 — launch-only); **per-agent MCP / model / plugins take effect at launch/restart**, so editing them on a *live* agent means "applies on next start," not instantly (set live where the engine allows, at-launch where it doesn't); per-agent tool scoping leans **deny-based** (`--allowedTools` is ignored under bypass — a claude bug, OD-14). Anything the engine can't change live is shown as **launch-time** or **blocked**, not as a fake-live toggle.
+  - **Account band — IN:** show **email / org / plan** from local creds (readable, no API); "signed out" when creds are absent.
+  - **Usage-limits band — IN:** show **session / weekly % + resets**, fetched **live from the API** (it isn't in local files). Fetch on open + a light poll; **degrade gracefully** ("unavailable") if the API/creds aren't reachable, so the new API dependency can't break the screen.
+  - **Storage:** **Setups** save / load-spawn-many is already resolved → the **dashboard runtime store** (OD-23; see the Storage line above).
+  - **🎨 design-layer:** the Settings tabs' write controls, the two new bands, and the per-agent Create-form controls are `design/` edits — land after the component-system refactor is confirmed done + per-item approval; the read/write endpoints behind them are backend, free to build now.
 
 ### OD-19 · Agent permanent Delete vs Retire — `DECIDED‑UNBUILT`
 - **Decided:** two-tier — Retire (soft, archives config+transcript) + Delete (hard wipe, confirm-gated). v1 ships **Retire only**.
@@ -239,7 +263,14 @@
 - **Source:** QA Q3; build-2b.
 - **Recommended:** **keep Delete deferred for v1** (Retire only, per the build-2b scope call); add Delete later as a clean confirm-gated wipe of config+transcript+links.
 - **Confidence:** ▶ Confident — this was the explicit build-2b decision.
-- **Decision:** _(unset — keep Delete deferred for v1?)_
+- **Decision:** **Ship both tiers in v1** — Retire **and** permanent Delete (this **changes the prior "Retire only" scope**, per the user). **Retire** stays the soft, reversible tier (stop the session + archive config/transcript; recoverable). **Delete = a hard, irreversible wipe**, governed by one rule: **wipe the agent's private footprint; tombstone everything shared.**
+  - **Wipe (private, hard — scope-b):** remove the dashboard **runtime record** (`runtime_store.remove_record`), kill the live **tmux session** (`bridge.close` → `kill-session`), and **delete the agent's on-disk Claude Code transcript + its subagent transcripts** — true on-disk erasure, not just a dashboard-record removal. *(Honest note: those JSONLs are Claude Code's own data; Delete destroys them deliberately — that's what distinguishes it from Retire, which keeps/archives them.)*
+  - **Available from any state:** Delete works on a running agent too — it's **interrupted + closed first**, then wiped. No forced Retire-then-Delete two-step.
+  - **Gate:** a **plain confirmation dialog** (not type-to-confirm).
+  - **Tombstone everything shared:** the agent's **scratchpad posts** (OD-17), **feed events/messages** (OD-01), and its **link history** (OD-08) are **kept, attributed to the now-deleted identity** and marked deleted/inactive — Delete does **not** rewrite the shared record or corrupt peers' OD-17 watermarks / OD-01 stream. Link edges become **inactive tombstones** on the surviving peer's list (non-functional), not silent removals.
+  - **Clear the agent's own transient state:** its **queued prompts** + **inbox items** (its pending inbound work, OD-02/09) are dropped — moot once the agent is gone, and operational state rather than shared history.
+  - **No identity recycling (ties OD-03):** the agent's **number is permanently retired** — monotonic, never reused, so an old `coder-03` living in tombstoned history never collides with a future agent. Color/icon may still cycle (they repeat by design past 16/25); the tombstone holds the retired number.
+  - **🎨 design-layer:** the Retire/Delete footer already exists in the mockup — any wording/confirm-dialog tweak is a `design/` edit, held until the refactor + per-item approval; the wipe/tombstone backend is free to build now.
 
 ### OD-20 · Console surface + slash-command runner — `OPEN`
 - **Question:** raw terminal feed endpoint is missing. Decide the **surface** (always-on pane vs. per-tap drawer vs. modal) and whether the slash-command **runner/routing** is in scope.
@@ -247,7 +278,11 @@
 - **Source:** DESIGN Console; QA Q28/Q29.
 - **Recommended:** a **per-tap expandable drawer scoped to one agent** (matches DESIGN's "expandable surface"), fed by capture-pane/scrollback; treat the slash-command runner as **later/optional**.
 - **Confidence:** ◆ Leaning — DESIGN leans expandable-per-agent, but drawer-vs-modal is a UX call.
-- **Decision:** _(unset)_
+- **Decision:** **Adopt the Console exactly as DESIGN/mockup already specify** — the design **settled both "open" questions** (the OD-20 framing was stale); the only residue is backend wiring, not a product call.
+  - **Surface (decided in design):** a **per-agent Console tab** in the Agent panel, scoped to the **single focused agent** (single-select so a command's target is unambiguous — why it lives here, not in the multi-target Prompt or multi-filter Feed), with an **Expand** control → a **partial step-into view covering left + middle columns only** (right edge stops at the right column so Team Feed + Prompt stay visible; recomputed on resize/splitter). Reflow: in-column the catalog slides up over the feed; expanded it becomes a left rail beside a wide feed with the run bar across the bottom. The feed **faithfully mimics a real Claude Code terminal** (dark self-contained `--term-*` palette — a documented `tokens.css` exception — with native `>` / `●` / `⎿` / `✻ Thinking…` / diff / permission markers). *(Not a modal, not always-on; deliberately distinct from Settings' full-body step-into.)* — DESIGN.md "Console".
+  - **Slash-command runner — IN (decided in design):** a first-class part of the Console, **not** deferred. A **complete catalog grouped into clusters** (Session & context · Model & behavior · Info & status · Tools & integrations · Project & custom · System), each entry = command + one-line description, with a filter box; commands with a home elsewhere (`/model` in Details, `/mcp` in Settings) are still listed, tagged *also-available-there*. Pick → stages into the run bar; typed-or-staged → runs against the focused agent → output lands in the feed.
+  - **The only open work is backend** (the mockup already tags the run bar `data-comp="console-runbar" data-status="planned"`; `runConsoleCmd` is a mock over a static `CON_FEED`): **(1)** wire the **live raw-terminal feed** — `capture-pane` / `scrollback` is already proven at the bridge, just connect it to the `console-feed`; **(2)** the **slash-command send/route** rides the bridge's existing `send` / `keys` (fire the command at the focused agent) + `capture-pane` (read output back). **Build caveat:** **interactive** commands (`/model`, `/clear`, …) drop the agent into a sub-prompt, so the runner must handle the follow-on interaction, not blind-send-and-forget.
+  - **🎨 design-layer:** nothing new — the Console surface, catalog, and run bar already exist in the mockup (`data-status="planned"`); flipping them planned→built is a `design/` + wiring step held until the refactor + per-item approval. The feed/route backend is free to build now.
 
 ---
 
@@ -260,7 +295,7 @@
 - **Source:** spec §2/§9.
 - **Recommended:** **hold the port until the design-system refactor lands and churn drops** (the stated condition); when porting, run a translation check against neobrutalism.dev/shadcn and **commit to one library** only if the current components map cleanly — otherwise keep the hand-rolled tokens/styles as the system.
 - **Confidence:** ✚ Can't infer — "hold until churn→zero" is grounded, but the library commitment needs a translation spike + your maintenance preference; I won't pick it for you.
-- **Decision:** _(unset)_
+- **Decision:** **Park — not yet.** Defer the React port until **design churn reaches zero** — which is **after** the QA-doc UI changes are integrated into the mockup *and* the component-system refactor lands (per the user, churn is **not** there yet). The two coupled calls — **(a) port timing** and **(b) library commitment** (adopt **neobrutalism.dev** / **shadcn** vs. keep the hand-rolled `tokens.css` / `styles.css` system) — are a **dedicated future discussion**, gated on a **translation spike** (map a few real components onto a candidate library to see whether they fit cleanly) **plus your maintenance preference** at that point. Nothing to build now: this is the **convergence milestone** where the two parallel tracks (frontend mockup ↔ backend) finally meet, so it stays parked until both sides are stable. *(Kept in the tracker rather than deleted so the item + its trigger don't get lost — it self-surfaces when churn hits zero.)*
 
 ### OD-22 · Message addressing schema (source + recipients) — `DECIDED‑UNBUILT` (Tier 1 / cross-cutting — added later; pairs with OD-01)
 - **Question:** How is every message/event tagged with **who it's from** and **who it's addressed to**?

@@ -97,7 +97,6 @@
 - Our error/danger red reads as a little too pink. Works for the palette but does not jump out when scanning the UI. I think we need a more distinct error red for this.
 - The Link config should default to 2-way.
 - The Messages "Content" filter needs to include an option for the actual 'message' text (ie, whatever the main reply text is referred to).
-- We need to include a trash/delete ghost button after edit for History cards for prompts that are not "Active" or "Complete" so that they can be deleted before they get run if needed.
 
 ## Scratch
 
