@@ -86,6 +86,20 @@
 
 > Active implementation queue — the one actionable section, in priority order, mixed effort. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
 
+1. **Inbox Warning header badge (max-turns / limit) + a limit-crossed example:** The Warning section and its heading-colour ramp are already built — sections run **Error · Warning · Permission · Plan · Decision**; the heading **label + count badge** use Error `--danger` · Warning `--warning` · Permission `--inbox-permission` · Plan/Decision `--muted`; Error keeps the `--danger` left-edge. Remaining gap: add a header badge on the Warning card mirroring the Error card's red **"Connection"** subtype badge but in the warning colour, with a clear label like **"Max turns"** (or "Context limit"). Generalise the subtype render — `sub` (~5034) is `type==='error'`-only — to emit it for `warning` cards too, and add a warning variant of `.inbox-subtype` (~1159, hardcoded `--danger`/`--danger-soft`) using **`--warning` text + outline + `--warning-soft` fill**. Make the demo a real limit case: an agent that crossed its turn/context limit and is now **pending** — adapt the existing rowan "context window 92%" sample (~5019) or add one.
+
+2. **Remove the divider before Reply in the Inbox card footer:** `inboxReplyHTML()` (~5012) prepends a 2px navy vertical separator (`<span … background:var(--border)>`) ahead of the Reply button. Drop that separator; keep Reply and its right-alignment.
+
+3. **Make the editor's extended gutter visible:** The line-number gutter already runs to the editor's bottom via the `.md-fill` filler row (~1765) — confirmed by driving the UI, not just reading code — but it's effectively invisible: the empty track is `--surface-3` tan on `--secondary-background` cream (a faint difference with no number to anchor it), and every seeded plan/doc is long enough to scroll, so the filler never shows. Fix both: (a) raise the empty track's contrast so it reads as a continued rail (carry the per-row hairline dividers into the filler, or a slightly stronger tint); (b) seed one **short** plan or document so the extended gutter is actually demonstrable. *(This is the earlier "item 4" finding — built, but you can't see it working.)*
+
+4. **Don't highlight past the last text line (Library editors):** A whole-doc or last-section selection currently fills the rail/row down into the empty `.md-fill` area below the last line. Clamp the selection highlight (`.md-row.rsel`/`.rsel-sec` → `--select`, ~1655) to stop at the last real content line — the empty filler rail stays unselected — across any Library text view.
+
+5. **Footer popover menus render as a raised overlay:** The Plans reviewer-chip dropdown (`.rev-pop`, ~1000) and the other footer popover-style menus (the merged Export `.ea-dd`; the verdict `.vpop`, ~1366) should open **above** neighbouring content and not be clipped by the footer's bounds — raise their stacking and ensure no ancestor `overflow` clips them. Placement/behaviour otherwise unchanged.
+
+6. **Rename the Export menu heading to "Copy & Export":** In `expMenuHTML()` the first heading is `<div class="exp-h">Export</div>` (~3735) — change it to **"Copy & Export"** (the "Add to prompt" heading stays). Reflected everywhere the merged Export dropdown mounts (Feed · History · Plans · Documents).
+
+
+
 ## Inbox
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
@@ -94,16 +108,13 @@
 - Given that we we cannot pull context information while an agent's running we could have context update periodically between runs and also have an option to pull directly possibly just by dropping down the context drop down in the agent panel but then we should probably have some kind of load indicator like a spinning thing so it's clear that it's not loaded but it will be.
 - Make the major header and footer use the pink color and do the same for the major movable internal panel area dividers. For the latter, I still want them teal when hover or actively being moved.
 - I want to switch from the cream background to something darker, like a charcoal. I want to keep the lighter cream for the main footer and the panel headers but for subheader within the panels I want to move to a darker charcoal (or whatever we use for the new main surface fill/background). 
-- Our error/danger red reads as a little too pink. Works for the palette but does not jump out when scanning the UI. I think we need a more distinct error red for this.
-- The Link config should default to 2-way.
-- The Messages "Content" filter needs to include an option for the actual 'message' text (ie, whatever the main reply text is referred to).
 
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
 - Change stop button to use a filled red icon
-- I want to work out how to build in more visual elements in Plans like charts, mockups and diagrams. I am thinking a few things. We could have a separate tab in Library or put these in the Assets tab, but we will need a way to comment them with visual markers etc. We might utilize what we have already in this tool: design\mockup-toolkit.js. If we put it in the Assets, we may want to structure the nav bar with headings, like something for stock images
+- I want to work out how to build in more visual elements in Plans like charts, mockups and diagrams. I am thinking a few things. We could have a seperate tab in Liibarary or put these in the Assets tab, but we will need a way to comment them with visual markers etc. We might utilize what we have already in this tool: design\mockup-toolkit.js. If we put it in the Assets, we may want to structure the nav bar with headings, like something for stock imagges
 - Plans should utilize mermaid diagrams in markdown.
 - Need to add a permanent delete option along with retire that fully wipes the agent info from the system.
 - Add some voice reading feature and, ideally, an option to change speed from normal up to 2-3x

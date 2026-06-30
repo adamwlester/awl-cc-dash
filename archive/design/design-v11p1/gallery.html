@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Gallery — AWL Multi-Agent Dashboard</title>
+  <!--
+    AWL Multi-Agent Dashboard — Component Gallery (visual catalog)
+    ----------------------------------------------------------------------------
+    A STATIC showcase of every component in the design-system registry, shown once,
+    grouped by canonical name. It SHARES tokens.css + styles.css with mockup.html
+    (both in this same design/ directory) so each specimen renders IDENTICALLY to
+    the live component — no divergent component CSS lives here. Only PAGE-LAYOUT
+    scaffolding is added inline below, all prefixed `gx-` so it never collides with
+    component classes. Head setup below is replicated verbatim from mockup.html.
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Design tokens — single source of truth for every raw value (see tokens.css / DESIGN.md). -->
+  <link rel="stylesheet" href="tokens.css">
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans:['Archivo','sans-serif'], mono:['JetBrains Mono','monospace'] },
+      fontWeight: { base:'500', heading:'800' },
+      colors: {
+        background:'var(--background)', 'secondary-background':'var(--secondary-background)',
+        foreground:'var(--foreground)', main:'var(--main)', 'main-foreground':'var(--main-foreground)',
+        border:'var(--border)', ring:'var(--ring)', overlay:'var(--overlay)',
+        surface3:'var(--surface-3)', muted:'var(--muted)', 'muted-2':'var(--muted-2)',
+        secondary:'var(--secondary)', 'secondary-foreground':'var(--secondary-foreground)', select:'var(--select)',
+        'main-dim':'var(--main-dim)', 'secondary-dim':'var(--secondary-dim)',
+        success:'var(--success)', warning:'var(--warning)', danger:'var(--danger)',
+        agent: { crimson:'var(--ag-crimson)', emerald:'var(--ag-emerald)', cobalt:'var(--ag-cobalt)', amber:'var(--ag-amber)', fern:'var(--ag-fern)',
+          violet:'var(--ag-violet)', vermilion:'var(--ag-vermilion)', cyan:'var(--ag-cyan)', gold:'var(--ag-gold)', citron:'var(--ag-citron)',
+          orchid:'var(--ag-orchid)', azure:'var(--ag-azure)', teal:'var(--ag-teal)', lime:'var(--ag-lime)', indigo:'var(--ag-indigo)', magenta:'var(--ag-magenta)' }
+      },
+      borderRadius: { base:'var(--radius-base)' },
+      boxShadow: { shadow:'var(--shadow)', shadowsm:'var(--shadow-sm)' },
+      spacing: { boxShadowX:'4px', boxShadowY:'4px', reverseBoxShadowX:'-4px', reverseBoxShadowY:'-4px' }
+    }}}
+  </script>
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- ===================================================================
+       gx-* PAGE-LAYOUT scaffolding ONLY (spec-card grid, headers, name/slug/
+       blurb typography). NO component CSS is defined, overridden, or duplicated
+       here — components are styled solely by styles.css. All classes carry the
+       `gx-` prefix so they never collide with component classes.
+       =================================================================== -->
+  <style>
+    .gx-page{ max-width:1320px; margin:0 auto; padding:28px 26px 120px; }
+    .gx-header{ margin-bottom:22px; padding:22px 24px; background:var(--secondary-background);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); }
+    .gx-h1{ font-size:26px; font-weight:900; letter-spacing:-0.01em; margin:0 0 8px; color:var(--foreground); }
+    .gx-intro{ font-size:12.5px; line-height:1.6; color:var(--muted); max-width:78ch; margin:0; }
+    .gx-intro code{ font-family:var(--font-mono); font-size:11px; background:var(--surface-3);
+      border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 4px; color:var(--foreground); }
+    .gx-nav{ display:flex; flex-wrap:wrap; gap:7px; margin-top:16px; }
+    .gx-nav a{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;
+      padding:5px 11px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--surface-btn); color:var(--foreground); text-decoration:none; box-shadow:var(--shadow-sm);
+      transition:transform .07s, box-shadow .07s; }
+    .gx-nav a:hover{ transform:translate(2px,2px); box-shadow:none; }
+
+    .gx-section{ margin-top:40px; scroll-margin-top:18px; }
+    .gx-section-h{ display:flex; align-items:baseline; gap:12px; margin:0 0 16px; padding-bottom:9px;
+      border-bottom:3px solid var(--border); }
+    .gx-section-h h2{ font-size:18px; font-weight:900; letter-spacing:-0.01em; margin:0; color:var(--foreground); }
+    .gx-section-h .gx-sub{ font-size:11px; font-weight:600; color:var(--muted); }
+
+    .gx-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap:16px; align-items:start; }
+    .gx-grid--wide{ grid-template-columns:repeat(auto-fill, minmax(min(440px, 100%), 1fr)); }
+
+    .gx-card{ display:flex; flex-direction:column; gap:11px; padding:15px 15px 16px;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+    .gx-card-head{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+    .gx-name{ font-size:14px; font-weight:900; color:var(--foreground); letter-spacing:-0.01em; }
+    .gx-slug{ font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--muted);
+      background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:1px 6px; }
+    .gx-status{ font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.06em;
+      padding:2px 7px; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); white-space:nowrap; }
+    .gx-status--planned{ background:var(--warning-soft); color:var(--warning-text); border-color:var(--warning); }
+    .gx-status--undecided{ background:var(--select); color:var(--main-foreground); }
+    .gx-blurb{ font-size:11px; line-height:1.5; color:var(--muted); margin:0; }
+
+    /* specimen stage — a neutral well so a specimen sits on the same canvas surface as the app */
+    .gx-stage{ display:flex; flex-wrap:wrap; align-items:flex-start; gap:14px 16px;
+      padding:14px; background:var(--background); border:var(--border-width) dashed var(--rule);
+      border-radius:var(--radius-base); }
+    .gx-stage--col{ flex-direction:column; align-items:stretch; }
+    /* a column stage bounds its direct children to its own width (min-width:0 lets nowrap titles
+       inside live components ellipsize exactly as they do in the app's panels, not blow out the card) */
+    .gx-stage--col > *{ min-width:0; max-width:100%; }
+    .gx-stage--center{ align-items:center; }
+    /* per-variant specimen wrapper: the component above, its state label below */
+    .gx-spec{ display:inline-flex; flex-direction:column; align-items:flex-start; gap:6px; }
+    .gx-spec--block{ display:flex; width:100%; }
+    .gx-spec-label{ font-family:var(--font-mono); font-size:8.5px; font-weight:700; color:var(--muted-2);
+      letter-spacing:0.02em; }
+    .gx-callout{ font-size:9px; font-weight:700; color:var(--muted); line-height:1.4; }
+    .gx-callout code{ font-family:var(--font-mono); font-size:8.5px; background:var(--surface-3);
+      border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 3px; color:var(--foreground); }
+
+    /* labelled sub-part callout list (agent-node-card composite) */
+    .gx-parts{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:3px; }
+    .gx-parts li{ font-size:9.5px; line-height:1.4; color:var(--muted); }
+    .gx-parts li code{ font-family:var(--font-mono); font-size:8.5px; font-weight:700; color:var(--foreground);
+      background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 4px; }
+
+    /* a small fixed-size frame so a single agent-node-card renders at its live square size */
+    .gx-node-frame{ width:200px; }
+    .gx-node-frame .node{ cursor:default; }
+
+    /* planned link-edge illustration — an inline SVG placeholder of directed arrows between two cards */
+    .gx-edge-demo{ position:relative; width:100%; max-width:360px; }
+    .gx-edge-svg{ display:block; width:100%; height:120px; }
+  </style>
+</head>
+
+<body class="bg-background text-foreground font-sans" style="font-weight:var(--font-weight-base)">
+
+  <!-- ===== agent icon sprite (game-icons.net subset, recolorable: bg=currentColor, glyph=var(--icon-fg)).
+       Only the four glyphs used by the specimens below are inlined; the same #ag-* symbol ids the mockup uses. ===== -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="ag-wizard" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256.3 19.42C204 57.2 177.2 111 152.5 160.7c43.4-24.6 101.7-32.9 126.9-28.7-63.8 10.6-108 25.8-144.4 64.3-2.2 4.5-4.1 8.3-6.4 13.1 115.4-27.8 134.4-27 250.9-.7C368 158.6 343 126.6 304 65.83 345.9 118.4 428.1 208.1 424.3 190.6 401.4 85.73 324.2 23.49 256.3 19.42zm-54.4 211.88-7 14h98.8l-7-14zm128 0-7 14h98.8l-7-14zM256 311.6c-20 0-43 14.5-68.9 32.4-19.2 13.3-39.9 28.1-63.3 38.4 28.6 6.1 65.8 4.8 98.2-2.6 21.3-4.8 40.5-12.1 53.7-20.5 8.5-5.5 14.1-11.1 17-16.4l-24.2-30.3c-3.7-.6-7.9-1-12.5-1z"/></symbol>
+    <symbol id="ag-golem" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 33.85 168.2 63.1l-6.6 52.9 94.4 27 94.4-27-6.6-52.9zM103 104.4v64h18v-23h18.8l2.1-16.2-.4-.1.5-1.7h-21v-23zm288 0v23h-21l.5 1.7-.4.1 2.1 16.2H391v23h18v-64zM93.3 327.9l28.8 172.5L247 478.2V376.4h18v101.8l111.2-13.9L405 291.8l-149 29.8z"/></symbol>
+    <symbol id="ag-gasmask" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M364.563 27.5c-24.54 10.796-66.057 18.094-113.875 18.094-47.3 0-89.258-6.898-113.907-17.5C107.477 64.73 97.12 118.44 107 177c10.73 63.596 50.354 119.6 85.688 155.78 17.285-4.952 36.943-7.717 57.843-7.717 20.725 0 40.228 2.72 57.407 7.593 35.5-36.38 75.654-92.59 86.407-155.656 10.04-58.882-.233-112.842-29.78-149.5zm-187.625 80.03c10.768.263 21.255 4.955 29.937 12.282 11.577 9.77 20.607 24.33 25.25 41.657 4.643 17.326 4.078 34.437-1.063 48.686-5.14 14.25-15.398 26.053-29.78 29.906-14.384 3.854-29.174-1.23-40.75-11-11.577-9.77-20.608-24.328-25.25-41.656-4.644-17.327-4.08-34.47 1.062-48.72 5.14-14.248 15.398-26.02 29.78-29.874a38.094 38.094 0 0 1 10.814-1.28zm146.75 0c3.59-.086 7.216.32 10.812 1.282 14.383 3.854 24.64 15.626 29.78 29.876 5.142 14.25 5.707 31.39 1.064 48.718-4.643 17.328-13.674 31.887-25.25 41.656-11.577 9.77-26.367 14.854-40.75 11-14.383-3.853-24.64-15.657-29.78-29.906-5.142-14.25-5.707-31.36-1.064-48.687 4.643-17.33 13.673-31.888 25.25-41.657 8.682-7.328 19.17-12.02 29.938-12.282z"/></symbol>
+    <symbol id="ag-robot" viewBox="0 0 512 512"><path fill="currentColor" d="M0 0h512v512H0z"/><path fill="var(--icon-fg)" d="M256 19c-13.8 0-27.9 3.02-41.5 8.48L256 79.44l41.5-51.96C283.9 22.02 269.8 19 256 19zm-59.4 16.96c-18.5 10.27-35.9 24.69-50.9 41.74-10.8 12.21-20.2 25.7-24.8 32.4l-64.8 87.1 59.1 83L95.9 348l71.6 64.2-6.9-27.3 36.1-108.2-40.7 27.1-75.98-106.3 42.28-56.3 97.4 48.7h72.7l97.4-48.7 42.3 56.3-76 106.3-40.8-27.2 1 3.2 35.2 105.1-6.9 27.3 71.5-64.2-19.4-67.8 59.2-83-64.8-87.1c-4.6-6.7-14-20.19-24.8-32.4-15-17.05-32.4-31.47-50.9-41.74L256 110.2zm15.1 256.44-5 15h98.6l-5-15z"/></symbol>
+  </svg>
+
+  <div class="gx-page">
+
+    <!-- ============================ HEADER ============================ -->
+    <header class="gx-header">
+      <h1 class="gx-h1">Component Gallery</h1>
+      <p class="gx-intro">
+        The visual component catalog for the AWL Multi-Agent Dashboard design system. Every component in the
+        registry appears here exactly once, grouped by its canonical name, each shown with the rendered specimen,
+        a readable name, its literal <code>data-comp</code> kebab slug, and a one-line purpose blurb. This page
+        renders <b>states, not behaviors</b> — it exists because the running app can't show everything at once
+        (most badge variants and all five Inbox card types are one data-state away from being invisible). It links
+        the <b>same</b> <code>tokens.css</code> and <code>styles.css</code> the mockup uses, so specimens render
+        identically to the live components; only page-layout scaffolding (the <code>gx-*</code> classes) is added here.
+      </p>
+      <nav class="gx-nav">
+        <a href="#primitives">Primitives</a>
+        <a href="#badges">Badge catalog</a>
+        <a href="#inbox">Inbox cards</a>
+        <a href="#composites">Composites</a>
+      </nav>
+    </header>
+
+    <!-- ===================================================================
+         SECTION 1 — PRIMITIVES (cross-cutting controls)
+         =================================================================== -->
+    <section class="gx-section" id="primitives">
+      <div class="gx-section-h"><h2>Primitives</h2><span class="gx-sub">cross-cutting controls &amp; elements</span></div>
+      <div class="gx-grid">
+
+        <!-- button -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Button</span><span class="gx-slug">button</span></div>
+          <p class="gx-blurb">The neobrutalism action button across its emphasis tiers, plus the bare icon-button forms.</p>
+          <div class="gx-stage">
+            <div class="gx-spec"><button data-comp="button" class="btn"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Neutral</button><span class="gx-spec-label">.btn</span></div>
+            <div class="gx-spec"><button class="btn-main"><i data-lucide="check" class="w-3.5 h-3.5"></i>Primary</button><span class="gx-spec-label">.btn-main</span></div>
+            <div class="gx-spec"><button class="btn-secondary"><i data-lucide="send-horizontal" class="w-3.5 h-3.5"></i>Secondary</button><span class="gx-spec-label">.btn-secondary</span></div>
+            <div class="gx-spec"><button class="btn-danger"><i data-lucide="x" class="w-3.5 h-3.5"></i>Retire</button><span class="gx-spec-label">.btn-danger</span></div>
+            <div class="gx-spec"><button class="btn-danger-solid"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button><span class="gx-spec-label">.btn-danger-solid</span></div>
+            <div class="gx-spec"><button class="icon-btn" title="Copy"><i data-lucide="copy"></i></button><span class="gx-spec-label">.icon-btn</span></div>
+            <div class="gx-spec"><button class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button><span class="gx-spec-label">.ghost-ic</span></div>
+          </div>
+        </div>
+
+        <!-- split-button -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Split Button</span><span class="gx-slug">split-button</span></div>
+          <p class="gx-blurb">A primary action paired with a dropdown that picks its scope/timing — Send (primary) and Revise (outline).</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <div data-comp="split-button" class="split split--primary">
+                <button class="split-drop"><i data-lucide="chevron-down"></i><span class="split-lbl">Now</span></button>
+                <button class="split-act" title="Send to target agents"><i data-lucide="send-horizontal"></i></button>
+              </div>
+              <span class="gx-spec-label">.split--primary (Send)</span>
+            </div>
+            <div class="gx-spec">
+              <div class="split split--outline">
+                <button class="split-drop"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
+                <button class="split-act" title="Revise the draft"><i data-lucide="wand-sparkles"></i></button>
+              </div>
+              <span class="gx-spec-label">.split--outline (Revise)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- export-control -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Export Control</span><span class="gx-slug">export-control</span></div>
+          <p class="gx-blurb">The merged Export · Add-to-prompt dropdown reused across feed / history / docs / plans (Copy, Export→file, Embed, Attach).</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <div data-comp="export-control" class="exp ea-dd">
+                <button class="exp-btn" title="Export · add to prompt…"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button>
+              </div>
+              <span class="gx-spec-label">.exp.ea-dd / .exp-btn</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- response-format-control -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Response Format Control</span><span class="gx-slug">response-format-control</span></div>
+          <p class="gx-blurb">Compose's response-shape menu trigger; the teal count chip surfaces "N selected" when active.</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <div data-comp="response-format-control" class="fmt">
+                <button class="fmt-btn active" title="Response format"><i data-lucide="sliders-horizontal" class="ic"></i><span class="fmt-lbl">Response</span><span class="fmt-badge" style="display:inline-flex">2</span><i data-lucide="chevron-down" class="cv"></i></button>
+              </div>
+              <span class="gx-spec-label">.fmt / .fmt-btn (active)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- segmented-control -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Segmented Control</span><span class="gx-slug">segmented-control</span></div>
+          <p class="gx-blurb">A connected single-select button group — used for Mode (with a danger Bypass) and the ordered Effort gradient.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="segmented-control" class="seg mode-seg" style="width:100%"><button>Plan</button><button>Ask</button><button>Edit</button><button class="active">Auto</button><button class="seg-danger">Bypass</button></div>
+              <span class="gx-spec-label">Mode</span>
+            </div>
+            <div class="gx-spec gx-spec--block">
+              <div class="seg" style="width:100%"><button>Low</button><button>Med</button><button class="active">High</button><button>Extra</button><button>Max</button><button>Ultra</button></div>
+              <span class="gx-spec-label">Effort</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- tab-bar -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Tab Bar</span><span class="gx-slug">tab-bar</span></div>
+          <p class="gx-blurb">Panel-header / sub-tab switcher; the active tab fills with the primary (pink) colour.</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <div data-comp="tab-bar" class="tabset">
+                <button class="tab-btn active">Compose</button>
+                <button class="tab-btn">History</button>
+                <button class="tab-btn">Details</button>
+              </div>
+              <span class="gx-spec-label">.tabset / .tab-btn</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- source-dropdown -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Source Dropdown</span><span class="gx-slug">source-dropdown</span></div>
+          <p class="gx-blurb">A trigger field showing the current agent selection as inline identity badges (From/To filter, Source/Target select).</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="source-dropdown" class="src-dd dd multi" style="width:100%">
+                <button class="dd-trig" type="button">
+                  <span class="dd-badges">
+                    <span class="badge badge-c"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span>
+                    <span class="badge-more">+3</span>
+                  </span>
+                  <i data-lucide="chevrons-up-down" class="picker-cv"></i>
+                </button>
+              </div>
+              <span class="gx-spec-label">.src-dd / .dd-trig</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- color-picker -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Color Picker</span><span class="gx-slug">color-picker</span></div>
+          <p class="gx-blurb">Select-style trigger that keeps the current agent colour swatch + name always visible.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="color-picker" class="picker" style="width:180px">
+                <button class="picker-trig" type="button"><span class="picker-sw" style="background:var(--ag-indigo)"></span><span class="picker-val">indigo</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+              </div>
+              <span class="gx-spec-label">.picker / .picker-trig (Color)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- icon-picker -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Icon Picker</span><span class="gx-slug">icon-picker</span></div>
+          <p class="gx-blurb">Combobox-style trigger showing the current agent glyph tile + name, with a searchable popover (not expanded here).</p>
+          <div class="gx-stage gx-stage--col" style="--cur-color:var(--ag-indigo)">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="icon-picker" class="picker" style="width:180px">
+                <button class="picker-trig" type="button"><span class="agtile picker-ico" style="color:var(--cur-color)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="picker-val">robot</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
+              </div>
+              <span class="gx-spec-label">.picker / .picker-ico (Icon)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- role-combobox -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Role Combobox</span><span class="gx-slug">role-combobox</span></div>
+          <p class="gx-blurb">Single-select-or-type field for the agent Role — picks from agent.md files or accepts a custom value.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="role-combobox" class="combo" style="width:100%">
+                <div class="combo-trig"><input class="combo-in" placeholder="Select or type a role…" value="researcher" readonly><button class="combo-cv" type="button" title="Choose from agent.md files"><i data-lucide="chevrons-up-down"></i></button></div>
+              </div>
+              <span class="gx-spec-label">.combo / .combo-trig</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- multi-select -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Multi Select</span><span class="gx-slug">multi-select</span></div>
+          <p class="gx-blurb">Chip-bearing multi-select with a checklist popover — used for an agent's Skills and Tools.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="multi-select" class="msel" style="width:100%">
+                <div class="msel-box">
+                  <span class="msel-chip">research<button type="button"><i data-lucide="x"></i></button></span>
+                  <span class="msel-chip">web-search<button type="button"><i data-lucide="x"></i></button></span>
+                  <span class="msel-chip">defuddle<button type="button"><i data-lucide="x"></i></button></span>
+                </div>
+                <i data-lucide="chevrons-up-down" class="msel-cv"></i>
+              </div>
+              <span class="gx-spec-label">.msel / .msel-box + .msel-chip</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- toggle-button -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Toggle Button</span><span class="gx-slug">toggle-button</span></div>
+          <p class="gx-blurb">A labeled toggle that reads its own Off/On state and fills teal when on — Opus Fast-mode &amp; Thinking-mode.</p>
+          <div class="gx-stage">
+            <div class="gx-spec"><button data-comp="toggle-button" class="think-tog fast-tog"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><span class="gx-spec-label">.fast-tog (off)</span></div>
+            <div class="gx-spec"><button class="think-tog on"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode On</span></button><span class="gx-spec-label">.think-tog.on</span></div>
+          </div>
+        </div>
+
+        <!-- mini-toggle -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Mini Toggle</span><span class="gx-slug">mini-toggle</span></div>
+          <p class="gx-blurb">A small inline filter chip (feed direction / content-type include); teal when active.</p>
+          <div class="gx-stage">
+            <div class="gx-spec"><button data-comp="mini-toggle" class="minitog on"><i data-lucide="arrow-up-right"></i>Sent</button><span class="gx-spec-label">.minitog.on</span></div>
+            <div class="gx-spec"><button class="minitog">Diffs</button><span class="gx-spec-label">.minitog (off)</span></div>
+          </div>
+        </div>
+
+        <!-- switch -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Switch</span><span class="gx-slug">switch</span><span class="gx-status gx-status--planned">planned</span></div>
+          <p class="gx-blurb">Compact enable/disable switch (MCP servers · plugins); teal when on. Wiring is not yet built.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><button data-comp="switch" data-status="planned" class="swh on" title="Enabled"></button><span class="gx-spec-label">.swh.on</span></div>
+            <div class="gx-spec"><button data-status="planned" class="swh" title="Disabled"></button><span class="gx-spec-label">.swh (off)</span></div>
+          </div>
+        </div>
+
+        <!-- agree-toggle -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Agree Toggle</span><span class="gx-slug">agree-toggle</span></div>
+          <p class="gx-blurb">Thumbs agree / disagree pair (default = agree) used in the review composer, comment popout, and nav cards.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec">
+              <span class="thumbs">
+                <button data-comp="agree-toggle" type="button" class="thumb up on" title="Agree"><i data-lucide="thumbs-up"></i></button>
+                <button type="button" class="thumb down" title="Disagree"><i data-lucide="thumbs-down"></i></button>
+              </span>
+              <span class="gx-spec-label">.thumb up.on / .thumb down</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- stepper -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Stepper</span><span class="gx-slug">stepper</span></div>
+          <p class="gx-blurb">Numeric −/+ stepper for the Max-turns limit on the agent config form.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><div data-comp="stepper" class="stepper" style="width:120px"><button>−</button><input type="number" value="50" readonly><button>+</button></div><span class="gx-spec-label">.stepper</span></div>
+          </div>
+        </div>
+
+        <!-- progress-bar -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Progress Bar</span><span class="gx-slug">progress-bar</span></div>
+          <p class="gx-blurb">The bordered health-coloured fill bar shared by context (ctxbar), the agent-card load bars (pbar / nbar), and usage.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block"><div data-comp="progress-bar" class="ctxbar"><i style="width:40%;background:var(--success)"></i></div><span class="gx-spec-label">.ctxbar (40% · success)</span></div>
+            <div class="gx-spec gx-spec--block"><div class="pbar"><i style="width:62%;background:var(--warning)"></i><span class="bar-cut" style="left:80%"></span></div><span class="gx-spec-label">.pbar (62% · warning, with cutoff)</span></div>
+            <div class="gx-spec gx-spec--block"><div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div><span class="gx-spec-label">.nbar-row (labeled, with value)</span></div>
+          </div>
+        </div>
+
+        <!-- run-strip -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Run Strip</span><span class="gx-slug">run-strip</span></div>
+          <p class="gx-blurb">The textless single-colour run-state bar on agent cards — active (green) · pending (warm) · idle (muted) · error (solid danger).</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block"><div data-comp="run-strip" class="run-strip run-active"><i style="width:58%"></i></div><span class="gx-spec-label">.run-active</span></div>
+            <div class="gx-spec gx-spec--block"><div class="run-strip run-pending"><i style="width:40%"></i></div><span class="gx-spec-label">.run-pending</span></div>
+            <div class="gx-spec gx-spec--block"><div class="run-strip run-idle"><i></i></div><span class="gx-spec-label">.run-idle</span></div>
+            <div class="gx-spec gx-spec--block"><div class="run-strip run-error"><i></i></div><span class="gx-spec-label">.run-error</span></div>
+          </div>
+        </div>
+
+        <!-- accordion -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Accordion</span><span class="gx-slug">accordion</span></div>
+          <p class="gx-blurb">The context-breakdown disclosure: a trigger summary row + an expandable body panel (shown open).</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div style="width:100%">
+                <button class="ctx-trigger open" type="button"><div class="summary-row"><div class="ctxbar"><i style="width:40%;background:var(--success)"></i></div><span class="text-[10px] font-bold text-muted font-mono">40%</span><i data-lucide="chevron-down" class="chev up"></i></div></button>
+                <div data-comp="accordion" class="acc open">
+                  <div class="bd"><div class="bd-head"><span class="bd-model">opus 4.8</span><span class="bd-tot">81.2k / 200k</span></div>
+                    <div class="bd-bar"><i style="width:46%;background:var(--success)"></i><i style="width:18%;background:var(--warning)"></i></div>
+                    <div class="cat"><span class="sw2" style="background:var(--success)"></span><span class="nm">System + tools</span><span class="tk">37.4k</span><span class="pc">46%</span></div>
+                    <div class="cat"><span class="sw2" style="background:var(--warning)"></span><span class="nm">Messages</span><span class="tk">14.6k</span><span class="pc">18%</span></div>
+                  </div>
+                </div>
+              </div>
+              <span class="gx-spec-label">.ctx-trigger.open + .acc.open</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- chip -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Chip</span><span class="gx-slug">chip</span></div>
+          <p class="gx-blurb">The generic bordered status/metadata chip in the title bar &amp; footer.</p>
+          <div class="gx-stage">
+            <div class="gx-spec"><span data-comp="chip" class="chip" style="font-family:'JetBrains Mono',monospace">v1.2</span><span class="gx-spec-label">.chip</span></div>
+          </div>
+        </div>
+
+        <!-- node-chip -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Node Chip</span><span class="gx-slug">node-chip</span></div>
+          <p class="gx-blurb">The icon + value config chips inside an agent card's settings row (mode · effort · think).</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="node-chip" class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span><span class="gx-spec-label">mode</span></div>
+            <div class="gx-spec"><span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span><span class="gx-spec-label">effort</span></div>
+            <div class="gx-spec"><span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span><span class="gx-spec-label">think</span></div>
+          </div>
+        </div>
+
+        <!-- token-pill -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Token Pill</span><span class="gx-slug">token-pill</span></div>
+          <p class="gx-blurb">The footer running-total token readout (pink fill); opens Settings → Usage.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="token-pill" class="tok-pill">Σ 1.42M tokens</span><span class="gx-spec-label">.tok-pill</span></div>
+          </div>
+        </div>
+
+        <!-- attachment-chip -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Attachment Chip</span><span class="gx-slug">attachment-chip</span></div>
+          <p class="gx-blurb">A file/asset attachment card in the Compose strip — name + cite + remove.</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <span data-comp="attachment-chip" class="att-card" title="docs/auth-rotation.md">
+                <i data-lucide="file-text" class="att-card-ic"></i>
+                <span class="att-card-nm">auth-rotation.md</span>
+                <button class="att-card-cite" type="button" title="Cite this attachment"><i data-lucide="link"></i></button>
+                <button class="att-card-x" type="button" title="Remove attachment"><i data-lucide="x"></i></button>
+              </span>
+              <span class="gx-spec-label">.att-card</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- jump-to-end-pill -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Jump-to-End Pill</span><span class="gx-slug">jump-to-end-pill</span></div>
+          <p class="gx-blurb">The floating corner pill that snaps a scroll region to its top/bottom edge (shown forced visible).</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><button data-comp="jump-to-end-pill" class="jump-pill show" title="Jump to bottom" type="button"><i data-lucide="chevrons-down"></i></button><span class="gx-spec-label">.jump-pill.show</span></div>
+          </div>
+        </div>
+
+        <!-- timeline -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Timeline</span><span class="gx-slug">timeline</span></div>
+          <p class="gx-blurb">The History rewind/handoff list — one row per turn with the "now" pill on the current row.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="timeline" class="tl" style="max-height:none;width:100%">
+                <div class="tl-row"><div class="tl-main"><div class="tl-top"><span class="tl-turn">Turn 33/50</span><span class="tl-time">14:52</span><span class="tl-ctx" style="color:var(--warning)">62%</span></div><div class="tl-desc">Approved remediation plan ordering</div></div><button class="tl-ic" title="Rewind to here"><i data-lucide="undo-2"></i></button></div>
+                <div class="tl-row current"><div class="tl-main"><div class="tl-top"><span class="tl-turn">Turn 34/50</span><span class="tl-now">now</span><span class="tl-time">14:56</span><span class="tl-ctx" style="color:var(--warning)">62%</span></div><div class="tl-desc">Awaiting deploy gate decision</div></div><button class="tl-ic" title="Rewind to here"><i data-lucide="undo-2"></i></button></div>
+              </div>
+              <span class="gx-spec-label">.tl / .tl-row (+ .current)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- marquee -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Marquee</span><span class="gx-slug">marquee</span></div>
+          <p class="gx-blurb">The two-track scrolling live-activity feed inside an agent card's band — active scrolls, idle is static + muted.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block" style="overflow:hidden">
+              <div data-comp="marquee" class="node-feed" style="width:100%">
+                <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+              </div>
+              <span class="gx-spec-label">.node-feed (active)</span>
+            </div>
+            <div class="gx-spec gx-spec--block" style="overflow:hidden">
+              <div class="node-feed idle" style="width:100%"><span class="trk a">idle — awaiting prompt</span></div>
+              <span class="gx-spec-label">.node-feed.idle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- toast -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Toast</span><span class="gx-slug">toast</span></div>
+          <p class="gx-blurb">The transient action-confirmation message (normally fixed bottom-center; shown statically here).</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="toast" class="toast show" style="position:static;transform:none;max-width:none">Approved — 01 sandy unblocked</span><span class="gx-spec-label">.toast.show</span></div>
+          </div>
+        </div>
+
+        <!-- summarize-slideover -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Summarize Slide-over</span><span class="gx-slug">summarize-slideover</span></div>
+          <p class="gx-blurb">The overlay that covers the message list with a generated conversation summary (header + scrolling body).</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="gx-spec gx-spec--block">
+              <div data-comp="summarize-slideover" class="feed-overlay open" style="position:relative;inset:auto;width:100%;height:230px">
+                <div class="fo-head">
+                  <div class="fo-title"><i data-lucide="sparkles"></i>Conversation summary</div>
+                  <span class="fo-sub">7 messages</span>
+                  <span class="flex-1"></span>
+                  <button class="ghost-ic" title="Copy summary"><i data-lucide="copy"></i></button>
+                  <button class="btn btn-sm"><i data-lucide="x" class="w-3.5 h-3.5"></i>Close</button>
+                </div>
+                <div class="fo-body">
+                  <h4>Auth token-rotation — where the thread stands</h4>
+                  <p><b class="k">researcher-01-sandy</b> found three JWT-middleware vulnerabilities; the critical one is an expiry bypass.</p>
+                  <h5>Open</h5>
+                  <ul><li>Decide rotation strategy: sliding-window vs one-time.</li></ul>
+                </div>
+              </div>
+              <span class="gx-spec-label">.feed-overlay.open</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 2 — BADGE CATALOG (10 families, exhaustive)
+         =================================================================== -->
+    <section class="gx-section" id="badges">
+      <div class="gx-section-h"><h2>Badge catalog</h2><span class="gx-sub">10 families — every variant shown, labeled by state</span></div>
+      <div class="gx-grid">
+
+        <!-- status-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Status Badge</span><span class="gx-slug">status-badge</span></div>
+          <p class="gx-blurb">The Team Graph agent run-state badge that overhangs a card's top-right corner — 4 states.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="status-badge" class="node-badge nb-active" style="position:static;box-shadow:var(--shadow-sm)">Active</span><span class="gx-spec-label">.nb-active</span></div>
+            <div class="gx-spec"><span class="node-badge nb-idle" style="position:static;box-shadow:var(--shadow-sm)">Idle</span><span class="gx-spec-label">.nb-idle</span></div>
+            <div class="gx-spec"><span class="node-badge nb-pending" style="position:static;box-shadow:var(--shadow-sm)">Pending</span><span class="gx-spec-label">.nb-pending</span></div>
+            <div class="gx-spec"><span class="node-badge nb-error" style="position:static;box-shadow:var(--shadow-sm)">Error</span><span class="gx-spec-label">.nb-error</span></div>
+          </div>
+        </div>
+
+        <!-- subagent-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Subagent Badge</span><span class="gx-slug">subagent-badge</span><span class="gx-status gx-status--undecided">undecided</span></div>
+          <p class="gx-blurb">Rectangular id-badges for a card's subagents, filled with the sub's run-state colour — 4 states (the <code>sb-error</code> state was added to mirror the status badge). Open question OQ-1 (remaining): clicking a subagent badge is a deliberate no-op.</p>
+          <div class="gx-stage gx-stage--center" data-status="undecided">
+            <div class="gx-spec"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent s1 — active">s1</span><span class="gx-spec-label">.sb-active</span></div>
+            <div class="gx-spec"><span class="sbadge sb-idle" title="subagent s2 — idle">s2</span><span class="gx-spec-label">.sb-idle</span></div>
+            <div class="gx-spec"><span class="sbadge sb-pending" title="subagent s3 — pending">s3</span><span class="gx-spec-label">.sb-pending</span></div>
+            <div class="gx-spec"><span class="sbadge sb-error" title="subagent s4 — error">s4</span><span class="gx-spec-label">.sb-error</span></div>
+          </div>
+        </div>
+
+        <!-- lifecycle-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Lifecycle Badge</span><span class="gx-slug">lifecycle-badge</span></div>
+          <p class="gx-blurb">The <code>.dbadge</code> shell carrying a lifecycle/state label across History, Messages, Plans, and Documentation — 10 states.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="lifecycle-badge" class="dbadge db-active">Active</span><span class="gx-spec-label">.db-active</span></div>
+            <div class="gx-spec"><span class="dbadge db-complete">Complete</span><span class="gx-spec-label">.db-complete</span></div>
+            <div class="gx-spec"><span class="dbadge db-error">Error</span><span class="gx-spec-label">.db-error</span></div>
+            <div class="gx-spec"><span class="dbadge db-draft">Draft</span><span class="gx-spec-label">.db-draft</span></div>
+            <div class="gx-spec"><span class="dbadge db-review">In review</span><span class="gx-spec-label">.db-review</span></div>
+            <div class="gx-spec"><span class="dbadge db-approved">Approved</span><span class="gx-spec-label">.db-approved</span></div>
+            <div class="gx-spec"><span class="dbadge db-sent">Sent</span><span class="gx-spec-label">.db-sent</span></div>
+            <div class="gx-spec"><span class="dbadge db-next">Next</span><span class="gx-spec-label">.db-next</span></div>
+            <div class="gx-spec"><span class="dbadge db-queued">Queued</span><span class="gx-spec-label">.db-queued</span></div>
+            <div class="gx-spec"><span class="dbadge db-held">Held</span><span class="gx-spec-label">.db-held</span></div>
+          </div>
+        </div>
+
+        <!-- verdict-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Verdict Badge</span><span class="gx-slug">verdict-badge</span></div>
+          <p class="gx-blurb">The 3-state review verdict badge (stroke icon + verdict-coloured label), built by <code>verdictBadgeHTML()</code>.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="verdict-badge" class="vbadge v-approve"><i data-lucide="circle-check"></i>Approve</span><span class="gx-spec-label">.v-approve</span></div>
+            <div class="gx-spec"><span class="vbadge v-revise"><i data-lucide="triangle-alert"></i>Revise</span><span class="gx-spec-label">.v-revise</span></div>
+            <div class="gx-spec"><span class="vbadge v-block"><i data-lucide="circle-x"></i>Block</span><span class="gx-spec-label">.v-block</span></div>
+          </div>
+        </div>
+
+        <!-- count-chip -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Count Chip</span><span class="gx-slug">count-chip</span></div>
+          <p class="gx-blurb">The three count-chip forms: a tab/section request count, a plan tally chip, and the Response "N selected" badge.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="count-chip" class="req-badge">4</span><span class="gx-spec-label">.req-badge</span></div>
+            <div class="gx-spec"><span class="cnt-chip c-approve"><i data-lucide="circle-check"></i><span class="cn">3</span></span><span class="gx-spec-label">.cnt-chip</span></div>
+            <div class="gx-spec"><span class="fmt-badge" style="display:inline-flex">2</span><span class="gx-spec-label">.fmt-badge</span></div>
+          </div>
+        </div>
+
+        <!-- connector-health-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Connector Health Badge</span><span class="gx-slug">connector-health-badge</span></div>
+          <p class="gx-blurb">MCP-server / connector status badge in Settings — 4 states.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Connected</span><span class="gx-spec-label">.hb-conn</span></div>
+            <div class="gx-spec"><span class="hbadge hb-oauth">OAuth ✓</span><span class="gx-spec-label">.hb-oauth</span></div>
+            <div class="gx-spec"><span class="hbadge hb-parked">Parked</span><span class="gx-spec-label">.hb-parked</span></div>
+            <div class="gx-spec"><span class="hbadge hb-warn">OAuth expired</span><span class="gx-spec-label">.hb-warn</span></div>
+          </div>
+        </div>
+
+        <!-- config-scope-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Config Scope Badge</span><span class="gx-slug">config-scope-badge</span></div>
+          <p class="gx-blurb">Settings lifecycle badge marking whether a config value applies live or only on a new session — 2 states.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · /effort</span><span class="gx-spec-label">.lc-live</span></div>
+            <div class="gx-spec"><span class="lc-badge lc-session">New session</span><span class="gx-spec-label">.lc-session</span></div>
+          </div>
+        </div>
+
+        <!-- identity-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Identity Badge</span><span class="gx-slug">identity-badge</span></div>
+          <p class="gx-blurb">The labelled identity unit (agent glyph tile + role/name) used wherever an agent is referenced; includes the human-user variant.</p>
+          <div class="gx-stage">
+            <div class="gx-spec">
+              <span data-comp="identity-badge" class="badge badge-c"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span>
+              <span class="gx-spec-label">emerald</span>
+            </div>
+            <div class="gx-spec">
+              <span class="badge badge-c"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="b-lab"><span class="b-role">synthesizer</span><span class="b-name">01 kai</span></span></span>
+              <span class="gx-spec-label">cobalt</span>
+            </div>
+            <div class="gx-spec">
+              <span class="badge badge-c"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="b-lab"><span class="b-role">auditor</span><span class="b-name">01 drew</span></span></span>
+              <span class="gx-spec-label">fern</span>
+            </div>
+            <div class="gx-spec">
+              <span class="badge badge-c ag-user-badge"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="b-lab"><span class="b-role">human</span><span class="b-name">User</span></span></span>
+              <span class="gx-spec-label">user (.agtile--user)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- inbox-subtype-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Inbox Subtype Badge</span><span class="gx-slug">inbox-subtype-badge</span></div>
+          <p class="gx-blurb">The small header subtype chip on Error / Warning Inbox cards — Error (red) and Warning (amber) — 2 variants.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="inbox-subtype-badge" class="inbox-subtype">Connection</span><span class="gx-spec-label">.inbox-subtype (Error)</span></div>
+            <div class="gx-spec"><span class="inbox-subtype inbox-subtype--warning">Max turns</span><span class="gx-spec-label">.inbox-subtype--warning</span></div>
+          </div>
+        </div>
+
+        <!-- overflow-badge -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Overflow Badge</span><span class="gx-slug">overflow-badge</span></div>
+          <p class="gx-blurb">The "+N" chip that stands in for identity badges hidden past a display cap.</p>
+          <div class="gx-stage gx-stage--center">
+            <div class="gx-spec"><span data-comp="overflow-badge" class="badge-more">+3</span><span class="gx-spec-label">.badge-more</span></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 3 — INBOX CARD TYPES (5)
+         =================================================================== -->
+    <section class="gx-section" id="inbox">
+      <div class="gx-section-h"><h2>Inbox card types</h2><span class="gx-sub">5 typed request cards — shown expanded with their action rows</span></div>
+      <div class="gx-grid gx-grid--wide">
+
+        <!-- error-inbox-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Error Inbox Card</span><span class="gx-slug">error-inbox-card</span></div>
+          <p class="gx-blurb">A failed-run alarm — danger left-edge + inline error text; Retry · Dismiss · Reply.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="inbox-sec inbox-sec--error">
+              <div data-comp="error-inbox-card" class="fcard inbox-card inbox-card--error open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="b-lab"><span class="b-role">auditor</span><span class="b-name">01 drew</span></span></span><span class="inbox-subtype">Connection</span><span class="inbox-title">Staging smoke test unreachable</span><span class="fcard-time">14:48</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="inbox-detail"><div class="rc-body inbox-err">Run failed — the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.</div></div>
+                  <div class="inbox-acts"><button class="btn-main btn-sm"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm">Dismiss</button><button class="btn-secondary btn-sm ml-auto"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- warning-inbox-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Warning Inbox Card</span><span class="gx-slug">warning-inbox-card</span></div>
+          <p class="gx-blurb">An attention-needed notice (e.g. max-turns reached) — amber subtype; Acknowledge · Reply.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="inbox-sec inbox-sec--warning">
+              <div data-comp="warning-inbox-card" class="fcard inbox-card inbox-card--warning open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">02 rowan</span></span></span><span class="inbox-subtype inbox-subtype--warning">Max turns</span><span class="inbox-title">Max turns reached — run paused at the limit</span><span class="fcard-time">14:46</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="inbox-detail"><div class="rc-body">rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — the run is now pending your call. Raise the turn budget and resume, or acknowledge to leave it parked.</div></div>
+                  <div class="inbox-acts"><button class="btn-main btn-sm">Acknowledge</button><button class="btn-secondary btn-sm ml-auto"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- permission-inbox-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Permission Inbox Card</span><span class="gx-slug">permission-inbox-card</span></div>
+          <p class="gx-blurb">A tool/command permission prompt; Approve · Deny · Always-allow · Reply.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="inbox-sec inbox-sec--permission">
+              <div data-comp="permission-inbox-card" class="fcard inbox-card inbox-card--permission open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="b-lab"><span class="b-role">ops</span><span class="b-name">01 sage</span></span></span><span class="inbox-title">Run bash command</span><span class="fcard-time">14:43</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="inbox-detail"><div class="rc-body" style="font-family:'JetBrains Mono',monospace">kubectl apply -f deploy/prod.yaml</div></div>
+                  <div class="inbox-acts"><button class="btn-main btn-sm">Approve</button><button class="btn-danger btn-sm">Deny</button><button class="btn btn-sm">Always allow</button><button class="btn-secondary btn-sm ml-auto"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- plan-inbox-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Plan Inbox Card</span><span class="gx-slug">plan-inbox-card</span></div>
+          <p class="gx-blurb">A plan-review hand-off — Review (→ Library Plans) · Reply (no Approve/Reject here).</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="inbox-sec inbox-sec--plan">
+              <div data-comp="plan-inbox-card" class="fcard inbox-card inbox-card--plan open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="b-lab"><span class="b-role">coder</span><span class="b-name">01 sandy</span></span></span><span class="inbox-title">Merge remediation plan to main</span><span class="fcard-time">14:41</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="inbox-detail"><div class="rc-body">Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test</div></div>
+                  <div class="inbox-acts"><button class="btn btn-sm"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button><button class="btn-secondary btn-sm ml-auto"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- decision-inbox-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Decision Inbox Card</span><span class="gx-slug">decision-inbox-card</span></div>
+          <p class="gx-blurb">A pick-an-option request — selectable options + Approve (disabled until a pick) · Reply.</p>
+          <div class="gx-stage gx-stage--col">
+            <div class="inbox-sec inbox-sec--decision">
+              <div data-comp="decision-inbox-card" class="fcard inbox-card inbox-card--decision open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">reviewer</span><span class="b-name">01 vega</span></span></span><span class="inbox-title">Choose token rotation strategy</span><span class="fcard-time">14:44</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="inbox-detail"><div class="space-y-1.5">
+                  <button class="opt"><span class="opt-nm">A · Sliding window</span><span class="opt-desc">Refresh extends expiry; simplest, slightly weaker on replay.</span></button>
+                  <button class="opt"><span class="opt-nm">B · One-time rotation</span><span class="opt-desc">Each refresh invalidates the prior token; strongest, more churn.</span></button>
+                </div></div>
+                  <div class="inbox-acts"><button class="btn-main btn-sm dec-approve" disabled title="Select an option first">Approve</button><button class="btn-secondary btn-sm ml-auto"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         SECTION 4 — COMPOSITES (+ planned link edges)
+         =================================================================== -->
+    <section class="gx-section" id="composites">
+      <div class="gx-section-h"><h2>Composites</h2><span class="gx-sub">multi-part cards, editors, and rows</span></div>
+      <div class="gx-grid gx-grid--wide">
+
+        <!-- agent-node-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Agent Node Card</span><span class="gx-slug">agent-node-card</span></div>
+          <p class="gx-blurb">The key composite — the Team Graph card. A fixed square holding meta strip → identity → settings → load bars → activity band → subagents. Sub-parts are labeled below.</p>
+          <div class="gx-stage gx-stage--col gx-stage--center">
+            <div class="gx-node-frame">
+              <div data-comp="agent-node-card" class="node selected" style="--nc:var(--ag-amber)">
+                <svg class="node-bg" aria-hidden="true"><use href="#ag-robot"/></svg>
+                <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 13:05 · 3h37m</span><button class="node-badge nb-active" title="Active">Active</button></div>
+                <div class="node-id"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="node-idblk"><div class="node-role">coder</div><div class="node-name">01 max</div></div><div class="node-model">sonnet 4.6</div></div>
+                <div class="node-div"></div>
+                <div class="node-settings">
+                  <span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>auto</span>
+                  <span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>high</span>
+                  <span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>on</span>
+                </div>
+                <div class="node-bars">
+                  <div class="nbar-row"><span class="nbl">Ctx</span><div class="pbar"><i style="width:48%;background:var(--success)"></i><span class="bar-cut" style="left:80%"></span></div><span class="nbv">48%</span></div>
+                  <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="nbv">22/50</span></div>
+                </div>
+                <div class="node-band">
+                  <div class="run-strip run-active"><i style="width:58%"></i></div>
+                  <div class="node-div"></div>
+                  <div class="node-feed">
+                    <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                    <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                  </div>
+                </div>
+                <div class="node-subs"><div class="subs-acc"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active">s1</span></div></div></div>
+              </div>
+            </div>
+            <ul class="gx-parts">
+              <li><code>node-meta-strip</code> — top row: created/elapsed age (left) + the status badge (overhangs the corner)</li>
+              <li><code>node-id</code> — identity row: glyph tile + role/name + model</li>
+              <li><code>node-settings</code> — the three config <code>node-chip</code>s (mode · effort · think)</li>
+              <li><code>node-bars</code> — the Ctx + Turns load bars (labeled progress bars)</li>
+              <li><code>node-band</code> — the activity band wrapping the <code>run-strip</code> + <code>marquee</code> (node-feed)</li>
+              <li><code>node-subs</code> — the subagent badge drawer at the bottom</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- message-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Message Card</span><span class="gx-slug">message-card</span></div>
+          <p class="gx-blurb">An expandable Team-Feed message — agent badge → status badge → direction, with the contiguous block rail when open.</p>
+          <div class="gx-stage gx-stage--col">
+            <div id="msg-list" style="width:100%">
+              <div data-comp="message-card" class="fcard msgcard open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="b-lab"><span class="b-role">coder</span><span class="b-name">01 max</span></span></span><span class="dbadge db-complete">Complete</span><span class="fcard-dir"><span class="dir-tag dir-in">recv</span></span><span class="fcard-prev">Patched validateToken() to enforce exp</span><span class="fcard-time">14:39</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="mrail-wrap">
+                  <div class="mrow mrow--title"><button class="mrail mrail--title"></button><div class="mrow-c"><div class="fcard-full"><span class="msg-turn">Turn 22</span></div></div></div>
+                  <div class="mrow"><button class="mrail"><span class="rail-tag">msg</span></button><div class="mrow-c"><div class="fcard-full">Patched validateToken() to enforce exp and added refresh-token rotation; Vitest green except one flaky timing case.</div></div></div>
+                  <div class="mrow"><button class="mrail"><span class="rail-tag">tht</span></button><div class="mrow-c"><div class="msg-blk blk-think"><span class="msg-blk-lbl">thinking</span>the timing case is environment-sensitive, not a real failure — worth a retry budget.</div></div></div>
+                </div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- history-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">History Card</span><span class="gx-slug">history-card</span></div>
+          <p class="gx-blurb">A sent-prompt history entry — status badge → sender → arrow → recipient badges, an attachment count chip, and Edit.</p>
+          <div class="gx-stage gx-stage--col">
+            <div style="width:100%">
+              <div data-comp="history-card" class="fcard open" data-histcard>
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="dbadge db-complete">Done</span><span class="badge badge-c ag-user-badge"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="b-lab"><span class="b-role">human</span><span class="b-name">User</span></span></span><i data-lucide="arrow-right" style="width:12px;height:12px;color:var(--muted);flex:0 0 auto"></i><span class="badge badge-c badge-sm"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span><span class="badge-more" style="height:26px">+1</span><span class="flex-1"></span><span class="att-chip"><i data-lucide="paperclip"></i><span class="att-n">2</span></span></button>
+                  <button class="ghost-ic" title="Edit in Compose"><i data-lucide="square-pen"></i></button>
+                  <span class="fcard-time">14:21</span>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="fcard-full">Audit the session + token-refresh path in src/auth for fixation risks; report findings to the scratchpad.</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- plan-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Plan Card</span><span class="gx-slug">plan-card</span></div>
+          <p class="gx-blurb">An expandable Library plan — a 3-row header (owner · title · state / feedback tally · steps / filename · dates). Shown collapsed.</p>
+          <div class="gx-stage gx-stage--col">
+            <div style="width:100%">
+              <div data-comp="plan-card" class="plan-card">
+                <button class="plan-head"><div class="plan-head-main">
+                  <div class="plan-row r1"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="b-lab"><span class="b-role">coder</span><span class="b-name">01 max</span></span></span><span class="plan-title">Auth token-rotation remediation</span><span class="flex-1"></span><span class="dbadge db-review">In review</span></div>
+                  <div class="plan-row r2"><span class="cnt-strip"><span class="cnt-chip c-approve"><i data-lucide="circle-check"></i><span class="cn">2</span></span><span class="cnt-chip c-revise"><i data-lucide="triangle-alert"></i><span class="cn">1</span></span></span><span class="flex-1"></span><span class="steps-txt">4/7 steps done</span></div>
+                  <div class="plan-row r3"><span class="plan-fname">.claude/plans/auth-rotation.md</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> Jun 26 · 5h ago&nbsp;&nbsp;<b>Edited</b> Jun 26 · 22m ago</span></div>
+                </div><i data-lucide="chevron-right" class="plan-chev"></i></button>
+                <div class="plan-body"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- asset-card -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Asset Card</span><span class="gx-slug">asset-card</span></div>
+          <p class="gx-blurb">A Library asset detail card — path + dates header, an image preview, and the Embed/Attach + Remove footer.</p>
+          <div class="gx-stage gx-stage--col">
+            <div data-comp="asset-card" class="assetdoc on" style="display:flex;width:100%">
+              <div class="doc-header"><span class="dh-path">assets/mockups/dashboard-v9.png</span><span class="dh-dates"><b>Created</b> Jun 24&nbsp;&nbsp;<b>Edited</b> Jun 26</span></div>
+              <div class="asset-preview" style="min-height:120px"><span class="ap-img" style="background:linear-gradient(135deg,var(--ag-cobalt),var(--ag-violet))"><i data-lucide="image"></i></span></div>
+              <div class="doc-foot"><div class="doc-foot-l"><div class="exp ea-dd"><button class="exp-btn"><i data-lucide="download" class="ic"></i><i data-lucide="chevron-down" class="cv"></i></button></div></div><button class="btn-danger btn-sm ml-auto"><i data-lucide="trash-2" class="w-3 h-3"></i>Remove</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- doc-editor -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Doc Editor</span><span class="gx-slug">doc-editor</span></div>
+          <p class="gx-blurb">The line-numbered markdown editor with an interactive left rail (select a line / section / the whole doc).</p>
+          <div class="gx-stage gx-stage--col">
+            <div data-comp="doc-editor" class="doc-ed" style="width:100%">
+              <div class="md">
+                <div class="md-row md-h2-row"><button class="md-rail is-title" data-title="1"><span class="rn">1</span></button><span class="md-line md-h1"># Auth Rotation Remediation</span></div>
+                <div class="md-row"><button class="md-rail"><span class="rn">2</span></button><span class="md-line md-blank"></span></div>
+                <div class="md-row md-h2-row"><button class="md-rail is-sec" data-sec="Findings"><span class="rn">3</span></button><span class="md-line md-h2">## Findings</span></div>
+                <div class="md-row rsel"><button class="md-rail"><span class="rn">4</span></button><span class="md-line"><span class="md-code-i">validateToken()</span> never checks <span class="md-code-i">exp</span> — held tokens stay valid.</span></div>
+                <div class="md-row"><button class="md-rail"><span class="rn">5</span></button><span class="md-line">- [x] Enforce exp on every verify</span></div>
+                <div class="md-row md-fill" aria-hidden="true"><span class="md-rail md-rail--fill"></span><span class="md-line"></span></div>
+              </div>
+              <div class="plan-cmt-pop"></div>
+            </div>
+            <span class="gx-spec-label">.doc-ed (line 4 selected)</span>
+          </div>
+        </div>
+
+        <!-- registry-row -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Registry Row</span><span class="gx-slug">registry-row</span></div>
+          <p class="gx-blurb">A Settings registry entry (MCP server · plugin · setup) — name/meta, a health badge, and an enable switch.</p>
+          <div class="gx-stage gx-stage--col">
+            <div data-comp="registry-row" class="reg-row" style="width:100%"><div class="reg-main"><div class="reg-name">firecrawl</div><div class="reg-meta">stdio · token</div></div><div class="reg-rt"><span class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Connected</span><button class="swh on" title="Enabled"></button></div></div>
+            <div class="reg-row off" style="width:100%"><div class="reg-main"><div class="reg-name">supabase</div><div class="reg-meta">~/.claude.json · OAuth</div></div><div class="reg-rt"><span class="hbadge hb-warn">OAuth expired</span><button class="swh" title="Disabled"></button></div></div>
+          </div>
+        </div>
+
+        <!-- settings-row -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Settings Row</span><span class="gx-slug">settings-row</span></div>
+          <p class="gx-blurb">A generic Settings key/value row — a left key, the value, and an optional trailing control / scope badge.</p>
+          <div class="gx-stage gx-stage--col">
+            <div style="width:100%">
+              <div data-comp="settings-row" class="set-row"><span class="rk">Auth method</span><span class="rv plain">Claude AI</span></div>
+              <div class="set-row"><span class="rk">Default model</span><span class="rv">claude-opus-4-8</span><span class="rt"><span class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)"><i data-lucide="pencil"></i></button></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- scratch-post -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Scratch Post</span><span class="gx-slug">scratch-post</span></div>
+          <p class="gx-blurb">An expandable scratchpad post in the Team Feed — status badge + agent badge + direction + preview.</p>
+          <div class="gx-stage gx-stage--col">
+            <div style="width:100%">
+              <div data-comp="scratch-post" class="fcard open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="dbadge db-active">Active</span><span class="badge badge-c"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span><span class="fcard-dir"><span class="dir-tag dir-out">sent</span></span><span class="fcard-prev">CRITICAL: expiry bypass in validateToken()</span><span class="fcard-time">14:21</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="fcard-full">CRITICAL — validateToken() never checks the exp claim, so a held refresh token keeps a session alive indefinitely. Posting to the scratchpad for the auditor to confirm.</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- log-line -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Log Line</span><span class="gx-slug">log-line</span></div>
+          <p class="gx-blurb">A monospace log entry in the Team Feed — agent badge + a mono log message (warn variant shown).</p>
+          <div class="gx-stage gx-stage--col">
+            <div style="width:100%">
+              <div data-comp="log-line" class="fcard open">
+                <div class="fcard-head">
+                  <button class="fcard-exp msel-head"><span class="badge badge-c"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="b-lab"><span class="b-role">ops</span><span class="b-name">01 sage</span></span></span><span class="fcard-prev fcard-log" style="color:var(--warning)">permission required — kubectl apply</span><span class="fcard-time">14:43</span></button>
+                  <button class="fcard-chevbtn"><i data-lucide="chevron-right" class="fcard-chev"></i></button>
+                </div>
+                <div class="fcard-body"><div class="fcard-full fcard-log">01 sage · permission required — kubectl apply · awaiting your input</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- link-edges (planned) -->
+        <div class="gx-card">
+          <div class="gx-card-head"><span class="gx-name">Link Edges</span><span class="gx-slug">link-edges</span><span class="gx-status gx-status--planned">planned</span></div>
+          <p class="gx-blurb">Directed arrows drawn between agent cards to show coordination links. Designed but not yet drawn — illustrated below as a placeholder.</p>
+          <div class="gx-stage gx-stage--col gx-stage--center" data-status="planned">
+            <div class="gx-edge-demo">
+              <svg class="gx-edge-svg" viewBox="0 0 360 120" aria-hidden="true">
+                <defs>
+                  <marker id="gx-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M0,0 L10,5 L0,10 z" fill="var(--secondary)"></path>
+                  </marker>
+                </defs>
+                <rect x="14" y="36" width="78" height="48" rx="5" fill="var(--secondary-background)" stroke="var(--border)" stroke-width="2"></rect>
+                <rect x="268" y="36" width="78" height="48" rx="5" fill="var(--secondary-background)" stroke="var(--border)" stroke-width="2"></rect>
+                <line x1="96" y1="60" x2="262" y2="60" stroke="var(--secondary)" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#gx-arrow)"></line>
+                <text x="53" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" font-weight="800" fill="var(--foreground)">sandy</text>
+                <text x="307" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" font-weight="800" fill="var(--foreground)">drew</text>
+              </svg>
+            </div>
+            <span class="gx-spec-label">placeholder illustration — not the live rendering</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- render lucide <i data-lucide> icons -->
+  <script>
+    if (window.lucide && lucide.createIcons) lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -95,13 +95,15 @@
 - Make the major header and footer use the pink color and do the same for the major movable internal panel area dividers. For the latter, I still want them teal when hover or actively being moved.
 - I want to switch from the cream background to something darker, like a charcoal. I want to keep the lighter cream for the main footer and the panel headers but for subheader within the panels I want to move to a darker charcoal (or whatever we use for the new main surface fill/background). 
 - Our error/danger red reads as a little too pink. Works for the palette but does not jump out when scanning the UI. I think we need a more distinct error red for this.
+- The Link config should default to 2-way.
+- The Messages "Content" filter needs to include an option for the actual 'message' text (ie, whatever the main reply text is referred to).
 
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
 - Change stop button to use a filled red icon
-- I want to work out how to build in more visual elements in Plans like charts, mockups and diagrams. I am thinking a few things. We could have a seperate tab in Liibarary or put these in the Assets tab, but we will need a way to comment them with visual markers etc. We might utilize what we have already in this tool: design\mockup-toolkit.js. If we put it in the Assets, we may want to structure the nav bar with headings, like something for stock imagges
+- I want to work out how to build in more visual elements in Plans like charts, mockups and diagrams. I am thinking a few things. We could have a separate tab in Library or put these in the Assets tab, but we will need a way to comment them with visual markers etc. We might utilize what we have already in this tool: design\mockup-toolkit.js. If we put it in the Assets, we may want to structure the nav bar with headings, like something for stock images
 - Plans should utilize mermaid diagrams in markdown.
 - Need to add a permanent delete option along with retire that fully wipes the agent info from the system.
 - Add some voice reading feature and, ideally, an option to change speed from normal up to 2-3x
@@ -125,3 +127,4 @@
 - Need to standardize our badge sizes better.
 - Need to decide what subagent info we want access to and where we access it. Related, what does clicking the subagent icon on agent cards do?
 - Need to confirm that the current UI components etc translate to neobrutalism.dev. Acceptable if they do not, but leaning towards using a consistent library for maintinence.
+- Need to determine what files should stay markdown vs what files would actually work better as JSON given they will be handled by agents and can be rendered in the UI however we want.
