@@ -917,6 +917,16 @@ Files: sidecar/eventbus.py (new), sidecar/main.py, sidecar/drivers/bridge.py, te
 
 ---
 
+### 2026-06-30 18:30:00 — design: the OD tracker's full design-layer (🎨) stream integrated into design/ (8 ODs)
+
+Integrated the eight design-tagged decisions (OD-03/13/14/15/16/18/19/20) into the six-file design system on the live (now-committed) `design/` files. **OD-03:** identity pools 16→**25** named `--ag-*` OKLCH-jewel colors (additive, gamut-clamped, existing 16 unchanged) + 29→**50** curated icons (sprite symbols + `AGENT_ICONS`); pickers auto-count to 50; gave the gallery a synced sprite so its agent glyphs render. **OD-14:** "Always allow" fully removed — Permission card is binary Approve/Deny (+Reply). **OD-20:** Console run bar flipped `planned`→built (markers removed; live feed/route is the backend stream's job). **OD-18:** net-new per-agent **MCP / Plugins / Deny-rules** scoping msels in Create + Details (reuse the msel primitive); Account/Limits bands confirmed present. **OD-13** (largest): `s1`→`A2` group+member badges; badge-click (focus parent → open Details Subagents → scope feed) **resolving OQ-1**; new **Subagents audit accordion**; nested **From/To feed tree** (parent-subtree vs leaf; Prompt-To kept flat); **Messages nesting**; gallery specimens flipped + a new accordion card; DESIGN.md updated, **OQ-1 deleted** from the register, and the "Inbox included" From/To contradiction **reconciled** to the inert-on-Inbox model. **OD-15/OD-16:** confirmed complete, left untouched (no scope creep). **OD-19:** confirmed Delete ships in v1 with a plain confirm — no change.
+
+Verified by driving the rendered UI over `http://localhost` with headless Chromium (the Playwright MCP browser was locked by another instance — used the prompt's sanctioned fallback): every touched surface screenshotted, narrow (1180) + wide (1920) resize with no overflow / console errors, and the new controls driven (badge-click, feed tree, accordion, scoping msels, pickers, Messages nesting, gallery). A 5-agent adversarial review caught 4 gallery propagation gaps (OD-20 console flip + OD-13 nested-tree / message-sub variants not propagated to the catalog, plus a stale `.sbadge` comment) — all fixed and re-verified. (Note: DEVLOG is now >700 lines; rotation deferred to avoid racing the concurrent backend-stream appends.)
+
+Files: design/tokens.css, design/styles.css, design/behavior.js, design/mockup.html, design/gallery.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

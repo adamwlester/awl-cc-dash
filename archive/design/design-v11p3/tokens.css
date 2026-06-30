@@ -119,40 +119,28 @@
   --node-icon-pct:5%;         /* watermark glyph tint (near-white over the field) */
 
   /* ---- Agent identity palette — the "Jewel" family ----------------------- */
-  /* 25 colours assigned per agent (round-robin, color = n mod 25), kept in a
-     different REGISTER from the UI accents above (deeper / more saturated) so
-     identity never reads as a UI signal. The "Jewel" family — one OKLCH recipe
-     (target oklch 0.52 0.15, gamut-clamped per hue), spread around the wheel in
-     spectral ROYGBIV order. 25 = the unique-colour ceiling (typical project);
-     past ~16 the icon is the primary disambiguator and colour a soft "family"
-     signal, so the ring densifies rather than re-spacing (existing 16 unchanged;
-     the +9 fill the widest gaps). These are the single source for the colour
-     picker, the agent tiles, and the agent-identity JS (read from CSS). */
+  /* 16 colours assigned per agent, kept in a different REGISTER from the UI
+     accents above (deeper / more saturated) so identity never reads as a UI
+     signal. An even OKLCH set — 16 hues spaced evenly around the wheel at one
+     fixed deep lightness/chroma (oklch 0.52 0.15). Listed in spectral ROYGBIV
+     order. These are the single source for the colour picker, the agent tiles,
+     the Palette Reference legend, and the agent-identity JS (read from CSS). */
   --ag-crimson:#aa3a61;
-  --ag-scarlet:#ae3a4f;
   --ag-vermilion:#af3c3a;
   --ag-amber:#aa4600;
   --ag-gold:#9d5400;
-  --ag-topaz:#915c00;
   --ag-citron:#876300;
-  --ag-chartreuse:#786900;
   --ag-lime:#687100;
-  --ag-peridot:#557600;
   --ag-fern:#387b12;
   --ag-emerald:#008149;
   --ag-teal:#008370;
-  --ag-turquoise:#007879;
   --ag-cyan:#007f91;
-  --ag-cerulean:#007494;
   --ag-azure:#0076ab;
   --ag-cobalt:#006bbb;
-  --ag-sapphire:#3565be;
   --ag-indigo:#4d5ebe;
   --ag-violet:#7152b5;
   --ag-orchid:#8b48a0;
-  --ag-fuchsia:#954393;
   --ag-magenta:#9e3f84;
-  --ag-rose:#a53c73;
 
   /* ---- Sizing scale (primitive, by px — recurring component dimensions) --- */
   /* Badge/bar/tile/icon/control dimensions used 2+ times across styles.css.

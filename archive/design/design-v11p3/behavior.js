@@ -46,28 +46,12 @@
   /* ===== generic interactions (ported from v7p3) ===== */
   function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden');}
   function agSync(scope){const link=scope.querySelector('[data-allnone]');if(!link)return;const rows=[...scope.querySelectorAll('.agrow')];const allOn=rows.length>0&&rows.every(r=>r.classList.contains('on'));link.dataset.act=allOn?'none':'all';link.textContent=allOn?'None':'All';}  /* show only the useful action */
-  function toggleAgRow(el){el.classList.toggle('on');
-    if(el.classList.contains('agrow--parent')){const subs=el.nextElementSibling;const on=el.classList.contains('on');   /* OD-13: parent select = the whole subtree (parent + its subagents) */
-      if(subs&&subs.classList.contains('agrow-subs'))subs.querySelectorAll('.agrow--sub').forEach(r=>r.classList.toggle('on',on));}
-    const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);}}   /* multi-select (Target / Filter) */
-  function toggleAgSubs(e,btn){e.stopPropagation();const row=btn.closest('.agrow');if(!row)return;const subs=row.nextElementSibling;if(!subs||!subs.classList.contains('agrow-subs'))return;const open=subs.classList.toggle('open');row.classList.toggle('subs-open',open);}   /* OD-13: expand/collapse a parent's subagent sub-rows (does NOT change selection) */
-  function setFeedSubFilter(node,id){const fil=document.getElementById('feed-filter');if(!fil)return false;   /* OD-13: scope the Team Feed filter to one subagent (best-effort, by id; called by subBadgeClick) */
-    const sub=[...fil.querySelectorAll('.agrow--sub')].find(r=>r.dataset.sub===id);if(!sub)return false;
-    fil.querySelectorAll('.agrow.on').forEach(r=>r.classList.remove('on'));sub.classList.add('on');
-    const subs=sub.closest('.agrow-subs');if(subs){subs.classList.add('open');const pr=subs.previousElementSibling;if(pr)pr.classList.add('subs-open');}
-    agSync(fil);updateAgBadges(fil);return true;}
+  function toggleAgRow(el){el.classList.toggle('on');const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);}}   /* multi-select (Target / Filter) */
   /* v9p9: header-dropdown popover toggle (To / Filter) + identity-badge summary in the trigger */
   function toggleSrcPop(btn){const dd=btn.closest('.src-dd');if(!dd)return;const pop=dd.querySelector('.src-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open)pop.classList.add('open');}
   function updateAgBadges(scope){const wrap=scope.querySelector('[data-badges]');if(!wrap)return;
-    const on=[...scope.querySelectorAll('.aglist .agrow.on')].filter(r=>{
-      if(r.classList.contains('agrow--sub')){const subs=r.closest('.agrow-subs');const par=subs&&subs.previousElementSibling;if(par&&par.classList.contains('on'))return false;}   /* OD-13: a fully-selected parent's badge stands in for its subagents */
-      return true;});
-    const cap=scope.dataset.badgeCap?parseInt(scope.dataset.badgeCap,10):3;
-    let html=on.slice(0,cap).map(r=>{
-      if(r.classList.contains('agrow--sub')){const id=r.dataset.sub||'';const st=[...r.classList].find(c=>c.indexOf('sb-')===0)||'sb-idle';   /* OD-13: subagent leaf → compact badge, parent identity in the name */
-        const subs=r.closest('.agrow-subs');const par=subs&&subs.previousElementSibling;const pn=par?((par.querySelector('.ag-name')||{}).textContent||''):'';
-        return '<span data-comp="identity-badge" class="badge badge-c badge-sub"><span class="sbadge '+st+' sub-fbadge">'+id+'</span><span class="b-lab"><span class="b-role">subagent</span><span class="b-name">'+pn+' › '+id+'</span></span></span>';}
-      const tileEl=r.querySelector('.agtile');if(!tileEl)return '';const tile=tileEl.outerHTML;const role=(r.querySelector('.ag-role')||{}).textContent||'';const name=(r.querySelector('.ag-name')||{}).textContent||'';
+    const on=[...scope.querySelectorAll('.aglist .agrow.on')];const cap=scope.dataset.badgeCap?parseInt(scope.dataset.badgeCap,10):3;
+    let html=on.slice(0,cap).map(r=>{const tile=r.querySelector('.agtile').outerHTML;const role=r.querySelector('.ag-role').textContent;const name=r.querySelector('.ag-name').textContent;
       return '<span data-comp="identity-badge" class="badge badge-c">'+tile+'<span class="b-lab"><span class="b-role">'+role+'</span><span class="b-name">'+name+'</span></span></span>';}).join('');
     if(on.length>cap)html+='<span data-comp="overflow-badge" class="badge-more">+'+(on.length-cap)+'</span>';
     if(!on.length)html='<span class="b-empty">No agents</span>';
@@ -247,33 +231,6 @@
   });}
   function subsTrig(e,el){const acc=el.closest('.subs-acc');if(!acc||!acc.classList.contains('has-more'))return;   /* one row → no drawer; let the click bubble up to select the node */
     e.stopPropagation();const open=acc.classList.toggle('open');const n=acc.closest('.node');if(n)n.classList.toggle('subs-open',open);LU();}
-
-  /* ===== OD-13: subagent model — group+member badges (A2), Details audit accordion, badge-click (resolves OQ-1) ===== */
-  /* Details → "Subagents" audit accordion: a sticky disclosure (like the node drawer, NOT a popup → not closed by closeAllPopups). */
-  function toggleSubsAudit(btn){const acc=btn.closest('.subs-audit');if(!acc)return;const open=acc.classList.toggle('open');btn.setAttribute('aria-expanded',open?'true':'false');if(typeof refreshJumpPills==='function')setTimeout(refreshJumpPills,30);}
-  /* Open the audit accordion on Details and scroll + highlight the row for `subId` (e.g. "A2"). */
-  function openSubsAudit(subId){
-    if(typeof switchTab==='function')switchTab('mid','details');
-    const acc=document.getElementById('det-subs-audit');if(!acc)return;
-    acc.classList.add('open');const hd=acc.querySelector('.subs-audit-head');if(hd)hd.setAttribute('aria-expanded','true');
-    acc.querySelectorAll('.sa-row.sa-hl').forEach(r=>r.classList.remove('sa-hl'));
-    const row=subId?acc.querySelector('.sa-row[data-sub="'+subId+'"]'):null;
-    if(row)row.classList.add('sa-hl');
-    setTimeout(()=>{(row||acc).scrollIntoView({block:'center',behavior:'smooth'});},40);}
-  /* Graph-card subagent badge click — replaces the old stopPropagation no-op (OQ-1). Three actions:
-     (1) focus the PARENT agent, (2) open Details → Subagents scrolled+highlighted to that row,
-     (3) scope the Team Feed to that subagent on the Messages tab. Still stops propagation so the
-     click doesn't also select the card or toggle the badge drawer. */
-  function subBadgeClick(e,badge){
-    e.stopPropagation();
-    const id=(badge.textContent||'').trim();
-    const node=badge.closest('.node');
-    if(node&&typeof selectNode==='function')selectNode(node);            /* (1) */
-    openSubsAudit(id);                                                    /* (2) */
-    if(typeof switchTab==='function')switchTab('feed','messages');        /* (3) */
-    if(typeof setFeedSubFilter==='function')setFeedSubFilter(node,id);
-    const pn=node?(node.querySelector('.text-foreground.truncate')||{}).textContent||'':'';
-    toast('Feed scoped → '+(pn?pn.replace(/^\d+\s+/,'').trim()+' › ':'')+id);}
 
   /* ===== Compose placeholders + merged Templates (v10p1 #22) ===== */
   let phSel=null;
@@ -571,8 +528,7 @@
     ['ag-cowled','cowled'],['ag-wolf','wolf-head'],['ag-bear','bear-head'],['ag-tiger','tiger-head'],['ag-dragon','dragon-head'],
     ['ag-skull','skull-mask'],['ag-ninja','ninja-head'],['ag-viking','viking-head'],['ag-samurai','samurai-helmet'],
     ['ag-oni','oni'],['ag-goblin','goblin-head'],['ag-ogre','ogre'],['ag-vampire','vampire-dracula'],['ag-witch','witch-face'],
-    ['ag-pumpkin','pumpkin-mask'],['ag-cyborg','cyborg-face'],['ag-mecha','mecha-head'],
-    ['ag-stag','stag-head'],['ag-elephant','elephant-head'],['ag-raccoon','raccoon-head'],['ag-rabbit','rabbit-head'],['ag-buffalo','buffalo-head'],['ag-minotaur','minotaur'],['ag-medusa','medusa-head'],['ag-orc','orc-head'],['ag-troll','troll'],['ag-imp','imp-laugh'],['ag-spectre','spectre'],['ag-spartan','spartan-helmet'],['ag-knight','black-knight-helm'],['ag-pirate','pirate-captain'],['ag-plague','plague-doctor-profile'],['ag-clown','clown'],['ag-monk','monk-face'],['ag-android','android-mask'],['ag-samus','samus-helmet'],['ag-deathskull','death-skull'],['ag-squid','squid-head']];
+    ['ag-pumpkin','pumpkin-mask'],['ag-cyborg','cyborg-face'],['ag-mecha','mecha-head']];
   function buildIconGrids(){
     const html=AGENT_ICONS.map(([id,nm])=>'<button class="icotile" data-name="'+nm+'" title="'+nm+'" onclick="pickIconChoice(this)"><span class="agtile" style="color:var(--cur-color)"><svg class="ag-svg"><use href="#'+id+'"/></svg></span></button>').join('');
     document.querySelectorAll('[data-icogrid]').forEach(g=>g.innerHTML=html);
@@ -1010,17 +966,6 @@
       {group:'Core tools',items:['Bash','Read','Write','Edit','Glob','Grep','WebSearch','WebFetch']},
       {group:'More native tools',items:['Agent','AskUserQuestion','NotebookEdit','TodoWrite','ExitPlanMode','Skill','SendMessage','LSP','EnterWorktree','ExitWorktree','BashOutput','KillShell','SlashCommand','PowerShell']},
     ],
-    /* OD-18: per-agent scoping — which MCP servers / plugins this agent may use, and the deny rules that hard-block it.
-       MCP / plugins take effect at the agent's next launch/restart; deny is the reliable hard-block (allow-lists are ignored under bypass — a claude bug). */
-    mcp:[
-      {group:'Configured MCP servers — none = all available',items:['playwright','github','supabase','firecrawl','exa','notion','docker','brave-search','rentcast','attom-api']},
-    ],
-    plugins:[
-      {group:'Installed plugins — none = all enabled',items:['claude-mem','superpowers','everything-claude-code','ui-ux-pro-max','pyright-lsp']},
-    ],
-    denyrules:[
-      {group:'Deny rules — tools/commands this agent can never run',items:['Bash(rm -rf:*)','Bash(sudo:*)','Bash(git push:*)','Bash(curl:*)','Write(/etc/**)','Write(**/.env)','Read(**/.env)','Read(**/secrets/**)','WebFetch','Edit(**/*.lock)']},
-    ],
   };
   function mselState(el){if(!el._sel){try{el._sel=new Set(JSON.parse(el.dataset.sel||'[]'));}catch(e){el._sel=new Set();}}return el._sel;}
   function buildMsel(el){const cat=MSEL_CATALOG[el.dataset.msel]||[];const sel=mselState(el);const box=el.querySelector('.msel-box');const pop=el.querySelector('.msel-pop');
@@ -1402,11 +1347,10 @@ resize intact.`,
   /* P1b: a Messages card uses the shared select-to-act model — click the header to select the WHOLE card
      (pink, multi + select-all), a per-block rail to select one block (teal), the chevron to expand
      (select ≠ expand). Scratch still uses fcardHTML (checkbox). */
-  function msgCardHTML(o,i){const a=AG[o.ag];return '<div data-comp="message-card" class="fcard msgcard'+(o.sub?' msgcard--sub':'')+'" data-selcard data-msgi="'+i+'">'
+  function msgCardHTML(o,i){const a=AG[o.ag];return '<div data-comp="message-card" class="fcard msgcard" data-selcard data-msgi="'+i+'">'
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
     +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
-    +(o.sub?'<span data-comp="subagent-badge" class="sbadge '+(o.substate||'sb-active')+' msg-subbadge" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — nested under '+a.role+' '+a.name+'">'+o.sub+'</span>':'')   /* OD-13: subagent events nest under their parent — the sub-id badge after the parent identity */
     +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed); user-sent keep just the dir tag */
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → status → dir */
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
@@ -1530,14 +1474,6 @@ resize intact.`,
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
        {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
-    /* OD-13: subagent events stream nested/indented UNDER their parent (here, coder-01-max). Always Received (helpers never receive operator sends); sub = the group+member id, subtype = the agent type. */
-    {ag:'max',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:17,time:'14:47',body:`Mapped 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check — that's the bypass max is patching.`,
-     blocks:[
-       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts · middleware/jwt.ts'},
-       {k:'meta',t:'subagent of coder-01-max · run A · spawned 14:46'}]},
-    {ag:'max',sub:'B1',subtype:'code-reviewer',substate:'sb-idle',dir:'in',status:'complete',turn:17,time:'14:47',body:`Reviewed the exp-enforcement patch against the remediation plan — covers the bypass; flagged the missing rotation-path test (max has since added it).`,
-     blocks:[
-       {k:'meta',t:'subagent of coder-01-max · run B · spawned 14:47'}]},
     {ag:'drew',dir:'in',status:'error',turn:18,time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
@@ -1643,7 +1579,7 @@ resize intact.`,
   /* ===== Inbox (approvals you owe) — data-driven (REQS), expandable + selectable like Log =====
      v10p1 #15: each card collapses to identity + type badge + title; expand reveals the detail + actions.
      The checkbox multi-selects (shared Copy/Share strip). data-agent lets a Pending badge jump-expand it.
-     #11: Reject + Deny use the danger color; Approve stays pink-primary. OD-14: Permission is binary Approve/Deny (+Reply) — "Always allow" fully removed. */
+     #11: Reject + Deny use the danger color; Approve stays pink-primary, Always allow stays neutral. */
   /* P2: Inbox grouped into typed SECTIONS — Permission · Plan · Decision · Error. The section header
      carries the type label, so cards drop the per-card type badge (this supersedes the old reddish→copper
      attention ramp). Approval → Plan. Decision is the AskUserQuestion surface — one question per card.
@@ -1668,7 +1604,7 @@ resize intact.`,
   function inboxReplyHTML(){return '<button class="btn-secondary btn-sm ml-auto" onclick="inboxReply(this)" title="Reply via the Editor (quotes the request as a reference block)"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* OD-14: binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button><button class="btn btn-sm" onclick="inboxResolve(this,\'Always allowed\')">Always allow</button>'+inboxReplyHTML();}
     else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plan: Review (→ Plans) + Reply only — no Approve/Reject */
       acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';

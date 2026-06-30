@@ -98,8 +98,6 @@
 - The Link config should default to 2-way.
 - The Messages "Content" filter needs to include an option for the actual 'message' text (ie, whatever the main reply text is referred to).
 - We need to include a trash/delete ghost button after edit for History cards for prompts that are not "Active" or "Complete" so that they can be deleted before they get run if needed.
-- Make from and to inline heading labels the from and to vis toggles.
-- Subagent selection in the dropdown needs to have the select All/None action wired to them. Right now, it does not select/deselect subagents, only agents.
 
 ## Scratch
 

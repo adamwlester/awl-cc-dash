@@ -223,9 +223,8 @@
     .node-feed.idle .trk.b{ display:none; }
     /* subagents: RECTANGULAR clickable id-badges, each FILLED with the sub's run-state status colour + BOLD INVERSE
        (white) id text — the exact .node-badge .nb-* treatment (--success active / --warning pending / --muted idle,
-       #fff ink). The id (OD-13: group + member — A1/A2/B1…, no `s` prefix) is the label, not a count. A badge
-       click is isolated from the parent card (stopPropagation), then runs subBadgeClick — focus the parent +
-       open Details → Subagents (scrolled/highlighted) + scope the Team Feed to that subagent (resolved OQ-1).
+       #fff ink). The id (s1/s2…) is the label, not a count. A badge click is isolated from the parent card
+       (stopPropagation); the click action itself is still unwired (open decision e).
        R-batch item 3: the strip is an IN-FLOW ACCORDION DRAWER (replaces the old +N popover). Collapsed shows only
        the first row of badges (vertically centred in the trigger) + a chevron on the right; clicking the strip
        toggles it OPEN, which grows the card downward (.node.subs-open drops the square) to reveal the remaining
@@ -258,37 +257,6 @@
     .subs-acc.open .subs-chev svg{ transform:rotate(90deg); }
     .node.subs-open{ aspect-ratio:auto; }   /* item 3: an open subagent drawer grows the card past its fixed square */
     .subs-empty{ align-self:center; font-family:var(--font-mono); font-size:8px; font-style:italic; color:var(--muted-2); }
-
-    /* ===================== OD-13: Details → "Subagents" audit accordion ===================== */
-    /* A read-only history of the focused agent's subagents, grouped by run. Pinned below the Timeline,
-       above the Retire/Delete footer. Clicking a graph-card subagent badge focuses the parent, opens
-       this accordion, and scrolls/highlights the matching row (resolves OQ-1). Reuses the disclosure
-       pattern of the node subagent drawer (chevron rotates 90° on open). */
-    .subs-audit{ flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow:hidden; }
-    .subs-audit-head{ width:100%; display:flex; align-items:center; gap:var(--space-6); padding:var(--space-7) var(--space-8); background:var(--surface-3); border:none; cursor:pointer; text-align:left; font:inherit; }
-    .subs-audit-head:hover{ background:var(--background); }
-    .sa-chev{ width:var(--size-14); height:var(--size-14); color:var(--muted); transition:transform .12s; flex:0 0 auto; }
-    .subs-audit.open .sa-chev{ transform:rotate(90deg); }
-    .sa-title{ font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--foreground); }
-    .sa-count{ display:inline-flex; align-items:center; justify-content:center; min-width:var(--size-16); height:var(--size-16); padding:0 var(--space-4); border-radius:var(--radius-sm); background:var(--secondary); color:var(--secondary-foreground); font-family:var(--font-mono); font-weight:800; font-size:10px; }
-    .sa-hint{ margin-left:auto; font-size:10px; font-weight:600; color:var(--muted-2); }
-    .subs-audit-body{ display:none; flex-direction:column; padding:var(--space-8); gap:var(--space-8); }
-    .subs-audit.open .subs-audit-body{ display:flex; }
-    .sa-run-h{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:var(--space-5); }
-    .sa-run-n{ color:var(--muted-2); font-weight:600; text-transform:none; letter-spacing:0; }
-    .sa-row{ border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--background); padding:var(--space-6) var(--space-7); display:flex; flex-direction:column; gap:var(--space-4); }
-    .sa-row + .sa-row{ margin-top:var(--space-5); }
-    .sa-row.sa-hl{ background:var(--select); border-color:var(--secondary); }
-    .sa-row-top{ display:flex; align-items:center; gap:var(--space-6); }
-    .sa-type{ font-weight:700; font-size:11px; color:var(--foreground); }
-    .sa-status{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:0 var(--space-4); border-radius:var(--radius-xs); border:var(--border-width) solid var(--border); }
-    .sa-st-running{ color:#fff; background:var(--success); border-color:var(--success); }
-    .sa-st-done{ color:var(--muted); background:transparent; }
-    .sa-st-error{ color:#fff; background:var(--danger); border-color:var(--danger); }
-    .sa-tx{ margin-left:auto; flex:0 0 auto; }
-    .sa-task{ font-size:11px; color:var(--foreground); line-height:1.35; }
-    .sa-usage{ display:flex; flex-wrap:wrap; gap:var(--space-5); font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--muted); }
-    .sa-usage .sep{ color:var(--muted-2); }
 
     /* ===================== ICON-FILL agent cards (light tint) ===================== */
     /* The card's game-icon echoes the real identity tiles' POLARITY — a slightly DARKER tinted field
@@ -520,26 +488,6 @@
     .agrow.on .ag-role{ color:var(--main-foreground); opacity:.7; }
     .ag-ck{ width:var(--size-14); height:var(--size-14); color:var(--main-foreground); opacity:0; flex:0 0 auto; }
     .agrow.on .ag-ck{ opacity:1; }
-    /* ===== OD-13: nested From/To FEED filter — agents (top) → subagents (indented, sender-side). Parent-select = whole
-       subtree, leaf-select = one subagent. Feed-filter ONLY: the Prompt compose-To stays flat (subagents are filter-only
-       senders, never addressable targets). ===== */
-    .agrow--parent .ag-exp{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-16); height:var(--size-16); padding:0; color:var(--muted); cursor:pointer; border-radius:var(--radius-xs); }
-    .agrow--parent .ag-exp:hover{ color:var(--foreground); background:var(--surface-3); }
-    .agrow--parent .ag-exp svg{ width:var(--size-12); height:var(--size-12); transition:transform .12s; }
-    .agrow--parent.subs-open .ag-exp svg{ transform:rotate(90deg); }
-    .ag-subcount{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; min-width:var(--size-15); height:var(--size-15); padding:0 var(--space-4); border-radius:var(--radius-xs); background:var(--surface-3); border:var(--border-width) solid var(--border); color:var(--muted); font-family:var(--font-mono); font-weight:800; font-size:9px; }
-    .agrow.on .ag-subcount{ background:var(--secondary); border-color:var(--secondary); color:var(--secondary-foreground); }
-    .agrow-subs{ display:none; flex-direction:column; background:var(--background); }
-    .agrow-subs.open{ display:flex; }
-    .agrow--sub{ padding-left:var(--size-26); gap:var(--space-6); }
-    .agrow--sub .ag-role{ font-size:8px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.03em; }
-    .agrow--sub .ag-name{ font-size:10px; }
-    .sub-fbadge{ flex:0 0 auto; }
-    .badge-sub .sbadge{ flex:0 0 auto; }
-    /* OD-13: subagent message cards nest indented under their parent in the Messages feed (always Received).
-       A left teal edge + indent marks them as a child of the agent above; the sub-id badge sits after the parent identity. */
-    .msgcard--sub{ margin-left:var(--size-20); border-left-color:var(--secondary); }
-    .msg-subbadge{ flex:0 0 auto; }
     .mini-link{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; }
     .mini-link:hover{ color:var(--link-hover); }
 
