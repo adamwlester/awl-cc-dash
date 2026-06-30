@@ -1,4 +1,4 @@
-# C2 Audit: Component Inventory and Behavior Wiring
+# Component Inventory and Behavior Wiring
 
 **Source:** `design/mockup.html` (5,297 lines, reconstructed in full and verified faithful).
 **Method:** direct grep and region reads of the CSS block (lines ~414 to 2020), the body markup (~2058 to 3464), and the behavior script (~3466 to 5293). Every claim below was checked against the actual file, not against prior session notes.

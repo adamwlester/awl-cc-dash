@@ -599,6 +599,14 @@ Files: design/mockup.html, DEVLOG.md
 
 ---
 
+### 2026-06-29 21:30:00 — Design-system reconciliation: spec updated + audit/spec relocated to dev/notes, ui-snippets moved to .scratch
+
+Prep for the one-shot design-system refactor (no product code or `design/` primary docs touched). (1) Reconciled `component-system-spec.md` to the decisions settled in the 06-27 and 06-29 planning chats and moved it out of `design/` into `dev/notes/` (it is build input that retires after the build, so `design/` now holds only primary design docs). Key spec changes: `data-comp` is now a kebab-case slug (one label, no parallel Title-Case registry); dormant or unresolved items are tagged via a `data-status` attribute (`planned` or `undecided`); stylesheet-extraction method is the building agent's call with render-identical as the acceptance bar; added a doc-distribution map (values to tokens.css, component CSS to styles.css, slugs and markers to mockup.html, catalog and blurbs to gallery.html, rules to DESIGN.md) so the spec can fully retire; decoupled from `TODO.md` entirely (no cross-references in the spec, mockup, gallery, or DESIGN.md); re-based the value snapshot on the live mockup as source of truth (naming the new icon-fill knobs `--node-tint` / `--node-icon-pct` and the `.agtile--me` / `.node-bg` additions as tokenization targets); replaced the old open-decisions list with an Open Questions register (OQ-1: `sb-error` and the subagent-click no-op parked as `undecided`, not forced); added a post-Phase-3 verification that `coverage-map.md`'s DESIGN.md citations still resolve. (2) Renamed and moved the audit `dev/notes/research/c2-audit.md` to `dev/notes/component-inventory-and-wiring.md` and dropped 'C2' from its H1 (the audit retires; agents work from the spec plus the live mockup, not the audit). (3) Moved `design/ui-snippets/` to `.scratch/ui-snippets/` (incremental design scratch, relocated out of `design/` to avoid confusion; now under the gitignored `.scratch`, so it is local-only and no longer tracked). Note: the audit and spec were created 06-27 but never logged; this entry backfills their existence as part of the relocation. Next: write the one-shot ultracode prompt against the updated spec.
+
+Files: dev/notes/component-system-spec.md, dev/notes/component-inventory-and-wiring.md, .scratch/ui-snippets/user-icon-options.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
