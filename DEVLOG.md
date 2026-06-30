@@ -607,6 +607,22 @@ Files: dev/notes/component-system-spec.md, dev/notes/component-inventory-and-wir
 
 ---
 
+### 2026-06-29 21:45:00 — Build prompt authored: dev/prompts/component-system-refactor.md
+
+Wrote the one-shot build prompt `dev/prompts/component-system-refactor.md` for the design-system refactor (to be run in ultracode). By design it points the building agent at `dev/notes/component-system-spec.md` as the authoritative plan rather than restating it, lists the required-reading context (the CLAUDE.md UI-verification and DEVLOG rules, the live `design/` files as current-state truth, the inventory audit as background only), and surfaces the guardrails that are easy to miss: the spec's decisions are final (the earlier tractability review in `.claude/cc-exports/` is superseded), the render must stay identical through extraction and tokenization (verified by driving the UI, not reading diffs), single-source tokens with no renames of existing custom properties, `data-comp` kebab slugs plus `data-status` planned/undecided markers, no `TODO.md` references anywhere, absorb-then-retire the spec into the five permanent design files, and the post-Phase-3 check that `coverage-map.md`'s DESIGN.md citations still resolve. Mechanism: parallel subagents in isolated git worktrees per the repo's existing `nextup-parallel-execution.md` pattern, with the agent owning sequencing, merges, and final headed verification. Prompt authoring only; no code or design files changed.
+
+Files: dev/prompts/component-system-refactor.md, DEVLOG.md
+
+---
+
+### 2026-06-29 22:00:00 — Review-driven refinements to the design-system spec + build prompt
+
+Folded in a second session's review of the build prompt (five accepted items). Spec (`dev/notes/component-system-spec.md`): (1) called out that much of the catalog is JavaScript-generated, not static markup (the `.db-*` Lifecycle family, the Verdict badge, the count chips, the identity badges, and all five inbox card types come from `inboxCardHTML` / `verdictBadgeHTML` / `renderInbox` / `renderFeed` over the `REQS` / `MSGS` / `db-*` data), so `data-comp` slugs must be emitted from inside the builder functions and the gallery must author static specimens for the JS-only variants; (2) added a 'what stays out of `tokens.css`' boundary so per-instance bindings (`--nc`) and data or runtime values (a bar's inline `width:68%`, resizable pane widths) are not tokenized, while the global `--node-*` knobs are. Prompt (`dev/prompts/component-system-refactor.md`): added an exclusive-ownership-of-`design/` launch precondition; in verification, told the agent to capture a baseline screenshot set before Phase 0 and diff later renders against it (lanes run in worktrees that mutate the file), and to fall back to headless Chrome over localhost if the Playwright MCP browser drops rather than stalling (preserving a real rendered parity pass, not static checks); and a one-line note that `design-docs-refactor.md` is superseded. Docs only; no code or `design/` primary files touched.
+
+Files: dev/notes/component-system-spec.md, dev/prompts/component-system-refactor.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
