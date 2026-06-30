@@ -944,6 +944,20 @@ Files: sidecar/hookbus.py (new), sidecar/main.py, sidecar/drivers/bridge.py, bri
 
 ---
 
+### 2026-06-30 21:30:00 — backend: Tier-2 agent-to-agent linking (OD-04/05/07/08) — reply-to relay LIVE
+
+Built the defining feature — the **serialized reply-to** link engine — and verified one full round-trip **live** through two real bridge agents. New `sidecar/links.py`: the link store + OD-06 config (direction a2b/b2a/both, relationship direct/shared, OD-05 trigger, OD-07 End-After caps) + the OD-08 grouped-by-agent view (a link double-lists under both agents, with the arrow relative to each group). New endpoints `POST/GET/DELETE /links` + `POST /links/{id}/kickoff` (reply-to can't *start* a convo — kickoff seeds it).
+- **OD-04 reply-to engine (in `main`):** a per-agent `answering_source`/`answering_link` — when an agent finishes a turn it was answering a linked peer for (detected at `generating→idle`), the sidecar lifts **that turn's** assistant text and routes it back to the peer (`recipients:[peer]`), then sets the peer's reply-to in return — strict **one-in-flight alternation**. Delivered by the link's **OD-05 trigger** (queue/next/now/**inject**[hook channel]/hold). **OD-07** caps it (default **25 exchanges**; a round-trip = 2 messages) — the runaway backstop; tokens cap too.
+- **Race fix (found live):** the bridge emits idle off *screen* state ~1s before the assistant entry is polled into `events`, so the first live run fired 0 times (empty turn-text → dropped). Fixed: the relay now **retries without dropping the reply-to** until the turn text lands, bounded to one turn.
+- **LIVE PASS:** A↔B link, End-After=1 → kickoff A→B → `link_fire` B→A ("GREETINGS-FROM-B") → `link_fire` A→B (cap) → link ends `messages=2 exchanges=1 active=False`. All three checks green.
+- **OD-06 scoping:** the *direct-messaging* relationship is fully built + live. The *shared-context* passive-awareness path (content-filtered piggyback on the receiver's next prompt via a per-(src→target) **watermark**) shares its mechanism with OD-17's scratchpad delta — its config is stored now; delivery lands with the OD-17 watermark utility.
+
+Verified: **+14 hermetic tests** (`tests/test_links_unit.py` 10; sidecar relay/cap/inject-trigger 4) → 181 hermetic green; plus the live relay above. No `design/` touched.
+
+Files: sidecar/links.py (new), sidecar/main.py, tests/test_links_unit.py (new), tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

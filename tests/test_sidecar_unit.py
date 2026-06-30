@@ -425,6 +425,99 @@ class TestInjectDisposition:
         assert any(e["type"] == "inject" for e in s.events)
 
 
+import links  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _clean_links():
+    links.reset()
+    yield
+    links.reset()
+
+
+def _agent(sid):
+    s = SessionState(session_id=sid, agent_type=None, model=None,
+                     permission_mode="default", cwd=None, system_prompt=None,
+                     driver_name="bridge")
+    s.driver = _FakeDriver()
+    return s
+
+
+def _finish_turn(s, text):
+    """Simulate a completed turn: running (sets _turn_start_idx) -> assistant text."""
+    s.push_event({"type": "status_change", "status": "running",
+                  "timestamp": "t"})
+    s.push_event({"type": "assistant",
+                  "content": [{"type": "text", "text": text}], "timestamp": "t"})
+
+
+class TestReplyToRelay:
+    """OD-04 serialized reply-to: a finished turn answering a linked peer fires
+    that turn's output back to the peer, and sets the peer's reply-to in return."""
+
+    def test_relay_enqueues_to_peer_and_sets_replyto(self):
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship=["direct"], trigger="queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "here is my reply")
+            main._maybe_relay_reply(b)
+            # B's output is enqueued to A, addressed From B -> [A]
+            assert [e["prompt"] for e in a.prompt_queue] == ["here is my reply"]
+            assert a.prompt_queue[0]["source"] == "B"
+            assert a.prompt_queue[0]["recipients"] == ["A"]
+            # and A is now set to reply back to B (alternation)
+            assert a.answering_source == "B" and a.answering_link == lk.id
+            # B's reply-to state is cleared (one-in-flight)
+            assert b.answering_source is None
+            assert lk.messages == 1
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_relay_noop_without_answering_source(self):
+        b = _agent("B"); main.sessions["B"] = b
+        try:
+            _finish_turn(b, "just a normal turn")
+            main._maybe_relay_reply(b)  # no answering_source -> nothing happens
+            assert all(s == b for s in [b])  # no crash
+        finally:
+            main.sessions.pop("B", None)
+
+    def test_cap_ends_exchange_and_stops_alternation(self):
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship=["direct"],
+                                end_after_exchanges=1)  # cap at 2 messages
+            # first fire B->A (message 1): not capped, sets A's reply-to
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "msg1")
+            main._maybe_relay_reply(b)
+            assert lk.active and a.answering_source == "B"
+            # second fire A->B (message 2): hits the cap -> link inactive, no more reply-to
+            _finish_turn(a, "msg2")
+            main._maybe_relay_reply(a)
+            assert lk.messages == 2 and lk.over_cap() and not lk.active
+            assert b.answering_source is None   # alternation stopped
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_inject_trigger_routes_to_hookbus(self):
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship=["direct"], trigger="inject")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "mid-run reply")
+            main._maybe_relay_reply(b)
+            # inject trigger -> A's hook inbox, NOT A's prompt queue
+            assert len(a.prompt_queue) == 0
+            assert [i["text"] for i in hookbus.pending("A")] == ["mid-run reply"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+
 class TestHookDrainEndpoints:
     def test_post_tool_use_drains_and_acks(self):
         s = _session(); main.sessions["s1"] = s

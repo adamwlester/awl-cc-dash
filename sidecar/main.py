@@ -34,6 +34,7 @@ from drivers import create_driver, default_driver_name, AgentDriver, DriverConfi
 from identity import assign_identity
 import eventbus
 import hookbus
+import links
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -95,6 +96,17 @@ class SessionState:
         # only) and never auto-flushed (released manually into the Editor).
         self.prompt_queue: deque[dict[str, Any]] = deque()
         self.held: list[dict[str, Any]] = []
+        # OD-04 serialized reply-to: the peer (agent id) whose inbound message this
+        # agent is currently answering, and the link it came over. Set when a link
+        # inbound is delivered; on the next generating->idle the sidecar routes
+        # THIS turn's output back to that peer (recipients:[peer]) and clears it.
+        # Strict one-inbound-in-flight per agent keeps the pairing unambiguous.
+        self.answering_source: str | None = None
+        self.answering_link: str | None = None
+        # Index into `events` where the current turn's output begins (set when the
+        # agent goes running), so the reply-to engine can lift just this turn's
+        # assistant text on idle.
+        self._turn_start_idx: int = 0
         self.pending_permission: dict[str, Any] | None = None
         self.total_cost_usd: float = 0.0
         self.total_turns: int = 0
@@ -144,6 +156,10 @@ class SessionState:
         if event is None:
             return
         self.events.append(event)
+        # OD-04: mark where the current turn's output begins so the reply-to
+        # engine can lift just this turn's assistant text on the next idle.
+        if event.get("type") == "status_change" and event.get("status") == "running":
+            self._turn_start_idx = len(self.events)
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
@@ -191,6 +207,10 @@ class SessionState:
             self.push_event(event)
             # OD-02: the generating->idle transition is the proven flush signal.
             if st == "idle":
+                # OD-04: relay this finished turn back to a linked peer FIRST (uses
+                # this turn's output before a queued prompt starts a new turn), then
+                # flush the next queued prompt.
+                _maybe_relay_reply(self)
                 _schedule_flush(self)
             return
 
@@ -226,7 +246,8 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
-            # OD-02: a completed turn (result -> idle) flushes the next queued prompt.
+            # OD-04 reply-to relay, then OD-02 flush of the next queued prompt.
+            _maybe_relay_reply(self)
             _schedule_flush(self)
 
 sessions: dict[str, SessionState] = {}
@@ -270,6 +291,121 @@ def _schedule_flush(session: "SessionState") -> None:
     except RuntimeError:
         return
     loop.create_task(_flush_queue(session))
+
+
+def _last_turn_assistant_text(session: "SessionState", start_idx: int) -> str:
+    """The text the agent produced in the turn that just ended — assistant text
+    blocks from `start_idx` up to the next turn boundary (a running status_change),
+    used as the reply-to payload."""
+    parts: list[str] = []
+    for ev in session.events[start_idx:]:
+        if ev.get("type") == "status_change" and ev.get("status") == "running":
+            break  # a new turn started; don't bleed into it
+        if ev.get("type") != "assistant":
+            continue
+        content = ev.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block.get("text") or "")
+                elif isinstance(block, str):
+                    parts.append(block)
+    return "\n".join(p for p in parts if p).strip()
+
+
+def _maybe_relay_reply(session: "SessionState",
+                       _start_idx: int | None = None, _attempt: int = 0) -> None:
+    """OD-04 link fire: if this agent just finished answering a linked peer's
+    inbound, route THIS turn's output back to that peer over the link (delivered
+    by the link's OD-05 trigger), then set the peer's reply-to back to this agent
+    — strict one-in-flight alternation, bounded by the OD-07 End-After cap.
+
+    The bridge emits generating->idle off *screen* state ~1s before the assistant
+    entry is polled into `events`, so when the turn text isn't there yet we RETRY
+    (keeping the reply-to) rather than dropping the fire. Idempotent: the reply-to
+    is consumed only once text is in hand.
+    """
+    src = session.answering_source
+    link_id = session.answering_link
+    if not src or not link_id:
+        return
+    lk = links.get_link(link_id)
+    if not lk or not lk.active:
+        session.answering_source = None
+        session.answering_link = None
+        return
+    start_idx = session._turn_start_idx if _start_idx is None else _start_idx
+    text = _last_turn_assistant_text(session, start_idx)
+    if not text:
+        # Turn text not polled into events yet — retry without losing the reply-to.
+        if _attempt < 6:
+            try:
+                asyncio.get_running_loop().call_later(
+                    1.5, lambda: _maybe_relay_reply(session, start_idx, _attempt + 1))
+            except RuntimeError:
+                pass  # no loop (hermetic tests) — text was simply absent
+        else:
+            logger.warning("relay: no turn text for %s after retries; dropping",
+                           session.session_id)
+            session.answering_source = None
+            session.answering_link = None
+        return
+    # Got the text — consume the reply-to and fire.
+    session.answering_source = None
+    session.answering_link = None
+    target = sessions.get(src)
+    if not target or not target.driver:
+        return
+
+    # Account the fire (one message, one direction) and check the End-After cap.
+    lk.messages += 1
+    lk.tokens += max(1, len(text) // 4)  # rough token estimate for the token cap
+    capped = lk.over_cap()
+    if capped:
+        lk.active = False
+    else:
+        # Set up the peer's reply-to back here so the conversation alternates.
+        target.answering_source = session.session_id
+        target.answering_link = link_id
+
+    logger.info("link_fire %s -> %s msg=%d exchanges=%d capped=%s trigger=%s",
+                session.session_id, src, lk.messages, lk.exchanges, capped, lk.trigger)
+    session.push_event({
+        "type": "link_fire", "link_id": link_id, "text": text,
+        "timestamp": datetime.now().isoformat(),
+        "source": session.session_id, "recipients": [src],
+        "exchanges": lk.exchanges, "capped": capped,
+    })
+
+    trigger = lk.trigger or "queue"
+    if trigger == "inject":
+        # Mid-run delivery via the OD-02 hook channel.
+        inj = hookbus.enqueue_inject(src, text, kind="inject",
+                                     source=session.session_id)
+        target.push_event({
+            "type": "inject", "text": text, "kind": "inject",
+            "inject_id": inj["id"], "timestamp": datetime.now().isoformat(),
+            "source": session.session_id, "recipients": [src],
+        })
+        return
+
+    entry = {
+        "id": str(uuid.uuid4())[:8], "prompt": text,
+        "source": session.session_id, "recipients": [src],
+        "disposition": trigger, "enqueued_at": datetime.now().isoformat(),
+    }
+    target.enqueue(entry, trigger)
+    if trigger == "hold":
+        return  # parked for manual release
+    if trigger == "now" and target.status == "running":
+        try:
+            asyncio.get_running_loop().create_task(target.driver.interrupt())
+        except Exception:  # pragma: no cover
+            pass
+        return
+    _schedule_flush(target)
 
 # ============================================================================
 # Session Lifecycle
@@ -479,6 +615,25 @@ class AnswerPermissionRequest(BaseModel):
     # approve = Yes (Enter); deny = No (Escape). Always-allow is unsupported
     # (option 2 was never verified live), so the choice is binary.
     approve: bool
+
+class CreateLinkRequest(BaseModel):
+    a: str
+    b: str
+    direction: Literal["a2b", "b2a", "both"] = "both"
+    relationship: list[str] = ["direct"]          # subset of {direct, shared}
+    shared_content: list[str] = []                # OD-06 content-type filter
+    shared_backfill: bool = False
+    trigger: Literal["now", "next", "queue", "inject", "hold"] = "queue"  # OD-05
+    end_after_exchanges: int | None = 25          # OD-07 default
+    end_after_tokens: int | None = None
+
+class LinkKickoffRequest(BaseModel):
+    """Seed a reply-to conversation: deliver `prompt` to `to_agent`, recording
+    that its reply routes back to `from_agent` over the link (reply-to alone can't
+    start a conversation — this is the explicit kickoff)."""
+    from_agent: str
+    to_agent: str
+    prompt: str
 
 class SetEffortRequest(BaseModel):
     effort: str
@@ -785,6 +940,69 @@ async def hook_stop(agent: str):
         logger.info("hook drain stop agent=%s delivered=%d", agent, len(injects))
     _surface_delivered_injects(agent, injects)
     return hookbus.stop_output(injects)
+
+
+# ============================================================================
+# Tier-2 linking (OD-04..08) — link CRUD + the reply-to conversation kickoff.
+# The on-idle reply-to relay lives in SessionState.handle_event / _maybe_relay_reply.
+# ============================================================================
+
+@app.post("/links")
+async def create_link(req: CreateLinkRequest):
+    """Create an agent-to-agent link (OD-06 relationship config)."""
+    lk = links.add_link(
+        a=req.a, b=req.b, direction=req.direction,
+        relationship=req.relationship, shared_content=req.shared_content,
+        shared_backfill=req.shared_backfill, trigger=req.trigger,
+        end_after_exchanges=req.end_after_exchanges,
+        end_after_tokens=req.end_after_tokens,
+    )
+    return lk.to_dict()
+
+
+@app.get("/links")
+async def list_links():
+    """All links, plus the OD-08 grouped-by-agent view (each link under both
+    agents' groups, with the direction arrow relative to that group's agent)."""
+    return {
+        "links": [lk.to_dict() for lk in links.all_links()],
+        "grouped": links.grouped_by_agent(),
+    }
+
+
+@app.delete("/links/{link_id}")
+async def delete_link(link_id: str):
+    if not links.remove_link(link_id):
+        raise HTTPException(status_code=404, detail="Link not found")
+    return {"status": "deleted", "link_id": link_id}
+
+
+@app.post("/links/{link_id}/kickoff")
+async def kickoff_link(link_id: str, req: LinkKickoffRequest):
+    """Start a reply-to conversation over a link: deliver `prompt` to `to_agent`
+    and record that its reply routes back to `from_agent` (OD-04). The relay then
+    alternates automatically until the OD-07 cap."""
+    lk = links.get_link(link_id)
+    if not lk:
+        raise HTTPException(status_code=404, detail="Link not found")
+    if not lk.allows(req.from_agent, req.to_agent):
+        raise HTTPException(status_code=400,
+                            detail="Link direction does not allow from->to")
+    target = sessions.get(req.to_agent)
+    if not target or not target.driver:
+        raise HTTPException(status_code=404, detail="Target agent not connected")
+    # Record reply-to BEFORE delivery so the target's finished turn fires back.
+    target.answering_source = req.from_agent
+    target.answering_link = link_id
+    entry = {
+        "id": str(uuid.uuid4())[:8], "prompt": req.prompt,
+        "source": req.from_agent, "recipients": [req.to_agent],
+        "disposition": lk.trigger, "enqueued_at": datetime.now().isoformat(),
+    }
+    target.enqueue(entry, lk.trigger if lk.trigger in ("now", "next", "queue") else "queue")
+    await _flush_queue(target)
+    return {"status": "kicked_off", "link_id": link_id,
+            "to": req.to_agent, "from": req.from_agent}
 
 
 @app.post("/sessions/{session_id}/interrupt")
