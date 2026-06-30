@@ -533,6 +533,56 @@ Files: frontend/src/renderer/Settings.tsx, frontend/src/renderer/api.ts, fronten
 
 ---
 
+### 2026-06-27 10:24:00 — Impulse mockup pass: icon-fill agent cards + avatar screenprint on the human tile + badge overhang restored
+
+Three user-requested changes to `design/mockup.html` (lock-checked first: the design doc was git-clean, untouched ~9.5h, no parallel session mid-edit). (1) **Icon-fill agent cards** — each Team Graph `.node` carries its agent colour via a per-card `--nc` var, plus a behind-content `.node-bg` `<svg><use href="#ag-*"></svg>` layer (z-index:-1, contained by `isolation:isolate`); the symbol's colour-square is knocked out (`color:transparent`) so only the white glyph shows at `--node-icon-alpha:0.30` — a single knob. Card text flipped to white-ink (with a soft shadow) so it stays legible on the colour. (2) **Human-tile screenprint** — generated a photo-derived white-ink cameo from the GitHub avatar (handle `adamwlester`, pulled from the git remote), radial-vignetted to drop the foliage background; saved as `assets/icons/ui/user-screenprint.png` and applied via a NEW `.agtile--me` class added only to genuine human tiles + the JS `agtileHTML` helper — the reused `.agtile--user` tiles (azure Scratch source, dashed New-agent slot) are deliberately untouched. (3) **Badge overhang** — removed the meta-strip de-pin override so `.node-badge` returns to its base `position:absolute; top:-8px; right:-8px` corner overhang (the old "ledge"); `.node` switched `overflow:hidden`→`visible` to let it overhang; date re-aligned high in the header, bottom toward the badge.
+
+Verified in-browser (Playwright/localhost, headless + fresh-reload parity) at 760→1760px: icon-fill, badge overhang, and the avatar cameo all hold at both extremes; selection-ring move, subagent-drawer growth (the `overflow` change), and status-badge click all work; 0 JS errors (favicon-404 only). All `--nc`/icon-alpha values stayed in the mockup (no `tokens.css` change). A background adversarial audit workflow (3 requirement skeptics + a regression critic) was launched. **Impulse "try it" pass — knobs to tune next: `--node-icon-alpha`, the white-ink text contrast, the date's exact vertical alignment, and screenprint punch (v1 smooth vs v2 punchy).**
+
+Files: design/mockup.html, assets/icons/ui/user-screenprint.png, DEVLOG.md
+
+---
+
+### 2026-06-27 10:40:00 — Correction: human-tile avatar inlined as a data URI (was a gitignored PNG)
+
+The background adversarial audit's regression critic caught a real packaging gap in the prior entry: the `assets/icons/ui/user-screenprint.png` it referenced is matched by `.gitignore` (`*.png` line 44 — and `*.svg` line 49, so the **entire `assets/icons` tree is gitignored / 0 files tracked**; that's exactly why the mockup inlines its agent icons as SVG symbols rather than linking the files). A committed `mockup.html` pointing at that PNG would render a **broken human avatar on any fresh checkout**. Fixed by **inlining the screenprint as a base64 data URI** in the `.agtile--me` rule (matching the mockup's established self-contained pattern) and deleting the now-unreferenced PNG copy from `assets/icons/ui/`. Re-verified in-browser: all 10 human tiles render the cameo from the data URI, 0 console errors, and the card/badge changes are unaffected. Net: the change is now fully self-contained — the only tracked file touched is `design/mockup.html`. Audit verdict was 4/4 PASS; the remaining notes are tuning nits (idle-text contrast on the blue/purple cards, cameo softening below ~24px, date only roughly bottom-aligned).
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
+### 2026-06-29 18:31:00 — Icon-fill cards: navy scrim overlay for contrast (`--node-scrim`)
+
+Per the contrast review, **darkened** the icon-fill agent cards (vs lightening + dark text). Added a `--node-scrim` knob (navy `rgba(0,24,88,0.42)`) painted as a `<rect class="node-scrim" width="100%" height="100%"/>` inside each of the 13 `.node-bg` layers, after the `<use>` — so it covers BOTH the colour fill and the glyph but sits behind the white text (the layer is z-index:-1). The whole card background now reads much darker while the inverse light text stays bright; the bold colour-as-identity look is preserved (hues deepened into one band, not turned pastel). Two knobs now: `--node-scrim` (darkness) and `--node-icon-alpha` (glyph strength). Verified via headless Chrome at 1480px (the Playwright MCP browser had dropped mid-session): emerald/cobalt/fern/amber all deepen uniformly, white text is crisp, the icon watermark still reads, no rendering breakage. Pure colour overlay — no layout change, so the prior 760→1760px extremes + interaction verification still holds.
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
+### 2026-06-29 18:45:00 — Icon-fill cards flipped to a LIGHT tint + standard navy text (dropped the dark scrim)
+
+The dark-scrim version read too dark against the rest of the light UI, so switched to the light treatment. Card background is now a **light tint** of the agent colour — `color-mix(in srgb, var(--nc) var(--node-tint,15%), var(--secondary-background))`; the glyph is the agent colour as a soft watermark — `--icon-fg: color-mix(in srgb, var(--nc) var(--node-icon-pct,30%), transparent)`; and **all the white-ink text/border overrides were removed** so text and borders inherit the standard navy/token colours and match every other surface. Removed the 13 `<rect class="node-scrim">` overlays plus the `--node-scrim`/`.node-scrim` CSS. Selected = a stronger 26% tint + teal ring + hard shadow. Two knobs: `--node-tint` (card lightness) and `--node-icon-pct` (watermark strength). Verified via headless Chrome at 1480px (Playwright MCP browser still down): pale tinted cards, crisp navy text, soft colour watermark, identity tiles still solid — integrates cleanly with the UI. Colour-only change, no layout impact, so the prior extremes/interaction verification still holds.
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
+### 2026-06-29 19:02:00 — Icon-fill cards: flipped icon polarity (darker field + lighter glyph), both pale & close
+
+Per the tweak, matched the real identity tiles' polarity in the pale register: the icon FIELD is now the slightly darker tint and the GLYPH the lighter tint (was reversed — the glyph had been the darker part via a translucent colour overlay). Field `--node-tint` 15%→22%; glyph switched from a translucent overlay `color-mix(--nc 30%, transparent)` to an OPAQUE lighter tint `color-mix(--nc 15%, var(--secondary-background))` (= the value the field used before). The two tints are now close and both fairly light, with the glyph lighter than the field (like the white-on-colour tiles, dialled pale). Selected bumped 26%→33% to stay distinct from the new 22% base; navy text/borders untouched. Verified via headless Chrome at 1480px: icons read as lighter glyphs on a marginally darker tinted field — subtle and light as asked. Knobs unchanged in spirit: `--node-tint` (field), `--node-icon-pct` (glyph).
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
+### 2026-06-29 19:20:00 — Icon-fill cards: glyph lightened to near-white for negative/positive contrast
+
+Per the contrast tweak, increased separation between the background-icon's negative space (field) and positive space (glyph) by **lightening the glyph** rather than darkening the field — keeps the cards light/on-brand (darkening the field would re-risk the "too dark vs the UI" problem). `--node-icon-pct` 15%→5% (near-white glyph); field stays `--node-tint` 22%. Mirrors the real identity tiles' white-on-colour glyph, just in the pale register. Verified via headless Chrome @1480px: glyphs read crisply as near-white shapes on the tint, navy text unaffected, overall card tone stays light. Knob: `--node-icon-pct` (drop toward 0% for pure white).
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

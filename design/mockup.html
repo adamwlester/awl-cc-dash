@@ -539,6 +539,12 @@
     .agtile .ag-svg{ width:100%; height:100%; display:block; }
     .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
     .agtile--user{ background:var(--ag-user); }
+    /* the HUMAN user (you): the avatar screenprint becomes the tile fill — a photo-derived
+       negative-space cutout on the --ag-user slate, echoing the agent glyphs but subtly photoreal.
+       Scoped to .agtile--me so the reused .agtile--user tiles (Scratch source, New-agent slot) are untouched. */
+    .agtile--me{ background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAZ8ElEQVR4nO2dAZLdKo+F/aZmR95Tz56yJ9aUqUzF9fMYCUkgQMD5qlJJ37YN9kUHIQnnn9+/fz8A/OX9+3fCE7mD/1rdAQDAOiAAIAcz/2VAAAC4GAgAABcDAQC1YCA4HAgAABcDAQDWQOCb/QGb89+rOwC2A5mCg4AHcBYvM1O3zNaY4S8AHsD+vMzP+eeYtQEJPIAz4Gb5/HOLJwDBuIR/sBdge6gZv/xdYv6Wrqk5FmwMlgD78grGWcYDPpLCyKljwIFgCbA3pRFLBtsSFIQIHAw8gP14FUsBrWeg9QiwTfhQ4AHsn+YrP2+5zo/iGogFHAg8gHNmfs2x3DF/jPtXY7/AxiALsAdlKk+z3i/PfYjzatkBzPgXAAGIR76GL11874q+VPmcywyAg4AAxMTD8KnrcVDGThk8ROAwEAOIS2u6zmqk1PGI+l8CPIBYWPP0Hjl6avbPBQBLgYNBGjAWGuP33o9PXSePQXgtQ0BA4AHEgDJqqhhHs5ZvNdTa0qHMDnjHArDkWAQEYC212Tw3stlv4JGyAyOCgRCBBSAIGDPC/83kqdH4uVJeax+pa40iv1dkGyYBD2AuIzfj1KL5XnAegKfBwhOYCARgzwh/HqSbYfiSEIxaEsATGAwEYA7fhpvHuO++NILXaPyj9/V/IvAOFgSIwSAgAOuDfFaPgIr0l9ea/UKPNGFjEZYGA4AAjCPfZmuZESnjlpYD1ll/lEDkSwO47xsAAfChdM3zP72ltpyRcksDbX+pa1HX0RQmlf35NTg+AJyAAPTxCi4/tb3WshyoHUu5/dqqvu9z6W1AmipATkzgDWwA6gDaeSuBPkuaLA+k1a5PudWcJyEdVxp/KVSSqEhtlXUM3LFgMRAAH2rG/xiMnyr8oV7awRmV5L5z3gP1mVSWTH1e8ueZYDNRYLAE6OMz1h9mRi2NOz/v+yw/RrPet/RNc25qrFS0tF0+G8QHgoDdgD7Gn//MDe4Rm3RqfeuNxNc2I1GpTc1S4UsPztzXACpAANqhjKBMgeW/lwJt5eecAUvVhNbSYW6ZUPaBy3Jw533HlssapAkDgSVAf45fWl+3Rt45kfBACkpy7n8tPiClO98sPYhgYBAgAL7Gzx2fo3WDU4MHUZ5P9YXrK/c5ZfS1+ILUtz/3j1eQBwECYOeHqOvnDIEynlIANKm20WvmWqS+NHxtULB2X/AEggAB6J/9OQPi3GfJA2g1dkt1YY3avVizFTVv4AsKYjmwEAhAe9Q/Jy98+Y4t1/vfn1+dhl8aOjcjWwt4tMdYREBaDuSZAU2fvEQO/AWFQDZqszZl/LU1d+16vcdrjtMYcE1sLEFKTqw+QaWWRdx1yowC6AACoINKe1HH1H6WPpeO86orsLSbBiwvqH5/IqD1SnIvBCLQAeoA9PSuzbUuLic0K4pnyr7UvAYqvecRMOTa4/oIDEAAdGgG2XdMa557l0Gscfep+Eft3LIkuqdScZfnGAIsAfyMnysC8owBrIK7P6kOQONF5MJpxSoaoAAegIzF+KnAGCUgu85UUpyjFkAcJYS1TAUQgADUGVGgc9rg1NYEaJZHrTM6RKARCEAdaV1p3fl3mvF/SGv8Z0JGQxuEBBkQgLFRf4/rRaPn/moZEc9UI5UlOOX5uwIBoKmt3zVlr9z1TsMS25C8BKrEugd4BAogAHZuNPQSKbXXOpu3VEZq05KtbRwNBEAuOdUWs5zu+ntQioaUMtRcq/w3B0SAAAJAwxm/Ju9N/f6ml2C0ljrnn7dkX6wiAFAIxDKiHPckT6Dc+NRC7gVwz7qnolLaUATgAZDU3H7MIP95Rvnz4p4j9dxqhj/LMPE9/gVLgLbcf4tbf9qg0xT2aFODtQpCLaWgYJZXAAH4Nz2bUSznnCYGNazFQVIMAIbtCARAvz58nQw4XfKsqOPz34825FOe81CwG1AmN3rMPv9h5LOwplRv9KxcgAdgH9xeb8k5YbC2vldQA8R2AhCAtUa6uwhY6v81wUJtHAA4cdMSQFPUI+WmR/bndDRxgdrx2j0ZwMDNHoAmfz2SGwduz96AG5/XcHYQgJHbOXtmmd4BebIHoHle0n6Kk59PGHYQgMdpUHAG2youPe8LOGVwW0SwdZuwV/tgUwHw/JKlQFRrXrulau2Ewduyfddy7ilCGZYdBMB7SdC6O8+rbj3fanxbpZ/mlV0rtlW/B30fRwqAZKw9xli7/qiBccLsf4tneDS7CIA0g6QO76GWex6x2efG2aa2NVc6Rvt7cLgAULO2xTOQjK52PW+DPW0wty6PpO9nplCm50J2FICW6PMbLB25iwfAiaI1hqJ9Ww9VZi0FYEEHN1UCetNSLbiT4dd+lj6XjrUU+PRkW4AABEBv5B6Dr5zhIuGxBrfs49eIyorn9N4kNBCA9jfNcK6x1t0tWSkK1lm2vE/rlulapWD5rGcbZLpJBP778i29td9rB3LE2bwnDaod+NIM/jo9s2uMcQUnC0CvktdqBEYUq8zyCmpGT6VZW/tVM3TLUmhngQ3PyQLwBJg5LLUB0vnvwBSqNcjn5SFF9aDScwmnC8BoqLUwN2umRkOgXpbR2tfvb6kCstaP2u+0QVOrB4BlwCB2FIBRg6HMQ7dGvT3X01RbPV6B5f5atuZaMyaRsyJXsKMAzKI2k0uzkraARcqH523k7UrtSCTnbbq1Eu2obj7YuBKwpQBHU8lXusbcjKapkNOm0zSucnl8S9qOgiu/tRh/eY50/fJzruhodT3AFezqAawK0qQBv7O0+XkE+d8WyvO43HtL/3oyIzURyIX7muDcLHYUAOsg6J09rAPPY61ekpzuofQcqE08tWVKrV+9IkctbXJPBAIwgB0FwMIo15GrhMv/nQ/Y1ln1UZ6v9QYoIah9nveFErQeo9Sei1l/IP/8/v37OZSWSsAyTkDN5pRLrmnbms6TZldq3S3dc+laa9qX4gfa9GX+ea3wKP/8h0hfegnCG1xopng8uwYBJbwr8kakGaXjKBe4hsVVt6zX37+G+MOI4y/CMGsxBSlWQsUoPA1/J97RDZwqAK1Y0mPScdp2uOtTglEuO1rW4NS1yjU2ZbTls8nFIDllYaxp1B5So7Bo76GXKYJ3egygx71qiW5b0maSG8wdY3UNNWKTH0cZN/csPu+gZWnxnR9hZk/M5zWBm7GEGP5sThUAjavtPfheQ18+t5nqT2lEXFbBYnRcX3M3nrqHxHz2U/SpNR1Z/jsSb0MAeDtOFQBPpBy19Vr5eeUa/zPE77MyHsCJRI1cQLSGR4nQdzwVB7BQtqsxoGgikZ5DgADY6M115waUX6ucgXOD//X3j2bdbRUlKZ3nEe8Y4WnNMMD0XMAuAtD6pXPra+p3LX2i/l3rBxcM06z7PfpcXqvnutK51niIJELRvIAj2CUL4PXF1/LpmgHbcwxn9OXP1HHaPkoxjxJtFJzqQ+3cUmile/+OA5PZxQOYneprdaW59TW1bi6XApr2uMxB+XvvNJU1xdh6fnkdKRgKLvEAdllqcBH7WtDMI6hW+/nrjzYdqPWGOGpFQa2ek+bc3n5fyY0eQCuWCjpNOo07XjPTjVgPWwN+nJFzIleeU/6ei9do6gbKzAq8BCXwAPT0DixtMYlmXV5z9TXteGCZda1Lk5b+1gqWAMPtAlBbS3unrqgMRP631vjza3oxa8a0LA1aXXrM/ocKwChVr82YaeBAo4y+jAf0rItb+jOKloDqzDavZScBkIJovYEr799LBkyl1qhU28zg1kgRaBXTnnuHCBwkABp3fWT0WjNILed8x9cErPV+TnCDT7iH8OwkADNVn1qva9DUuLd4LDOMYbSn0RMAtAZgW9KQV7KbAGjdyJ7B3HKupiKut0+9aNOQkb/T1utSS67XeL0j2U0AevLTLe14zVrRB1vkzTU9aU1rZuU6dhSA2gCobaRpuXbPTDGiUEe6b801OCIYivX+LN9PhPsLx64CoME7j99z3ZGbmfLfRfQ4OMOT4iWaACr1b21/UnH+lUuDkwXgaTQIriRVcyzH6EHFZSFGViN6UsuAjKwe5LhGBHYUgBmzXERXUdoJqHkeLYG02UIgzeycYHHHt97ne4NHsKMAWLEODmkgfMG9VSLhPSA199Fyv7VzPPcreJdEJ6aNI8Vg192A0u466njr9R/C6B/mZ0lkrP3l+uMx0/X0Sdt+RA+K41Ucs9P9XOMBzC5b9So3bhWjrw/cMfnsVe4zKGc2ri/avnFtWa6hPbZ23a/d1oCgluNm/hMEYCQthqA5z2ocIzIO5e+/l456tGUx6Icx3Nrz5H5nCdzW+jNDBGoTyfRlBgSARwq2vZNSZLXzrOfns+ln+No2PeAM2uKG1+659R6S8rjRxjl9qbFrDGAmGmNqWUuX8QVLvXtqiFnUjqWO0/Z/BlbP6ZtJW86TsF43dDwBAuDzxfUE1Kxr59JV5lxhyuipGbc8zpot8RYCbinQKgLScS30ikAYIAA81LqyNBDOFZ1V+JP/WxICjcG2RMS195sa7qu2zPHgLfpm+e5GicBUYYEA1LHOiBZjq11Hc6525tYGBT0yHJY+UMseSlx6A5TWSs4UQASmAQGQoQYENXBfB2/Ae6BrZjbNIC49Cm203+KCU8bvMfuXz8er70dwigBYvlwtqfifcPN2LG1aDaG8NrfksHgImuO1noAmFmL9HkpDj+Bap0lBwaUgDVhHMwNJMYH885aUXdmPXByoZUfZp6ehvp5q10IZgJMM6deE9X4LyRC72NJjgADUkSL0Pe59Pri4wFo+u0iDzPI7LgXYkjprIZKRa9CK03YicIoAjBxQnJF6lZ+WrqYUtKLudURkn3KB0yL3PRJJuMetROAUARiNpXSz5jVo3G+N11EL+HE/19xyLp5RM3iLVyTFDXYkOXmGS4EAyPxqjGhb00+a47hsBCc2ozMQvWxjKM5eWRhOEoCRqZuWXHSLmyjNKOXsK2UFtCkvaYaWZjtrEHFE1mY1SeF1heOUNOAzeEClvyLwpQQ1kfcWuEIirSFrfkdVNErXKL2bH2M24SaSom4kDKcJwEj+fIH/U6i61rAsbZQ/9xoVt64v/5ayAHlmIj/W475PI2X/Dv1cIAB2ZueqW9vSFrF8fN7NL0YI8tRhafTaQZ4Lxi2kJzAQgLHUZsaakZXrfI27XdYMUMdTFYblsT/CvXh7JGAhEIDxa7/aMTUR+I7nKGfiPCOQGzElChbvIK8J0FQUSmnQ0guAICwEAjAWzdqYE4G3eGMPVbWnNcoWSg/Eay172xIgNCelASOiHew1dzw3vpf4jLuWZ+rTssbXEDowdhM3eQCastZeqPRdbRmgSfP9MIFHrwxB3ufS3bdev1aYVLYLAnCTAMx0RUvjlH7++sMhnWvtW01Qetx9qwcAIVjMP79//34uorVarqUNycAtXsBHLWsgFRFpswkeWCoQIQILuU0AZoqAZGy5AGgNRpsh4Po0C23fWl/3BZy4cQkQpVSzVhTDZQZaim9q1/j64QkMeiNuzQLUNqiMbKPlGOocy3nluj5KBB5CEYBbBWD0AOTy+lrjldbr2kKenmBeqziBjbhZAB6hCm92H7hNO7VzpOtaahDKz7TPoueZRfFGruV2AZglAtKOu5Wbi3rbTg3iA08hCBCAtZmHFmPkRCQSGg8Cs38AIADjvIBUMfYyCj9zzZ3HIjxFRHutyMJ1HRCAOaXBI2Y87X4ATcbjdRA4ri0QGAjAvxk9gMvae+4Yj3Ys1+TKgK2BwBmBQ+DIjYVAEiP3B0hteGzwodCUG5dta+IMmPE3Bx7A3VDvFaCWLR7bgfOdhtF5n0uAAMzBOlN6B+l6r6VZUpzmDbzPBUAA5rDTYOJ2FVLHlJ9JW5o9go+zSM8FQADuHXga45vhgawQAanN9FwCBCDmJiRNwHAWve5+6Un07FHw5F3dgQggCxD3XQQjA2azXo9GBRFXCxrIgAcwFk8Xugfv2Vd7HW5XJGbfIEAA5tE76D2i+NzS4h2wAaic/SMZPbyQv0AAdPQO3lYjGF2e3NMOt3/Cqyx4tKeQBl57G24WgB3KVj3W6q3lvaNSiCAQNwtAWlREY1k7exbceAoBJUy1fkEIgnKzAKyE2g5ckiYF6VLnOeXv8j5Qx1iAmz4YCMD6/H/vK7lq1K7R8jIS7TmWvo/cFQkEIABryUWgVg9AfdZjfOVMrd0tSPWh1fXHsiAAKARaz2f8+d89pElFQJxowbA3Ah5ALN4J2QuPlB838/cGGVEkNBkIwHg0BifNyrW9AZalgweapUfrRqOWoCToAEuAteRuNPfv7+cZRs61P5I3+y/Q88/ye8b/ITiIG/9zUCuaAJl2kGuuTc3wtdm1FI7W2oSWLADVJ8usXbvX73c/mQj8+QMcgQDMC5j9GK5PCYImrz5qn7s20u9Z6py/QuynknlAurADCEAdykBbPAJqF5zk1tdEQLoG1wdL9aPmeprPetr5ZvwfQSypoGSZXQEEEIA6Hmtvbgus5tqSCHgLgPa+uHZ7BEDyhmpBwVwEpE1KIAMC4FNFV+ObvaS1PHV9LuLPxQHKEuPWJUEtptDjhVjayX//GTblCZTHl88Ohl8BWQA7LbO/dRBy7qs0m3mU95Zt1T4bXedvvX5Z1YhYgQAEYLzxt2JZw3rOchr3fkV+3vo8c/HNnyM8ggwsAXjejjJbarBalgBUey2zuwapH7VZv6d0mVur14738Dg0exiuAQLgIwBloC93Q8tZSGqj1iZXPWehtZTYe9a3CoB3e3+4Pl6AJUCf8VOGX5az9kKJidTXnnZGXHslmhqG99agIQTADufma9fqmoIeqf3eQdpTTOSF5j567rXFM3pv8wogADrKXLRkQPng8ZyhKc/CwyM4Yab34i3+PloQIAA6JMNvqRloEYeeJcCORj5r9q/B1VwcIQQQAL8UVLQZwiMFuQuenpY2FkPVZOz0zP4PCIBf/rlmNJ7lqJp2eq+93UDOSIsCic+OogABkNeANbe/98v1yhZ4zX6hB+uCPqfG86TS5jBAAP4NlcvnKFW+JQ5wi4tOQRU2ScVT1mv2kBYWlE0DAqCf8Xcznujkpc6tRhHGkJRQAreUmysBvQ3fUrPvUXTDFSZ54lnQZG1rtlc12zBDxAlu9QCoIp5eNBt3dnPdV3kV6fB208AgsYnb3gr8KvaUr8o/e3z5O4kLh8aL2vk+k0PGyY1blgAtD3bUF6FZr1s3CbVeYwbUOr9c/+fHzgyeJefrebc3vH+nLwEiGX5+fc36trcfkQKDZfGM5bxTSA3nDF8anCgAPUE9jXHOwksEHmVsYgS1MujnoFjJaIYJwSlLAO+A3ohr9Rh3b2HJuzCDkF+/1q5WrDxJm7bjdr2dBWCU0UttrRABLwHwMHxNvy0DdIbBl32e6V2kyNfdTQBmGj3X7rNomTCzvLQ0Supnjmiu+8kpxXSDALRswZ3BivYjlJXuYvwr+5J2aStyHcAb2PijpJEiGX80biliek/zAFqj97d6ApEG3IpZl1uOrerLVm1GSAN6luGuoGXHmld6bwStQblI7j/YyAPYIW3n1bY2kDZjJx3XB8/U4mi4rEaUvoxm6yDgKGONJgI1Q91pTR1pGcK1u8L40+T2XNtdFQQcOfDTIWnMyPcRtZ8w/g0EYObe8tlYSl+15bCRDCxS3yI+l+3ue/YSIErxzMy2qXV/WrA56CRWG386pe2ZHsB74RelydtrtwevHvQrufnehz6HWQKwcvaKOHhaIui3isDq4qeclcueIe3OXAJEcGEj9MF7c84JRCrmeQL2Y1j7p8cAIvcDIvDvLcDRjC6S1zGM2ZWACGbJzyJ39SMI1Si4e4xi+Om5gBWFQNEG9er+WNb2udewut9WNMudKEaXnkv6saoSMNLgjdSX0/pvqYK8xugi9eHEUuDT+hSt79bAZYRyXQ3pubAfqzcDRTO4aP3ZtcSaMvLhb7htJD0X92W1AEQ2umhVhJbzvPDecXi1sUXsTwQB+ANEIObz1JQo1/oQzcg+ovUrrWo4igD8ASIQ67mWaTrL2j+agUXuX1rZeCQBiCwC0fumoeX1361tRDKwnEj9Sk8AognADoYWvX81rK8uO4GI95GeIER8K3CYh8Oweh98j2FL/Y52X6d9T0+0PkX0AHaabWcF27zZde2uIfI9pCcY0QVgFxHwetPvqnuNHLG3EvU+0hOQHQRgBxHw6GevAJz0wtEjjGuDvm0jALsN6J7U29uZsttxo9BRRrVTPyMGAbd9mE59TZc+M21Qb5d7Ss8G7OQB5Ow2w43+n4OkDTe7Pa+tjGjnfu8qADsPam29vFdqz3KtmdSEbhsD2r3vOy0BSnZyBy33Yq2mi2jcErV72/k7Tc9m7OwB7G4EHK3ue+QXjG5nGLfc3ykCEGmwr/g/BzWfz2Zbo7jpHk8SgI8Ig38kkQuOPN4fsBPp2ZwTBeAGEfDY4OP5jLY3hFvvdfZrwWdxw2u1NYZdzva3PI9RpOcwTvUASjDw7c+hdOejvtprBuk5lFsE4A8QAfl5HDvQG0nP4excB2Dl+C+z8XmcVE/hSXou4CYPIAfeAHhuN/6bBeADQgCuM/qc2wUgB2JwJ+m5GAjA/wdCcAdpdQciAAHggRCcCQw/AwIgAyE4Bxh/AQRAD4RgX2D4DBAAOxCCPYDRK4AAtAMhiAeM3ggEwA8Iwhpg9B1AAPyBEMwBhu8ABGA8EAQ/YPTOQADWAFHQAYMfDARgPdHEYOXLVGDwk4EA3P1filHX6elHa3tgEae+EmxXev6DzyhvA5aA0QcCHsCevA0v+5TExWv2L/+jUhAYCMC5SO/w417fXROQm175fQUQAFACI78ICAAAF3PTS0EBAM+/+V8Su+NTxIaqNQAAAABJRU5ErkJggg==");
+      background-size:cover; background-position:center top; background-repeat:no-repeat; }
+    .agtile--me .agtile-luc{ display:none; }
 
     /* ============================ Team Graph node ============================ */
     .graph-wrap{ position:relative; }
@@ -548,11 +554,11 @@
        (top meta strip → identity → divider → settings → load bars → activity band → subagents),
        with the activity band pinned to the bottom (margin-top:auto on .band) and overflow clipped so
        every card stays the same height regardless of subagent count. */
-    .node{ position:relative; display:flex; flex-direction:column; gap:6px; aspect-ratio:1; overflow:hidden; background:var(--secondary-background);
+    .node{ --nc:var(--secondary-background); --node-tint:22%; position:relative; isolation:isolate; display:flex; flex-direction:column; gap:6px; aspect-ratio:1; overflow:visible; background:color-mix(in srgb, var(--nc) var(--node-tint), var(--secondary-background));
       border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:9px;
-      cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }
+      cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }   /* icon-fill (light): card = a light tint of --nc (per-card agent colour); --node-tint is the knob. isolation+overflow:visible let the icon layer sit behind content and the status badge overhang the corner */
     .node:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .node.selected{ background:var(--select); box-shadow:var(--shadow); transform:none; }   /* v9p1: --select selection fill (light teal; was a pink ring in v8p8, light-pink fill in v8p9) */
+    .node.selected{ background:color-mix(in srgb, var(--nc) 33%, var(--secondary-background)); box-shadow:var(--shadow); transform:none; outline:3px solid var(--ring); outline-offset:-3px; }   /* icon-fill (light): selected = a stronger tint of the agent colour + teal inner ring + hard shadow (bumped to stay distinct from the new 22% base field) */
     .node.selected:hover{ transform:none; box-shadow:var(--shadow); }
     .node-dot{ position:absolute; top:-7px; left:-7px; width:15px; height:15px; border-radius:50%; border:2px solid var(--border); }
     /* v8p9: removed .node-view ("VIEWING" badge) — selection now reads from the card fill */
@@ -570,11 +576,12 @@
     /* full-bleed divider — breaks past the 9px card padding, navy border colour */
     .node-div{ height:0; border-top:2px solid var(--border); margin:0 -9px; }
     /* top meta strip: age (left) + status badge (right), in-flow at the very top */
-    .node-meta-strip{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .node-meta-strip{ display:flex; align-items:flex-end; gap:6px; min-height:9px; margin-top:-5px; padding-right:34px; }   /* badge now overhangs (absolute); the date rides high in the header, bottom-aligned toward the badge's lower edge, clear of the overhang via padding-right */
     .node-age{ flex:1 1 auto; min-width:0; text-align:left; font-family:'JetBrains Mono',monospace; font-size:7.5px; font-weight:600;
       color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    /* status badge in-flow (de-pin the corner-anchored .node-badge when it sits in the meta strip) */
-    .node-meta-strip .node-badge{ position:static; top:auto; right:auto; flex:0 0 auto; }
+    /* status badge RE-PINNED to overhang the card's top-right ledge (the old look): the de-pin override
+       is removed, so .node-badge uses its base position:absolute; top:-8px; right:-8px (z-index:3, above the
+       icon-fill layer). overflow:visible on .node lets it overhang the corner. */
     /* identity row: tile + role/name (left), model + opus-only FAST bolt (right, bottom-aligned to name) */
     .node-id{ display:flex; align-items:flex-end; gap:7px; }
     .node-id .agtile{ width:26px; height:26px; align-self:center; }
@@ -656,6 +663,21 @@
     .subs-acc.open .subs-chev svg{ transform:rotate(90deg); }
     .node.subs-open{ aspect-ratio:auto; }   /* item 3: an open subagent drawer grows the card past its fixed square */
     .subs-empty{ align-self:center; font-family:'JetBrains Mono',monospace; font-size:8px; font-style:italic; color:var(--muted-2); }
+
+    /* ===================== ICON-FILL agent cards (light tint) ===================== */
+    /* The card's game-icon echoes the real identity tiles' POLARITY — a slightly DARKER tinted field
+       with a LIGHTER glyph (solid tiles = coloured background + light glyph) — just kept pale, and the
+       two tints close together. STANDARD navy text/borders so the cards sit with the rest of the light
+       UI. --nc (per-card inline) is the agent colour; --node-tint = the FIELD tint (the darker part,
+       on .node); --node-icon-pct = the GLYPH tint (the lighter part). .node-bg reuses the SAME #ag-*
+       symbol as a behind-content layer (z-index:-1, contained by the card's isolation); its colour
+       square is knocked out (color:transparent) so the field shows through, and the glyph is an OPAQUE
+       lighter tint painted over it. */
+    .node-bg{ position:absolute; inset:0; z-index:-1; width:100%; height:100%; pointer-events:none;
+      color:transparent; --node-icon-pct:5%;
+      --icon-fg:color-mix(in srgb, var(--nc) var(--node-icon-pct), var(--secondary-background));   /* glyph = a LIGHTER tint than the field (--node-tint), echoing the white glyph on the solid tiles */
+      border-radius:var(--radius-base); overflow:hidden; }
+    .node-bg use, .node-bg > svg{ width:100%; height:100%; display:block; }
 
     /* ============================ pickers — Color (Select) + Icon (Combobox), current always visible ============================ */
     .picker{ position:relative; }
@@ -2354,7 +2376,8 @@
                 <!-- v8p6: link lines removed (non-working) — revisit when proper link edges land (C17) -->
                 <div class="graph-grid" id="graph-grid">
 
-                  <div id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)">
+                  <div id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)" style="--nc:var(--ag-emerald)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-wizard"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 14:30 · 2h12m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">01 sandy</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt" title="Fast mode: ON (opus only)"></i></div></div>
                     <div class="node-meta">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
@@ -2379,7 +2402,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)">
+                  <div id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cobalt)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-golem"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-25 09:12 · 1d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="node-idblk"><div class="node-role">synthesizer</div><div class="node-name">01 kai</div></div><div class="node-model">sonnet 4.6</div></div>
                     <div class="node-meta">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
@@ -2401,7 +2425,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)">
+                  <div id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)" style="--nc:var(--ag-fern)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-gasmask"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button class="node-badge nb-error" onclick="event.stopPropagation();statusJump('error',this)" title="Error — run failed · open Inbox">Error</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="node-idblk"><div class="node-role">auditor</div><div class="node-name">01 drew</div></div><div class="node-model">haiku 4.5</div></div>
                     <div class="node-meta">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
@@ -2426,7 +2451,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)">
+                  <div id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)" style="--nc:var(--ag-amber)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-robot"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 13:05 · 3h37m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="node-idblk"><div class="node-role">coder</div><div class="node-name">01 max</div></div><div class="node-model">sonnet 4.6</div></div>
                     <div class="node-meta">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
@@ -2451,7 +2477,8 @@
                     <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
-                  <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)">
+                  <div id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)" style="--nc:var(--ag-crimson)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-fox"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 11:20 · 5h22m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">02 rowan</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
                     <div class="node-meta">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
@@ -2476,7 +2503,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)">
+                  <div id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)" style="--nc:var(--ag-violet)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-spider"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-24 16:40 · 2d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="node-idblk"><div class="node-role">tester</div><div class="node-name">01 nova</div></div><div class="node-model">haiku 4.5</div></div>
                     <div class="node-meta">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
@@ -2498,7 +2526,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)">
+                  <div id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cyan)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-eagle"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:02 · 40m</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="node-idblk"><div class="node-role">reviewer</div><div class="node-name">01 vega</div></div><div class="node-model">sonnet 4.6</div></div>
                     <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
@@ -2523,7 +2552,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)">
+                  <div id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)" style="--nc:var(--ag-vermilion)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-centurion"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-23 08:15 · 3d</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="node-idblk"><div class="node-role">planner</div><div class="node-name">01 quinn</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
                     <div class="node-meta">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
@@ -2545,7 +2575,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)">
+                  <div id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)" style="--nc:var(--ag-citron)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-parrot"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 10:05 · 6h37m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="node-idblk"><div class="node-role">docs</div><div class="node-name">01 wren</div></div><div class="node-model">haiku 4.5</div></div>
                     <div class="node-meta">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
@@ -2570,7 +2601,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)">
+                  <div id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)" style="--nc:var(--ag-magenta)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-tribal"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:10 · 1h32m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="node-idblk"><div class="node-role">designer</div><div class="node-name">01 lex</div></div><div class="node-model">sonnet 4.6</div></div>
                     <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
@@ -2595,7 +2627,8 @@
                     <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span class="sbadge sb-active" title="subagent s1 — active" onclick="event.stopPropagation()">s1</span><span class="sbadge sb-active" title="subagent s2 — active" onclick="event.stopPropagation()">s2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
-                  <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)">
+                  <div id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)" style="--nc:var(--ag-teal)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-astronaut"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-22 14:00 · 4d</span><button class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="node-idblk"><div class="node-role">ops</div><div class="node-name">01 sage</div></div><div class="node-model">haiku 4.5</div></div>
                     <div class="node-meta">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
@@ -2620,7 +2653,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)">
+                  <div id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)" style="--nc:var(--ag-indigo)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-thirdeye"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:25 · 17m</span><button class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="node-idblk"><div class="node-role">analyst</div><div class="node-name">01 io</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
                     <div class="node-meta">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
@@ -2642,7 +2676,8 @@
                     <div class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
-                  <div id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)">
+                  <div id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)" style="--nc:var(--ag-gold)">
+                    <svg class="node-bg" aria-hidden="true"><use href="#ag-cowled"/></svg>
                     <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 12:48 · 3h54m</span><button class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-id"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="node-idblk"><div class="node-role">scribe</div><div class="node-name">01 fen</div></div><div class="node-model">sonnet 4.6</div></div>
                     <div class="node-meta">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
@@ -2888,7 +2923,7 @@ Short-lived notes for the current run — kept brief on purpose.
               <div class="src-pop">
                 <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                 <div class="aglist aglist-scroll" style="max-height:300px">
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
+              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
               <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
@@ -3009,13 +3044,13 @@ Short-lived notes for the current run — kept brief on purpose.
                 <span class="subbar-lab">From</span>
                 <div class="src-dd dd single" id="source-dd">
                     <button class="dd-trig" type="button" onclick="toggleSourceDD()">
-                      <span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span>
+                      <span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span>
                       <span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span>
                       <i data-lucide="chevrons-up-down" class="picker-cv"></i>
                     </button>
                     <div class="src-pop" id="source-pop">
                       <div class="aglist">
-                        <button class="agrow on" onclick="pickSource(this)"><span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                        <button class="agrow on" onclick="pickSource(this)"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
                         <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
                         <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
                         <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
@@ -4522,7 +4557,7 @@ Short-lived notes for the current run — kept brief on purpose.
   };
   const AG_ORDER=['sandy','kai','drew','max','rowan','nova','vega','quinn','wren','lex','sage','io','fen'];
   function agtileHTML(a){return a.user
-    ?'<span class="agtile agtile--user"><i data-lucide="user" class="agtile-luc"></i></span>'
+    ?'<span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span>'
     :'<span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span>';}
   function badgeHTML(a,sm){return '<span class="badge badge-c'+(sm?' badge-sm':'')+(a.user?' ag-user-badge':'')+'">'
     +agtileHTML(a)+'<span class="b-lab"><span class="b-role">'+a.role+'</span><span class="b-name">'+a.name+'</span></span></span>';}
