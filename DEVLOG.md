@@ -623,6 +623,68 @@ Files: dev/notes/component-system-spec.md, dev/prompts/component-system-refactor
 
 ---
 
+### 2026-06-29 22:30:00 — Component-system Phases 2 + 5: data-comp / data-status tags on mockup.html
+
+Additively annotated `design/mockup.html` (no render/behavior change): added `data-comp="<slug>"` to the root of every component instance per the registry, and `data-status` markers for not-wired/open-question items. Builder-generated families (identity/verdict/lifecycle/count/overflow/inbox-subtype badges, message/scratch/log/history/plan/asset cards, all five inbox-card types, doc-editor, export-control, attachment-chip, jump-pill, agree-toggle) got the attribute inside the returned HTML string so every rendered instance carries it; the five inbox slugs come from a per-type `_inboxComp` map; toast is set via `setAttribute`. Static/repeated families (status-badge ×14, connector-health ×21, config-scope ×19, registry-row ×26, settings-row ×38, subagent-badge ×11, switch ×23, agent-node-card ×13) were tagged on every instance via a one-off scratch script; cross-cutting primitives got one representative each. Pass B: `data-status="planned"` on the dormant edge layer (host `#graph-wrap` + comments at `LINKS`/`drawEdges`), Link Save/Delete, MCP/plugin switches, Console run+input (both views), and Review/citation/attachment routing (`sendReview`/`gotoCitation`/`composeAttach`/`openAttachment`); `data-status="undecided"` on every `.sbadge` (OQ-1, carries both attrs). Verified: all 53 registry slugs present, both inline scripts pass `node --check`, and stripping every added attribute reproduces the pre-edit file byte-for-byte (purely additive).
+
+Files: design/mockup.html, DEVLOG.md
+
+---
+
+### 2026-06-29 22:35:00 — Open System Decisions tracker created (dev/notes/agent-qa)
+
+Created `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` — a shared tracker inventorying every unaddressed **system/product** decision (the band between the finished mockup and the proven bridge floor), kept distinct from the in-flight design-system refactor. 23 stable-ID'd items (`OD-01…OD-23`) in four tiers (Foundation · Linking · Feature-area · Strategic), each with a kind tag (`OPEN` / `BLOCKED` / `DECIDED‑UNBUILT`), a one-screen index table up top, and a blank `Decision:` line to fill as we resolve them together. Synthesized from `dev/notes/coverage-map.md`, `design/TODO.md` (incl. section C + Inbox), the two 06-27 cc-export planning sessions (ui-spec-3, build-2b), and the refactor spec's OQ-1. Read/think artifact only — **no `design/` files touched** (the refactor agent owns them mid-run); items that touch the design layer are flagged 🎨 to hold until that pass lands.
+
+Files: dev/notes/agent-qa/open-system-decisions-2026-06-29.md, DEVLOG.md
+
+---
+
+### 2026-06-29 22:45:00 — Open System Decisions tracker: added agent recommendation + confidence per entry
+
+Reworked `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` so every one of the 23 `OD-*` entries now carries a **Recommended:** line (my suggested call) and a **Confidence:** tag, reusing the v5 QA doc's convention (▶ Confident / ◆ Leaning / ✚ Can't infer) for consistency. Added a **Conf** column to the index table and a confidence legend to "How to use." Recommendations are grounded in the existing notes where a prior decision settles it (e.g. OD-10 lifecycle caps = notify-only per ui-spec Q5b → ▶; OD-19 Delete-deferred per build-2b → ▶; OD-17 scratchpad write-in/read-out per QA Q22 → ▶) and honestly tagged ✚ where it's genuinely the user's product/taste call (OD-07 default cap value, OD-21 library commitment, OD-22 scope items, OD-23 palette direction). Content-only addition; no entries removed, no `design/` files touched.
+
+Files: dev/notes/agent-qa/open-system-decisions-2026-06-29.md, DEVLOG.md
+
+---
+
+### 2026-06-29 23:00:00 — OD-01 finalized: aggregated event-stream design + event-id scheme
+
+Filled the **Decision** field for OD-01 (cross-agent event stream) in `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` and flipped its index Status to `decided` (Recommended left as-is per the session rule). The decision records: a single sidecar-owned aggregated **SSE** stream all panels subscribe to (replaces the 800 ms `/history` poll); lightweight per-event envelopes `{id, agent_id, seq, type, ts, payload|pointer}` with heavy content fetched on demand; a **bounded bus, not a stored mega-log** (on-disk per-agent JSONL stays source of truth; sidecar keeps a rolling ring buffer, UI virtualizes/backfills, From/To filters server-side); a deterministic composite **event id** `{agent_id}:{source}:{anchor}[:{block}]` (session-uuid · `t`/`s` · transcript-entry `uuid` or synth trigger key · block index) for dedup/replay; and a separate monotonic `seq` for ordering. Re-read the doc first (no parallel changes this round). Tracker-only edit; no `design/` or product code touched.
+
+Files: dev/notes/agent-qa/open-system-decisions-2026-06-29.md, DEVLOG.md
+
+---
+
+### 2026-06-29 23:30:00 — Component-system Phase 4: design/gallery.html visual catalog created
+
+New static component gallery `design/gallery.html` — the visual catalog for the design system. Links the **same** `tokens.css` + `styles.css` (and identical Tailwind config + lucide CDN) as `mockup.html`, so specimens render identically to the live components; only page-layout scaffolding is added inline, all `gx-`-prefixed (no component CSS redefined). Shows every registry slug **exactly once** grouped into Primitives → Badge catalog → Inbox cards → Composites: all **53 `data-comp` slugs** present (1 each) plus a 54th `link-edges` group (`data-status="planned"` SVG placeholder); badges are exhaustive (status 4 · subagent 3 (marked `undecided`, OQ-1 note) · lifecycle 10 · verdict 3 · count-chip 3 forms · connector-health 4 · config-scope 2 · identity 3+user · inbox-subtype 2 · overflow 1) and all **5 inbox card types** are hand-authored from the real builder markup. `agent-node-card` shows its 6 sub-parts with labeled callouts. Verified in-browser (headless, served over localhost) at wide + narrow extremes: 0 console errors, 77 lucide icons resolved, tokens/styles applied, no horizontal overflow after two fixes (added `.gx-stage--col > * { min-width:0; max-width:100% }` so live nowrap titles ellipsize, and `minmax(min(Npx,100%),1fr)` on the grids so cards never exceed the viewport). Headed parity pass not run — the Playwright MCP in this env is headless-only with no per-call headed toggle and no standalone Playwright installed.
+
+Files: design/gallery.html, DEVLOG.md
+
+---
+
+### 2026-06-29 23:55:00 — Component-system refactor LANDED: `design/` is now the 5-file design system (capstone)
+
+The one-shot `dev/prompts/component-system-refactor.md` pass is complete; `design/` is final, with the five permanent sources (`tokens.css` · `styles.css` · `mockup.html` · `gallery.html` · `DESIGN.md`) as the sole design source. This capstone covers the orchestrator-owned phases (Phases 2+5 and 4 are logged at 22:30 and 23:30). **Phase 0 (extract):** lifted both inline `<style>` blocks verbatim into the new `design/styles.css` (≈180 KB) and linked it from `mockup.html` right after `tokens.css`; proven **render-identical** by an objective per-element computed-style fingerprint over all **7514** body elements (hash matched the pre-extraction baseline exactly). **Phase 1 (tokenize):** added to `tokens.css` — `--border-width`/`--divider-width`/`--ring-width`, `--radius-sm`/`--radius-xs`, `--font-sans`/`--font-mono`, a primitive `--size-*` scale (27 small component dims, ≥2 uses, ≤64px) and a `--space-*` scale (15 padding/gap steps), and the global icon-fill knobs `--node-tint`/`--node-tint-selected`/`--node-icon-pct`; **removed** the retired `--req-*` family (6 tokens, confirmed unreferenced). `styles.css` now references everything via `var()` (2182 refs) — **zero** residual 2px/3px border or radius literals, **zero** inline font-family strings, **zero** recurring untokenized padding/gap/size values. Render-identical re-proven by computed-style diff: the only deltas vs baseline were the intended, visually-inert font-family normalization (the 3-part `…ui-monospace…` stack collapsed to `--font-mono` where JetBrains Mono always wins) plus the live clock; confirmed visually wide+narrow. (Per-instance `--nc` and data/runtime values like bar `width:%` were deliberately left inline, per the token-scope rule.) **Reconciliation:** removed the vestigial `.rz-grip` dead markup (4 `display:none` spans + the dead CSS rule — render-identical, the divider is the `::before`) and stripped the 4 literal `TODO.md` references from `mockup.html`'s changelog comments. **Phase 3 (DESIGN.md):** added a new **Component system** section (the `data-comp` naming convention + full registry, the `data-status` planned/undecided convention, the wired-vs-planned behavior policy, and the **Open Questions register** seeding **OQ-1**: subagent error-state/click); rewrote the token rules for the new categories + the primitive-vs-alias rule + the `--req-*` removal; documented the four previously-undocumented badge families (connector-health, config-scope, verdict, inbox-subtype) and the `req-badge`→count-chip rename; dropped the per-component inventory in favor of the gallery; and removed all 6 `TODO.md` cross-references (kept the "deferred"/"planned" intent without the external link). **Seam check (post-Phase-3):** every `dev/notes/coverage-map.md` citation of `DESIGN.md` still resolves — no section was renamed/removed (only added). **Spec retired:** `dev/notes/component-system-spec.md` now carries a RETIRED banner at its top (fully absorbed into the five files). **Verification:** Playwright MCP (served over `http://localhost`) **plus** an independent headless-Chrome render — both engines render the mockup and gallery identically (parity), at wide (1680) and narrow (1180/620) extremes, with the Inbox-tab interaction exercising the JS builders post-tagging (5 typed cards render correctly). Mechanism: the disjoint-file lanes (mockup-attributes vs tokens/styles vs gallery) ran as concurrent background subagents rather than git worktrees, since region-disjointness made isolation unnecessary; left uncommitted for review per the repo commit rule. **Maintenance contract:** `tokens.css`=every value · `styles.css`=shared component CSS (mockup+gallery) · `mockup.html`=working app surface + `data-comp`/`data-status` · `gallery.html`=visual catalog · `DESIGN.md`=rules & intent. Open: **OQ-1** stays `undecided`.
+
+Files: design/styles.css (new), design/gallery.html (new), design/tokens.css, design/mockup.html, design/DESIGN.md, dev/notes/component-system-spec.md, DEVLOG.md
+
+### 2026-06-29 23:58:00 — OD-02 finalized: prompt queue + dual-channel delivery (send-keys + hook-pull Inject)
+
+Filled the **OD-02** Decision in the open-system-decisions tracker (Status → `decided`). Call: sidecar owns a per-agent **ordered** queue driven by the bridge's `generating→idle` signal, with **two delivery channels** — **send-keys-on-idle** for Now/Next/Queue (clean user turns) and a **`PostToolUse`+`Stop` HTTP-hook inbox** for **true mid-run Inject**, chosen over degrade-to-Next per the user's "full functionality in v1"; **Hold** (link-only) = payload staged for manual release into the target's Editor. Hook path validated against the hooks reference (`PostToolUse` `additionalContext` mid-turn + `Stop` `decision:block` backstop for no-tool turns); flagged build risks — tool/turn-boundary granularity, WSL2→Windows sidecar reachability, a durable ack-on-2xx inbox, and a one-agent spike to confirm mid-turn `additionalContext` on the installed Claude build. Read/think artifact — no product code changed.
+
+Files: dev/notes/agent-qa/open-system-decisions-2026-06-29.md, DEVLOG.md
+
+---
+
+### 2026-06-30 00:30:00 — Subagent badge: added the `sb-error` 4th run-state (resolves OQ-1's error half)
+
+Per user request, gave the subagent badge an **error** state, mirroring the graph status badge's 4th state. Added `.sbadge.sb-error{ background:var(--danger); color:#fff }` to `styles.css` (the exact `.nb-error` / `.db-error` solid-danger + inverse-ink treatment); a live errored subagent (`s6`) now renders red in the SCRIBE 01 fen card's expanded subagent strip in `mockup.html`; and the gallery's **Subagent Badge** group now shows **4** variants (`.sb-active` · `.sb-idle` · `.sb-pending` · `.sb-error`). `DESIGN.md` synced: the registry now reads "Subagent Badge (4 states)", the Team Graph subagent description lists active / pending / idle / **error** → `--success` / `--warning` / `--muted` / `--danger`, and **OQ-1 was narrowed** to only the subagent-badge **click** no-op (still `undecided` — the badge keeps `data-status="undecided"` for the click; the error-state half is now resolved, as the user OK'd leaving the click open). Verified in-browser (Playwright over localhost): `.sb-error` computes to `rgb(210,59,106)` / white in both the gallery specimen and the live mockup `s6`; 0 console errors. A deliberate, additive design state (not render-identical) — the only visible delta is the new red error badge.
+
+Files: design/styles.css, design/mockup.html, design/gallery.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
