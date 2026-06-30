@@ -106,6 +106,7 @@
 
 - We need some kind of indicator when an agent goes from active to idle and the user has not yet checked the output/response. 
 - Given that we we cannot pull context information while an agent's running we could have context update periodically between runs and also have an option to pull directly possibly just by dropping down the context drop down in the agent panel but then we should probably have some kind of load indicator like a spinning thing so it's clear that it's not loaded but it will be.
+- Make the major header and footer use the pink color and do the same for the major movable internal panel area dividers. For the latter, I still want them teal when hover or actively being moved. 
 
 ## Scratch
 
