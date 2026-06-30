@@ -18,6 +18,7 @@ import json
 import logging
 import re
 import uuid
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -30,6 +31,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
 from identity import assign_identity
+import eventbus
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -82,6 +84,15 @@ class SessionState:
         self.created_at = datetime.now().isoformat()
         self.events: list[dict[str, Any]] = []
         self.subscribers: list[asyncio.Queue[dict[str, Any]]] = []
+        # OD-01 dedup set: deterministic ids already emitted, so a transcript
+        # re-poll / reconnect replays without duplicates (no-op on a repeat).
+        self._emitted_ids: set[str] = set()
+        # OD-02 per-agent ORDERED prompt queue (not strict FIFO) + a Hold staging
+        # slot. Sends to a busy agent are queued, not 409-dropped, and flushed on
+        # the proven generating->idle transition. `held` items are parked (link-
+        # only) and never auto-flushed (released manually into the Editor).
+        self.prompt_queue: deque[dict[str, Any]] = deque()
+        self.held: list[dict[str, Any]] = []
         self.pending_permission: dict[str, Any] | None = None
         self.total_cost_usd: float = 0.0
         self.total_turns: int = 0
@@ -123,12 +134,45 @@ class SessionState:
         }
 
     def push_event(self, event: dict[str, Any]):
+        # OD-01/OD-22: stamp the envelope (id/agent_id/seq/ts/source/recipients)
+        # at the single fan-out choke point. A re-polled transcript entry (same
+        # deterministic id) dedups to a no-op (stamp returns None).
+        event = eventbus.stamp(event, agent_id=self.session_id,
+                               emitted_ids=self._emitted_ids)
+        if event is None:
+            return
         self.events.append(event)
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
             except asyncio.QueueFull:
                 pass  # subscriber too slow, skip
+        # Mirror into the bounded cross-agent ring + merged subscribers (OD-01).
+        eventbus.publish_global(event)
+
+    def enqueue(self, entry: dict[str, Any], disposition: str) -> dict[str, Any]:
+        """Place a prompt per its OD-02 disposition (an ordered queue, not FIFO):
+
+        * ``queue`` — append-tail, flush at idle (the polite default).
+        * ``next``  — insert-head, flush at idle (jump ahead of the queue).
+        * ``now``   — insert-head; the caller interrupts the run so the resulting
+          idle flushes it immediately.
+        * ``hold``  — park in the staging slot; never auto-flushed (released
+          manually into the Editor for approval/edit before send).
+
+        (``inject`` rides the hook channel, not this queue — spike-gated.)
+        Returns ``{status, position}`` (or ``{status:'held', held}``).
+        """
+        if disposition == "hold":
+            self.held.append(entry)
+            return {"status": "held", "held": len(self.held)}
+        if disposition in ("next", "now"):
+            self.prompt_queue.appendleft(entry)
+            position = 0
+        else:  # "queue"
+            self.prompt_queue.append(entry)
+            position = len(self.prompt_queue) - 1
+        return {"status": "queued", "position": position}
 
     def handle_event(self, event: dict[str, Any]):
         """Driver event callback: update session bookkeeping, then fan out.
@@ -143,6 +187,9 @@ class SessionState:
             if st in ("connecting", "idle", "running", "error", "closed"):
                 self.status = st  # type: ignore[assignment]
             self.push_event(event)
+            # OD-02: the generating->idle transition is the proven flush signal.
+            if st == "idle":
+                _schedule_flush(self)
             return
 
         if etype == "permission_request":
@@ -177,8 +224,50 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
+            # OD-02: a completed turn (result -> idle) flushes the next queued prompt.
+            _schedule_flush(self)
 
 sessions: dict[str, SessionState] = {}
+
+
+async def _flush_queue(session: "SessionState") -> None:
+    """OD-02: send the next queued prompt iff the agent is idle and one is queued.
+
+    Re-entrancy is gated by flipping status to ``running`` *before* the only
+    ``await`` (driver.send), so a concurrent flush sees ``running`` and returns —
+    strict one-in-flight, no double-send.
+    """
+    if session.status == "running" or not session.prompt_queue or not session.driver:
+        return
+    entry = session.prompt_queue.popleft()
+    session.status = "running"  # gate re-entry before the await
+    session.push_event({
+        "type": "status_change", "status": "running",
+        "timestamp": datetime.now().isoformat(),
+        "source": entry.get("source", "user"),
+        "recipients": entry.get("recipients", ["user"]),
+    })
+    try:
+        await session.driver.send(entry["prompt"])
+    except Exception as e:  # pragma: no cover - exercised live
+        logger.error(f"Session {session.session_id} queued-send failed: {e}")
+        session.status = "error"
+        session.push_event({
+            "type": "error", "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        })
+
+
+def _schedule_flush(session: "SessionState") -> None:
+    """Schedule a queue flush on the event loop (handle_event is sync and must
+    not await). No-op when nothing is queued or no loop is running (e.g. tests)."""
+    if not session.prompt_queue:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    loop.create_task(_flush_queue(session))
 
 # ============================================================================
 # Session Lifecycle
@@ -363,6 +452,18 @@ class CreateSessionRequest(BaseModel):
 
 class SendPromptRequest(BaseModel):
     prompt: str
+    # OD-22 addressing (built in now so linking / multi-target sends need no later
+    # migration). source = who the prompt is from (default the operator);
+    # recipients = typed addressees (user | <agent-id> | scratch), default the
+    # target agent. These drive routing + the From/To filter + Sent/Received — not
+    # visibility. Full agent-to-agent routing lands with OD-02/linking.
+    source: str = "user"
+    recipients: list[str] | None = None
+    # OD-02 send-timing disposition. `queue` (the polite default) waits for the
+    # turn AND the existing queue; `next` jumps ahead at the next idle; `now`
+    # interrupts the current run and delivers immediately; `hold` stages for
+    # manual release. (`inject` = mid-run via the hook channel — spike-gated.)
+    disposition: Literal["now", "next", "queue", "hold"] = "queue"
 
 class SetModelRequest(BaseModel):
     model: str
@@ -471,31 +572,47 @@ async def close_session(session_id: str):
 
 @app.post("/sessions/{session_id}/send")
 async def send_prompt(session_id: str, req: SendPromptRequest):
+    """OD-02: enqueue a prompt on the per-agent ordered queue (never 409-drop).
+
+    An idle agent flushes immediately; a busy agent queues per disposition
+    (`queue`/`next`), or — for `now` — is interrupted so the resulting idle
+    flushes it at the head. `hold` stages for manual release. OD-22: the entry
+    carries `source` + `recipients` (default the operator -> this agent)."""
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
-    if session.status == "running":
-        raise HTTPException(status_code=409, detail="Session is busy")
     if not session.driver:
         raise HTTPException(status_code=503, detail="Session not connected yet")
 
-    session.status = "running"
-    session.push_event({
-        "type": "status_change", "status": "running",
-        "timestamp": datetime.now().isoformat(),
-    })
+    entry = {
+        "id": str(uuid.uuid4())[:8],
+        "prompt": req.prompt,
+        "source": req.source,
+        "recipients": req.recipients if req.recipients is not None else [session_id],
+        "disposition": req.disposition,
+        "enqueued_at": datetime.now().isoformat(),
+    }
+    result = session.enqueue(entry, req.disposition)
+    result["session_id"] = session_id
 
-    try:
-        await session.driver.send(req.prompt)
-    except Exception as e:
-        session.status = "error"
-        session.push_event({
-            "type": "error", "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-        })
-        raise HTTPException(status_code=500, detail=str(e))
+    if req.disposition == "hold":
+        return result  # parked; never auto-flushed
 
-    return {"status": "sent", "session_id": session_id}
+    # `now` jumps the queue and interrupts the running turn so the resulting idle
+    # flushes the head; otherwise try to flush immediately if the agent is idle.
+    if req.disposition == "now" and session.status == "running":
+        try:
+            await session.driver.interrupt()
+        except Exception as e:
+            logger.error(f"Session {session_id} interrupt-for-now failed: {e}")
+        return result
+
+    await _flush_queue(session)
+    # If it flushed (agent was idle), report sent; else it's queued behind the run.
+    flushed = entry not in session.prompt_queue and req.disposition != "hold"
+    if flushed and session.status != "error":
+        result["status"] = "sent"
+    return result
 
 
 @app.get("/sessions/{session_id}/events")
@@ -530,6 +647,65 @@ async def get_history(session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     return sessions[session_id].events
+
+
+def _parse_csv(value: str | None) -> set[str] | None:
+    """Split a comma-separated From/To filter query param into a set (or None)."""
+    if not value:
+        return None
+    parts = {p.strip() for p in value.split(",") if p.strip()}
+    return parts or None
+
+
+@app.get("/events")
+async def stream_all_events(since: int | None = None,
+                            source: str | None = None,
+                            recipient: str | None = None):
+    """OD-01 merged cross-agent SSE stream — the single feed all panels subscribe
+    to, replacing the per-session `/history` poll.
+
+    Replays the bounded ring (optionally from `?since=<seq>` for scroll-backfill)
+    then streams live, with **server-side** From/To filtering: `?source=a,b`
+    (sender) and `?recipient=user,c` (any addressee). Each event carries the OD-01
+    envelope (id/agent_id/seq/ts) + OD-22 source/recipients.
+    """
+    sources = _parse_csv(source)
+    recipients = _parse_csv(recipient)
+
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
+    eventbus.GLOBAL_SUBSCRIBERS.append(queue)
+
+    async def generator():
+        try:
+            for event in eventbus.replay(since=since, sources=sources,
+                                         recipients=recipients):
+                yield {"event": "message", "data": json.dumps(event)}
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    # Apply the same server-side filter to live events.
+                    if eventbus.event_matches(event, sources, recipients):
+                        yield {"event": "message", "data": json.dumps(event)}
+                except asyncio.TimeoutError:
+                    yield {"event": "ping", "data": ""}
+        finally:
+            if queue in eventbus.GLOBAL_SUBSCRIBERS:
+                eventbus.GLOBAL_SUBSCRIBERS.remove(queue)
+
+    return EventSourceResponse(generator())
+
+
+@app.get("/events/history")
+async def get_merged_history(since: int | None = None,
+                             source: str | None = None,
+                             recipient: str | None = None):
+    """Non-streaming merged backfill — the bounded ring sliced by `?since=<seq>`
+    and From/To filtered server-side (same params as `/events`). For virtualized
+    scroll without holding an SSE connection; the on-disk JSONL transcripts remain
+    the source of truth beyond the ring window."""
+    return eventbus.replay(since=since,
+                           sources=_parse_csv(source),
+                           recipients=_parse_csv(recipient))
 
 
 @app.post("/sessions/{session_id}/interrupt")

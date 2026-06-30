@@ -353,10 +353,18 @@ def derive_subagents(entries: list[dict]) -> dict:
 
 
 def _entry_to_event(entry: dict) -> dict | None:
-    """Convert a transcript JSONL entry into a frontend event, or None to skip."""
+    """Convert a transcript JSONL entry into a frontend event, or None to skip.
+
+    OD-01: each transcript event carries ``anchor`` = the JSONL entry's own
+    ``uuid`` and ``source_kind='t'`` so the sidecar can mint a *deterministic*
+    event id (``{agent_id}:t:{uuid}``). Re-polling the same entry then dedups to
+    a no-op and a reconnect replays without duplicates. A missing uuid leaves
+    ``anchor=None`` (the sidecar falls back to a seq-based id).
+    """
     etype = entry.get("type")
     msg = entry.get("message", {}) or {}
     ts = entry.get("timestamp") or datetime.now().isoformat()
+    anchor = entry.get("uuid")
     if etype == "assistant":
         return {
             "type": "assistant",
@@ -364,6 +372,8 @@ def _entry_to_event(entry: dict) -> dict | None:
             "content": msg.get("content", []),
             "model": msg.get("model"),
             "timestamp": ts,
+            "anchor": anchor,
+            "source_kind": "t",
         }
     if etype == "user":
         return {
@@ -371,6 +381,8 @@ def _entry_to_event(entry: dict) -> dict | None:
             "sdk_type": "UserMessage",
             "content": msg.get("content", []),
             "timestamp": ts,
+            "anchor": anchor,
+            "source_kind": "t",
         }
     return None
 

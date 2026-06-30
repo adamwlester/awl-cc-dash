@@ -10,14 +10,30 @@ detail; a ``permission_resolved`` event clears it. These carry neither the
 import sys
 from pathlib import Path
 
+import pytest
+
 # The sidecar runs with its own dir on sys.path (not the repo root).
 _SIDECAR = Path(__file__).resolve().parent.parent / "sidecar"
 if str(_SIDECAR) not in sys.path:
     sys.path.insert(0, str(_SIDECAR))
 
+import asyncio  # noqa: E402
+
+import eventbus  # noqa: E402
+import main  # noqa: E402
 from main import SessionState  # noqa: E402
 from drivers import default_driver_name  # noqa: E402
-from identity import assign_identity, AG_COLORS, AG_ICONS  # noqa: E402
+from identity import (  # noqa: E402
+    assign_identity, AG_COLORS, AG_ICONS, AG_ICONS_CURATED,
+)
+
+
+@pytest.fixture(autouse=True)
+def _clean_event_bus():
+    # The cross-agent bus is process-global (like `sessions`) — reset per test.
+    eventbus.reset()
+    yield
+    eventbus.reset()
 
 
 def _session():
@@ -117,18 +133,39 @@ class TestIdentityAssignment:
         assert ident["number"] == 1
         assert ident["name"] == ""
         assert ident["color"] == AG_COLORS[0][1]   # round-robin slot 0
-        assert ident["icon"] == AG_ICONS[0]
+        assert ident["icon"] == AG_ICONS_CURATED[0]  # round-robin over the curated 50
         # Color is a real hex value.
         assert ident["color"].startswith("#") and len(ident["color"]) == 7
 
     def test_color_and_number_round_robin(self):
-        # Ordinal n -> color slot n%16, number n+1.
+        # Ordinal n -> color slot n%len(palette) (=25 once the design stream lands
+        # the +9; 16 today), number n+1.
         for n in (1, 5, 15, 16, 17):
             ident = assign_identity(None, n)
             assert ident["color"] == AG_COLORS[n % len(AG_COLORS)][1]
             assert ident["number"] == n + 1
-        # Wraps: ordinal 16 reuses slot 0's color (past-16 uniqueness deferred).
-        assert assign_identity(None, 16)["color"] == assign_identity(None, 0)["color"]
+        # Wraps at the palette size (generalized so it survives 16 -> 25).
+        assert (assign_identity(None, len(AG_COLORS))["color"]
+                == assign_identity(None, 0)["color"])
+
+    def test_icon_round_robin_over_curated_50(self):
+        # OD-03: icon = n mod 50 over the CURATED pool (not the full 167 on disk).
+        assert len(AG_ICONS_CURATED) == 50
+        for n in (0, 1, 25, 49, 50, 51, 99, 100):
+            assert assign_identity(None, n)["icon"] == AG_ICONS_CURATED[n % 50]
+        # Wraps every 50; adjacent ordinals differ.
+        assert assign_identity(None, 50)["icon"] == assign_identity(None, 0)["icon"]
+        assert assign_identity(None, 0)["icon"] != assign_identity(None, 49)["icon"]
+
+    def test_curated_pool_is_50_unique_real_icons(self):
+        # Exactly 50, all distinct, all bare stems, all present on disk (a subset
+        # of the discovered 167) — guards curation drift if an asset is removed.
+        assert len(AG_ICONS_CURATED) == 50
+        assert len(set(AG_ICONS_CURATED)) == 50
+        discovered = set(AG_ICONS)
+        for stem in AG_ICONS_CURATED:
+            assert "/" not in stem and not stem.endswith(".svg")
+            assert stem in discovered, f"curated icon missing on disk: {stem}"
 
     def test_overrides_are_honored(self):
         req = {"role": "Reviewer", "number": 7, "name": "Ada",
@@ -157,3 +194,196 @@ class TestIdentityAssignment:
             driver_name="bridge", identity=ident,
         )
         assert s.to_dict()["identity"] == ident
+
+
+# ---------------------------------------------------------------------------
+# Cross-agent event envelope + addressing (OD-01 + OD-22) on push_event
+# ---------------------------------------------------------------------------
+
+class TestEventEnvelope:
+    def test_push_stamps_envelope(self):
+        s = _session()
+        s.push_event({"type": "assistant", "content": []})
+        ev = s.events[-1]
+        assert ev["agent_id"] == "s1"          # OD-01 sender = session id
+        assert isinstance(ev["seq"], int)        # OD-01 monotonic ordering key
+        assert ev["id"]                          # OD-01 stable id
+        assert ev["ts"]
+        assert ev["source"] == "s1"             # OD-22 default source
+        assert ev["recipients"] == ["user"]      # OD-22 default recipients
+
+    def test_push_dedups_anchored_event_on_repoll(self):
+        s = _session()
+        s.push_event({"type": "assistant", "anchor": "uuid-1", "source_kind": "t"})
+        s.push_event({"type": "assistant", "anchor": "uuid-1", "source_kind": "t"})
+        # Same transcript entry re-polled -> a single stored event (no-op dedup).
+        anchored = [e for e in s.events if e.get("anchor") == "uuid-1"]
+        assert len(anchored) == 1
+
+    def test_push_mirrors_into_global_ring(self):
+        s = _session()
+        s.push_event({"type": "assistant", "content": []})
+        ring = eventbus.replay()
+        assert len(ring) == 1
+        assert ring[0]["agent_id"] == "s1"
+
+    def test_two_agents_merge_into_one_stream(self):
+        a = SessionState(session_id="a1", agent_type=None, model=None,
+                         permission_mode="default", cwd=None, system_prompt=None,
+                         driver_name="bridge")
+        b = SessionState(session_id="b1", agent_type=None, model=None,
+                         permission_mode="default", cwd=None, system_prompt=None,
+                         driver_name="bridge")
+        a.push_event({"type": "assistant", "content": []})
+        b.push_event({"type": "assistant", "content": []})
+        a.push_event({"type": "assistant", "content": []})
+        ring = eventbus.replay()
+        assert [e["agent_id"] for e in ring] == ["a1", "b1", "a1"]
+        # Monotonic seq across the merged stream.
+        seqs = [e["seq"] for e in ring]
+        assert seqs == sorted(seqs)
+
+    def test_preaddressed_event_keeps_source_recipients(self):
+        s = _session()
+        s.push_event({"type": "assistant", "source": "user", "recipients": ["s1"]})
+        ev = s.events[-1]
+        assert ev["source"] == "user"
+        assert ev["recipients"] == ["s1"]
+
+
+class TestMergedHistoryEndpoint:
+    """The OD-01 merged /events/history endpoint: ring replay + From/To + ?since."""
+
+    def _two_agents(self):
+        a = SessionState(session_id="a1", agent_type=None, model=None,
+                         permission_mode="default", cwd=None, system_prompt=None)
+        b = SessionState(session_id="b1", agent_type=None, model=None,
+                         permission_mode="default", cwd=None, system_prompt=None)
+        a.push_event({"type": "assistant", "content": []})
+        b.push_event({"type": "assistant", "content": [], "recipients": ["a1"]})
+        return a, b
+
+    def test_returns_merged_ring(self):
+        self._two_agents()
+        merged = asyncio.run(main.get_merged_history())
+        assert [e["agent_id"] for e in merged] == ["a1", "b1"]
+
+    def test_recipient_filter(self):
+        self._two_agents()
+        to_a1 = asyncio.run(main.get_merged_history(recipient="a1"))
+        assert [e["agent_id"] for e in to_a1] == ["b1"]
+
+    def test_source_filter(self):
+        self._two_agents()
+        from_a1 = asyncio.run(main.get_merged_history(source="a1"))
+        assert [e["agent_id"] for e in from_a1] == ["a1"]
+
+    def test_since_backfill(self):
+        self._two_agents()
+        merged = asyncio.run(main.get_merged_history())
+        cutoff = merged[0]["seq"]
+        later = asyncio.run(main.get_merged_history(since=cutoff))
+        assert [e["agent_id"] for e in later] == ["b1"]
+
+
+# ---------------------------------------------------------------------------
+# OD-02: per-agent ordered prompt queue + idle-flush (no more 409-drop)
+# ---------------------------------------------------------------------------
+
+class _FakeDriver:
+    name = "fake"
+
+    def __init__(self):
+        self.sent: list[str] = []
+        self.interrupted = 0
+
+    def supports(self, _cap):
+        return False
+
+    async def send(self, prompt):
+        self.sent.append(prompt)
+
+    async def interrupt(self):
+        self.interrupted += 1
+
+
+class TestPromptQueue:
+    def test_enqueue_queue_appends_tail(self):
+        s = _session()
+        s.enqueue({"prompt": "a"}, "queue")
+        s.enqueue({"prompt": "b"}, "queue")
+        assert [e["prompt"] for e in s.prompt_queue] == ["a", "b"]
+
+    def test_enqueue_next_inserts_head(self):
+        s = _session()
+        s.enqueue({"prompt": "a"}, "queue")
+        s.enqueue({"prompt": "b"}, "next")
+        assert [e["prompt"] for e in s.prompt_queue] == ["b", "a"]
+
+    def test_hold_stages_not_queues(self):
+        s = _session()
+        r = s.enqueue({"prompt": "h"}, "hold")
+        assert [e["prompt"] for e in s.held] == ["h"]
+        assert len(s.prompt_queue) == 0
+        assert r["status"] == "held"
+
+    def test_flush_sends_head_when_idle(self):
+        s = _session()
+        s.driver = _FakeDriver()
+        s.status = "idle"
+        s.enqueue({"prompt": "a", "source": "user", "recipients": ["s1"]}, "queue")
+        s.enqueue({"prompt": "b"}, "queue")
+        asyncio.run(main._flush_queue(s))
+        assert s.driver.sent == ["a"]          # head sent
+        assert s.status == "running"
+        assert [e["prompt"] for e in s.prompt_queue] == ["b"]  # head popped
+
+    def test_flush_noop_when_running(self):
+        s = _session()
+        s.driver = _FakeDriver()
+        s.status = "running"
+        s.enqueue({"prompt": "a"}, "queue")
+        asyncio.run(main._flush_queue(s))
+        assert s.driver.sent == []             # busy: nothing flushed
+        assert len(s.prompt_queue) == 1
+
+    def test_flush_noop_when_empty(self):
+        s = _session()
+        s.driver = _FakeDriver()
+        s.status = "idle"
+        asyncio.run(main._flush_queue(s))
+        assert s.driver.sent == []
+
+    def test_send_to_idle_sends_immediately(self):
+        s = _session(); s.driver = _FakeDriver(); s.status = "idle"
+        main.sessions["s1"] = s
+        try:
+            asyncio.run(main.send_prompt("s1", main.SendPromptRequest(prompt="x")))
+        finally:
+            main.sessions.pop("s1", None)
+        assert s.driver.sent == ["x"]
+
+    def test_send_to_busy_enqueues_not_409(self):
+        # The OD-02 fix: a prompt to a running agent is QUEUED, never dropped.
+        s = _session(); s.driver = _FakeDriver(); s.status = "running"
+        main.sessions["s1"] = s
+        try:
+            r = asyncio.run(main.send_prompt(
+                "s1", main.SendPromptRequest(prompt="x", disposition="queue")))
+        finally:
+            main.sessions.pop("s1", None)
+        assert r["status"] == "queued"
+        assert s.driver.sent == []
+        assert [e["prompt"] for e in s.prompt_queue] == ["x"]
+
+    def test_send_now_interrupts_running_and_heads_queue(self):
+        s = _session(); s.driver = _FakeDriver(); s.status = "running"
+        main.sessions["s1"] = s
+        try:
+            asyncio.run(main.send_prompt(
+                "s1", main.SendPromptRequest(prompt="x", disposition="now")))
+        finally:
+            main.sessions.pop("s1", None)
+        assert s.driver.interrupted == 1               # Now interrupts the run
+        assert s.prompt_queue[0]["prompt"] == "x"      # waits at head for idle-flush
+        assert s.driver.sent == []

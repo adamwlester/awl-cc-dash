@@ -893,6 +893,30 @@ Files: dev/prompts/backend-decision-integration.md (new), dev/prompts/design-str
 
 ---
 
+### 2026-06-30 15:30:00 — backend: OD-23 storage homes + OD-03 identity finish (foundation tier-1, hermetic)
+
+First backend slice of `dev/prompts/backend-decision-integration.md` — the two small, independent foundation items, TDD with hermetic tests, no `design/` touched (the 🎨 stream owns it).
+
+- **OD-23 storage & scoping homes** — new `sidecar/storage.py`: the one canonical model for *where data lives*, three homes all keyed off each agent's `cwd` (never a fixed path). 🏠 Dashboard store = `runtime_store.runtime_dir()` (Setups/templates), exposed as a public accessor so locations can't diverge; 📁 Project home = `<project>/.awl/` (scratchpad OD-17, plan-reviews OD-15), WSL-reachable via the proven `bridge.paths.win_to_wsl` (reused, with a local fallback so the module always imports); 👥 Setup = a roster in the dashboard store. The consumers (OD-15/17/18/16) import these resolvers. Added public `runtime_store.runtime_dir()` (single source of truth).
+- **OD-03 identity finish** — `sidecar/identity.py`: curated **50 icons** from the 167 on disk (distinct/recognizable, category-interleaved) as the auto-assignment pool; round-robin now `icon = n mod 50`, `color = n mod len(AG_COLORS)` (already ready for `mod 25` — the +9 color names/values are the design stream's; the cross-stream seam is documented, not invented). Full 167 set kept for the manual picker/recolor endpoint.
+- **Verified:** 108 hermetic tests green (`tests/test_storage_unit.py` new, 14; `tests/test_sidecar_unit.py` updated to the curated-icon contract + curated-pool drift guards; existing bridge unit tests unaffected). No live env needed. DEVLOG rotation (>700 lines) remains deferred to avoid clobbering the concurrent design-stream appends.
+
+Files: sidecar/storage.py (new), sidecar/identity.py, sidecar/runtime_store.py, tests/test_storage_unit.py (new), tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
+### 2026-06-30 17:45:00 — backend: OD-01 + OD-22 merged event stream/addressing + OD-02 push-queue (Tier-1 foundation complete, hermetic)
+
+Built the rest of the load-bearing Tier-1 foundation from `dev/prompts/backend-decision-integration.md`, TDD, all hermetic. No `design/` touched.
+
+- **OD-01 + OD-22 (one envelope)** — new `sidecar/eventbus.py`: the sidecar now owns ONE aggregated, identity-stamped event stream. Every event is stamped at the single `push_event` choke point with `{id, agent_id, seq, ts, source, recipients[]}` — `seq` a separate global monotonic ordering key, `id` a **deterministic** composite `{agent_id}:{source_kind}:{anchor}` (anchor = the JSONL entry `uuid`, surfaced from the bridge driver's `_entry_to_event`) so a re-poll/reconnect **dedups to a no-op**; synthesized events get a unique seq-based id. OD-22 `source` + typed `recipients[]` (default `source=agent`, `recipients=['user']`; pre-addressed events preserved). New **`GET /events`** (merged SSE) + **`GET /events/history`** (REST backfill) replace the per-session `/history` poll, both with server-side **From/To filtering** (`?source=`/`?recipient=`) + `?since=<seq>` scroll-backfill against a **bounded ring** (the per-agent JSONL stays source of truth). `SendPromptRequest` gained `source`/`recipients` so linking/multi-target sends need no later migration.
+- **OD-02 push-queue** — `send_prompt` no longer **409-drops** to a busy agent: it enqueues on a per-agent **ordered queue** (`SessionState.enqueue` + `prompt_queue`/`held`) with dispositions **Now / Next / Queue / Hold** (Queue the polite default), flushed by `_flush_queue` on the proven **generating→idle** transition (scheduled from `handle_event`, strict one-in-flight via a pre-await status gate). *Now* interrupts the run so the resulting idle delivers at the head; *Hold* stages for manual release. (*Inject* = the hook channel — spike-gated, next.) Unblocks the OD-04/05/06/07 linking chain.
+- **Verified:** 146 hermetic tests green (`tests/test_eventbus_unit.py` new +16; `tests/test_sidecar_unit.py` +envelope/merged-endpoint/queue; `tests/test_bridge_unit.py` +`_entry_to_event` anchor). Sidecar imports clean; `/events` + `/events/history` routes registered. **LIVE verification still pending** (next phase, serial): the merged stream end-to-end through a real agent, the queue idle-flush on a real turn boundary, and the OD-02 hook spike. Seam-mapping of the big files was done via a 4-agent parallel understand-sweep first.
+
+Files: sidecar/eventbus.py (new), sidecar/main.py, sidecar/drivers/bridge.py, tests/test_eventbus_unit.py (new), tests/test_sidecar_unit.py, tests/test_bridge_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

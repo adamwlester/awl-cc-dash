@@ -30,6 +30,7 @@ from sidecar.drivers.bridge import (
     context_window_for_model,
     DEFAULT_CONTEXT_WINDOW,
     CONTEXT_WINDOW_1M,
+    _entry_to_event,
 )
 from bridge.bridge import VALID_PERMISSION_MODES
 
@@ -1051,3 +1052,36 @@ class TestBuildLaunchConfig:
     def test_mcp_none_inherits_global(self):
         # mcp_servers unset -> None -> no --mcp-config (inherit the global registry).
         assert _driver()._build_mcp_config() is None
+
+
+# ---------------------------------------------------------------------------
+# OD-01: transcript events carry a deterministic anchor (the JSONL entry uuid)
+# so the sidecar can build a stable, dedup-able event id.
+# ---------------------------------------------------------------------------
+
+class TestEntryToEventAnchor:
+    def test_assistant_event_carries_uuid_anchor(self):
+        ev = _entry_to_event({
+            "type": "assistant", "uuid": "abc-123",
+            "message": {"content": [], "model": "sonnet"},
+            "timestamp": "2026-06-30T00:00:00",
+        })
+        assert ev["type"] == "assistant"
+        assert ev["anchor"] == "abc-123"   # the deterministic OD-01 id anchor
+        assert ev["source_kind"] == "t"     # transcript-sourced
+
+    def test_user_event_carries_uuid_anchor(self):
+        ev = _entry_to_event({
+            "type": "user", "uuid": "u-9",
+            "message": {"content": []},
+        })
+        assert ev["anchor"] == "u-9"
+        assert ev["source_kind"] == "t"
+
+    def test_missing_uuid_leaves_anchor_none(self):
+        ev = _entry_to_event({"type": "assistant", "message": {"content": []}})
+        assert ev["anchor"] is None        # sidecar falls back to a seq-based id
+        assert ev["source_kind"] == "t"
+
+    def test_non_message_entry_skipped(self):
+        assert _entry_to_event({"type": "file-history-snapshot"}) is None

@@ -23,11 +23,23 @@ from typing import Any
 logger = logging.getLogger("awl-sidecar.runtime")
 
 
-def _runtime_dir() -> Path:
+def runtime_dir() -> Path:
+    """The dashboard runtime store directory (the 🏠 Dashboard home, OD-23).
+
+    ``sidecar/runtime/`` by default, overridable via ``AWL_SIDECAR_RUNTIME``.
+    This is the single source of truth for the dashboard-owned store location —
+    ``storage.dashboard_runtime_dir`` resolves to exactly this, so Setups /
+    templates / identity / sessions never diverge across modules.
+    """
     override = os.environ.get("AWL_SIDECAR_RUNTIME")
     if override:
         return Path(override)
     return Path(__file__).resolve().parent / "runtime"
+
+
+def _runtime_dir() -> Path:
+    # Back-compat private alias; delegates to the public accessor above.
+    return runtime_dir()
 
 
 def _records_file() -> Path:
