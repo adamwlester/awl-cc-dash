@@ -42,6 +42,12 @@ import deletion
 import library
 import templates_store
 import storage
+import scratchpad
+import marquee
+import console_catalog
+import settings_io
+import utility_llm
+import subagents_naming
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -223,6 +229,11 @@ class SessionState:
             if st in ("connecting", "idle", "running", "error", "closed"):
                 self.status = st  # type: ignore[assignment]
             self.push_event(event)
+            if st == "running":
+                # OD-17: start-of-run scratchpad catch-up — deliver this agent's
+                # unread delta as a passive `context` inject (lands at its first
+                # tool boundary; idle agents have no boundary so they catch up now).
+                _deliver_scratch_delta(self)
             # OD-02: the generating->idle transition is the proven flush signal.
             if st == "idle":
                 if self._was_running:        # one completed turn (OD-10 cap loop)
@@ -437,6 +448,30 @@ def _maybe_relay_reply(session: "SessionState",
             pass
         return
     _schedule_flush(target)
+
+
+def _scratch_key(session: "SessionState") -> str:
+    """The scratchpad project key — co-located agents (same cwd) share one board."""
+    return session.cwd or session.session_id
+
+
+def _deliver_scratch_delta(session: "SessionState") -> None:
+    """OD-17: enqueue the agent's unread scratchpad delta as a PASSIVE `context`
+    inject (delivered at the next tool boundary via the hook channel; never
+    triggers a turn). No-op when there's nothing new past its watermark."""
+    try:
+        delta = scratchpad.unread(session.session_id, _scratch_key(session))
+        if not delta:
+            return
+        hookbus.enqueue_inject(session.session_id, scratchpad.render(delta),
+                               kind="context", source="scratch")
+        session.push_event({
+            "type": "scratch_delivered", "count": len(delta),
+            "timestamp": datetime.now().isoformat(),
+            "source": "scratch", "recipients": [session.session_id],
+        })
+    except Exception:  # pragma: no cover - delivery is best-effort
+        pass
 
 # ============================================================================
 # Session Lifecycle
@@ -1254,6 +1289,158 @@ async def library_set_review(req: ReviewRequest):
 
 
 # ============================================================================
+# OD-17 shared scratchpad — post + auto-read delta (live mid-run push)
+# ============================================================================
+
+class ScratchPostRequest(BaseModel):
+    cwd: str                       # the project (co-located agents share a board)
+    author: str
+    text: str
+
+
+@app.get("/scratch")
+async def get_scratch(cwd: str):
+    return {"posts": scratchpad.all_posts(cwd)}
+
+
+@app.post("/scratch")
+async def post_scratch(req: ScratchPostRequest):
+    """Append a post; feed it (recipients:[scratch]); and push each RUNNING agent
+    in the same project its unread delta mid-run via the hook channel (idle agents
+    catch up at their next run's first tool boundary)."""
+    persist = None
+    try:
+        sp = storage.scratchpad_path(req.cwd)
+        persist = str(sp) if sp else None
+    except Exception:
+        persist = None
+    post = scratchpad.post(req.cwd, req.author, req.text, persist_path=persist)
+    # live mid-run push to running co-located agents
+    for s in sessions.values():
+        if s.status == "running" and (s.cwd or s.session_id) == req.cwd:
+            _deliver_scratch_delta(s)
+    return {"status": "posted", "post": post}
+
+
+# ============================================================================
+# OD-12 marquee — the per-agent liveness tail (derived from the stream)
+# ============================================================================
+
+@app.get("/sessions/{session_id}/marquee")
+async def get_marquee(session_id: str):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    events = sessions[session_id].events
+    return {"line": marquee.marquee_line(events), "idle": marquee.is_idle(events)}
+
+
+# ============================================================================
+# OD-20 console — slash-command catalog (the live feed/route rides send/keys +
+# capture-pane on the bridge; interactive commands need follow-on handling)
+# ============================================================================
+
+@app.get("/console/catalog")
+async def console_catalog_endpoint(q: str | None = None):
+    if q:
+        return {"commands": console_catalog.filter_commands(q)}
+    return {"clusters": console_catalog.clusters(),
+            "by_cluster": console_catalog.by_cluster()}
+
+
+class ConsoleRunRequest(BaseModel):
+    command: str
+
+
+@app.post("/sessions/{session_id}/console/run")
+async def console_run(session_id: str, req: ConsoleRunRequest):
+    """Route a slash-command to the focused agent over the bridge (send/keys), then
+    read the screen back. Interactive commands (e.g. /model, /clear) drop the agent
+    into a sub-prompt — flagged so the caller drives the follow-on rather than
+    blind-sending."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    drv = session.driver
+    if drv is None or not hasattr(drv, "_bridge") or not hasattr(drv, "tmux_name"):
+        raise HTTPException(status_code=400, detail="Console requires a bridge agent")
+    interactive = console_catalog.is_interactive(req.command.split()[0] if req.command else "")
+    try:
+        drv._bridge.send(drv.tmux_name, req.command)          # type: ignore[attr-defined]
+        await asyncio.sleep(1.0)
+        screen = drv._bridge.read(drv.tmux_name, lines=40)["content"]  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"console run failed: {e}")
+    return {"command": req.command, "interactive": interactive, "screen": screen}
+
+
+# ============================================================================
+# OD-18 settings — interactive reads/writes (confirm-gated) + account/usage
+# ============================================================================
+
+class SettingsWriteRequest(BaseModel):
+    path: str
+    key: str | None = None      # dotted key for set/toggle/remove; None -> whole-doc write
+    value: Any | None = None
+    op: Literal["write", "set", "toggle", "remove"] = "set"
+    confirm: bool = False
+
+
+@app.get("/settings/read")
+async def settings_read(path: str):
+    return settings_io.read_json(path)
+
+
+@app.get("/settings/account")
+async def settings_account(creds_path: str):
+    return settings_io.account_band(creds_path)
+
+
+@app.post("/settings/write")
+async def settings_write(req: SettingsWriteRequest):
+    try:
+        if req.op == "write":
+            return settings_io.write_json(req.path, req.value or {}, confirm=req.confirm)
+        if req.op == "toggle":
+            return settings_io.toggle_key(req.path, req.key, confirm=req.confirm)
+        if req.op == "remove":
+            return settings_io.remove_key(req.path, req.key, confirm=req.confirm)
+        return settings_io.set_key(req.path, req.key, req.value, confirm=req.confirm)
+    except settings_io.ConfirmationRequired:
+        raise HTTPException(status_code=428, detail="Confirmation required (set confirm=true)")
+
+
+# ============================================================================
+# OD-16 utility-LLM passes — Revise / Summarize via the sdk engine (the ONLY two
+# non-bridge consumers). Everything else multi-agent stays on the bridge.
+# ============================================================================
+
+class ReviseRequest(BaseModel):
+    text: str
+    scope: Literal["grammar", "language", "refactor"] = "grammar"
+    model: str | None = None
+
+class SummarizeRequest(BaseModel):
+    text: str
+    model: str | None = None
+
+
+@app.post("/utility/revise")
+async def utility_revise(req: ReviseRequest):
+    try:
+        return {"scope": req.scope, "result": await utility_llm.revise(req.text, req.scope, req.model)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"revise pass failed: {e}")
+
+
+@app.post("/utility/summarize")
+async def utility_summarize(req: SummarizeRequest):
+    try:
+        return {"result": await utility_llm.summarize(req.text, req.model)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"summarize pass failed: {e}")
+
+
+# ============================================================================
 # Tier-2 linking (OD-04..08) — link CRUD + the reply-to conversation kickoff.
 # The on-idle reply-to relay lives in SessionState.handle_event / _maybe_relay_reply.
 # ============================================================================
@@ -1450,8 +1637,14 @@ async def get_subagents(session_id: str):
     if not session.driver.supports("subagents"):
         return {"count": 0, "subagents": []}
     try:
-        result = await session.driver.get_subagents()
-        return result or {"count": 0, "subagents": []}
+        result = await session.driver.get_subagents() or {"count": 0, "subagents": []}
+        # OD-13: relabel to the group+member scheme (A2, no `s` prefix). v1 groups
+        # the current flat set as one run (A); full per-run segmentation + the
+        # subagent-transcript ingest is the follow-on.
+        subs = result.get("subagents") or []
+        if subs:
+            result["subagents"] = subagents_naming.assign_names([subs])
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

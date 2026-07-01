@@ -972,6 +972,29 @@ Files: sidecar/inbox.py (new), sidecar/checklist.py (new), sidecar/deletion.py (
 
 ---
 
+### 2026-06-30 — sidecar: settings_io.py — path-explicit, confirm-gated settings file I/O (OD-18)
+
+Added the safe file-layer primitives under the OD-18 interactive Settings surface: `read_json` (missing/empty/corrupt → `{}`), `write_json` (atomic temp-file+replace, pretty, creates parent dirs), `set_key`/`toggle_key`/`remove_key` (nested dotted-path read-modify-write), and read-only `account_band` (lenient email/org/plan mapping, one-level nesting, `{"signed_out": True}` when absent). Every mutator is confirm-gated via a required `confirm=True` kwarg that raises `ConfirmationRequired` (a `PermissionError` subclass) before any FS change. **Safety:** operates ONLY on explicit paths passed by the caller — hardcodes no real `~/.claude`/`<project>/.claude` location. Module docstring records the honest feasibility boundary (mid-run permission-mode engine-BLOCKED; per-agent MCP/model/plugins apply at launch/restart) without enforcing engine semantics. Endpoints wire later. TDD: 35 hermetic pytest cases on `tmp_path`, all green (`tests/test_settings_io_unit.py -q` → 35 passed). No existing file edited.
+
+Files: sidecar/settings_io.py, tests/test_settings_io_unit.py, DEVLOG.md
+
+---
+
+### 2026-07-01 00:40:00 — backend: OD-12/13/17/18/20 + sdk (OD-16) — scratchpad & Revise LIVE; Tier-3 complete
+
+Finished the Tier-3 backend + the sdk carve-out. Five more pure modules were built in parallel by background subagents (each TDD-green: watermark 17, subagents_naming 13, marquee 25, settings_io 35, console_catalog 17); I wired the endpoints + driver + live-verified the novel bridge/SDK behaviors.
+- **OD-17 scratchpad** — new `sidecar/scratchpad.py` on the shared `watermark.py` (per-agent auto-read delta; first read = full board; own posts included). `POST/GET /scratch`. Delivery = the OD-02 hook channel as a **passive `context` inject** (never triggers a turn): **live mid-run push** to running co-located agents + **start-of-run catch-up** on `status→running`. **LIVE PASS:** a scratch note posted mid-run reached the running agent at its next tool boundary — it surfaced the token in-turn (`scratch_delivered` event + token both present). `watermark.py` is the shared OD-06/OD-17 mechanism; OD-06 shared-context delivery rides it next.
+- **OD-16 sdk carve-out** — new `sidecar/utility_llm.py`: **Revise** (Grammar/Language/Refactor, default Grammar) + **Summarize** as non-interactive one-shot `claude_agent_sdk.query()` passes — the ONLY two non-bridge consumers. `POST /utility/revise|summarize`. **LIVE PASS:** "this sentance has an obvous eror" → "This sentence has an obvious error in it."
+- **OD-18 settings** — endpoints over the confirm-gated `settings_io.py`: `GET /settings/read|account`, `POST /settings/write` (write/set/toggle/remove; 428 when unconfirmed).
+- **OD-20 console** — `console_catalog.py` (6 clusters, 43 commands, interactive flags) → `GET /console/catalog`; `POST /sessions/{id}/console/run` routes a slash-command over the bridge's send + capture-pane (interactive commands flagged for follow-on).
+- **OD-12 marquee** — `marquee.py` liveness tail → `GET /sessions/{id}/marquee`. **OD-11 checklist** endpoint added earlier. **OD-13** — `subagents_naming.py` (group+member `A2`, no `s` prefix) relabels the subagents endpoint (v1 single-run grouping; per-run segmentation + subagent-transcript ingest is the follow-on).
+
+Verified: **395 hermetic green** (new: scratchpad 8, watermark 17, marquee 25, subagents_naming 13, console_catalog 17, settings_io 35, utility_llm 6) + the two live PASSes above. No `design/` touched.
+
+Files: sidecar/scratchpad.py (new), sidecar/watermark.py (new), sidecar/marquee.py (new), sidecar/subagents_naming.py (new), sidecar/console_catalog.py (new), sidecar/settings_io.py, sidecar/utility_llm.py (new), sidecar/main.py, tests/test_scratchpad_unit.py (new), tests/test_watermark_unit.py (new), tests/test_marquee_unit.py (new), tests/test_subagents_naming_unit.py (new), tests/test_console_catalog_unit.py (new), tests/test_utility_llm_unit.py (new), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

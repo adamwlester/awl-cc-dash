@@ -1,0 +1,82 @@
+"""OD-13 subagent GROUP+MEMBER naming (pure logic).
+
+Replaces the flat monotonic ``s1..sN`` scheme with a group+member naming:
+
+* A **GROUP** is a parent RUN that spawned subagents. Groups are lettered in
+  occurrence order — A, B, C, … past Z into AA, AB, … (bijective base-26 /
+  spreadsheet-column style).
+* A **MEMBER** is the spawn order *within* that run — 1, 2, 3, …
+
+The badge shown in the UI is ``f"{group}{member}"`` (e.g. ``"A2"``) — there is
+NO ``s`` prefix anywhere. The full sender form is ``"coder-01 › A2"`` using a
+U+203A single right-angle quote as the separator.
+
+This module is intentionally **pure**: it takes runs that have ALREADY been
+segmented (by the caller, at parent-transcript user-prompt / turn boundaries)
+and assigns names. It performs no I/O and touches no servers, tmux, or bridge.
+"""
+
+from __future__ import annotations
+
+# U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK — the sender-form separator.
+SENDER_SEP = "›"
+
+
+def group_letter(index: int) -> str:
+    """Return the spreadsheet-column-style letter for a 0-based ``index``.
+
+    0 -> "A", 25 -> "Z", 26 -> "AA", 27 -> "AB", 51 -> "AZ", 52 -> "BA", …
+
+    This is a *bijective* base-26 numbering: there is no zero digit, so "Z" is
+    followed by "AA" (not "BA").
+    """
+    if index < 0:
+        raise ValueError(f"group index must be non-negative, got {index}")
+    letters = []
+    n = index + 1  # shift to 1-based for bijective base-26
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        letters.append(chr(ord("A") + rem))
+    return "".join(reversed(letters))
+
+
+def assign_names(runs: list[list[dict]]) -> list[dict]:
+    """Assign group letters + member numbers to already-segmented ``runs``.
+
+    ``runs`` is a list of runs in occurrence order; each run is a list of
+    subagent-spawn dicts in spawn order.
+
+    Returns a FLAT list of the spawns (occurrence order across runs, spawn
+    order within each run). Each returned dict is a shallow **copy** of the
+    input augmented with:
+
+    * ``"group"``  — the letter for its run
+    * ``"member"`` — 1-based position within its run
+    * ``"badge"``  — ``f"{group}{member}"`` (e.g. ``"A2"``)
+
+    Input dicts are never mutated. Only runs that actually contain spawns
+    consume a letter: a run's letter is its index *among runs that have
+    spawns*, in order (empty runs are skipped and consume no letter).
+    """
+    result: list[dict] = []
+    group_index = 0  # advances only for runs that contain spawns
+    for run in runs:
+        if not run:
+            continue
+        letter = group_letter(group_index)
+        for member, spawn in enumerate(run, start=1):
+            augmented = dict(spawn)  # copy — never mutate the input
+            augmented["group"] = letter
+            augmented["member"] = member
+            augmented["badge"] = f"{letter}{member}"
+            result.append(augmented)
+        group_index += 1
+    return result
+
+
+def sender_form(parent_label: str, badge: str) -> str:
+    """Return the full sender form, e.g. ``"coder-01 › A2"``.
+
+    The separator is a U+203A single right-angle quote.
+    """
+    return f"{parent_label} {SENDER_SEP} {badge}"
