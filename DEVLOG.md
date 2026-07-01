@@ -927,6 +927,14 @@ Files: design/tokens.css, design/styles.css, design/behavior.js, design/mockup.h
 
 ---
 
+### 2026-06-30 19:10:00 — dev: design-stream finisher part 2 prompt (the under-tagged design-layer gaps)
+
+Cross-referenced all 23 ODs against the live (post-pass-1) design files via three parallel audit agents and found the design-layer work the tracker decided but never 🎨-tagged — so it fell outside `design-stream-finisher.md`'s scope. Wrote `dev/prompts/design-stream-finisher-p2.md` to finish it: **OD-06** Link Config drawer reframe (drop Payload → Relationship multi-select + Shared-context content-type filter + backfill toggle; reorder), **OD-07** End-After "Turns/50"→"Exchanges/25", **OD-08** grouped-by-agent link-tracking list, **OD-10** Warning-card Continue/Raise-cap/Stop actions, **OD-11** segmented run-strip (done÷total + step label; barber-pole floor kept), **OD-22** per-message recipient mini-badge. Flagged one genuine **conflict** for a human call (not in the build): the **OD-09 Plan card** ships Review+Reply and deliberately drops Approve/Reject, but the OD-09 decision says Approve/Reject. Everything else in those clusters (OD-05 triggers, OD-12 marquee, OD-17 scratch, OD-01/22 sender+From/To+direction, OD-09 Permission/Error/Warning/Decision types, OD-10 cap inputs) audited as already-present.
+
+Files: dev/prompts/design-stream-finisher-p2.md (new), DEVLOG.md
+
+---
+
 ### 2026-06-30 20:30:00 — backend: OD-02 hook channel SHIPPED + spike PASS + foundation live-verified
 
 Ran the prerequisite-#1 **OD-02 hook spike** live on the installed build (claude **2.1.195**) and it **PASSES** — so per the prompt I shipped the full hook functionality (unblocks OD-05 Inject, OD-09 Plan/Decision, OD-17 live scratchpad). Findings, each proven by driving a real tmux agent (serialized, throwaway cwd):
@@ -941,6 +949,14 @@ Also **live-verified the Tier-1 foundation** through the same real agent: the me
 Verified: **+21 hermetic tests** (`tests/test_hookbus_unit.py` 12; bridge gateway-parse 5; sidecar inject-disposition + drain-endpoints 4) → **167 hermetic green**; plus the live spikes above. No `design/` touched.
 
 Files: sidecar/hookbus.py (new), sidecar/main.py, sidecar/drivers/bridge.py, bridge/bridge.py, bridge/paths.py, tests/test_hookbus_unit.py (new), tests/test_bridge_unit.py, tests/test_sidecar_unit.py, DEVLOG.md
+
+---
+
+### 2026-06-30 20:05:00 — fix: corrected an OD-09 tracker error (Inbox Plan card has no Approve/Reject)
+
+Per the user: the Inbox **Plan** card carries no Approve/Reject — those verdicts (Approve · Revise · Reject) live **only in the Library → Plans tab**; the Inbox Plan card is notify-only (Review + Reply). The tracker's OD-09 Decision wrongly read "Approve/Reject for Plan" on the card. Fixed the clause inline and added a dated **Correction note** (matching the doc's OD-13/OD-17 convention). Also tightened `design-stream-finisher-p2.md`: the Plan card is now marked "confirmed correct — do not change; ignore the erroneous tracker line" (previously framed as an open decision to surface). The p2 build scope (OD-06/07/08/10/11/22) is unchanged.
+
+Files: dev/notes/agent-qa/open-system-decisions-2026-06-29.md, dev/prompts/design-stream-finisher-p2.md, DEVLOG.md
 
 ---
 
@@ -969,6 +985,16 @@ Built OD-10 + OD-09 and integrated four Tier-3 modules (four built in parallel b
 Verified: **274 hermetic green** (new: inbox 11, checklist 19, deletion 17, library 25, templates 17) + the two live PASSes above. No `design/` touched.
 
 Files: sidecar/inbox.py (new), sidecar/checklist.py (new), sidecar/deletion.py (new), sidecar/library.py (new), sidecar/templates_store.py (new), sidecar/main.py, sidecar/drivers/bridge.py, tests/test_inbox_unit.py (new), tests/test_checklist_unit.py (new), tests/test_deletion_unit.py (new), tests/test_library_unit.py (new), tests/test_templates_store_unit.py (new), DEVLOG.md
+
+---
+
+### 2026-06-30 23:55:00 — design: design-stream finisher P2 — the under-tagged linking/feed work integrated into design/ (OD-06/07/08/10/11/22)
+
+Integrated the **remaining design-layer decisions the tracker decided but never 🎨-tagged** (the set Part 1 didn't cover) into the six-file design system, building each from its OD `Decision:` line. **OD-06:** reframed the **Link Config drawer** — removed the **Payload** segment; added a **Relationship** multi-toggle (Direct messaging / Shared context — a link can be both), with Shared context revealing a **content-type multi-select** (Thoughts/Read/Write/Bash/Diffs/Meta) + a **"share all prior context" backfill switch** (default off); reordered to pair+direction → Relationship → Trigger → End After → Save/Delete → link list (`linkRel`/`linkSwitch` + the hover/blurb de-Payloaded; `linkSave` now reads the Relationship state, not the deleted seg). **OD-07:** End-After left cap **"Turns"→"Exchanges"**, default **50→25** (an Exchange = one message each direction). **OD-08:** net-new **`link-list`** — every link **grouped by agent**, double-listed under both endpoints, each row a **→/←/↔ arrow relative to that group's agent** (`renderLinkList`/`linkArrow`, `LINKS_CFG`). **OD-10:** **Warning** inbox card now has **two variants** — a cap-crossing one (Continue / Raise cap / Stop, notify-only) and the generic Acknowledge — via an `o.cap` branch. **OD-11:** **segmented run-strip** (`.run-seg`) — done÷total equal segments with navy separators, the current step shimmering and **labelling the bar** (mono); barber-pole kept as the floor; one node card converted. **OD-22:** typed **`recipients[]`** on `MSGS` + a compact **`recipient-badge`** rendered `sender → recipient → status → dir` (routing, not visibility). Cosmetics: OD-17 scratch path → `<project>/.awl/scratchpad.md`; OD-04 fire = reply-completion sentence.
+
+Verified by driving the rendered UI over `http://localhost` (headless Chromium — the Playwright MCP browser was locked; used the prompt's sanctioned fallback) at narrow (1180) + wide (1920): every new control driven (Relationship disclosure, content/backfill toggles, link list, Exchanges/25, recipient badges, segmented strip, the three cap actions), **zero console errors**, plus a headed parity pass. A **6-reviewer adversarial panel** (parallel, per-finding verify) caught **4 real gaps** — a `linkSave()` stale-Payload leak (always toasted "Message"), a stale `Payload` CSS-section comment, a gallery Composites count off-by-one (50→51), and this missing log entry — **all fixed and re-verified** (Save now toasts the Relationship; gallery 116 articles balanced). Gallery: +`link-list` (populated + empty) and +`recipient-badge` cards; both Warning variants and the segmented run-strip shown. OD-09 Plan card left **as-is** (Review + Reply, no Approve/Reject — the tracker's "Approve/Reject for Plan" line is a known doc error). No scope-creep (OD-15/16 untouched, the OD-03 sprite/picker convergence not started, OQ-2 `inbox-section` marker intact). DEVLOG **rotation deferred** (>700 lines) to avoid racing the concurrent backend-stream appends.
+
+Files: design/mockup.html, design/styles.css, design/behavior.js, design/gallery.html, design/DESIGN.md, DEVLOG.md
 
 ---
 

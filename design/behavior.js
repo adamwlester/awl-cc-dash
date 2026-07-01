@@ -974,8 +974,8 @@
   function bumpLinks(d){const el=document.getElementById('foot-links');if(el){el.textContent=Math.max(0,(parseInt(el.textContent,10)||0)+d);}}
   function linkSave(){const dir=((document.getElementById('link-dir')||{}).title||'A → B');
     const trig=((document.querySelector('#link-drawer .seg button.active')||{}).textContent||'Queue').trim();
-    const pay=((document.querySelectorAll('#link-drawer .seg')[1]||document.createElement('div')).querySelector('button.active')||{}).textContent||'Message';
-    toast('Link saved — '+dir+' · '+trig+' · '+pay);toggleDrawer();bumpLinks(1);}
+    const rel=[...document.querySelectorAll('#link-drawer .minitog[data-rel].on')].map(b=>b.textContent.trim()).join(' + ')||'Direct messaging';   /* OD-06: the Relationship multi-toggle replaced the old Payload segment — read Direct/Shared, not the deleted seg */
+    toast('Link saved — '+dir+' · '+trig+' · '+rel);toggleDrawer();bumpLinks(1);}
   function linkDelete(){toast('Link removed');toggleDrawer();bumpLinks(-1);}
 
   /* ===== v8p6: Role combobox — options from user/project agent.md files; create-side prefills from front matter ===== */
@@ -1031,6 +1031,48 @@
   function toggleMsel(box){const el=box.closest('.msel');const pop=el.querySelector('.msel-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open){buildMsel(el);pop.classList.add('open');}}
   function mselPick(e,btn){e.stopPropagation();const el=btn.closest('.msel');const sel=mselState(el);const it=btn.dataset.it;if(sel.has(it))sel.delete(it);else sel.add(it);buildMsel(el);el.querySelector('.msel-pop').classList.add('open');}
   function mselRemove(e,btn){e.stopPropagation();const el=btn.closest('.msel');mselState(el).delete(btn.dataset.it);buildMsel(el);}
+
+  /* ===== OD-06: Link Config — Relationship multi-toggle + Shared-context disclosure =====
+     A link can be BOTH Direct messaging AND Shared context, so Relationship is a MULTI-toggle (the single-select
+     segPick won't serve it). Toggling "Shared context" reveals/hides the nested content-type filter + backfill. The
+     same plain multi-toggle drives the content-type row; the disclosure is re-synced on every toggle (scoped to the
+     button's own drawer, so the mockup and the gallery specimen stay independent). */
+  function linkRel(btn){btn.classList.toggle('on');
+    const wrap=btn.closest('.drawer');if(!wrap)return;
+    const sharedOn=!!wrap.querySelector('.minitog[data-rel="shared"].on');
+    const block=wrap.querySelector('.link-shared');if(block)block.classList.toggle('hidden',!sharedOn);}
+  /* the backfill is the shared switch primitive (.swh) — a plain config toggle (no registry-enable toast) */
+  function linkSwitch(el){el.classList.toggle('on');el.title=el.classList.contains('on')?'On — backfill all prior context once':'Off — incremental updates only';}
+
+  /* ===== OD-08: Link tracking list — every configured link, grouped by agent =====
+     Each link joins two agents, so it is DOUBLE-LISTED under both endpoints; each entry shows the OTHER agent + a
+     →/←/↔ arrow relative to THIS group's agent (→ to · ← from · ↔ both), reusing the pair-row arrow vocabulary.
+     LINKS_CFG is keyed by agent name (distinct from the planned on-graph `LINKS` edge data, which is node-id keyed). */
+  const LINKS_CFG=[
+    {a:'sandy',b:'kai',dir:'ab',rel:['direct']},
+    {a:'sandy',b:'drew',dir:'both',rel:['direct','shared']},
+    {a:'max',b:'kai',dir:'ba',rel:['shared']},
+    {a:'vega',b:'sandy',dir:'both',rel:['direct']}
+  ];
+  function relSummary(rel){return rel.map(r=>r==='direct'?'Direct':'Shared').join(' · ');}
+  /* arrow relative to the group's agent: isA = this group's agent is the link's `a` endpoint */
+  function linkArrow(dir,isA){if(dir==='both')return '↔';const outgoing=(dir==='ab')===isA;return outgoing?'→':'←';}
+  function renderLinkList(){const el=document.getElementById('link-list');if(!el)return;
+    if(!LINKS_CFG.length){el.innerHTML='<div class="link-empty">No links yet — connect two agents from the Team Graph to create one.</div>';return;}
+    let html='';AG_ORDER.forEach(key=>{
+      const mine=LINKS_CFG.map((lk,i)=>({lk,i})).filter(({lk})=>lk.a===key||lk.b===key);
+      if(!mine.length||!AG[key])return;const a=AG[key];
+      html+='<div data-comp="registry-group-header" class="reg-grp link-grp">'+badgeHTML(a,true)+'<span class="ct">'+mine.length+'</span></div>';
+      html+=mine.map(({lk,i})=>{const isA=lk.a===key;const other=AG[isA?lk.b:lk.a];if(!other)return '';
+        const arrow=linkArrow(lk.dir,isA);const ttl=arrow==='→'?'to':(arrow==='←'?'from':'both ways');
+        return '<button class="link-row" onclick="linkListPick(this)" data-link="'+i+'" title="Load this link to edit (planned)">'
+          +'<span class="link-arrow" title="'+ttl+'">'+arrow+'</span>'+badgeHTML(other,true)
+          +'<span class="link-rel">'+relSummary(lk.rel)+'</span></button>';}).join('');});
+    el.innerHTML=html;LU();}
+  /* optional master/detail: clicking a list entry would load it into the fields above — planned (the drawer's
+     Save/Delete are toast+counter only), so for now it just selects the row + acknowledges via toast. */
+  function linkListPick(row){const el=row.closest('.link-list');if(el)el.querySelectorAll('.link-row.sel').forEach(r=>r.classList.remove('sel'));
+    row.classList.add('sel');toast('Link loaded — edit the fields above (planned)');}
 
   /* ===== v8p7: Source dropdown (single-select, mirrors the old Source list) ===== */
   function toggleSourceDD(){const pop=document.getElementById('source-pop');if(!pop)return;const open=pop.classList.contains('open');closeAllPopups();if(!open)pop.classList.add('open');}
@@ -1378,6 +1420,20 @@ resize intact.`,
 
   /* FEED + HISTORY — expandable cards (Plan-style) with two-line agent badges; checkbox = multi-select */
   function dirTag(d){return d==='out'?'<span data-comp="dir-tag" class="dir-tag dir-out">sent</span>':'<span data-comp="dir-tag" class="dir-tag dir-in">recv</span>';}
+  /* OD-22: recipient mini-badge — every message carries a typed recipients[] (user | <agent-id> | scratch, default
+     [user]). It's ADDRESSED-TO / routing (drives the From/To filter + Sent/Received direction), NOT visibility —
+     every message still shows regardless. Rendered as a deliberately-SMALLER identity badge (the recipient-badge
+     exception) after the sender: sender → "→" → recipient(s) → status → dir. Reuses agent identity (tile + short
+     name); User and Scratch are the two non-agent recipients. */
+  function recipientBadge(rid){
+    if(rid==='user')return '<span data-comp="recipient-badge" class="rcpt" title="addressed to User"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="rcpt-nm">User</span></span>';
+    if(rid==='scratch')return '<span data-comp="recipient-badge" class="rcpt" title="addressed to the shared Scratchpad"><span class="agtile rcpt-scratch"><i data-lucide="notebook-pen" class="agtile-luc"></i></span><span class="rcpt-nm">Scratch</span></span>';
+    const a=AG[rid];if(!a)return '';
+    return '<span data-comp="recipient-badge" class="rcpt" title="addressed to '+a.role+' '+a.name+'"><span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span><span class="rcpt-nm">'+a.name.replace(/^\d+\s*/,'')+'</span></span>';}
+  function recipientsHTML(o){const r=(o.recipients&&o.recipients.length)?o.recipients:['user'];const CAP=2;
+    const shown=r.slice(0,CAP).map(recipientBadge).join('');
+    const more=r.length>CAP?'<span class="rcpt-more" title="'+esc(r.slice(CAP).join(', '))+'">+'+(r.length-CAP)+'</span>':'';
+    return '<span class="rcpt-to" title="addressed to">→</span>'+shown+more;}
   /* typed message content blocks — rendered in the expanded card; the Include toggles show/hide them by kind */
   const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
   /* A7: the block TYPE is now shown by the rail tag (3-char, in the rail box), so the block CONTENT carries NO inline
@@ -1407,8 +1463,9 @@ resize intact.`,
     +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
     +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
     +(o.sub?'<span data-comp="subagent-badge" class="sbadge '+(o.substate||'sb-active')+' msg-subbadge" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — nested under '+a.role+' '+a.name+'">'+o.sub+'</span>':'')   /* OD-13: subagent events nest under their parent — the sub-id badge after the parent identity */
-    +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed); user-sent keep just the dir tag */
-    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → status → dir */
+    +recipientsHTML(o)   /* OD-22: → recipient mini-badge(s) — who it's addressed to (routing) */
+    +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed) */
+    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → recipient → status → dir */
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
@@ -1511,7 +1568,7 @@ resize intact.`,
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
-    {ag:'user',dir:'out',turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},
+    {ag:'user',dir:'out',recipients:['sandy','drew'],turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},   /* OD-22: a user send carries its To/Target selection as recipients[] (multi) — drives the → recipient mini-badges; the rest default to [user] */
     {ag:'drew',dir:'in',status:'complete',turn:11,time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
@@ -1521,7 +1578,7 @@ resize intact.`,
        {k:'diff',t:'  function validateToken(token) {\n-   return decode(token)\n+   const c = decode(token)\n+   if (c.exp < now()) throw new TokenExpired()\n+   return c\n  }'}]},
     {ag:'kai',dir:'in',status:'complete',turn:14,time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
      blocks:[
-       {k:'write',t:'● Write  ~/.claude/shared/scratchpad.md (+18 −0)'}]},
+       {k:'write',t:'● Write  <project>/.awl/scratchpad.md (+18 −0)'}]},   /* OD-17/OD-23: scratchpad lives with the project (.awl/) */
     {ag:'sandy',dir:'in',status:'complete',turn:15,time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
@@ -1663,7 +1720,7 @@ resize intact.`,
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
     {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'},   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
-    {ag:'rowan',type:'warning',subtype:'Max turns',time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — the run is now pending your call. Raise the turn budget and resume to let it keep going, or acknowledge to leave it parked.`}   /* R11 item 1: a real limit-crossed case — the agent crossed its turn limit and is now pending (its graph card shows Pending · 50/50). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge) */
+    {ag:'rowan',type:'warning',subtype:'Max turns',cap:true,time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — the run is now pending your call. Continue to resume as-is, Raise cap to bump the turn budget and resume, or Stop to end the run.`}   /* R11 item 1 + OD-10: a real cap-crossing case — the agent crossed its turn limit and is now pending (its graph card shows Pending · 50/50). cap:true → the Continue/Raise cap/Stop action set (notify-only). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge) */
   ];
   function inboxReplyHTML(){return '<button class="btn-secondary btn-sm ml-auto" onclick="inboxReply(this)" title="Reply via the Editor (quotes the request as a reference block)"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
@@ -1673,8 +1730,15 @@ resize intact.`,
       acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
-    else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Warning: attention-needed notice — Acknowledge (clears it) + Reply */
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Acknowledged\')">Acknowledge</button>'+inboxReplyHTML();}
+    else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
+      /* OD-10: TWO warning variants. A cap-CROSSING warning (Max turns / Context %, o.cap) is notify-only — the run
+         paused and you choose: Continue (resume as-is) · Raise cap (bump the Lifecycle limit + resume) · Stop. Never
+         auto-kills; Stop is user-initiated (--danger). A generic warning (approaching rate/usage cap) keeps the plain
+         Acknowledge. Both keep Reply. */
+      if(o.cap){acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Continuing\')" title="Resume the run as-is">Continue</button>'
+          +'<button class="btn btn-sm" onclick="inboxResolve(this,\'Raised cap\')" title="Raise this agent\'s cap (Lifecycle) and resume">Raise cap</button>'
+          +'<button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Stopped\')" title="Stop the run">Stop</button>'+inboxReplyHTML();}
+      else{acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Acknowledged\')">Acknowledge</button>'+inboxReplyHTML();}}
     else{detail='<div class="rc-body inbox-err">'+esc(o.body)+'</div>';   /* Error: inline error text + Retry · Dismiss · Reply (no View, no Forward) */
       acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML();}
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
@@ -1867,7 +1931,7 @@ resize intact.`,
     'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
     'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Messages (team traffic; Type = direction, Content = tool detail; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Permission · Plan · Decision · Error sections; its badge is the fleet total).",
     'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. From (single) sets who it's sent as; To (multi, led by the Scratch row) sets who receives it. Compose · Templates · History, with From/To persisting across all three.",
-    'Link Config':"Forwards context from one agent to another. Direction A→B / B→A / A↔B. Trigger (when it delivers): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue drains the queue (polite default) · Hold stages for your approval. Payload (what is sent): Message · Transcript · Manual. End After bounds this exchange — distinct from an agent's own Lifecycle limits."
+    'Link Config':"Forwards context from one agent to another. Direction A→B / B→A / A↔B. Relationship (what flows — a link can be both): Direct messaging is a reply-to conversation · Shared context is passive awareness of selected content (Thoughts/Read/Write/Bash/Diffs/Meta), optionally backfilled once. Trigger (when it delivers): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue drains the queue (polite default) · Hold stages for your approval. End After bounds this exchange in Exchanges/Tokens — distinct from an agent's own Lifecycle limits."
   };
   function seedHoverCards(){document.querySelectorAll('.pcard-head h3').forEach(h=>{const k=h.textContent.trim();const d=HC[k];if(!d)return;
     if(h.parentElement.querySelector('.hc-glyph'))return;
@@ -1881,7 +1945,7 @@ resize intact.`,
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
     document.querySelectorAll('[data-expmount]').forEach(m=>{m.outerHTML=expMenuHTML(m.dataset.expmount);});   /* R-batch items 6/9: mount the merged Export control into the Feed + History footers (static markup carries a placeholder span) */
-    renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();eaUpdateAll();
+    renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();renderLinkList();eaUpdateAll();
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
