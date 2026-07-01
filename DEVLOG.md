@@ -1021,6 +1021,16 @@ Files: sidecar/scratchpad.py (new), sidecar/watermark.py (new), sidecar/marquee.
 
 ---
 
+### 2026-06-30 23:57:30 — design: OD-11 run-strip — sizing bug fixed + segmented bar brought to every active card
+
+Fixed the segmented run-strip regression from the P2 pass. **Sizing:** `.run-seg` was `--size-13` (13px) while every other `.run-strip` is `--size-6` (6px), so the one segmented card's bar rendered ~2× tall and misaligned in the node-band. Dropped it to `--size-6` and moved the current-step label out of the bar — it was an absolute overlay *inside* the 13px bar; it now rides **above** the bar as a compact mono line (`.rseg-lab`, `display:block`, `--size-7`). Because the node-band is bottom-pinned (`margin:auto` top), the label floats up without moving the bar, so the bar stays 6px and every card's bar seats identically. **Consistency:** the segmented form was on only one card (node-4 max); brought it to **all actively-running cards** with representative step counts — node-4 (5-step · Run typecheck), node-9 wren (4-step · Regenerate API table), node-13 fen (3-step · Summarise turns) — and kept node-10 lex as the **barber-pole indeterminate floor** (the no-checklist example). No hardcoded px (reused `--size-6/7`, `--space-9/2`); nothing outside the run-strip touched.
+
+Verified over `http://localhost` (headless Chromium, MCP browser locked — sanctioned fallback) at 4 widths (1000/1180/1920/2300): **every** card's bar = 6px and sits 54px off its card-bottom (identical → aligned), **0** row-misalignments, 3 segmented cards with visible labels, **0** console errors; gallery specimen all six bars 6px with the label above; **headed parity pass** returned identical metrics + rendering.
+
+Files: design/styles.css, design/mockup.html, design/gallery.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
