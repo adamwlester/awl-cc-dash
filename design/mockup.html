@@ -893,7 +893,8 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div data-comp="run-strip" class="run-strip run-pending"><i style="width:40%"></i></div>
+                      <!-- OD-11 segment-recolor: sandy self-reported a 6-step checklist and is PAUSED at step 3 — blocked awaiting your permission on the settings.json edit. A BLOCKING pause, so the current segment recolours WARM (.cur-paused — static, no shimmer) and the graph badge reads Pending. Step name stays hover-only (the bar's title). (A non-blocking Warning would keep the segment shimmering; a structural whole-run error would fall back to the flat .run-error whole-bar.) -->
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 3 of 6 · Apply settings.json edit (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div data-comp="marquee" class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
@@ -942,6 +943,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
                     </div>
                     <div class="node-band">
+                      <!-- OD-11 segment-recolor: drew failed on a STRUCTURAL / whole-run error (staging unreachable — ECONNREFUSED; the session can't proceed), so the strip uses the flat .run-error whole-bar danger fallback, not a segmented per-step recolour (a STEP-scoped failure would instead recolour just the current segment via .cur-error on a segmented bar). Static — halted, not working. -->
                       <div class="run-strip run-error"><i></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">

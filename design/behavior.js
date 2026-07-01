@@ -275,6 +275,45 @@
     const pn=node?(node.querySelector('.text-foreground.truncate')||{}).textContent||'':'';
     toast('Feed scoped → '+(pn?pn.replace(/^\d+\s+/,'').trim()+' › ':'')+id);}
 
+  /* ===== Per-card inbox footer — a parallel view of each agent's open Inbox items =====
+     Splits each graph card's footer: subagents on the LEFT (.subs-acc), a small envelope+count on the RIGHT
+     (.node-inbox). The envelope is a FAITHFUL MIRROR of that agent's open Inbox items (REQS filtered by agent) — so
+     resolving via either surface (the footer row deep-links to the Inbox card; the status badge is the fast path to
+     the one blocking thing) clears the item from both. Count = OPEN items (not read); an item leaves only when
+     completed. Two states: open items → teal envelope + count, expandable to a drawer of typed rows; none → dimmed,
+     non-expandable. The drawer is INDEPENDENT of the subagents drawer (both can be open) and grows the card downward.
+     Built once from REQS at boot (before initSubsAcc, so the badge-wrap measure accounts for the envelope's width). */
+  function renderNodeInboxes(){
+    document.querySelectorAll('.graph-grid .node').forEach(node=>{
+      const subs=node.querySelector('.node-subs');if(!subs||subs.dataset.ninb)return;   /* build once per card */
+      subs.dataset.ninb='1';
+      const key=agKeyFromNode(node);
+      const items=REQS.filter(r=>r.ag===key);
+      const inner=subs.innerHTML;   /* preserve the existing subagents content (.subs-acc / .subs-empty) */
+      let trig,drawer='';
+      if(items.length){const n=items.length;
+        trig='<button data-comp="node-inbox" class="node-inbox" onclick="ninbTrig(event,this)" aria-expanded="false" title="Inbox — '+n+' open item'+(n===1?'':'s')+' · click to expand"><i data-lucide="mail" class="ninb-ic"></i><span class="ninb-n">'+n+'</span></button>';
+        drawer='<div class="ninb-drawer">'+items.map(o=>'<button class="ninb-row" onclick="ninbGoto(event,\''+key+'\',\''+o.type+'\')" title="Open in Inbox → '+secLabel(o.type)+'"><span class="ninb-type ninb-type--'+o.type+'">'+secLabel(o.type)+'</span><span class="ninb-row-t">'+esc(o.title)+'</span></button>').join('')+'</div>';
+      } else {
+        trig='<span data-comp="node-inbox" class="node-inbox node-inbox--empty" title="Inbox — no open items"><i data-lucide="mail" class="ninb-ic"></i></span>';
+      }
+      subs.innerHTML='<div class="node-subs-bar">'+inner+trig+'</div>'+drawer;
+    });
+  }
+  /* toggle the per-card inbox drawer (independent of the subagents drawer); a dimmed/empty envelope doesn't expand */
+  function ninbTrig(e,el){e.stopPropagation();if(el.classList.contains('node-inbox--empty'))return;
+    const node=el.closest('.node');if(!node)return;
+    const open=node.classList.toggle('ninb-open');el.setAttribute('aria-expanded',open?'true':'false');LU();}
+  /* deep-link a footer row into the Team Feed → Inbox — scroll + expand + select + flash that agent's typed card.
+     The parallel path to the status badge's statusJump; the item stays open until it's actually completed there. */
+  function ninbGoto(e,key,type){e.stopPropagation();
+    if(typeof switchTab==='function')switchTab('feed','inbox');
+    const card=document.querySelector('#feed-inbox .inbox-card--'+type+'[data-agent="'+key+'"]');
+    if(card){card.classList.add('open','sel');card.scrollIntoView({block:'nearest',behavior:'smooth'});
+      card.classList.remove('reply-flash');void card.offsetWidth;card.classList.add('reply-flash');setTimeout(()=>card.classList.remove('reply-flash'),1000);
+      if(typeof eaUpdate==='function')eaUpdate('feed');}
+    LU();toast('Inbox → '+secLabel(type));}
+
   /* ===== Compose placeholders + merged Templates (v10p1 #22) ===== */
   let phSel=null;
   function setFillEnabled(on){const ta=document.getElementById('tpl-fill-input');const r=document.querySelector('#prompt-compose .fill-btn:not(.fill-btn--go)');const g=document.querySelector('#prompt-compose .fill-btn--go');
@@ -1720,7 +1759,8 @@ resize intact.`,
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
     {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'},   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
-    {ag:'rowan',type:'warning',subtype:'Max turns',cap:true,time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — the run is now pending your call. Continue to resume as-is, Raise cap to bump the turn budget and resume, or Stop to end the run.`}   /* R11 item 1 + OD-10: a real cap-crossing case — the agent crossed its turn limit and is now pending (its graph card shows Pending · 50/50). cap:true → the Continue/Raise cap/Stop action set (notify-only). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge) */
+    {ag:'rowan',type:'warning',subtype:'Max turns',time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — a notify-only heads-up (it never auto-kills). Dismiss to clear it from the Inbox, or Reply to weigh in.`},   /* OD-10 (simplified): a Warning is a plain FYI — Dismiss (pink, the completion action) + Reply only; the old cap-specific Continue/Raise cap/Stop set is gone (no per-warning dependency). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge). */
+    {ag:'max',type:'warning',subtype:'Context 82%',time:'14:52',title:'Nearing the context limit — compaction imminent',body:`max is at ~82% of its context window; an auto-compaction will trigger soon. No hard block — a heads-up while the run keeps going. Dismiss to clear it, or Reply to weigh in.`}   /* OD-10 + inbox-footer demo: a NON-blocking warning on an ACTIVE agent (max's graph card stays Active) — the case the per-card inbox footer exists for: an open item that doesn't flip the binary status badge. Its footer envelope shows a count while the badge reads active. */
   ];
   function inboxReplyHTML(){return '<button class="btn-secondary btn-sm ml-auto" onclick="inboxReply(this)" title="Reply via the Editor (quotes the request as a reference block)"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
@@ -1731,14 +1771,15 @@ resize intact.`,
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
     else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
-      /* OD-10: TWO warning variants. A cap-CROSSING warning (Max turns / Context %, o.cap) is notify-only — the run
-         paused and you choose: Continue (resume as-is) · Raise cap (bump the Lifecycle limit + resume) · Stop. Never
-         auto-kills; Stop is user-initiated (--danger). A generic warning (approaching rate/usage cap) keeps the plain
-         Acknowledge. Both keep Reply. */
-      if(o.cap){acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Continuing\')" title="Resume the run as-is">Continue</button>'
-          +'<button class="btn btn-sm" onclick="inboxResolve(this,\'Raised cap\')" title="Raise this agent\'s cap (Lifecycle) and resume">Raise cap</button>'
-          +'<button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Stopped\')" title="Stop the run">Stop</button>'+inboxReplyHTML();}
-      else{acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Acknowledged\')">Acknowledge</button>'+inboxReplyHTML();}}
+      /* OD-10 (simplified per user): a Warning is a plain FYI — the cap-specific actions (Continue / Raise cap / Stop)
+         and the generic Acknowledge are ALL gone, so a Warning carries no warning-specific dependency. Just two actions:
+           · Dismiss — the completion action (clears the warning; a warning never auto-clears, only manual Dismiss).
+             Styled PINK (btn-main) as this card's sole primary "commit here" (like the old Continue), NOT danger —
+             danger stays on give-up/destructive actions (the Error card's Dismiss, Deny, Stop).
+           · Reply — the shared teal hand-off every card carries (never completes the item).
+         Warnings are notify-only and never hard-block: the run-state badge stays active and the run-strip keeps
+         shimmering (only Permission/Plan/Decision/max-turns pause). */
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Dismissed\')" title="Dismiss this warning (clears it from the Inbox)">Dismiss</button>'+inboxReplyHTML();}
     else{detail='<div class="rc-body inbox-err">'+esc(o.body)+'</div>';   /* Error: inline error text + Retry · Dismiss · Reply (no View, no Forward) */
       acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML();}
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
@@ -1957,6 +1998,7 @@ resize intact.`,
     seedHoverCards();
     initResizers();updateFmt('fmt');initEditorMics();LU();drawEdgesSoon();
     initJumpPills();
+    renderNodeInboxes();   /* per-card inbox footer — split the footer + mirror each agent's open Inbox items (before initSubsAcc so wrap accounts for the envelope) */
     initSubsAcc();   /* R-batch item 3: detect subagent-strip wrap (→ chevron/drawer) on load */
     {const gg=document.getElementById('graph-grid');if(gg&&window.ResizeObserver)new ResizeObserver(()=>initSubsAcc()).observe(gg);else window.addEventListener('resize',initSubsAcc);}   /* recompute wrap on any graph-grid resize (splitter drag OR window resize), falling back to the window event */
   }
