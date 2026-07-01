@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import uuid
 from collections import deque
 from datetime import datetime
@@ -35,6 +36,12 @@ from identity import assign_identity
 import eventbus
 import hookbus
 import links
+import inbox
+import checklist
+import deletion
+import library
+import templates_store
+import storage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -108,6 +115,16 @@ class SessionState:
         # assistant text on idle.
         self._turn_start_idx: int = 0
         self.pending_permission: dict[str, Any] | None = None
+        # OD-10 lifecycle caps (notify-only). Set on Create, editable; the cap
+        # poll-loop raises a Warning inbox card on crossing — the run continues.
+        self.max_turns: int | None = None
+        self.max_context_pct: float | None = None
+        self.context_pct: float | None = None   # latest derived context usage %
+        # Locally-derived turn count (each generating->idle = one turn), so the
+        # OD-10 cap loop works for the bridge driver too (it emits status_change,
+        # not the SDK's `result` with num_turns).
+        self.turn_count: int = 0
+        self._was_running: bool = False
         self.total_cost_usd: float = 0.0
         self.total_turns: int = 0
         self.driver: AgentDriver | None = None
@@ -160,6 +177,7 @@ class SessionState:
         # engine can lift just this turn's assistant text on the next idle.
         if event.get("type") == "status_change" and event.get("status") == "running":
             self._turn_start_idx = len(self.events)
+            self._was_running = True
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
@@ -207,6 +225,9 @@ class SessionState:
             self.push_event(event)
             # OD-02: the generating->idle transition is the proven flush signal.
             if st == "idle":
+                if self._was_running:        # one completed turn (OD-10 cap loop)
+                    self.turn_count += 1
+                    self._was_running = False
                 # OD-04: relay this finished turn back to a linked peer FIRST (uses
                 # this turn's output before a queued prompt starts a new turn), then
                 # flush the next queued prompt.
@@ -227,6 +248,16 @@ class SessionState:
             # The prompt was answered (here or directly in the terminal) — drop
             # the pending detail so it cannot linger.
             self.pending_permission = None
+            self.push_event(event)
+            return
+
+        if etype == "error":
+            # OD-09 Error section: raise a STICKY inbox card (persists until
+            # Retry/Dismiss). Best-effort subtype from the message text.
+            msg = event.get("error") or event.get("message") or ""
+            cls = inbox.classify_error(msg) or {"subtype": "error", "message": str(msg)[:500]}
+            inbox.raise_item(self.session_id, "error", cls, sticky=True,
+                             dedup_key=f"error:{cls['subtype']}")
             self.push_event(event)
             return
 
@@ -555,9 +586,50 @@ async def reconnect_sessions():
             session.status = "error"
 
 
+CAP_POLL_INTERVAL = 3.0  # seconds
+
+
+async def _cap_poll_loop():
+    """OD-10 notify-only cap loop: compare each agent's live turns / context-% to
+    its stored caps and raise a Warning inbox card on crossing (dedup'd per
+    subtype so it fires once). The run is NOT auto-killed — the user chooses
+    Continue / Raise cap / Stop. This is the same loop that feeds OD-09's Warning
+    section."""
+    while True:
+        try:
+            await asyncio.sleep(CAP_POLL_INTERVAL)
+            for session in list(sessions.values()):
+                if session.max_turns is None and session.max_context_pct is None:
+                    continue
+                warns = inbox.cap_warnings(
+                    turns=max(session.turn_count, session.total_turns),
+                    max_turns=session.max_turns,
+                    context_pct=session.context_pct,
+                    max_context_pct=session.max_context_pct,
+                )
+                for w in warns:
+                    item = inbox.raise_item(
+                        session.session_id, "warning", w,
+                        dedup_key=f"warning:{w['subtype']}")
+                    if item.get("_new_warning_pushed"):
+                        continue
+                    item["_new_warning_pushed"] = True
+                    session.push_event({
+                        "type": "warning", "subtype": w["subtype"],
+                        "value": w["value"], "cap": w["cap"],
+                        "timestamp": datetime.now().isoformat(),
+                        "source": session.session_id, "recipients": ["user"],
+                    })
+        except asyncio.CancelledError:  # pragma: no cover
+            return
+        except Exception as e:  # pragma: no cover - keep the loop alive
+            logger.error("cap poll loop error: %s", e)
+
+
 @app.on_event("startup")
 async def _on_startup():
     await reconnect_sessions()
+    asyncio.create_task(_cap_poll_loop())
 
 
 # ============================================================================
@@ -587,6 +659,8 @@ class CreateSessionRequest(BaseModel):
     enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
     mcp_servers: list[str] | None = None                   # subset; None = global
     identity: IdentityInput | None = None                  # dashboard-owned id fields
+    max_turns: int | None = None                           # OD-10 cap (notify-only)
+    max_context_pct: float | None = None                   # OD-10 cap (notify-only)
 
 class SendPromptRequest(BaseModel):
     prompt: str
@@ -634,6 +708,19 @@ class LinkKickoffRequest(BaseModel):
     from_agent: str
     to_agent: str
     prompt: str
+
+class TemplateRequest(BaseModel):
+    name: str
+    body: str
+    placeholders: list[str] | None = None
+
+class ReviewRequest(BaseModel):
+    cwd: str
+    filename: str
+    owner: str | None = None
+    state: str | None = None
+    verdict: str | None = None
+    comments: list[Any] | None = None
 
 class SetEffortRequest(BaseModel):
     effort: str
@@ -684,6 +771,8 @@ async def create_session(req: CreateSessionRequest):
         mcp_servers=req.mcp_servers,
         identity=identity,
     )
+    session.max_turns = req.max_turns                  # OD-10 caps
+    session.max_context_pct = req.max_context_pct
     sessions[session_id] = session
     logger.info(f"Created session {session_id}")
 
@@ -710,19 +799,86 @@ async def get_session(session_id: str):
 
 
 @app.delete("/sessions/{session_id}")
-async def close_session(session_id: str):
+async def close_session(session_id: str, hard: bool = False):
+    """Retire (soft, default) or — with ?hard=true — OD-19 permanent **Delete**:
+    a hard wipe of the agent's private footprint (runtime record, tmux session,
+    on-disk transcript) while everything SHARED is tombstoned (links → inactive
+    tombstones; feed/scratchpad history is kept and attributed). The agent's
+    number is retired (never reused). Queue + inbox (operational state) are dropped.
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
 
     if session.listen_task and not session.listen_task.done():
         session.listen_task.cancel()
+
+    if hard:
+        # --- OD-19 hard wipe + tombstone ---
+        number = (session.identity or {}).get("number") if session.identity else None
+        link_ids = [lk.id for lk in links.all_links()
+                    if session_id in (lk.a, lk.b)]
+        transcript_path = None
+        subagent_paths: list[str] = []
+        drv = session.driver
+        try:
+            # Resolve the on-disk transcript for true erasure (bridge driver only).
+            if drv is not None and hasattr(drv, "_bridge") and hasattr(drv, "tmux_name"):
+                from bridge.transcript import find_transcript  # type: ignore
+                transcript_path = find_transcript(drv._bridge, drv.tmux_name)  # type: ignore[attr-defined]
+        except Exception:
+            transcript_path = None
+        plan = deletion.plan_deletion(
+            session_id, transcript_path=transcript_path,
+            subagent_paths=subagent_paths, link_ids=link_ids,
+            identity_number=number)
+        # interrupt + close the live tmux session
+        if drv is not None:
+            try:
+                await drv.close()
+            except Exception:
+                pass
+        # erase the on-disk transcript(s). The bridge writes them inside WSL, so a
+        # WSL path (/home/...) must be removed via the bridge's WSL shell — a
+        # Windows Path.unlink can't reach the WSL filesystem.
+        for p in plan["wipe"]["transcripts"]:
+            try:
+                if drv is not None and hasattr(drv, "_bridge") and str(p).startswith("/"):
+                    drv._bridge._run(f"rm -f {shlex.quote(p)}")  # type: ignore[attr-defined]
+                else:
+                    Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
+        # remove the dashboard runtime record
+        try:
+            import runtime_store
+            runtime_store.remove_record(session_id)
+        except Exception:
+            pass
+        # tombstone shared links (inactive, non-functional) + retire the number
+        for lid in link_ids:
+            lk = links.get_link(lid)
+            if lk:
+                lk.active = False
+        if isinstance(number, int):
+            deletion.retire_number(number)
+        # drop operational state
+        session.prompt_queue.clear()
+        session.held.clear()
+        for it in inbox.items_for(session_id):
+            inbox.resolve_item(session_id, it["id"])
+        session.status = "closed"
+        del sessions[session_id]
+        logger.info("Deleted (hard) session %s (number %s retired)", session_id, number)
+        return {"status": "deleted", "session_id": session_id,
+                "wiped": plan["wipe"], "tombstoned": plan["tombstone"]}
+
+    # --- soft Retire (default) ---
     if session.driver:
         try:
             await session.driver.close()
         except Exception:
             pass
-
     session.status = "closed"
     del sessions[session_id]
     logger.info(f"Closed session {session_id}")
@@ -940,6 +1096,161 @@ async def hook_stop(agent: str):
         logger.info("hook drain stop agent=%s delivered=%d", agent, len(injects))
     _surface_delivered_injects(agent, injects)
     return hookbus.stop_output(injects)
+
+
+# --- OD-09 Plan/Decision detection via the OD-02 PreToolUse hook channel ---
+# The agent's ExitPlanMode (Plan) and AskUserQuestion (Decision) tool calls are
+# visible to hooks even when the screen isn't. The spike confirmed the hook
+# channel works; these raise the typed Inbox card (detect-and-surface). Returning
+# `{}` allows the tool to proceed so the agent isn't blocked if no one answers —
+# the user answers by attaching. (The richer hold-for-answer round-trip via
+# updatedInput is a fast-follow that needs its own live proof.)
+
+def _raise_plandecision(agent: str, body: dict[str, Any], itype: str) -> None:
+    session = sessions.get(agent)
+    tool_input = (body or {}).get("tool_input") or {}
+    data = {"tool": (body or {}).get("tool_name"), "tool_input": tool_input}
+    inbox.raise_item(agent, itype, data, dedup_key=f"{itype}:{(body or {}).get('tool_use_id','')}")
+    if session:
+        try:
+            session.push_event({
+                "type": itype, "data": data,
+                "timestamp": datetime.now().isoformat(),
+                "source": agent, "recipients": ["user"],
+            })
+        except Exception:  # pragma: no cover
+            pass
+
+
+@app.post("/internal/hooks/plan/{agent}")
+async def hook_plan(agent: str, body: dict[str, Any] | None = None):
+    """PreToolUse(ExitPlanMode) — raise a Plan inbox card, then allow."""
+    _raise_plandecision(agent, body or {}, "plan")
+    return {}
+
+
+@app.post("/internal/hooks/decision/{agent}")
+async def hook_decision(agent: str, body: dict[str, Any] | None = None):
+    """PreToolUse(AskUserQuestion) — raise a Decision inbox card, then allow."""
+    _raise_plandecision(agent, body or {}, "decision")
+    return {}
+
+
+# ============================================================================
+# OD-09 inbox — the merged "needs you" surface across all five typed sections.
+# ============================================================================
+
+@app.get("/inbox")
+async def get_inbox():
+    """All open inbox items grouped by agent (error/warning/plan/decision from the
+    inbox store, plus each agent's pending permission), and the fleet badge =
+    number of agents with >=1 open request."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for agent_id, items in inbox.all_open().items():
+        grouped.setdefault(agent_id, []).extend(items)
+    # Merge in screen-anchored permission prompts (they live on SessionState).
+    for sid, s in sessions.items():
+        if s.pending_permission:
+            grouped.setdefault(sid, []).append({
+                "id": f"perm:{sid}", "agent_id": sid, "type": "permission",
+                "data": s.pending_permission, "resolved": False,
+            })
+    return {"inbox": grouped, "fleet_badge": len(grouped)}
+
+
+@app.post("/inbox/{agent}/{item_id}/resolve")
+async def resolve_inbox_item(agent: str, item_id: str, body: dict[str, Any] | None = None):
+    ok = inbox.resolve_item(agent, item_id, answer=(body or {}).get("answer"))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Inbox item not found")
+    return {"status": "resolved", "agent": agent, "item_id": item_id}
+
+
+# ============================================================================
+# OD-11 run-strip checklist (done÷total, barber-pole floor)
+# ============================================================================
+
+def _assistant_texts(session: "SessionState") -> list[str]:
+    out: list[str] = []
+    for ev in session.events:
+        if ev.get("type") != "assistant":
+            continue
+        content = ev.get("content")
+        if isinstance(content, str):
+            out.append(content)
+        elif isinstance(content, list):
+            buf = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    buf.append(block.get("text") or "")
+                elif isinstance(block, str):
+                    buf.append(block)
+            if buf:
+                out.append("\n".join(buf))
+    return out
+
+
+@app.get("/sessions/{session_id}/checklist")
+async def get_checklist(session_id: str):
+    """OD-11: the agent's self-reported checklist parsed from its transcript
+    (done÷total + current item); barber-pole indeterminate when none published."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return checklist.parse_checklist(_assistant_texts(sessions[session_id]))
+
+
+# ============================================================================
+# OD-16 Templates store (dashboard runtime store; reusable / project-agnostic)
+# ============================================================================
+
+@app.get("/templates")
+async def list_templates_endpoint():
+    return templates_store.list_templates()
+
+
+@app.post("/templates")
+async def add_template_endpoint(req: TemplateRequest):
+    return templates_store.add_template(req.name, req.body, req.placeholders)
+
+
+@app.delete("/templates/{template_id}")
+async def delete_template_endpoint(template_id: str):
+    if not templates_store.remove_template(template_id):
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"status": "deleted", "template_id": template_id}
+
+
+# ============================================================================
+# OD-15 Library — project-scoped read + render + the plan-review side-store
+# ============================================================================
+
+@app.get("/library/documents")
+async def library_documents(cwd: str, subdir: str | None = None):
+    """List the project's markdown Plans/Documents (read-only, project-scoped)."""
+    root = storage.project_root(cwd)
+    if not root:
+        raise HTTPException(status_code=400, detail="cwd required")
+    return library.list_markdown(str(root), subdir)
+
+
+@app.get("/library/document")
+async def library_document(path: str):
+    try:
+        return library.read_document(path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
+@app.get("/library/reviews")
+async def library_reviews(cwd: str):
+    return library.load_reviews_for_cwd(cwd)
+
+
+@app.post("/library/reviews")
+async def library_set_review(req: ReviewRequest):
+    return library.set_review_for_cwd(
+        req.cwd, req.filename, owner=req.owner, state=req.state,
+        verdict=req.verdict, comments=req.comments)
 
 
 # ============================================================================

@@ -483,6 +483,21 @@ class BridgeDriver(AgentDriver):
                     "url": f"{base}/internal/hooks/stop/{agent}",
                     "timeout": 5,
                 }]}],
+                # OD-09: surface the agent's own Plan (ExitPlanMode) and Decision
+                # (AskUserQuestion) tool calls as typed Inbox cards — these are
+                # screen-blind but hook-visible. Returns allow (detect-and-surface).
+                "PreToolUse": [
+                    {"matcher": "ExitPlanMode", "hooks": [{
+                        "type": "http",
+                        "url": f"{base}/internal/hooks/plan/{agent}",
+                        "timeout": 5,
+                    }]},
+                    {"matcher": "AskUserQuestion", "hooks": [{
+                        "type": "http",
+                        "url": f"{base}/internal/hooks/decision/{agent}",
+                        "timeout": 5,
+                    }]},
+                ],
             }
         }
 

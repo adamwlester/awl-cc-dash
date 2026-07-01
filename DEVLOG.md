@@ -958,6 +958,20 @@ Files: sidecar/links.py (new), sidecar/main.py, tests/test_links_unit.py (new), 
 
 ---
 
+### 2026-06-30 22:45:00 — backend: OD-10 caps + OD-09 inbox + Tier-3 batch (OD-11/15/16/19) — caps & delete LIVE
+
+Built OD-10 + OD-09 and integrated four Tier-3 modules (four built in parallel by background subagents, each TDD-green; I wired the endpoints + driver + live-verified).
+- **OD-10 caps (notify-only):** per-agent `max_turns`/`max_context_pct` (set on Create) + a sidecar **poll-loop** that raises a **Warning** inbox card on crossing — the run continues (Continue/Raise/Stop is the user's call; no auto-kill). Added a locally-derived `turn_count` (each generating→idle = a turn) so caps work for the **bridge** driver (it emits status_change, not the SDK's `result.num_turns`). **LIVE PASS:** max_turns=1 → a `max_turns` Warning card raised, fleet_badge=1.
+- **OD-09 inbox:** new `sidecar/inbox.py` — the typed store (permission/error/warning/plan/decision) + the **error pattern-match** classifier + the cap→Warning derivation. `GET /inbox` (grouped by agent + pending-permission merged + fleet badge), `POST /inbox/{a}/{id}/resolve`. **Error** raised sticky on driver error events. **Plan/Decision** = the spike-gated path: per-agent **PreToolUse** hooks on `ExitPlanMode`/`AskUserQuestion` POST to `/internal/hooks/plan|decision/{agent}` → raise the typed card (**detect-and-surface** floor; returns allow so the agent isn't blocked). The richer hold-for-answer round-trip via `updatedInput` is a designed fast-follow needing its own live proof.
+- **OD-19 Retire/Delete:** `DELETE /sessions/{id}?hard=true` → `sidecar/deletion.py` plan: **wipe** the private footprint (runtime record + tmux kill + **on-disk transcript erased via the bridge's WSL shell** — a Windows `Path.unlink` can't reach the WSL fs) and **tombstone** the shared (links → inactive), retire the number (never reused), drop queue+inbox. **LIVE PASS:** transcript GONE on disk, number retired, tmux killed.
+- **OD-11 checklist:** `sidecar/checklist.py` (done÷total parse, barber-pole floor) → `GET /sessions/{id}/checklist`. **OD-15 library:** `sidecar/library.py` (project-scoped md read + plan-review side-store at `<project>/.awl/plan-reviews.json`) → `/library/*`. **OD-16 templates:** `sidecar/templates_store.py` (dashboard-store CRUD + placeholder render) → `/templates`.
+
+Verified: **274 hermetic green** (new: inbox 11, checklist 19, deletion 17, library 25, templates 17) + the two live PASSes above. No `design/` touched.
+
+Files: sidecar/inbox.py (new), sidecar/checklist.py (new), sidecar/deletion.py (new), sidecar/library.py (new), sidecar/templates_store.py (new), sidecar/main.py, sidecar/drivers/bridge.py, tests/test_inbox_unit.py (new), tests/test_checklist_unit.py (new), tests/test_deletion_unit.py (new), tests/test_library_unit.py (new), tests/test_templates_store_unit.py (new), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
