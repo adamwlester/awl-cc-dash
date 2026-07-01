@@ -213,11 +213,10 @@
     /* OD-11: SEGMENTED run-strip — the agent self-reports a checklist of major steps and the strip renders done÷total
        as equal segments split by navy separators (reusing --border / --border-width). The current (in-progress)
        segment carries the barber-pole shimmer. The segmented bar is the SAME --size-6 height as every other .run-strip,
-       so every card's bar seats identically in .node-band (no card's bar is taller or misaligned). The current step name
-       rides ABOVE the bar as a compact mono line (.rseg-lab) rather than overlaid inside it — and since .node-band is
-       bottom-pinned (margin:auto top), that label floats up without moving the bar, so all cards' bars stay aligned. The
-       plain single-fill + barber-pole stay the floor for runs with no checklist. (The denominator can grow mid-run — the
-       bar can step back — never a fabricated %.) */
+       so every card's bar seats identically in .node-band (no card's bar is taller or misaligned). The current step
+       NAME is hover-only — carried on the bar's `title` (e.g. "Step 4 of 5 · Run typecheck") — so it never adds an
+       always-on label line and never changes the card layout. The plain single-fill + barber-pole stay the floor for
+       runs with no checklist. (The denominator can grow mid-run — the bar can step back — never a fabricated %.) */
     .run-seg{ display:flex; align-items:stretch; height:var(--size-6); }
     .run-seg .rseg{ flex:1; min-width:0; height:100%; background:var(--surface-3); border-right:var(--border-width) solid var(--border); }
     .run-seg .rseg:last-of-type{ border-right:none; }
@@ -226,11 +225,6 @@
     .run-seg .rseg.cur::after{ content:''; position:absolute; inset:0;
       background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
       animation:run-barber 0.8s linear infinite; }
-    /* current-step label — a compact mono line seated ABOVE the segmented bar (sibling before .run-seg), so the bar keeps
-       the standard height; padded to counter the node-band's -9px bleed so the text sits at the card's content column. */
-    .rseg-lab{ display:block; padding:0 var(--space-9) var(--space-2); font-family:var(--font-mono); font-size:var(--size-7);
-      font-weight:700; letter-spacing:0.02em; line-height:1; color:var(--foreground);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed; pauses on hover */
     .node-feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:var(--size-15); }
     .node-feed .trk{ white-space:nowrap; font-family:var(--font-mono); font-size:8px; font-weight:600;

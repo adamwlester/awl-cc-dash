@@ -1075,6 +1075,18 @@ Files: frontend/src/renderer/{api.ts, App.tsx, events.tsx, TeamFeed.tsx, PromptP
 
 ---
 
+### 2026-07-01 02:15:00 — design: OD-11 run-strip step label → hover-only (per user)
+
+Per the user, the OD-11 current-step name is now **hover-only** rather than an always-on mono line above the bar (the always-on label changed the card's layout, which they didn't want). Removed the `.rseg-lab` element from the three segmented cards (node-4/9/13) and the gallery specimen, deleted the now-unused `.rseg-lab` CSS rule, and updated the DESIGN.md + gallery wording. The step name (`Step N of M · <name>`) stays on the bar's `title` tooltip. Net effect: segmented and plain run-strips are now **layout-identical** (no label line) — every card's bar is `--size-6` and seats identically.
+
+Verified over `http://localhost` (headless + headed, narrow 1180 / wide 1920): every bar 6px, all bars 54px off card-bottom (aligned), **0** `.rseg-lab` elements, all three segmented tooltips intact, **0** console errors.
+
+Context (not built): a broader OD-11 revision is under discussion — state should **recolor the current segment** (running→shimmer / paused-pending→warm / errored→danger) on a persistent segmented track rather than collapse to a flat bar; a run/turn/step glossary (a "run" = between prompt inputs; steps live within a run; retry redoes the whole run → segments reset); and a **per-card inbox footer** (split the subagents footer into subagents-left + an envelope+count inbox-right, expandable to typed entries that deep-link into the Inbox) so non-blocking Warnings surface on the card without touching the binary status badge.
+
+Files: design/mockup.html, design/styles.css, design/gallery.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
