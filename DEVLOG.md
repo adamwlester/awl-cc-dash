@@ -1059,7 +1059,25 @@ Files: CLAUDE.md, .claude/settings.json, DEVLOG.md
 
 Now that the branch was fully merged into `main` (0 unmerged commits), deleted it both locally (`git branch -d`, the safe merged-only delete) and on `origin` (`git push origin --delete`), then pruned stale tracking refs. Only `main` remains, local and remote in sync. Closes out the branch-consolidation work — future work stays on `main` per the new Git behavioral rule.
 
-Files: branch topology only (no file contents changed) + DEVLOG.md (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
+Files: branch topology only (no file contents changed) + DEVLOG.md
+
+---
+
+### 2026-07-01 01:22:06 — frontend: throwaway MVP renderer rewired to the current (OD) sidecar contract
+
+The MVP renderer under `frontend/src/renderer/` had fallen out of sync with the heavily-extended backend — it still spoke the old per-session `/history` poll + `send({prompt})`. Rewired `api.ts` to the full current contract and replaced the per-session poll with the merged **`/events` SSE stream + `/events/history` backfill** (dedup by envelope id, seq-ordered, dedup-set bounded in lockstep with the event cap). Wired the now-available features across the panels: merged **Messages** feed (Focused/All with per-agent grouping + system-line renderers for link_fire/inject/scratch/warning/plan/decision), the 5-type **Inbox** (permission Approve/Deny + error/warning/plan/decision resolve), agent-to-agent **linking** (create/delete/kickoff, sender constrained to the link direction), **Scratch** read/post, the **Console** slash-command catalog + runner, send-timing **Now/Next/Queue/Hold** + **send-as-agent** (From selector), **Settings** account band + confirm-gated file writes (428 gate), **Library** reads, subagents, the checklist/marquee **run-strip**, **templates** (insert/save), and **revise/summarize**. Added `WorkPanel.tsx` (Library/Links/Scratch) and a standalone `frontend/vite.config.ts` for headless browser verification (the Electron `npm run dev`/`build` path is unaffected — it uses `electron.vite.config.ts`). Left `design/`, `sidecar/`, `bridge/` untouched.
+
+Verified live against a running sidecar (which reconnected to a real bridge agent, "01 bob"): renderer `tsc --noEmit` clean; the app loads with **0 console errors** (added an inline empty favicon to kill the dev-server 404); the merged feed renders bob's real turns/tool-calls; the Inbox surfaced bob's live permission prompt; the Console loaded the 6-cluster catalog; the Settings account band read plan `max`; Files-read rendered `.claude/settings.json`; layout held at 1000px and 2560px extremes. An adversarial review workflow (4 dimensions → per-finding skeptic verify) confirmed 2 real issues, both fixed here: (1) kickoff sender could violate a directional link (→ backend 400, silently swallowed), and (2) the SSE dedup `Set` grew unbounded while the event array was capped.
+
+Also repaired a DEVLOG corruption introduced concurrently during this session — the `## Archived history` heading had been clobbered onto the prior (01:02:01) entry's `Files:` line — restoring the heading + rotation intro verbatim. Note: `DEVLOG.md` is now ~1090 lines, past the ~700 rotation threshold; a rotation pass is due (deferred — not bundled into this feature turn).
+
+Files: frontend/src/renderer/{api.ts, App.tsx, events.tsx, TeamFeed.tsx, PromptPanel.tsx, WorkPanel.tsx (new), AgentPanel.tsx, TeamGraph.tsx, Settings.tsx, index.html}, frontend/vite.config.ts (new), DEVLOG.md
+
+---
+
+## Archived history
+
+Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
 **Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21 entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension, port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4** with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK + `stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).
 

@@ -137,15 +137,29 @@ function RateLimitBanner() {
   )
 }
 
+// A compact one-line "system" note for the merged-bus events that aren't
+// assistant/user turns — link fires, injects, scratch deltas, warnings,
+// plan/decision raises, errors. Colored left accent keys the kind.
+function SystemLine({ accent, icon, label, detail }: { accent: string; icon: string; label: string; detail?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.card, border: `2px solid ${C.border}`, borderLeft: `4px solid ${accent}`, borderRadius: 5, padding: '5px 10px', marginBottom: 8 }}>
+      <span style={{ fontSize: 11 }}>{icon}</span>
+      <span style={{ fontSize: 9.5, fontWeight: 800, color: C.t2, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{label}</span>
+      {detail ? <span style={{ fontSize: 10.5, color: C.t3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{detail}</span> : null}
+    </div>
+  )
+}
+
 export function EventRenderer({ event }: { event: SDKEvent }) {
   const sdk = event.sdk_type || ''
   const sub = event.subtype || ''
+  const t = event.type
 
   if (sub === 'hook_started' || sub === 'hook_response') return null
-  if (event.type === 'status_change') return null
+  if (t === 'status_change') return null
   if (sub === 'init') return <SystemInitCard data={event.data || {}} />
 
-  if (sdk === 'AssistantMessage') {
+  if (sdk === 'AssistantMessage' || t === 'assistant') {
     const content = toBlocks(event.content ?? event.data?.message?.content)
     return (
       <>
@@ -159,7 +173,7 @@ export function EventRenderer({ event }: { event: SDKEvent }) {
     )
   }
 
-  if (sdk === 'UserMessage') {
+  if (sdk === 'UserMessage' || t === 'user') {
     const content = toBlocks(event.content ?? event.data?.message?.content)
     return (
       <>
@@ -172,15 +186,35 @@ export function EventRenderer({ event }: { event: SDKEvent }) {
     )
   }
 
-  if (sdk === 'RateLimitEvent') return <RateLimitBanner />
+  if (sdk === 'RateLimitEvent' || t === 'rate_limit') return <RateLimitBanner />
+
+  // ---- merged-bus system events (OD-01/02/04/09/17) ----
+  const preview = (s: any, n = 90) => { const str = String(s ?? ''); return str.length > n ? str.slice(0, n - 1) + '…' : str }
+  if (t === 'link_fire') return <SystemLine accent={C.teal} icon="🔗" label="Linked reply" detail={preview(event.text)} />
+  if (t === 'inject' || t === 'inject_delivered') return <SystemLine accent={C.secondary} icon="⇢" label={event.kind === 'context' ? 'Context inject' : 'Inject'} detail={preview(event.text)} />
+  if (t === 'scratch_delivered') return <SystemLine accent={C.railSection} icon="📋" label="Scratch delta" detail={`${event.count ?? ''} new post(s)`} />
+  if (t === 'warning') return <SystemLine accent={C.warning} icon="⚠" label={`Warning · ${event.subtype ?? ''}`} detail={event.cap != null ? `${event.value} ≥ cap ${event.cap}` : undefined} />
+  if (t === 'plan') return <SystemLine accent={C.inboxPermission} icon="◷" label="Plan proposed" detail={preview(event.data?.tool_input?.plan)} />
+  if (t === 'decision') return <SystemLine accent={C.inboxPermission} icon="?" label="Decision needed" detail={preview(event.data?.tool_input?.question ?? event.data?.tool_input?.questions?.[0]?.question)} />
+  if (t === 'error') return <SystemLine accent={C.danger} icon="✕" label="Error" detail={preview(event.error ?? event.message)} />
   return null
+}
+
+const RENDERABLE_TYPES = new Set([
+  'assistant', 'user', 'rate_limit',
+  'link_fire', 'inject', 'inject_delivered', 'scratch_delivered', 'warning', 'plan', 'decision', 'error',
+])
+
+// Will EventRenderer draw anything for this event? (status/permission_* events
+// are stored but render nothing.)
+export function isRenderableEvent(e: SDKEvent): boolean {
+  if (e.sdk_type === 'AssistantMessage' || e.sdk_type === 'UserMessage' || e.sdk_type === 'RateLimitEvent') return true
+  if (e.subtype === 'init') return true
+  return RENDERABLE_TYPES.has(e.type)
 }
 
 // Does the event list contain anything that actually renders? (status/permission
 // events are stored but render nothing, so events.length overcounts.)
 export function hasRenderable(events: SDKEvent[]): boolean {
-  return events.some(e =>
-    e.sdk_type === 'AssistantMessage' || e.sdk_type === 'UserMessage' ||
-    e.sdk_type === 'RateLimitEvent' || e.subtype === 'init'
-  )
+  return events.some(isRenderableEvent)
 }

@@ -17,7 +17,7 @@ import React from 'react'
 import { C, MONO, deriveBadge, fmtCreated, timeAgo, healthColor } from './tokens'
 import { StatusBadge } from './ui'
 import { AgentTile } from './AgentTile'
-import type { Session, Subagent } from './api'
+import type { Session, Subagent, Checklist, Marquee } from './api'
 
 function modeShort(mode: string): string {
   return ({
@@ -39,9 +39,23 @@ function Chip({ label, value, muted }: { label: string; value: string; muted?: b
   )
 }
 
-function RunStrip({ badge }: { badge: string }) {
-  // active -> barber-pole (working, % unknown — the honest fallback); pending ->
-  // warm flat; idle -> muted empty; error -> solid danger.
+function RunStrip({ badge, checklist }: { badge: string; checklist?: Checklist }) {
+  // A real self-reported checklist wins: show a determinate done÷total bar + the
+  // current item. Otherwise: active -> barber-pole (working, % unknown — the
+  // honest floor); pending -> warm flat; idle -> muted empty; error -> danger.
+  if (checklist && !checklist.indeterminate && checklist.total > 0) {
+    const pct = Math.round(checklist.fraction * 100)
+    return (
+      <div>
+        <div style={{ height: 6, border: `1.5px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', background: C.surface }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: C.success }} />
+        </div>
+        <div style={{ fontSize: 7.5, fontWeight: 800, color: C.t3, fontFamily: MONO, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {checklist.done}/{checklist.total}{checklist.current ? ` · ${checklist.current}` : ''}
+        </div>
+      </div>
+    )
+  }
   if (badge === 'active') {
     return <div className="awl-barber" style={{ height: 6, border: `1.5px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }} />
   }
@@ -49,6 +63,16 @@ function RunStrip({ badge }: { badge: string }) {
   return (
     <div style={{ height: 6, border: `1.5px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', background: badge === 'idle' ? C.surface : 'transparent' }}>
       <div style={{ width: '100%', height: '100%', background: fill }} />
+    </div>
+  )
+}
+
+function MarqueeLine({ marquee, active }: { marquee?: Marquee; active: boolean }) {
+  const line = marquee?.line
+  if (!line || marquee?.idle) return null
+  return (
+    <div style={{ fontSize: 8.5, color: active ? C.t3 : C.t5, fontFamily: MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={line}>
+      {line}
     </div>
   )
 }
@@ -70,11 +94,13 @@ function SubagentStrip({ subs }: { subs: Subagent[] }) {
   )
 }
 
-function AgentCard({ session, percent, workSteps, subs, selected, onSelect, nowMs }: {
+function AgentCard({ session, percent, workSteps, subs, checklist, marquee, selected, onSelect, nowMs }: {
   session: Session
   percent: number | null
   workSteps: number | null
   subs: Subagent[]
+  checklist?: Checklist
+  marquee?: Marquee
   selected: boolean
   onSelect: () => void
   nowMs: number
@@ -139,8 +165,9 @@ function AgentCard({ session, percent, workSteps, subs, selected, onSelect, nowM
         <span style={{ fontSize: 9, fontWeight: 800, color: C.t2, width: 34, textAlign: 'right', flexShrink: 0, fontFamily: MONO }}>{workSteps ?? '—'}</span>
       </div>
 
-      {/* run strip */}
-      <RunStrip badge={badge} />
+      {/* marquee liveness tail + run strip */}
+      <MarqueeLine marquee={marquee} active={badge === 'active'} />
+      <RunStrip badge={badge} checklist={checklist} />
 
       <div style={{ flex: 1 }} />
       {/* subagents */}
@@ -149,10 +176,12 @@ function AgentCard({ session, percent, workSteps, subs, selected, onSelect, nowM
   )
 }
 
-export function TeamGraph({ sessions, usageBy, subagentsBy, selectedId, onSelect, nowMs }: {
+export function TeamGraph({ sessions, usageBy, subagentsBy, checklistBy, marqueeBy, selectedId, onSelect, nowMs }: {
   sessions: Session[]
   usageBy: Record<string, { percent: number | null; work_steps: number | null }>
   subagentsBy: Record<string, Subagent[]>
+  checklistBy: Record<string, Checklist>
+  marqueeBy: Record<string, Marquee>
   selectedId: string | null
   onSelect: (id: string) => void
   nowMs: number
@@ -171,6 +200,7 @@ export function TeamGraph({ sessions, usageBy, subagentsBy, selectedId, onSelect
               <AgentCard key={s.session_id} session={s}
                 percent={u.percent} workSteps={u.work_steps}
                 subs={subagentsBy[s.session_id] || []}
+                checklist={checklistBy[s.session_id]} marquee={marqueeBy[s.session_id]}
                 selected={s.session_id === selectedId}
                 onSelect={() => onSelect(s.session_id)} nowMs={nowMs} />
             )

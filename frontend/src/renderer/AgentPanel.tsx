@@ -15,11 +15,11 @@
 // mode-at-launch, cwd, and an optional per-agent disallowed-tools gate (proven).
 // ============================================================================
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { C, FONT, MONO, AG_COLORS, deriveBadge, fmtCreated, timeAgo, healthColor } from './tokens'
 import { Btn, StatusBadge, Segmented, Tabs, Field, ReadOnly } from './ui'
 import { AgentTile } from './AgentTile'
-import type { Session, ContextUsage, CreatePayload } from './api'
+import { api, type Session, type ContextUsage, type CreatePayload, type ConsoleCommand } from './api'
 
 const MODEL_OPTS = [
   { value: 'inherit', label: 'Inherit' }, { value: 'opus', label: 'Opus' },
@@ -246,13 +246,92 @@ function Create({ onCreate, onCancel, busy }: {
   )
 }
 
+// ---- Console (OD-20 slash-command runner) ----------------------------------
+
+function Console({ session }: { session: Session }) {
+  const [catalog, setCatalog] = useState<{ clusters: string[]; by_cluster: Record<string, ConsoleCommand[]> } | null>(null)
+  const [q, setQ] = useState('')
+  const [filtered, setFiltered] = useState<ConsoleCommand[] | null>(null)
+  const [manual, setManual] = useState('')
+  const [screen, setScreen] = useState<{ command: string; interactive: boolean; screen: string } | null>(null)
+  const [running, setRunning] = useState(false)
+
+  useEffect(() => { api.consoleCatalog().then(c => c && setCatalog({ clusters: c.clusters, by_cluster: c.by_cluster })) }, [])
+  useEffect(() => {
+    if (!q.trim()) { setFiltered(null); return }
+    let cancelled = false
+    api.consoleCatalog(q).then(c => { if (!cancelled) setFiltered(c?.commands || []) })
+    return () => { cancelled = true }
+  }, [q])
+
+  const run = async (command: string) => {
+    if (!command.trim()) return
+    setRunning(true)
+    const r = await api.consoleRun(session.session_id, command.trim())
+    setRunning(false)
+    setScreen(r || { command, interactive: false, screen: '(no response — Console needs a bridge agent)' })
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: C.input, border: `2px solid ${C.border}`, borderRadius: 5,
+    padding: '6px 9px', fontSize: 11, color: C.t1, fontFamily: MONO, outline: 'none',
+  }
+
+  const CmdRow = ({ c }: { c: ConsoleCommand }) => (
+    <div onClick={() => run(c.command)} className="nb-btn" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', border: `2px solid ${C.border}`, borderRadius: 5, background: C.card, boxShadow: C.shadowSm, marginBottom: 5, cursor: 'pointer' }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, fontFamily: MONO, minWidth: 96 }}>{c.command}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 9.5, color: C.t3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</span>
+      {c.interactive && <span title="opens a sub-prompt" style={{ fontSize: 8, fontWeight: 800, color: C.warnText, background: C.warnSoft, border: `1.5px solid ${C.border}`, borderRadius: 3, padding: '0 4px' }}>INT</span>}
+      {c.also_in && <span style={{ fontSize: 8, fontWeight: 800, color: C.t5 }}>· {c.also_in}</span>}
+    </div>
+  )
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ padding: 10, display: 'flex', gap: 6, borderBottom: `2px solid ${C.border}`, background: C.surface }}>
+        <input className="nb-in" style={{ ...inputStyle, fontFamily: MONO }} value={manual} placeholder="/command …" onChange={e => setManual(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') run(manual) }} />
+        <Btn variant="primary" onClick={() => run(manual)} disabled={!manual.trim() || running}>{running ? '…' : 'Run'}</Btn>
+      </div>
+      {screen && (
+        <div style={{ borderBottom: `2px solid ${C.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: C.codeBg }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: C.t1, fontFamily: MONO }}>{screen.command}</span>
+            {screen.interactive && <span style={{ fontSize: 8, fontWeight: 800, color: C.warnText }}>interactive — drives a sub-prompt</span>}
+            <div style={{ flex: 1 }} />
+            <Btn variant="ghost" onClick={() => setScreen(null)}>✕</Btn>
+          </div>
+          <pre style={{ margin: 0, padding: 10, maxHeight: 160, overflow: 'auto', fontSize: 10, fontFamily: MONO, color: C.t3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{screen.screen}</pre>
+        </div>
+      )}
+      <div style={{ padding: 10, flexShrink: 0 }}>
+        <input className="nb-in" style={inputStyle} value={q} placeholder="Filter commands…" onChange={e => setQ(e.target.value)} />
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 10px 10px' }}>
+        {filtered ? (
+          filtered.length === 0 ? <div style={{ fontSize: 11, color: C.t5, textAlign: 'center', marginTop: 20 }}>No matches.</div>
+            : filtered.map(c => <CmdRow key={c.command} c={c} />)
+        ) : catalog ? (
+          catalog.clusters.map(cl => (
+            <div key={cl}>
+              <div style={{ fontSize: 9, fontWeight: 800, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '10px 0 6px' }}>{cl}</div>
+              {(catalog.by_cluster[cl] || []).map(c => <CmdRow key={c.command} c={c} />)}
+            </div>
+          ))
+        ) : <div style={{ fontSize: 11, color: C.t5, textAlign: 'center', marginTop: 20 }}>Loading catalog…</div>}
+      </div>
+    </div>
+  )
+}
+
 // ---- Panel shell -----------------------------------------------------------
+
+type AgentTab = 'details' | 'create' | 'console'
 
 export function AgentPanel({ session, ctx, tab, onTab, onSetModel, onSetEffort, onRetire, onCreate, creating, nowMs }: {
   session: Session | null
   ctx: ContextUsage | null
-  tab: 'details' | 'create'
-  onTab: (t: 'details' | 'create') => void
+  tab: AgentTab
+  onTab: (t: AgentTab) => void
   onSetModel: (m: string) => void
   onSetEffort: (e: string) => void
   onRetire: () => void
@@ -265,10 +344,16 @@ export function AgentPanel({ session, ctx, tab, onTab, onSetModel, onSetEffort, 
       <div style={{ height: 34, minHeight: 34, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', gap: 8, flexShrink: 0 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent</span>
         <div style={{ flex: 1 }} />
-        <Tabs tabs={[{ value: 'details', label: 'Details' }, { value: 'create', label: 'Create' }]} active={tab} onChange={(t) => onTab(t as any)} />
+        <Tabs tabs={[{ value: 'details', label: 'Details' }, { value: 'console', label: 'Console' }, { value: 'create', label: 'Create' }]} active={tab} onChange={(t) => onTab(t as AgentTab)} />
       </div>
       {tab === 'create' ? (
         <Create onCreate={onCreate} onCancel={() => onTab('details')} busy={creating} />
+      ) : tab === 'console' ? (
+        session ? <Console session={session} /> : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, textAlign: 'center', color: C.t5, fontSize: 11, lineHeight: 1.6 }}>
+            Select an agent to open its Console.
+          </div>
+        )
       ) : session ? (
         <Details session={session} ctx={ctx} onSetModel={onSetModel} onSetEffort={onSetEffort} onRetire={onRetire} nowMs={nowMs} />
       ) : (

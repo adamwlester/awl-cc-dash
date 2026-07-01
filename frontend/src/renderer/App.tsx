@@ -1,28 +1,36 @@
 // ============================================================================
-// AWL Multi-Agent Dashboard — the three-pane shell
+// AWL Multi-Agent Dashboard — the three-pane shell (throwaway MVP renderer)
 // ----------------------------------------------------------------------------
-// Title bar · three resizable columns (Agent | Team Graph/Library | Team
-// Feed/Prompt) · status footer. Owns the global state + polling and wires the
-// proven bridge endpoints into the panels. Selection drives the app: clicking a
-// Team Graph card focuses that agent in the Agent panel, Feed, and Prompt.
+// Title bar · three resizable columns (Agent | Team Graph/Work | Team
+// Feed/Prompt) · status footer. Owns the global state + the merged /events SSE
+// bus and wires the current sidecar contract into the panels. Selection drives
+// the app: clicking a Team Graph card focuses that agent in the Agent panel,
+// Feed, and Prompt.
 //
-// Honest scope: Library (middle-bottom) is a placeholder (needs file endpoints);
-// the Console tab, Scratch/Log feeds, the non-Permission Inbox sections, linking,
-// send-timing, and Settings are absent (each needs net-new backend) — see the
-// per-panel notes. Everything rendered is backed by a proven endpoint.
+// Scope: this is the FUNCTIONAL MVP renderer exercising the current backend —
+// the merged event stream, the 5-type Inbox, agent-to-agent linking, Scratch,
+// the Console, send-timing + send-as-agent, Settings reads/writes, Library
+// reads, subagents, the checklist/marquee run-strip, templates, and
+// revise/summarize. Minimal styling, reusing tokens.ts + ui.tsx primitives.
 // ============================================================================
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { C, FONT, timeAgo } from './tokens'
-import { api, type Session, type SDKEvent, type ContextUsage, type CreatePayload } from './api'
+import {
+  api, openEventStream,
+  type Session, type SDKEvent, type ContextUsage, type CreatePayload,
+  type SendOpts, type InboxResponse, type LinksResponse, type Checklist, type Marquee,
+} from './api'
 import { Splitter } from './Splitter'
 import { TeamGraph } from './TeamGraph'
 import { AgentPanel } from './AgentPanel'
 import { TeamFeed } from './TeamFeed'
 import { PromptPanel } from './PromptPanel'
+import { WorkPanel } from './WorkPanel'
 import { Settings } from './Settings'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+const EVENT_CAP = 4000
 
 function fmtTokens(n: number): string {
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
@@ -41,33 +49,74 @@ function Chip({ children, bg, fg }: { children: React.ReactNode; bg: string; fg:
 export function App() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [events, setEvents] = useState<SDKEvent[]>([])
+  const [allEvents, setAllEvents] = useState<SDKEvent[]>([])
   const [ctx, setCtx] = useState<ContextUsage | null>(null)
   const [usageBy, setUsageBy] = useState<Record<string, { percent: number | null; work_steps: number | null }>>({})
   const [subagentsBy, setSubagentsBy] = useState<Record<string, any[]>>({})
+  const [checklistBy, setChecklistBy] = useState<Record<string, Checklist>>({})
+  const [marqueeBy, setMarqueeBy] = useState<Record<string, Marquee>>({})
+  const [inbox, setInbox] = useState<InboxResponse>({ inbox: {}, fleet_badge: 0 })
+  const [links, setLinks] = useState<LinksResponse>({ links: [], grouped: {} })
   const [tokenPill, setTokenPill] = useState(0)
   const [health, setHealth] = useState<{ ok: boolean; version: string }>({ ok: false, version: '' })
-  const [agentTab, setAgentTab] = useState<'details' | 'create'>('details')
+  const [agentTab, setAgentTab] = useState<'details' | 'create' | 'console'>('details')
   const [creating, setCreating] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [nowMs, setNowMs] = useState(Date.now())
   const mountedAt = useRef(Date.now())
   const sessionsRef = useRef<Session[]>([])
   sessionsRef.current = sessions
+  const seenRef = useRef<Set<string>>(new Set())
 
   // Resizable layout sizes (px); middle column + bottom panels flex.
-  const [leftW, setLeftW] = useState(330)
-  const [rightW, setRightW] = useState(440)
+  const [leftW, setLeftW] = useState(340)
+  const [rightW, setRightW] = useState(460)
   const [graphH, setGraphH] = useState(360)
   const [feedH, setFeedH] = useState(320)
 
   const selected = sessions.find(s => s.session_id === selectedId) || null
+  const focusedEvents = selectedId ? allEvents.filter(e => e.agent_id === selectedId) : []
 
   // ---- "ago" tick ----------------------------------------------------------
   useEffect(() => {
     const i = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(i)
   }, [])
+
+  // ---- merged event bus: history backfill + live SSE (dedup by id, seq order)
+  const ingest = useCallback((incoming: SDKEvent[]) => {
+    const fresh: SDKEvent[] = []
+    for (const e of incoming) {
+      const key = e.id || `${e.agent_id ?? '?'}:${e.seq ?? Math.random()}`
+      if (seenRef.current.has(key)) continue
+      seenRef.current.add(key)
+      fresh.push(e)
+    }
+    if (!fresh.length) return
+    setAllEvents(prev => {
+      const merged = prev.concat(fresh)
+      merged.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+      if (merged.length <= EVENT_CAP) return merged
+      const capped = merged.slice(merged.length - EVENT_CAP)
+      // Keep the dedup set bounded in lockstep with the event window so a
+      // long-lived session doesn't leak ids for evicted events. A re-replayed
+      // old event just re-appends and slices back out by seq — no duplicate.
+      const next = new Set<string>()
+      for (const e of capped) next.add(e.id || `${e.agent_id ?? '?'}:${e.seq ?? ''}`)
+      seenRef.current = next
+      return capped
+    })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    // Immediate paint from the bounded-ring backfill…
+    api.eventsHistory().then(hist => { if (!cancelled && hist) ingest(hist) })
+    // …then the live merged stream (also re-replays the ring on reconnect —
+    // deduped by event id).
+    const es = openEventStream({ onEvent: (ev) => ingest([ev]) })
+    return () => { cancelled = true; es.close() }
+  }, [ingest])
 
   // ---- health --------------------------------------------------------------
   useEffect(() => {
@@ -80,11 +129,11 @@ export function App() {
     return () => clearInterval(i)
   }, [])
 
-  // ---- roster + usage (all agents) -----------------------------------------
+  // ---- roster + usage + inbox + links (all agents) -------------------------
   useEffect(() => {
     let cancelled = false
     const poll = async () => {
-      const [ss, us] = await Promise.all([api.sessions(), api.usage()])
+      const [ss, us, ib, lk] = await Promise.all([api.sessions(), api.usage(), api.inbox(), api.links()])
       if (cancelled) return
       if (ss) setSessions(ss)
       if (us) {
@@ -93,15 +142,36 @@ export function App() {
         setUsageBy(by)
         setTokenPill(us.token_pill || 0)
       }
+      if (ib) setInbox(ib)
+      if (lk) setLinks(lk)
     }
     poll()
     const i = setInterval(poll, 2000)
     return () => { cancelled = true; clearInterval(i) }
   }, [])
 
-  // ---- subagents (all agents) — slower cadence so the per-agent read_log
-  // fan-out doesn't pile onto the 2s roster/usage poll and saturate the
-  // sidecar's WSL-subprocess thread pool (each read_log spawns wsl.exe).
+  const refreshLinks = useCallback(async () => { const lk = await api.links(); if (lk) setLinks(lk) }, [])
+
+  // ---- checklist + marquee (all agents; cheap, in-memory on the sidecar) ----
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      const ss = sessionsRef.current
+      if (!ss.length) { setChecklistBy({}); setMarqueeBy({}); return }
+      const [cls, mqs] = await Promise.all([
+        Promise.all(ss.map(async s => [s.session_id, await api.checklist(s.session_id)] as const)),
+        Promise.all(ss.map(async s => [s.session_id, await api.marquee(s.session_id)] as const)),
+      ])
+      if (cancelled) return
+      setChecklistBy(Object.fromEntries(cls.filter(([, v]) => v)) as Record<string, Checklist>)
+      setMarqueeBy(Object.fromEntries(mqs.filter(([, v]) => v)) as Record<string, Marquee>)
+    }
+    poll()
+    const i = setInterval(poll, 3000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [])
+
+  // ---- subagents (all agents) — slower cadence: each read_log spawns wsl.exe.
   useEffect(() => {
     let cancelled = false
     const poll = async () => {
@@ -124,17 +194,16 @@ export function App() {
     }
   }, [sessions, selectedId])
 
-  // ---- focused agent: message stream + context -----------------------------
+  // ---- focused agent: context (the message stream comes from the merged bus)
   useEffect(() => {
-    if (!selectedId) { setEvents([]); setCtx(null); return }
+    if (!selectedId) { setCtx(null); return }
     let cancelled = false
     const loop = async () => {
       while (!cancelled) {
-        const [hist, c] = await Promise.all([api.history(selectedId), api.context(selectedId)])
+        const c = await api.context(selectedId)
         if (cancelled) break
-        if (hist) setEvents(hist)
         setCtx(c)
-        await new Promise(r => setTimeout(r, 900))
+        await new Promise(r => setTimeout(r, 1200))
       }
     }
     loop()
@@ -147,11 +216,8 @@ export function App() {
     const s = await api.create(payload)
     setCreating(false)
     if (s) {
-      // Optimistically add to the roster so the "clear stale selection" effect
-      // doesn't immediately drop this freshly-selected agent before the next
-      // roster poll catches up (a race that left the new agent unselected).
       setSessions(prev => prev.some(x => x.session_id === s.session_id) ? prev : [...prev, s])
-      setSelectedId(s.session_id); setAgentTab('details'); setEvents([])
+      setSelectedId(s.session_id); setAgentTab('details')
     }
   }, [])
 
@@ -161,15 +227,19 @@ export function App() {
     setSelectedId(null)
   }, [selectedId])
 
-  const onSend = useCallback(async (prompt: string) => {
-    if (!selectedId) return
-    await api.send(selectedId, prompt)
+  const onSend = useCallback(async (prompt: string, opts?: SendOpts) => {
+    if (!selectedId) return null
+    return await api.send(selectedId, prompt, opts)
   }, [selectedId])
 
   const onStop = useCallback(async () => { if (selectedId) await api.interrupt(selectedId) }, [selectedId])
   const onSetModel = useCallback(async (m: string) => { if (selectedId && m) await api.setModel(selectedId, m) }, [selectedId])
   const onSetEffort = useCallback(async (e: string) => { if (selectedId) await api.setEffort(selectedId, e) }, [selectedId])
   const onAnswer = useCallback(async (id: string, approve: boolean) => { await api.answerPermission(id, approve) }, [])
+  const onResolveInbox = useCallback(async (agent: string, itemId: string, answer?: any) => {
+    await api.resolveInbox(agent, itemId, answer)
+    const ib = await api.inbox(); if (ib) setInbox(ib)
+  }, [])
 
   // ---- footer counts -------------------------------------------------------
   const subCount = Object.values(subagentsBy).reduce((a, l) => a + l.length, 0)
@@ -185,6 +255,7 @@ export function App() {
         <span style={{ fontSize: 13, fontWeight: 900, color: C.mainFg }}>AWL Multi-Agent Dashboard</span>
         <Chip bg={C.card} fg={C.t1}>v{health.version || '0.3'}</Chip>
         <Chip bg={C.card} fg={C.t1}>{sessions.length} agents</Chip>
+        {inbox.fleet_badge > 0 && <Chip bg={C.warnSoft} fg={C.warnText}>⚑ {inbox.fleet_badge} need you</Chip>}
         <div style={{ flex: 1 }} />
         <Chip bg={C.card} fg={C.t3}>{new Date(nowMs).toLocaleTimeString()}</Chip>
         <Chip bg={C.card} fg={C.t3}>WSL2</Chip>
@@ -207,38 +278,34 @@ export function App() {
             onSetModel={onSetModel} onSetEffort={onSetEffort} onRetire={onRetire}
             onCreate={onCreate} creating={creating} nowMs={nowMs} />
         </div>
-        <Splitter orientation="vertical" onDelta={(d) => setLeftW(w => clamp(w + d, 240, 560))} />
+        <Splitter orientation="vertical" onDelta={(d) => setLeftW(w => clamp(w + d, 260, 620))} />
 
-        {/* Middle — Team Graph over Library placeholder */}
+        {/* Middle — Team Graph over the Work panel (Library / Links / Scratch) */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ height: graphH, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ height: 34, minHeight: 34, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0 }}>
               <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Team Graph</span>
             </div>
             <TeamGraph sessions={sessions} usageBy={usageBy} subagentsBy={subagentsBy as any}
+              checklistBy={checklistBy} marqueeBy={marqueeBy}
               selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setAgentTab('details') }} nowMs={nowMs} />
           </div>
           <Splitter orientation="horizontal" onDelta={(d) => setGraphH(h => clamp(h + d, 150, 900))} />
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ height: 34, minHeight: 34, background: C.surface, borderBottom: `2px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Library</span>
-            </div>
-            <div style={{ flex: 1, overflow: 'auto', padding: 16, background: C.bg, color: C.t5, fontSize: 11, lineHeight: 1.6 }}>
-              <b style={{ color: C.t3 }}>Plans · Documents · Assets</b> — not built this run.<br />
-              The Library needs net-new file endpoints (read/edit plan &amp; doc files, the review side-store, asset media). Surfaced here, deliberately deferred.
-            </div>
+            <WorkPanel sessions={sessions} focused={selected} links={links} onLinksChanged={refreshLinks} />
           </div>
         </div>
-        <Splitter orientation="vertical" onDelta={(d) => setRightW(w => clamp(w - d, 320, 720))} />
+        <Splitter orientation="vertical" onDelta={(d) => setRightW(w => clamp(w - d, 340, 760))} />
 
         {/* Right — Team Feed over Prompt */}
         <div style={{ width: rightW, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ height: feedH, flexShrink: 0, overflow: 'hidden' }}>
-            <TeamFeed session={selected} events={events} sessions={sessions} onAnswer={onAnswer} />
+            <TeamFeed focusedId={selectedId} events={allEvents} sessions={sessions}
+              inbox={inbox} onAnswer={onAnswer} onResolveInbox={onResolveInbox} />
           </div>
           <Splitter orientation="horizontal" onDelta={(d) => setFeedH(h => clamp(h + d, 150, 900))} />
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <PromptPanel session={selected} events={events} onSend={onSend} onStop={onStop} />
+            <PromptPanel session={selected} sessions={sessions} events={focusedEvents} onSend={onSend} onStop={onStop} />
           </div>
         </div>
       </div>
@@ -252,6 +319,7 @@ export function App() {
         <span>{idle} idle</span>
         <span style={{ color: C.warning }}>{pending} pending</span>
         {errored > 0 && <span style={{ color: C.danger }}>{errored} error</span>}
+        <span>{links.links.filter(l => l.active).length} links</span>
         <span>session {timeAgo(new Date(mountedAt.current).toISOString(), nowMs)}</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 5, background: C.main, color: C.mainFg, border: `2px solid ${C.border}` }}>
