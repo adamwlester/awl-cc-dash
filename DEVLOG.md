@@ -1107,6 +1107,37 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-01 16:00:32 — System data-model map (dev/notes/data-model-map.md)
+
+Wrote a new working note mapping the dashboard's data model end-to-end, in response to a concern
+that the storage model felt "overly distributed" and hard to audit. Frames all state in four
+categories (🏠 dashboard store `sidecar/runtime/`, 📁 project store `<project>/.awl/`, 🔌 surfaced
+Claude config, ⚡ in-memory) and ties each data type to its real repo-relative path *and* its UI
+pane/`data-comp` in a master table, plus two end-to-end traces, the durable-vs-ephemeral boundary,
+and an audit. Built from three read-only探 passes (persistence census, UI-surface map, OD-23
+scoping rationale). Key finding: persistence is concentrated (only 5 files on disk); the real
+maintainability risk is the *invisible* persist/ephemeral split — Inbox/Links/queues/watermarks
+are in-memory and lost on a sidecar restart with no UI cue. Audit verdict: keep the OD-23
+three-homes model; recommend two light fixes — make ⚡ a documented tier and decide which items
+should persist (Inbox, Links), and replace the plan-reviews filename key + the raw-`cwd` scope key.
+Docs-only, no code changed. Complements the broader `docs/ARCHITECTURE.md` by zooming into the
+storage/scoping model with UI anchoring + audit. (DEVLOG rotation still overdue at >1120 lines —
+deferred again, not bundled into this turn.)
+
+Files: dev/notes/data-model-map.md (new), DEVLOG.md
+
+---
+
+### 2026-07-01 16:10:26 — docs: integrated the OD decisions into ARCHITECTURE.md; archived the tracker
+
+Refactored `docs/ARCHITECTURE.md` to **absorb the decided `OD-*` decisions** so they live in one doc, then **archived** the standalone tracker. Added a new **§10 "Design decisions (the OD record)"** — one distilled entry per **OD-01…OD-20, OD-22, OD-23** (settled decision + where it's wired / "UI: DESIGN.md"), grouped by the original tiers; the `OD-NN` labels stay stable anchors (DESIGN.md + `dev/prompts/` reference them and now resolve here). **OD-21 (React-port timing) was retired from tracking** per the user — its "park until design churn → zero" fact stays as plain context in §3.4 + §9, with a one-line retirement note in §10. Rewrote the header ("what it is *not*" now says decisions are integrated, not externalized), repointed the §12 Related-docs bullet, and renumbered Repo map → §11 / Related docs → §12. Rationale kept out: the archived tracker retains the forks/confidence/"why," §10 records only the *what* (build status stays §9's matrix).
+
+`git mv dev/notes/open-system-decisions-2026-06-29.md → archive/notes/open-system-decisions-2026-06-29.md` (history preserved); fixed the now-dangling tracker path in `dev/prompts/backend-decision-integration.md` (2 refs) and `dev/prompts/design-stream-finisher-p1.md` (1 ref — it still pointed at the even-older `agent-qa/` path), both now → the archive path + a note that decisions live in ARCHITECTURE.md §10. Verified: §§1–12 numbered with no gaps, 22 OD entries present, no stray OD-21, both tracker links resolve to the archive. (Concurrent stream note: another session's 16:00:32 `data-model-map` entry above + its untracked files were left untouched; only my own paths were staged. DEVLOG rotation still overdue >1130 lines — deferred.)
+
+Files: docs/ARCHITECTURE.md, archive/notes/open-system-decisions-2026-06-29.md (moved from dev/notes/), dev/prompts/backend-decision-integration.md, dev/prompts/design-stream-finisher-p1.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

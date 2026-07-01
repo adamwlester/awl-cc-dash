@@ -2,7 +2,7 @@
 
 Integrate into the `design/` files the full **design-layer (🎨) stream** of the resolved decision tracker, in one coordinated pass, and leave the design system finished and final. Deliver working, verified work, not a proposal. You have full repo and system access; use it. Scope is the **eight design-tagged decisions** (OD-03, OD-13, OD-14, OD-15, OD-16, OD-18, OD-19, OD-20) — limited to what is actionable now.
 
-**The tracker is your plan, not this prompt.** `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` holds the locked **`Decision:`** lines and the per-item **🎨 design-layer:** notes that say exactly what each touches. Follow those, and **build from `Decision:`, never `Recommended:`** (some `Recommended` lines now state the reversed/superseded policy — e.g. OD-19's says "keep Delete deferred," but the `Decision` ships Delete in v1). This prompt points you at context and flags the few things easy to get wrong; it deliberately does not restate the decisions — read them at the source.
+**The tracker is your plan, not this prompt.** `archive/notes/open-system-decisions-2026-06-29.md` (archived — the decisions are now integrated into `docs/ARCHITECTURE.md` §10) holds the locked **`Decision:`** lines and the per-item **🎨 design-layer:** notes that say exactly what each touches. Follow those, and **build from `Decision:`, never `Recommended:`** (some `Recommended` lines now state the reversed/superseded policy — e.g. OD-19's says "keep Delete deferred," but the `Decision` ships Delete in v1). This prompt points you at context and flags the few things easy to get wrong; it deliberately does not restate the decisions — read them at the source.
 
 ## The current state of `design/` — work from the live files
 

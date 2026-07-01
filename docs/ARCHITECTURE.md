@@ -7,10 +7,11 @@
 > and where does that code live," start here; for pixels and interaction intent read DESIGN.md, and for the
 > chronology read the DEVLOG.
 >
-> **What it is *not*.** Not a visual spec (that's DESIGN.md + the `design/` mockup), not a task list, and not
-> a decisions log. The **decided target behaviours** it references are specified in the decisions tracker,
-> [`dev/notes/open-system-decisions-2026-06-29.md`](../dev/notes/open-system-decisions-2026-06-29.md) (the
-> `OD-01 … OD-23` items) — this doc cites those IDs rather than restating them.
+> **What it is *not*.** Not a visual spec — that's DESIGN.md + the `design/` mockup, which this doc points to for
+> pixels and interaction detail — and not a task list. It **does** now carry the system's **decided behaviours**:
+> the `OD-01 … OD-23` decisions (formerly a standalone tracker) are integrated into
+> [§10](#10-design-decisions-the-od-record), the canonical home the `OD-*` labels resolve to. The archived
+> tracker keeps the full original deliberation (the forks weighed, confidence, rationale) for the *why we chose it*.
 >
 > **Sources & freshness.** Written against the code as it stands (sidecar `v0.3.0`), grounded in a direct read
 > of `frontend/`, `sidecar/`, and `bridge/`. Two older notes describe a **pre-integration** snapshot and are
@@ -153,9 +154,9 @@ The frontend reads agent state two ways:
 ### 3.4 Visual lag vs. the mockup (intentional)
 The React app is **functionally** wired to the full backend but **visually trails** the `design/` mockup — e.g.
 16 agent colours (vs. the mockup's 25), the Console tab still stubbed in places, and some controls are honest
-no-ops for bridge-blocked features. This gap is by design: **OD-21** parks the "port the React app up to the
-finished mockup/tokens" work until design churn approaches zero. The mockup is the visual target; the React app
-is the working client.
+no-ops for bridge-blocked features. This gap is by design: the React port up to the finished mockup/tokens is
+deliberately deferred until design churn approaches zero. The mockup is the visual target; the React app is the
+working client.
 
 ---
 
@@ -380,7 +381,7 @@ decided OD feature set. Verification maturity varies, and a few things are genui
 |-------|------|
 | **Live-verified (bridge floor)** | Create / run turns / read feed, permission round-trips, resume, model + effort changes — proven below **and through** the dashboard UI (per `CLAUDE.md` / `DEVLOG.md`). |
 | **Built & wired** | The full sidecar OD surface (event bus, queue, hooks, inbox, links, scratchpad, library, settings reads + gated writes, console, templates, utility passes) and the React client that consumes it. Confirm specifics against `DEVLOG.md`. |
-| **Visually lagging the mockup** | The React UI trails `design/` (16 vs 25 colours, Console gaps, some no-op controls). Parked by **OD-21** until design churn → zero. |
+| **Visually lagging the mockup** | The React UI trails `design/` (16 vs 25 colours, Console gaps, some no-op controls). The React port is deferred until design churn → zero. |
 | **Bridge-blocked (engine limits, honest 400s / fallbacks)** | Mid-run **permission-mode** change (only Shift+Tab cycles) · **`/fast`** + **thinking** toggles · true mid-run **Inject** (degrades to Next/Queue) · run-strip real **%** (barber-pole floor) · subagent **pending-vs-active** · per-agent **cost** (bridge emits none). |
 
 > **Reconciliation note.** [`dev/notes/coverage-map.md`](../dev/notes/coverage-map.md) predates the backend
@@ -390,7 +391,148 @@ decided OD feature set. Verification maturity varies, and a few things are genui
 
 ---
 
-## 10. Repo map — where the architecture lives
+## 10. Design decisions (the OD record)
+
+The system/product decisions behind the architecture above — integrated here from what was a standalone tracker so
+there is **one** home for them. Each `OD-NN` label is a **stable anchor**: DESIGN.md and the `dev/` prompts
+reference these IDs, and they now resolve here. Entries record the **settled decision** and where it's wired (for
+UI-shaped decisions, DESIGN.md owns the visual form); the archived tracker
+([`archive/notes/open-system-decisions-2026-06-29.md`](../archive/notes/open-system-decisions-2026-06-29.md))
+retains the full original deliberation — the forks weighed, confidence, and *why we chose it*. Build maturity per
+decision is the honest matrix in [§9](#9-build-status--honest-boundaries); this section is the *what*, not the status.
+
+### Tier 1 — Foundation
+
+**OD-01 · Cross-agent event stream + identity tagging.** One sidecar-owned aggregated SSE stream all panels
+subscribe to, replacing the old 800 ms `/history` poll. Every event is a lightweight envelope stamped with its
+sender; heavy content is referenced and fetched on demand. It's a **bounded ring, not a stored mega-log** — the
+per-agent JSONL transcripts on disk stay the source of truth, the UI backfills on scroll, From/To filters apply
+server-side. Event id = deterministic composite `{agent_id}:{source_kind}:{anchor}` (so re-polls/reconnects dedup
+to no-ops); ordering is a separate monotonic `seq`. *Wired: §6.1.*
+
+**OD-02 · Prompt queue + idle/turn-boundary detection.** The sidecar owns a per-agent **ordered** queue (not
+strict FIFO), driven by the bridge's `generating→idle` transition, delivered over two channels: **push-on-idle**
+(tmux send-keys) for Now/Next/Queue, and a **hook-pull inbox** for true Inject (`PostToolUse` + `Stop` HTTP hooks
+→ an inbox-drain endpoint; durable, ack-on-2xx). **Hold** parks the payload in a staging slot for manual release.
+Replaces the old "`/send` to a busy agent 409s and drops it." *Wired: §6.2–6.3.*
+
+**OD-03 · Agent identity.** role+number+name+colour+icon, set at create, persisted, shown everywhere; **read-only
+in v1**. Pools = **25 colours + 50 curated icons**, assigned round-robin (`colour = n mod 25`, `icon = n mod 50`);
+past 16 the icon is the primary disambiguator. Icons served recoloured from `assets/icons/agents/` via
+`/assets/agent-icons/`. *Wired: §6.5. (The React client ships 16 colours today — see §9.)*
+
+**OD-22 · Message addressing.** Every event carries `source` (the OD-01 sender) and a typed `recipients[]`
+(`user | <agent-id> | scratch`, default `[user]`). `recipients` is **routing** — it drives delivery, the From/To
+filter, and Sent/Received direction — **not visibility**; every event still shows in the operator's feed. *Wired: §6.1.*
+
+**OD-23 · Storage & scoping.** One rule: **dashboard data lives with the dashboard; project data lives with the
+project; teams are reusable and live with the dashboard.** Three homes — the dashboard runtime store (identity,
+sessions, Setups, templates), `<project>/.awl/` (scratchpad + plan-review side-store; travels with the repo,
+WSL-reachable), and Setup rosters (a dashboard concept). Code keys off each agent's `cwd`, never a fixed path.
+*Wired: §7.*
+
+### Tier 2 — Agent-to-agent linking
+
+**OD-04 · Link fire (reply-to).** A fire = the **completion of a reply**, not a blind broadcast: when the source
+finishes the turn answering a linked peer's inbound (detected at the idle turn-boundary), the sidecar routes that
+turn's output back to the inbound's sender by enqueuing on the peer's queue. Strict **one-inbound-in-flight** per
+agent. *Wired: §6.4.*
+
+**OD-05 · Link trigger modes.** Full vocabulary **Now · Next · Queue · Inject · Hold**, all via the OD-02 queue,
+**Queue the default**. Inject has no safe mid-run point on the bridge, so it **transparently degrades to
+Next/Queue**; Hold stages for manual approval. *Wired: §6.2; Inject limit: §9.*
+
+**OD-06 · Link relationship model.** The link's "Payload" knob is replaced by a **Relationship** selector
+(multi-select): **Direct messaging** (reply-to, OD-04) and/or **Shared context** (passive awareness, filtered by
+content-type, with an optional backfill toggle). Shared-context delivery is **piggyback** — updates ride the
+receiver's next prompt, never triggering a turn, bounded by a per-(source→target) **watermark** that dedups across
+channels (the same mechanism as OD-17). *Config-drawer UI: DESIGN.md.*
+
+**OD-07 · Link End-After.** Bounds the inter-agent exchange, counted in **Exchanges** (one message each direction —
+**not** internal turns/steps, which are OD-10's scope). Two independent caps (Exchanges, Tokens), each toggleable;
+**default 25 exchanges**. *Wired: §6.4.*
+
+**OD-08 · Link tracking.** No on-graph edges or per-card link badges for now; tracking lives in the Link Config
+panel as an **all-links list grouped by agent** (each link double-listed under both agents, with a direction
+arrow). *UI: DESIGN.md.*
+
+### Tier 3 — Feature areas
+
+**OD-09 · Inbox.** Five typed sections — **Permission · Error · Warning · Plan · Decision** — raised over two
+mechanisms: **screen-state** (Permission, Error/stall) and the **OD-02 hook channel** (Plan via `ExitPlanMode`,
+Decision via `AskUserQuestion` — visible to hooks even when the screen isn't). Permission is binary Approve/Deny
+(OD-14); **Plan cards are notify-only** (verdicts live in Library → Plans); Error is **sticky**. The Plan/Decision
+hook path is spike-gated with a **detect-and-surface fallback**. *Wired: §6.3, §6.5.*
+
+**OD-10 · Lifecycle caps.** **Notify-only**: crossing a stored max-turns or context-% cap raises a **Warning**
+(Continue / Raise cap / Stop) and the run continues — never an auto-kill. Backed by the ~3 s cap poll-loop that
+also feeds OD-09's Warning section. *Wired: §6.5.*
+
+**OD-11 · Run-strip completion %.** **Agent self-report, barber-pole as the floor**: a system-prompt mandate has
+each agent publish an ordered checklist up front and mark items done; the sidecar renders **done ÷ total** as a
+segmented bar. No checklist → honest **barber-pole indeterminate** (never a fabricated %). Rejected: an external
+LLM estimator and turns-used ÷ cap. *Wired: §6.5; bridge floor: §9.*
+
+**OD-12 · Marquee.** A **low-fidelity scrolling tail** of the agent's transcript output — a pure **liveness**
+signal, not an audit surface (auditing lives in Messages). Rides the OD-01 stream; no new backend; decoupled from
+the OD-11 checklist. *(The React UI omits it today — §9.)*
+
+**OD-13 · Subagent integration model.** A subagent is a **sub-identity of its parent** (`coder-01 › A2`), riding
+the OD-01 sender stamp + OD-22 addressing. The one net-new backend piece: the sidecar **ingests each subagent's
+own transcript** (folder-watch on the parent's `subagents/` dir, joined to its spawn) and replaces flat `s1…sN`
+with **group+member** naming (`A2`). Pending-vs-active is bridge-blocked. *Backend: §5.4/§6; badge-click, nested
+filter tree, and Details accordion UI: DESIGN.md; §9.*
+
+**OD-14 · Permissions.** **"Always allow" fully removed** (UI + all persistence) — permissions stay a clean
+**binary Approve/Deny** (+Reply). Permission **mode stays launch-only** (mid-run change bridge-blocked); per-agent
+scoping is **deny-based** (`--allowedTools` is ignored under bypass — a Claude bug). *Wired: §8; bridge-blocked: §9.*
+
+**OD-15 · Library.** v1 = **read + render** of Plans/Documents from the project's `cwd` (via WSL), project-scoped
+per OD-23. The **plan-review side-store** (owner/state/verdicts/comments) is a small structured file at
+`<project>/.awl/plan-reviews.json`, keyed by filename. **Deferred:** write-back, Assets media, richer plans.
+**Bridge-blocked:** Plan-approve → resume-out-of-plan-mode (the OD-09 hook path may unblock it). *Wired: §4.2, §7;
+panel UI: DESIGN.md.*
+
+**OD-16 · Prompt composition extras.** The **full mockup surface, nothing cut**: the Editor + inserted-block
+primitive (embed/template/citation), **Embed**, **Attach** (needs Windows↔WSL2 path normalization — solve, don't
+dodge), **Citations** (built with Attach), **Templates** (stored in the dashboard runtime store, OD-23),
+**Revise/Summarize** (run on the in-process SDK path, **not** the bridge), **Send-as-agent** (rides OD-22 + OD-02),
+a response-format preamble, voice mic, History + Retry, and the merged Export control. *SDK path: §5.3; utility
+endpoints: §4.2; composition UI: DESIGN.md.*
+
+**OD-17 · Shared scratchpad.** An **always-current, auto-read** channel (reverses the old explicit-send-only
+policy). Delivered as a **per-agent delta off a read watermark** (bounded); **live mid-run push** to running agents
+via the OD-02 hook channel as passive context that doesn't trigger a turn (an **early-collision signal**), with
+start-of-run catch-up for idle agents and a full-board snapshot on first read. Stored at
+`<project>/.awl/scratchpad.md` (OD-23); posts carry `recipients:[scratch]`. *Wired: §6, §8.*
+
+**OD-18 · Settings writes + account/usage.** Make Settings **fully interactive** — expose a write for everything
+the engine can set (Config · MCP · Plugins, user + project scope) plus per-agent scoping in the Create/Agent panel;
+all writes **confirm-gated**. Feasibility marked honestly (mid-run permission-mode blocked; per-agent MCP/model/
+plugins take effect at launch/restart; tool scoping deny-based). **Account band** (email/org/plan from local creds)
+and **usage-limits band** (session/weekly %, live from the API, graceful degrade) both **IN**. The Setups store
+lives in the dashboard runtime store. *Wired: §4.2, §7; tab UI + bands: DESIGN.md.*
+
+**OD-19 · Retire + Delete.** **Both ship in v1.** Retire = soft/reversible (stop + archive). Delete = hard and
+irreversible, on one rule: **wipe the private footprint** (runtime record + tmux session + on-disk transcripts,
+incl. subagents), **tombstone everything shared** (scratchpad posts, feed events, link edges — kept, attributed to
+the deleted identity, marked inactive). Works from any state (interrupt + close first); plain confirm; the agent's
+**number is permanently retired** (no recycling). *Wired: §4.2.*
+
+**OD-20 · Console.** Adopt the design as specified: a **per-agent Console tab** scoped to the focused agent, with
+an **Expand** → partial step-into over the left + middle columns; the feed faithfully mimics a real Claude Code
+terminal. The **slash-command runner is IN** (a full grouped catalog + filter, staged into a run bar). The only
+open work is backend: wire the live `capture-pane`/`scrollback` feed and route commands via the bridge's
+`send`/`keys` + `capture-pane` (handling interactive follow-ons). *Wired: §4.2; React Console stubbed: §9; surface
+UI: DESIGN.md.*
+
+> **OD-21 (React-port timing) was retired from tracking.** Its decision was simply "park the React-app → mockup
+> port until design churn approaches zero" — that fact lives as plain context in §3.4 and §9, so no separate
+> decision record is kept.
+
+---
+
+## 11. Repo map — where the architecture lives
 
 | Path | Layer |
 |------|-------|
@@ -406,12 +548,13 @@ decided OD feature set. Verification maturity varies, and a few things are genui
 
 ---
 
-## 11. Related docs
+## 12. Related docs
 
 - [`design/DESIGN.md`](../design/DESIGN.md) — UI/UX intent, the three-column layout, every panel, the design
   system. The `design/` mockup is the **visual authority**.
-- [`dev/notes/open-system-decisions-2026-06-29.md`](../dev/notes/open-system-decisions-2026-06-29.md) — the
-  `OD-01…OD-23` decisions this doc references (the WHAT behind the coordination spine).
+- [`archive/notes/open-system-decisions-2026-06-29.md`](../archive/notes/open-system-decisions-2026-06-29.md) —
+  **archived.** The `OD-01…OD-23` decisions are integrated into [§10](#10-design-decisions-the-od-record); this
+  archived tracker retains the full original deliberation (forks, confidence, rationale).
 - [`dev/notes/coverage-map.md`](../dev/notes/coverage-map.md) — pre-integration capability→reality map; still the
   best reference for **what the bridge can physically observe**.
 - [`DEVLOG.md`](../DEVLOG.md) — append-only chronology; the authority on **what was built/verified when**.
