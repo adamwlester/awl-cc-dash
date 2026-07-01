@@ -1097,6 +1097,16 @@ Files: docs/ARCHITECTURE.md (new), dev/notes/open-system-decisions-2026-06-29.md
 
 ---
 
+### 2026-07-01 15:44:05 — docs: corrected & tightened docs/ARCHITECTURE.md after external review
+
+Reviewed `docs/ARCHITECTURE.md` (created earlier today, commit `108d3c7`) against the live code — a provenance trace of its authoring session plus a fresh parallel re-verification of `sidecar/` + `bridge/` + `frontend/` and the referenced docs. Verdict: **substantively accurate** (dozens of concrete claims — driver CAPABILITIES sets, the event envelope, the endpoint surface, ring size, poll cadences, OD-01…OD-23 attributions, storage, reconnect — all confirmed against code). Fixed the defects the review surfaced: **(D1)** `serialize.py` path corrected `sidecar/drivers/serialize.py` → **`sidecar/serialize.py`** in §4.3 + §10; **(D2)** removed the phantom `/scratch (3s)` poll from §3.3 (scratch is read on demand + delta-pushed via the hook/watermark path, OD-17, not polled); **(D3)** completed the §10 repo map — added the 13 previously-omitted sidecar modules (`links`, `scratchpad`, `watermark`, `library`, `templates_store`, `console_catalog`, `checklist`, `marquee`, `subagents_naming`, `settings_io`, `utility_llm`, `deletion`, `storage`); **(D4)** noted the per-session `GET /sessions/{id}/events` SSE in §4.2; **(D5)** reconciled the `TmuxBridge` method list in §5.4 with the internal helpers (`session_id_for`/`register_session_id`/`wsl_host_ip`/`sidecar_hook_base_url`); **(D6)** reworded "/utility/* via the `sdk` driver" → the in-process SDK `query()` path (not the driver class).
+
+Also **collapsed the `v0.3.0` version string to a single canonical mention** (the "Sources & freshness" header) — removed the inline repeats in the topology diagram, the §4 intro, and §6 — so the one volatile value that recurred can't drift out of sync. Per discussion, deliberately did **not** add a separate parameters table / inline tags: agents treat code as source-of-truth (the doc says so), and a parallel value registry would just add a second sync burden. No structural rewrite — surgical edits only; all CONFIRMED content preserved verbatim. (DEVLOG rotation still overdue at >1110 lines — deferred, not bundled into this turn.)
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

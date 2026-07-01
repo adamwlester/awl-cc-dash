@@ -44,7 +44,7 @@ Claude Code agents from a single window, **without touching the raw CLI**:
 │                                                                                   │
 │  ┌───────────────────────────┐     HTTP + SSE      ┌────────────────────────────┐ │
 │  │  Electron app  (frontend/) │  ◄──────────────►  │  Sidecar  (sidecar/)       │ │
-│  │  main → preload → renderer │   127.0.0.1:7690   │  FastAPI · v0.3.0          │ │
+│  │  main → preload → renderer │   127.0.0.1:7690   │  FastAPI                   │ │
 │  │  React · 3-pane UI         │                    │  SessionState · event bus  │ │
 │  │  SSE /events + poll loops  │                    │  queue · hooks · inbox     │ │
 │  └───────────────────────────┘                    │  links · scratch · library │ │
@@ -142,7 +142,9 @@ The frontend reads agent state two ways:
   capped (~4000). This is the OD-01 envelope end of the pipe.
 - **Targeted polling (pull)** for readouts that aren't event-shaped, each on its own cadence:
   `/health` (5s) · `/sessions` + `/usage` + `/inbox` + `/links` (2s) · `/sessions/{id}/checklist` +
-  `/marquee` (3s) · `/subagents` (4.5s) · the focused agent's `/context` (~1.2s loop) · `/scratch` (3s).
+  `/marquee` (3s) · `/subagents` (4.5s) · the focused agent's `/context` (~1.2s loop). The **scratchpad**
+  is not on a poll — it's read on demand and its deltas are pushed to running agents via the hook/watermark
+  path (OD-17).
 
 > **Historical note:** the pre-integration UI polled `/history` every 800 ms with array-index keys. That is
 > gone — the current renderer consumes the merged SSE bus with stable ids. The `coverage-map.md` description of
@@ -159,7 +161,7 @@ is the working client.
 
 ## 4. Sidecar — the coordinator (`sidecar/`)
 
-A **FastAPI** app ([`sidecar/main.py`](../sidecar/main.py)), `title="AWL Dashboard Sidecar"`, `version 0.3.0`,
+A **FastAPI** app ([`sidecar/main.py`](../sidecar/main.py)), `title="AWL Dashboard Sidecar"`,
 served by uvicorn on `0.0.0.0:7690` (host overridable via `AWL_SIDECAR_HOST`). It is the single source of
 coordination truth: everything cross-agent lives here, not in the frontend and not in the bridge.
 
@@ -180,7 +182,7 @@ capability-gated ones return `400` when the active driver can't do the thing.
 |---------|-----------|-----|
 | **Health / sessions** | `GET /health` · `POST /sessions` · `GET /sessions[/{id}]` · `DELETE /sessions/{id}` (`?hard=true` → permanent wipe + tombstone) | OD-19 |
 | **Messaging** | `POST /sessions/{id}/send` (disposition: now/next/queue/hold/inject) · `GET /sessions/{id}/history` | OD-02 |
-| **Merged feed** | `GET /events` (SSE) · `GET /events/history?since=<seq>` — both with server-side From/To filter | OD-01/22 |
+| **Merged feed** | `GET /events` (SSE) · `GET /events/history?since=<seq>` — both with server-side From/To filter; a per-session `GET /sessions/{id}/events` SSE also exists, but the client subscribes to the merged bus | OD-01/22 |
 | **Hook channel** | `POST /internal/hooks/{post-tool-use,stop,plan,decision}/{agent}` | OD-02/09 |
 | **Inbox** | `GET /inbox` · `POST /inbox/{agent}/{item}/resolve` | OD-09 |
 | **Linking** | `POST/GET /links` · `DELETE /links/{id}` · `POST /links/{id}/kickoff` | OD-04…08 |
@@ -191,11 +193,11 @@ capability-gated ones return `400` when the active driver can't do the thing.
 | **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` | — |
 | **Settings** | `GET /settings/{read,account,config,mcp,plugins}` · `POST /settings/write` (confirm-gated) | OD-18 |
 | **Templates** | `GET/POST /templates` · `DELETE /templates/{id}` | OD-16 |
-| **Utility LLM** | `POST /utility/{revise,summarize}` — routed through the **`sdk`** driver, not the bridge | OD-16 |
+| **Utility LLM** | `POST /utility/{revise,summarize}` — run on the in-process Claude Agent **SDK** path (calls SDK `query()` directly, not the `sdk` driver class), never the bridge | OD-16 |
 | **Assets** | `GET /assets/agent-icons/{name}?color=` — recolorable agent SVGs | OD-03 |
 
 ### 4.3 Serialization
-[`sidecar/drivers/serialize.py`](../sidecar/drivers/serialize.py) normalizes both driver worlds into one event
+[`sidecar/serialize.py`](../sidecar/serialize.py) normalizes both driver worlds into one event
 shape: it maps SDK message classes (`AssistantMessage`, `UserMessage`, …) and content blocks (`text`,
 `thinking`, `tool_use`, `tool_result`) to the frontend's event/`type` vocabulary, with depth-limited safe
 recursion. The bridge driver maps already-Anthropic-format JSONL blocks with minimal transform, adding the
@@ -238,7 +240,8 @@ behind `/utility/*`. It is **not** a whole-system fallback; agents always run on
 ### 5.4 The bridge package (`bridge/`) and the Windows/WSL2 seam
 [`bridge/bridge.py`](../bridge/bridge.py) exposes `TmuxBridge` (~20 documented methods: create, send, keys,
 read, read_log, list, show, close, shutdown, rename, resume, status, batch_create, broadcast, interrupt,
-scrollback, watch, wait_idle, export, mcp_sync, plus `set_cwd`/`set_model`). Key mechanics:
+scrollback, watch, wait_idle, export, mcp_sync, plus `set_cwd`/`set_model` and internal helpers
+`session_id_for`/`register_session_id`/`wsl_host_ip`/`sidecar_hook_base_url`). Key mechanics:
 
 - **Detached creation.** `create()` runs `tmux new-session -d -s <name> … 'claude --session-id <uuid> …'`. The
   `-d` means **no window** — sessions are always **tab-less**. A Windows Terminal tab opens **only** on an
@@ -267,7 +270,7 @@ scrollback, watch, wait_idle, export, mcp_sync, plus `set_cwd`/`set_model`). Key
 ## 6. The coordination spine (cross-cutting)
 
 The features that make this "more than terminals in a grid" all ride on a small set of sidecar-owned
-primitives. These are the decided architecture (the `OD-*` tracker) as **built** in `v0.3.0`.
+primitives. These are the decided architecture (the `OD-*` tracker) as **built** today.
 
 ### 6.1 The event envelope (OD-01 + OD-22)
 Every event, from either driver, is stamped by `eventbus.stamp()` into one envelope:
@@ -394,9 +397,10 @@ decided OD feature set. Verification maturity varies, and a few things are genui
 | [`frontend/src/main/`](../frontend/src/main/) · [`preload/`](../frontend/src/preload/) · [`renderer/`](../frontend/src/renderer/) | Electron main / preload / React renderer |
 | [`frontend/src/renderer/api.ts`](../frontend/src/renderer/api.ts) | The frontend↔sidecar contract (endpoints + SSE + event types) |
 | [`sidecar/main.py`](../sidecar/main.py) | FastAPI app, `SessionState`, all endpoints, queue flush, cap loop |
-| [`sidecar/eventbus.py`](../sidecar/eventbus.py) · `hookbus.py` · `inbox.py` | Event ring + stamping · inject channel · inbox raising |
-| [`sidecar/drivers/`](../sidecar/drivers/) | `base.py` (seam) · `bridge.py` · `sdk.py` · `serialize.py` · `__init__.py` (selection) |
-| [`sidecar/runtime_store.py`](../sidecar/runtime_store.py) · `identity.py` | Restart-surviving session records · identity assignment |
+| [`sidecar/eventbus.py`](../sidecar/eventbus.py) · `hookbus.py` · `inbox.py` · `serialize.py` | Event ring + stamping · inject channel · inbox raising · driver→event normalization |
+| [`sidecar/drivers/`](../sidecar/drivers/) | `base.py` (seam) · `bridge.py` · `sdk.py` · `__init__.py` (selection) |
+| [`sidecar/runtime_store.py`](../sidecar/runtime_store.py) · `identity.py` · `deletion.py` · `storage.py` | Restart-surviving session records · identity assignment · hard-delete/tombstone · store helpers |
+| `links.py` · `scratchpad.py` · `watermark.py` · `library.py` · `templates_store.py` · `console_catalog.py` · `checklist.py` · `marquee.py` · `subagents_naming.py` · `settings_io.py` · `utility_llm.py` | Coordination-spine feature modules: linking · scratchpad · read-watermarks · library · templates · console catalog · checklist parse · marquee tail · subagent naming · settings read/write · utility-LLM passes |
 | [`bridge/bridge.py`](../bridge/bridge.py) · `transcript.py` · `paths.py` · `mcp.py` · `registry.py` | tmux/WSL2 control · JSONL parsing · path/net translation · MCP sync · Settings reads |
 | [`start-dashboard.bat`](../start-dashboard.bat) | Launches sidecar + Electron together |
 
