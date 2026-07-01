@@ -2,7 +2,7 @@
 
 Integrate into `sidecar/` and `bridge/` the **backend stream** of the resolved decision tracker — every actionable-now backend change it implies — in one coordinated pass, and leave the backend finished, verified, and live-tested. Deliver working code, not a proposal. You have full repo and system access (real laptop, real WSL2/tmux, the installed Claude build); use it.
 
-**The tracker is your plan, not this prompt.** `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` holds the 23 Open Decisions (OD-01…OD-23), all resolved. Each OD's **`Decision:`** line is the contract for what to build — build from it, **never from `Recommended:`** (several `Recommended` lines now contradict their own `Decision` — OD-05 Inject, OD-17 scratchpad, OD-19 Delete — and are preserved as historical record, not instructions). This prompt points you at context, fixes the build order, and flags what's easy to get wrong; it deliberately does not restate the decisions.
+**The tracker is your plan, not this prompt.** `dev/notes/open-system-decisions-2026-06-29.md` holds the 23 Open Decisions (OD-01…OD-23), all resolved. Each OD's **`Decision:`** line is the contract for what to build — build from it, **never from `Recommended:`** (several `Recommended` lines now contradict their own `Decision` — OD-05 Inject, OD-17 scratchpad, OD-19 Delete — and are preserved as historical record, not instructions). This prompt points you at context, fixes the build order, and flags what's easy to get wrong; it deliberately does not restate the decisions.
 
 ## Parallel streams (read this first)
 
@@ -16,7 +16,7 @@ Bare-minimum throwaway UI to exercise a backend feature is authorized (the user'
 
 ## Read first
 
-- `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` — the authoritative plan; the OD **Decision** paragraphs (WHAT). Start with the foundation set — **OD-01 / OD-02 / OD-22 / OD-23** — and the **OD-02 spike note**.
+- `dev/notes/open-system-decisions-2026-06-29.md` — the authoritative plan; the OD **Decision** paragraphs (WHAT). Start with the foundation set — **OD-01 / OD-02 / OD-22 / OD-23** — and the **OD-02 spike note**.
 - `CLAUDE.md` — the repo rules. The **bridge** (Custom Tooling) section, the **Testing** section, and the **DEVLOG** rule are mandatory (see Verification and Finish). Note the bridge-sessions rule: programmatic session creation never opens a terminal tab.
 - `dev/notes/coverage-map.md` — "Backend reality in one screen" + the Cross-Cutting table; what's already proven vs the hard ceilings.
 - The code each OD names: `sidecar/main.py` (`SessionState.to_dict`/`handle_event`/`push_event`, `stream_events`, `send_prompt` — the 409-drop, `create_session`, `answer_permission`, `/settings/*`, `/usage`); `sidecar/drivers/bridge.py` (`BridgeDriver.events` — the ~1s poll = the stream/queue/idle seam, `derive_context_usage`, `derive_subagents`, `classify_tool`, `CAPABILITIES`, the `isSidechain` skip at ~line 305, and `set_mode` — the honest 400 that is the BRIDGE-BLOCKED mid-run-permission-mode precedent); `bridge/bridge.py` (`TmuxBridge.create` — the launch-flag injection point, `status`/`_detect_state`, `send`/`keys`/`interrupt`, `read_log`, `_write_agent_config`, `mcp_sync`); `bridge/transcript.py`, `bridge/paths.py` (`win_to_wsl`/`wsl_to_win`/`WSL_AWL_DIR`), `sidecar/identity.py`, `sidecar/runtime_store.py`, `bridge/registry.py`; and for the carve-out, `sidecar/drivers/sdk.py` + `sidecar/drivers/serialize.py`.

@@ -1087,6 +1087,16 @@ Files: design/mockup.html, design/styles.css, design/gallery.html, design/DESIGN
 
 ---
 
+### 2026-07-01 14:49:23 — docs: created docs/ARCHITECTURE.md (system architecture) + moved the OD decisions tracker
+
+Created **`docs/ARCHITECTURE.md`** — the first system-architecture reference (the `docs/` dir was empty). It documents the four-tier stack (Electron frontend ↔ FastAPI sidecar `:7690` ↔ driver seam ↔ tmux/WSL2 bridge) with per-layer sections, the OD **coordination spine** (event envelope OD-01/22, prompt queue + hook channel OD-02, linking OD-04+, inbox/caps/identity/checklist, storage-homes OD-23), key end-to-end flows (create / send-while-busy / permission round-trip / link fire / scratchpad delta / resume), and an honest **built vs. visually-lagging vs. bridge-blocked** matrix. Written from a parallel code read of `frontend/` + `sidecar/` + `bridge/`, reconciled against DESIGN.md (intent) and the OD tracker (decided behaviour); explicitly flags `dev/notes/coverage-map.md` as a **pre-integration snapshot** now superseded on "built vs not" (backend + the React renderer are both wired to the full OD contract; the UI only trails the mockup *visually*, per OD-21). Positioned as the system counterpart to DESIGN.md (visuals) and DEVLOG.md (history), linking out rather than duplicating.
+
+Per the user, also **moved** `dev/notes/agent-qa/open-system-decisions-2026-06-29.md` → `dev/notes/` (via `git mv`, history preserved) and **removed** the now-empty `agent-qa/` folder; fixed the two stale path references in `dev/prompts/backend-decision-integration.md`. (DEVLOG entries naming the old path are left verbatim — this file is append-only. Rotation is still due at >1090 lines — deferred, not bundled into this docs turn.)
+
+Files: docs/ARCHITECTURE.md (new), dev/notes/open-system-decisions-2026-06-29.md (moved from dev/notes/agent-qa/), dev/prompts/backend-decision-integration.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
