@@ -1031,6 +1031,14 @@ Files: design/styles.css, design/mockup.html, design/gallery.html, design/DESIGN
 
 ---
 
+### 2026-07-01 00:42:53 — Merged feature/agent-console-tab back into main (fast-forward)
+
+Consolidated ~a week of work back onto `main`: the long-lived `feature/agent-console-tab` branch (67 commits, 2026-06-24 → 07-01, from the Agent Console tab through the OD backend/design passes) was merged into `main` via a clean fast-forward — `main` had not diverged (0 commits ahead), so no conflicts and no file-content changes. Pushed; `main` d98725f → f4b4c39, now identical to the feature branch. Per request to stop work happening on a side branch — future work lands on `main`. Feature branch left in place pending a delete decision.
+
+Files: branch topology / DEVLOG.md (no product file contents changed by the merge)
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
