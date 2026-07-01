@@ -1045,6 +1045,18 @@ Added a **new first entry** to CLAUDE.md's Behavioral rules — "Git — never b
 
 Files: CLAUDE.md, .claude/settings.json, DEVLOG.md
 
+---
+
+### 2026-07-01 00:53:14 — Correction: keep `git push` un-gated (user intent), gate only branch creation
+
+Prior entry wrongly said it "restored the `git push` ask gates" — those had been removed **deliberately** by the user (commit 22d84ab, "allow pushing commits without asking"), not by accident. Reverted that part: removed `Bash(git push *)` / `Bash(git push)` from `.claude/settings.json` `ask`, keeping only the branch-creation gates (`checkout -b/-B`, `switch -c/-C`, `branch *`, `worktree add *`). Fixed the CLAUDE.md Git rule line that claimed push "stays gated" — push now stays free; only branch creation prompts.
+
+Files: CLAUDE.md, .claude/settings.json, DEVLOG.md
+
+---
+
+## Archived history
+
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
 **Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21 entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension, port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4** with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK + `stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).

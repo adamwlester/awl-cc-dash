@@ -37,8 +37,6 @@
       "Read(./archive/_human-only)"
     ],
     "ask": [
-      "Bash(git push *)",
-      "Bash(git push)",
       "Bash(git checkout -b *)",
       "Bash(git checkout -B *)",
       "Bash(git switch -c *)",
