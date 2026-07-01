@@ -36,10 +36,6 @@
       "Read(./archive/_human-only/**)",
       "Read(./archive/_human-only)"
     ],
-    "ask": [
-      "Bash(git push *)",
-      "Bash(git push)"
-    ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "C:\\Users\\lester\\.vscode\\extensions\\html-preview-default",
