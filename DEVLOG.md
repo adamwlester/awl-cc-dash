@@ -1055,9 +1055,11 @@ Files: CLAUDE.md, .claude/settings.json, DEVLOG.md
 
 ---
 
-## Archived history
+### 2026-07-01 01:02:01 — Deleted the merged feature/agent-console-tab branch (local + remote)
 
-Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
+Now that the branch was fully merged into `main` (0 unmerged commits), deleted it both locally (`git branch -d`, the safe merged-only delete) and on `origin` (`git push origin --delete`), then pruned stale tracking refs. Only `main` remains, local and remote in sync. Closes out the branch-consolidation work — future work stays on `main` per the new Git behavioral rule.
+
+Files: branch topology only (no file contents changed) + DEVLOG.md (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
 **Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21 entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension, port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4** with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK + `stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).
 
