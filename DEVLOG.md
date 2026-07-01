@@ -271,6 +271,29 @@ Files: DEVLOG.md, archive/devlog/DEVLOG-archive-04.md
 
 ---
 
+### 2026-07-01 18:05:00 — docs: fully anchored data-model-map to the final intended design
+
+Per the user, re-anchored `dev/notes/data-model-map.md` so its UI column reflects the **final
+intended design/system**, not current MVP wiring. The §2/§3 structure (pane names, tabs, every
+`data-comp`) was already the `design/` mockup; stripped the four §3 table cells that had leaked
+current-implementation caveats ("save flow planned in MVP", "reads wired / global writes planned",
+"drawer wired; Save/Delete + edges planned", "placeholder — no live source yet") so features read
+as the finished product. Left the "survives restart?" column + the §5–§7 audit as current-backend
+truth **on purpose** — that gap is exactly what the audit measures against the ideal. Touched only
+my own paths (concurrent session active on `docs/`+`design/`).
+
+Files: dev/notes/data-model-map.md, DEVLOG.md
+
+---
+
+### 2026-07-01 18:25:00 — chore: moved design/TODO.md → dev/notes/DESIGN_TODO.md (design/ now pure design files)
+
+Per the user, moved the design backlog out of `design/` so the design system is exactly its **six files** and nothing else. `git mv design/TODO.md dev/notes/DESIGN_TODO.md` (history preserved). Updated the live **path** references: the CLAUDE.md "Design changes" rule (now names the backlog's new home) and the three dev prompts that cited `design/TODO.md` as their work-list/context ([`link-behavior-refactor.md`](dev/prompts/link-behavior-refactor.md), [`nextup-parallel-execution.md`](dev/prompts/nextup-parallel-execution.md), [`backend-decision-integration.md`](dev/prompts/backend-decision-integration.md) — verified no `design/TODO.md` path remains under `dev/`). Left untouched: the `archive/**` snapshots, the append-only DEVLOG history, `.claude/plans/`, and the purely-conceptual "don't reference the backlog" mentions in the spent prompts (policy statements, not path pointers).
+
+Files: design/TODO.md → dev/notes/DESIGN_TODO.md (moved), CLAUDE.md, dev/prompts/link-behavior-refactor.md, dev/prompts/nextup-parallel-execution.md, dev/prompts/backend-decision-integration.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

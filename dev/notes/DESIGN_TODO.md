@@ -100,23 +100,26 @@
 - We need to include a trash/delete ghost button after edit for History cards for prompts that are not "Active" or "Complete" so that they can be deleted before they get run if needed.
 - Make from and to inline heading labels the from and to vis toggles.
 - Subagent selection in the dropdown needs to have the select All/None action wired to them. Right now, it does not select/deselect subagents, only agents.
+- Make the stop buttons a danger background fill with empty square, not just the danger outline square.
+- The agent selector at the top of the link config needs to be a dropdown for both the agents being linked.
 
 ## Scratch
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
-- Change stop button to use a filled red icon
+### General
 - I want to work out how to build in more visual elements in Plans like charts, mockups and diagrams. I am thinking a few things. We could have a separate tab in Library or put these in the Assets tab, but we will need a way to comment them with visual markers etc. We might utilize what we have already in this tool: design\mockup-toolkit.js. If we put it in the Assets, we may want to structure the nav bar with headings, like something for stock images
 - Plans should utilize mermaid diagrams in markdown.
-- Need to add a permanent delete option along with retire that fully wipes the agent info from the system.
 - Add some voice reading feature and, ideally, an option to change speed from normal up to 2-3x
 - Need a string search feature for text fields.
 - Need to turn compact into a multiselect with the 5 built in options.
 - Need to track compaction history in context dropdown. Count and what type and when based on turns and time. Maybe put in the rewind/handoff list
 - Output options should include tldr tables with tests/checks and emojis signaling status.
+- I think we need to make a sort of icon/badge for the "system". This would be used for, say, system wide errors that are listed in the Inbox.
+- We need a simple way to share context once between agents. Could add this to "timeline-mode-switcher" as another option. Could make it part of link config as an one-time option instead of save
+- We need to add a "Fork" option to the Rewind/Handoff to the "timeline-mode-switcher".
 
-
-### Big picture
+### Big picture and/or Needs more research 
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
 - Need to build in more visual elements in plans like charts, mockups and diagrams
 - Consider including an Artifacts tab in Library
@@ -131,3 +134,4 @@
 - Need to decide what subagent info we want access to and where we access it. Related, what does clicking the subagent icon on agent cards do?
 - Need to confirm that the current UI components etc translate to neobrutalism.dev. Acceptable if they do not, but leaning towards using a consistent library for maintinence.
 - Need to determine what files should stay markdown vs what files would actually work better as JSON given they will be handled by agents and can be rendered in the UI however we want.
+- In addition to retry, I believe we 

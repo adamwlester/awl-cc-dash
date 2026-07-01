@@ -11,7 +11,7 @@ The through-line: today content is shared to agents three different ways (a **Sh
 - **`CLAUDE.md`** — the design-related parts: the folder map, the Key-files table, and especially the **UI-verification rule** (drive the rendered UI; resize narrow+wide; click every control; headless loop then one headed pass), the **DEVLOG rule** (log every repo change before ending the turn), and the **editing-discipline rule** (*preserve everything you weren't asked to change* — reproduce untouched markup/JS exactly).
 - **`design/DESIGN.md`** — in full. It is the design reference (intent + patterns). Pay attention to: *Prompts (right, bottom)* + *The Templates flow*; *Library (middle, bottom)* incl. the shared doc editor + comment popout; *Team Feed* + *The Inbox tab*; the *Agent (left pane)* Mode block; *Linking & context-sharing*; and the *Design system* surface/color tables.
 - **`design/tokens.css`** — the **single source of truth** for every design value. Use `var(--token)`; never hardcode a color/space/radius/shadow. If you need a new value, add it here, grouped with a comment.
-- **`design/TODO.md`** — the Inbox notes driving this work (the ones about Embed/Attach, the Error badge, the feed relabels, Templates→Editor) and the backlog items it closes. See **Docs to keep in sync** at the end.
+- **`dev/notes/DESIGN_TODO.md`** — the Inbox notes driving this work (the ones about Embed/Attach, the Error badge, the feed relabels, Templates→Editor) and the backlog items it closes. See **Docs to keep in sync** at the end.
 - **Open `design/mockup.html` and serve it over `http://localhost`** (the Playwright MCP browser blocks `file:`) before changing anything — study the Prompts panel, Library, Team Feed/Inbox, and the Agent Mode block as they behave today.
 - Reference-only (do not edit): **`archive/design/design-v10p6/mockup.html`** — the frozen older version you'll pull the labeled-toggle style from in P0.
 
@@ -43,7 +43,7 @@ Independent and low-risk; do it first to clear complexity before touching shared
 - Ultraplan footprint: ~8 references in the mockup, 2 in `design/DESIGN.md`. Includes the Mode-block toggle, its plan-mode gating (`syncUltraGate`, wired near the init call `document.querySelectorAll('.seg.mode-seg').forEach(syncUltraGate)`), any `ultra` field in demo data (e.g. `PLANS` entries carry `ultra:false`) and any Ultraplan **tag** rendered on plan cards/graph cards.
 - Current Mode toggles: the `.swh` slider-switch row (CSS at the `.swh` / `.swh.on` rules ~line 1637-1639) carrying **Fast · Thinking · Ultraplan**, in **both** the Agent → **Details** and **Create** tabs. Gating today: *Fast gated to Opus*, *Ultraplan gated to Plan mode*.
 - Revert target: `archive/design/design-v10p6/mockup.html` — the older **labeled toggle-button** style (reads "Opus fast-mode Off/On" / "Thinking mode off/on"). Pull its exact markup + CSS.
-- `design/TODO.md` **B4** — remove the "*must support the new native ultraplan functionality*" clause.
+- `dev/notes/DESIGN_TODO.md` **B4** — remove the "*must support the new native ultraplan functionality*" clause.
 
 **Changes:**
 - Remove Ultraplan entirely: the toggle, its gating logic, any badge/tag, the `ultra` demo-data fields, and all mentions (mockup + DESIGN.md + the TODO B4 clause). All planning uses the default path now.
@@ -170,14 +170,14 @@ Today `railBadge` counts **all** verdicts on a section (`n = approve+revise+bloc
 
 - **The Review / Inbox *formalization*** — the single-reviewer-agent model, how agent verdicts resolve, and how the human gate relates to agent review. P4c only restyles the Review *control*; the workflow stays as-is. This is the real **TODO B13** — leave a one-line marker in `DEVLOG.md` (and ensure B13 captures it) so it isn't lost.
 - **Real backend** — temp-file materialization, actual message sending, real plan/review state. Everything here is mock behavior in `design/mockup.html`.
-- **Other Inbox notes not discussed** — `design/TODO.md` Inbox also lists items this refactor does **not** cover (turns-bar dropdown, removing the Library nav trash ghost, divider-line color, Team-Feed timestamp alignment, removing "Time" from the Link Config End-After). **Leave those Inbox notes untouched** — don't implement or file them.
+- **Other Inbox notes not discussed** — `dev/notes/DESIGN_TODO.md` Inbox also lists items this refactor does **not** cover (turns-bar dropdown, removing the Library nav trash ghost, divider-line color, Team-Feed timestamp alignment, removing "Time" from the Link Config End-After). **Leave those Inbox notes untouched** — don't implement or file them.
 - **Team Feed Scratch & Log tabs** — the new select-to-act selection rail and the Embed/Attach control are **Messages-only**; Scratch and Log are untouched in this pass.
 
 ## Docs to keep in sync / TODO.md housekeeping
 
 - **`design/DESIGN.md`** — updated per-phase as listed above; confirm it agrees with the mockup before finishing.
 - **`design/tokens.css`** — any new/!changed values (status colors, block boundary) live here, grouped + commented.
-- **`design/TODO.md`** — **remove the Inbox notes this refactor implements** (the Embed/Attach behavior incl. "all of this new behavior needs to be wired up", the compose linked-docs/assets cards, the Failed→Error + Error-in-Inbox + status-color note, the Filter→From/To and Show/Include relabels, the Templates-below + Compose→Editor note, the Plans/Documents "Editor" header + inline-buttons note). **Remove the Ultraplan clause from B4.** Treat **C7** (attention ramp) as closed by the Inbox sections. **Leave** the out-of-scope Inbox notes (above) in place.
+- **`dev/notes/DESIGN_TODO.md`** — **remove the Inbox notes this refactor implements** (the Embed/Attach behavior incl. "all of this new behavior needs to be wired up", the compose linked-docs/assets cards, the Failed→Error + Error-in-Inbox + status-color note, the Filter→From/To and Show/Include relabels, the Templates-below + Compose→Editor note, the Plans/Documents "Editor" header + inline-buttons note). **Remove the Ultraplan clause from B4.** Treat **C7** (attention ramp) as closed by the Inbox sections. **Leave** the out-of-scope Inbox notes (above) in place.
 
 ## Finish
 
