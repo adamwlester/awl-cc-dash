@@ -113,6 +113,12 @@ No `testpaths` is configured — pass the path you want to run.
 
 ## Behavioral rules
 
+### Git — never branch without express permission
+Work happens on **`main`**. Commit normal work directly to `main`; do **not** create or switch to a new branch, and do not push one, without my explicit, in-conversation go-ahead.
+- **This overrides the harness default.** The built-in Bash guidance ("if on the default branch, branch first") does **not** apply in this repo — never auto-create a `feature/*` (or any) branch as a side effect of starting work. This binds **every agent and subagent**, including autonomous, batch, and background runs.
+- **Branch-creating commands require a yes first:** `git checkout -b` / `-B`, `git switch -c` / `-C`, `git branch <name>`, and `git worktree add`. These are gated in [`.claude/settings.json`](.claude/settings.json) (`ask`), so they will prompt — if one prompts, **stop and ask**, don't work around it. Read-only git (`status`, `log`, `branch -vv`, `diff`) and committing to `main` stay free; `git push` stays gated as before.
+- **If a task genuinely needs branch isolation,** say so and wait for my explicit approval before creating anything. When approved and the work is merged, merge back to `main` and delete the branch rather than leaving it to accumulate.
+
 ### Scope & safety
 - Stay inside the project directory for all operations unless explicitly told otherwise.
 - When touching global config (`~/.claude/`, etc.), explain the change before making it.

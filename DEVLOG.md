@@ -1039,7 +1039,11 @@ Files: branch topology / DEVLOG.md (no product file contents changed by the merg
 
 ---
 
-## Archived history
+### 2026-07-01 00:49:20 — Rule + enforced gate: agents must not branch without permission
+
+Added a **new first entry** to CLAUDE.md's Behavioral rules — "Git — never branch without express permission" — that overrides the harness "branch off the default branch" default: work stays on `main`, branch-creating commands need an explicit yes, and approved branches get merged back + deleted. Backed it with an enforced guardrail in `.claude/settings.json`: restored the (removed) `git push` `ask` gates and added `git checkout -b/-B`, `git switch -c/-C`, `git branch *`, and `git worktree add *` to `ask`, so those prompt (they override the blanket `Bash(git *)` allow). Note: `git branch <listing>` (e.g. `-vv`) now also prompts — acceptable friction, can narrow later.
+
+Files: CLAUDE.md, .claude/settings.json, DEVLOG.md
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
