@@ -434,6 +434,22 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-02 04:01:29 — codex: add AGENTS.md entry point
+
+Added a root `AGENTS.md` for Codex sessions. It points agents to `CLAUDE.md` as the primary project guide, explains that Codex is being used as support capacity to continue focused repo work while Claude Code / Claude Max plan tokens are limited, and repeats the key working rules that matter before editing.
+
+Files: AGENTS.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:03:29 — claude guide: note Codex entry point
+
+Added `AGENTS.md` to the `CLAUDE.md` Key files table so Claude agents understand that it is the Codex-specific entry point, points back to the Claude guide, and exists as coordination context for support work while Claude Max tokens are constrained.
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
