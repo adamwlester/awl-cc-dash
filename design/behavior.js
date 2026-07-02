@@ -1722,7 +1722,7 @@ resize intact.`,
         </ul>
         <h5>Needs you</h5>
         <ul>
-          <li>5 open Inbox requests — <b class="k">drew</b> error — staging unreachable (14:48), <b class="k">rowan</b> warning — max turns reached, paused (14:46), <b class="k">sage</b> permission (deploy gate, 14:43), <b class="k">sandy</b> plan to merge (14:41), and <b class="k">vega</b> decision on rotation strategy (14:44).</li>
+          <li>6 open Inbox requests — <b class="k">drew</b> error — staging unreachable (14:48), <b class="k">rowan</b> warning — max turns reached, paused (14:46), <b class="k">sage</b> permission (deploy gate, 14:43), <b class="k">sandy</b> plan to merge (14:41) + permission to edit settings.json (14:42), and <b class="k">vega</b> decision on rotation strategy (14:44).</li>
         </ul>
         <p class="fo-sub">Generated from all 9 log entries · mock summary</p>`}
   };
@@ -1755,6 +1755,7 @@ resize intact.`,
   const REQS=[
     {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'},
     {ag:'sandy',type:'plan',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
+    {ag:'sandy',type:'permission',time:'14:42',title:'Edit settings.json',cmd:'apply patch → .claude/settings.json (add rotation-hook allow rule)'},
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},

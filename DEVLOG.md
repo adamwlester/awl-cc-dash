@@ -304,6 +304,14 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-01 18:08:32 — design: sandy dual-dropdown demo card + OD-11 run-strip segment-recolor demo coverage
+
+Closed the two remaining design gaps across the six-file system (map→implement→review workflow + main-loop triage + browser verify). **Task 1 (sandy dual-dropdown):** node-1 now carries both drawers so they can be driven open together — added a 2nd `sandy` REQS item (`type:'permission'`, "Edit settings.json" → envelope count 2) and replaced her `subs-empty` footer with a populated 6-badge `.subs-acc` (A1–A6, mixed: 4 active / 1 idle / 1 error), modeled on node-4. **Task 2 (OD-11 coverage):** converted the three flat `run-pending` bars — node-5 rowan (Step 5/5, max turns), node-7 vega (Step 3/5, sign-off), node-11 sage (Step 4/6, permission) — to segmented `run-seg` bars with a single `.rseg.cur.cur-paused`, dropping the fabricated `width:%` fills (node-3 drew's flat `run-error` left intact as the whole-run fallback). Propagated to `gallery.html`: synced the agent-node-card live mirror (6 badges + ✉2), added a 6-badge node-subagents specimen, and added a "paused BETWEEN steps" run-strip specimen (warm on the *next* segment); reconciled the hand-written line-1725 overview count (5→6, sandy's permission added). No `tokens.css`/`styles.css`/`DESIGN.md` change (reuse-only — existing tokens/classes cover every value). Verified: `node --check` clean; browser-driven at wide (1920) + narrow (182px) with **both drawers open on sandy at once** (zero overflow, card grows downward), all three converts segmented with no fabricated widths, drew unchanged, and the three new/updated gallery specimens — headless loop closed with a headed parity pass.
+
+Files: design/behavior.js, design/mockup.html, design/gallery.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

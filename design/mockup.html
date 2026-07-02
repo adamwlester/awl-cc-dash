@@ -901,7 +901,7 @@
                         <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A3 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A3</span><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent A4 — idle · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A4</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A5 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A5</span><span data-comp="subagent-badge" class="sbadge sb-error" title="subagent A6 — error · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A6</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cobalt)">
@@ -997,7 +997,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:100%;background:var(--danger)"></i></div><span class="nbv">50/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-pending"><i style="width:100%"></i></div>
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 5 of 5 · Synthesize source findings (paused — max turns reached)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
                         <span class="trk a">max turns reached — paused for your input&nbsp;&nbsp;·&nbsp;&nbsp;50/50 turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
@@ -1046,7 +1046,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:94%;background:var(--danger)"></i></div><span class="nbv">47/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-pending"><i style="width:45%"></i></div>
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 3 of 5 · Post review verdict (paused — needs your sign-off)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;review needs your sign-off&nbsp;&nbsp;·&nbsp;&nbsp;</span>
@@ -1148,7 +1148,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:72%;background:var(--warning)"></i></div><span class="nbv">36/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-pending"><i style="width:40%"></i></div>
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 4 of 6 · Deploy to staging (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on deploy step&nbsp;&nbsp;·&nbsp;&nbsp;</span>
