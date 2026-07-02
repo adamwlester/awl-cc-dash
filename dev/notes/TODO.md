@@ -1,4 +1,4 @@
-# Dashboard TODO — design & backend backlog
+# DASHBOARD TODO — DESIGN & BACKEND BACKLOG
 
 > **⚠ Backlog is reference-only; "Next up" is the one actionable section.** For the lettered backlog sections (D · B · H), agents must not implement anything, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. The exception is **Next up**: items there are approved for work, and being directed to that section is itself the signal to build them (see its instructions). This is otherwise a capture-and-triage doc.
 >
@@ -6,7 +6,7 @@
 >
 > **How it's used** — The human writes rough notes under **Inbox**; an agent files each into the right section. Work gets driven either by promoting an item into **Next up** (then directing an agent there to implement it; the human removes it after reviewing) or by cutting any item into a fresh prompt. Nothing in the backlog is a work order until that happens.
 
-## How agents maintain this list
+## HOW AGENTS MAINTAIN THIS LIST
 
 > **Verify first.** Before adding or reordering, check the item against the current system — the design files for design items, the app code for backend items — and confirm it isn't already built. Drop anything already implemented; trim partly-built items to just the remaining gap.
 >
@@ -32,7 +32,7 @@
 > 3. **Disambiguate references.** If the human used the wrong term, a loose label, or shorthand, map it to the actual component/feature name as it appears in `design/mockup.html` (or the relevant app module) so it's unambiguous what's being referenced. If you genuinely can't tell what's meant, keep the original wording and flag it rather than guess.
 > 4. Delete it from the Inbox once filed, so the bucket stays empty for next time.
 
-## D — Design
+## D — DESIGN
 
 > UI/UX work staged in the design system (`design/` — the mockup, tokens, DESIGN.md).
 
@@ -42,7 +42,7 @@
 4. **Save Response Summary:** Add a save action for summaries — the Summarize slide-over is copy-only today (the Export control saves raw selections, not generated summaries).
 5. **Notes Hub:** Centralize my own notes somewhere in the dashboard — a project `notes.md` exists in Library → Documents, but there's no dedicated notes surface.
 
-## B — Backend
+## B — BACKEND
 
 > Features needing real backend/runtime work (`sidecar/`, `bridge/`, the `frontend/` app).
 
@@ -62,7 +62,7 @@
 14. **AI-Touched Tracking (open):** Track what AI has touched with a local file per directory (e.g. `index.md`).
 15. **Asset Sourcing (open):** Check that skills and other special CC assets are pulled from the ideal source.
 
-## H — Housekeeping & docs
+## H — HOUSEKEEPING & DOCS
 
 > Maintenance, config, and documentation chores.
 
@@ -74,11 +74,11 @@
 6. **System Details Doc:** Document and maintain my system details — OS, Claude install, plugins, etc.
 7. **Config SOPs:** Write SOPs for all major system-config activities (agent, hook, skills setup).
 
-## Next up
+## NEXT UP
 
 > Active implementation queue — the one actionable section, in priority order, mixed domain. Approved for work; implement each item per the **Next up** steps in "How agents maintain this list." Leave finished items in place — the human removes them after reviewing the work. Empty by design when nothing is queued.
 
-## Inbox
+## INBOX
 
 > Rough human notes for an agent to incorporate later — one rough note per bullet. Empty by design. An agent files each into the right section per the **Inbox** steps in "How agents maintain this list" (file with a bold header, an ID for backlog sections, minimal clarity edits, disambiguate references), then clears it from this list.
 
@@ -96,7 +96,7 @@
 - The agent selector at the top of the link config needs to be a dropdown for both the agents being linked.
 - We need to include the same action strip in Documents as Plans for each of the Documents cards (eg Export, Reviewer, Revise...). Basically the same action strip as what we have in Plans cards. 
 
-## Scratch
+## SCRATCH
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 

@@ -320,6 +320,14 @@ Files: dev/notes/DESIGN_TODO.md → dev/notes/TODO.md (moved + rewritten), CLAUD
 
 ---
 
+### 2026-07-01 19:52:04 — docs: TODO.md h1/h2 heading labels → ALL CAPS
+
+Per the user, uppercased the eight `#`/`##` heading labels in `dev/notes/TODO.md` (title, HOW AGENTS MAINTAIN THIS LIST, D — DESIGN, B — BACKEND, H — HOUSEKEEPING & DOCS, NEXT UP, INBOX, SCRATCH). The `###` subheads under Scratch and all body text/prose section references left unchanged.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
