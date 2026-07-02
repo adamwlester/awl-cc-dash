@@ -450,6 +450,118 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-02 04:14:40 — architecture queue numbered with priority placeholders
+
+Numbered the eight current `docs/ARCHITECTURE.md` §10 open-question entries and preallocated empty `Priority — High`, `Priority — Medium`, and `Priority — Low` subsections at the end of the section for the next sorting pass.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:23:29 — scratch cleanup: preserved ui-snippets
+
+Cleaned the ignored `.scratch/` transient bucket per request: removed 156 non-protected top-level entries (~91 MB), including stale screenshots/logs/scripts/folders and generated verification output. Preserved `.scratch/ui-snippets/` untouched; it remains the only child under `.scratch/`.
+
+Files: .scratch/ (ignored transient cleanup; `.scratch/ui-snippets/` preserved), DEVLOG.md
+
+---
+
+### 2026-07-02 04:26:02 - docs: old note port-candidate review scratch
+
+Reviewed the three old dev notes requested (`component-inventory-and-wiring`, `component-system-spec`, and `coverage-map`) against current DESIGN/ARCHITECTURE/DEVLOG, then wrote a scratch handoff identifying which details are already absorbed, stale, or still worth centralizing.
+
+Files: dev/notes/scratch/2026-07-02-doc-port-candidates.md (new), DEVLOG.md
+
+---
+
+### 2026-07-02 04:30:15 — architecture queue sorted by priority
+
+Sorted `docs/ARCHITECTURE.md` §10 into `Priority — High`, `Priority — Medium`, and `Priority — Low` subsections per user direction, renumbering entries continuously across the subsections. Added a maintenance note that future edits must renumber entries continuously in High → Medium → Low display order.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:32:31 - docs: add TLDR to old-note port review
+
+Appended a concise TLDR to the scratch port-candidate review so the actionable candidates are scannable without reading the full analysis.
+
+Files: dev/notes/scratch/2026-07-02-doc-port-candidates.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:41:10 - docs: correct port-candidate TLDR
+
+Corrected the scratch port-candidate review after rechecking `DESIGN.md`: the mockup behavior checklist is already covered, so it is now marked as not a port candidate and removed from the TLDR's candidate list.
+
+Files: dev/notes/scratch/2026-07-02-doc-port-candidates.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:54:08 - docs: archive retired dev notes
+
+Moved the three retired dev notes into `archive/dev/notes/` for deprecation cleanup: component inventory/wiring, component system spec, and coverage map. Searched current docs/prompts for remaining references; no references were edited in this pass.
+
+Files: dev/notes/component-inventory-and-wiring.md -> archive/dev/notes/component-inventory-and-wiring.md, dev/notes/component-system-spec.md -> archive/dev/notes/component-system-spec.md, dev/notes/coverage-map.md -> archive/dev/notes/coverage-map.md, DEVLOG.md
+
+---
+
+### 2026-07-02 04:57:39 - docs: remove architecture related-docs section
+
+Removed `docs/ARCHITECTURE.md`'s trailing Related docs section so the architecture reference no longer points agents at superseded archive/provenance docs; current authority relationships remain defined in the document intro and project guide.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
+### 2026-07-02 05:00:16 - docs: audit archive notes for port candidates
+
+Audited `archive/notes/data-model-map-2026-07-01.md` and `archive/notes/open-system-decisions-2026-06-29.md` against the current architecture/design/TODO ground truth, then overwrote the scratch review with the finding that no meaningful port-worthy content remains.
+
+Files: dev/notes/scratch/2026-07-02-doc-port-candidates.md, DEVLOG.md
+
+---
+
+### 2026-07-02 05:03:07 - docs: review unverified behavior candidates
+
+Reviewed the numbered candidate source set for desired behavior that is not proven, not wired, or still lacks a clear implementation path. Wrote a concise scratch triage with 22 candidate items and recommendations, noting the moved coverage-map archive path and the highest-value follow-ups for the architecture queue.
+
+Files: dev/notes/scratch/2026-07-02-unverified-behavior-candidates.md (new), DEVLOG.md
+
+---
+
+### 2026-07-02 05:56:50 - tests: inventory current suite coverage
+
+Reviewed the live `tests/` tree, collected 428 pytest cases, and ran the hermetic subset (`395 passed, 33 deselected`). Rewrote `tests/README.md` from the stale bridge-only summary into a current inventory by file, marking what is established, what is not established, live-test caveats, and coverage gaps for app/UI smoke testing.
+
+Files: tests/README.md, DEVLOG.md
+
+---
+
+### 2026-07-02 05:59:20 - tests: add README maintenance rule
+
+Added an explicit maintenance note to `tests/README.md` that test-suite changes must keep the README's layout table and established/not-established coverage notes current.
+
+Files: tests/README.md, DEVLOG.md
+
+---
+
+### 2026-07-02 06:05:57 - tests: revert README audit rewrite
+
+Restored `tests/README.md` back to its pre-audit tracked content after the test inventory write-up proved too snapshot-like for a durable README.
+
+Files: tests/README.md, DEVLOG.md
+
+---
+
+### 2026-07-02 — reviewed + committed the Codex-session working tree
+
+Audited the uncommitted working tree from the prior Codex session before committing: confirmed the three `dev/notes/` deletions are content-identical moves into `archive/dev/notes/` (CRLF-only diff), the `ARCHITECTURE.md` §10 sort preserved all 8 open-question entries (renumbered into High/Medium/Low), and the §12 Related-docs removal only dropped pointers to now-archived docs. Nothing lost or mangled. Committed and pushed as housekeeping.
+
+Files: (review only — committing CLAUDE.md, DEVLOG.md, dev/notes/TODO.md, docs/ARCHITECTURE.md, archive/dev/notes/*, dev/notes/scratch/2026-07-02-unverified-behavior-candidates.md)
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

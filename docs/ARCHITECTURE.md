@@ -1015,7 +1015,13 @@ final intent. An entry closes one of two ways: **sorted** (a mechanism is found 
 **explicitly omitted** (a recorded decision). The body text above already states each intended behavior at
 its natural home, with a Today-marker.
 
-**Mid-run permission-mode change** *(→ §6.2, §7.11)*
+Maintenance note: when adding, removing, or moving entries, renumber them continuously across the
+priority subsections in display order (High → Medium → Low); do not restart numbering inside each
+subsection.
+
+### Priority — High
+
+**1. Mid-run permission-mode change** *(→ §6.2, §7.11)*
 - **Desired final behavior:** the operator changes an agent's permission mode live, mid-run, from the UI.
 - **Current blocker:** the CLI only cycles modes via Shift+Tab inside the TUI — no flag, no slash command,
   no API; the bridge driver doesn't advertise `set_mode` and `POST /sessions/{id}/mode` returns an honest
@@ -1025,7 +1031,7 @@ its natural home, with a Today-marker.
 - **Fallback if infeasible:** mode stays launch-only; the UI presents it as a launch-time choice, never a
   fake-live control.
 
-**True mid-run Inject** *(→ §7.3)*
+**2. True mid-run Inject** *(→ §7.3)*
 - **Desired final behavior:** an Inject-disposition message reaches a running agent immediately, mid-turn.
 - **Current blocker:** no safe arbitrary injection point exists on a live TUI; the hook channel delivers
   only at tool boundaries (`PostToolUse`) or turn end (`Stop`), so Inject degrades to Next/Queue.
@@ -1034,32 +1040,7 @@ its natural home, with a Today-marker.
 - **Fallback if infeasible:** hook-boundary delivery plus the transparent Next/Queue degrade is the final
   model.
 
-**Real run-strip completion %** *(→ §7.10)*
-- **Desired final behavior:** the run-strip shows a genuine completion percentage for every run.
-- **Current blocker:** the engine emits no progress signal; the only honest source is the self-reported
-  checklist, and without one the strip shows barber-pole indeterminate.
-- **Research/POC must establish:** whether any engine-side signal (transcript structure, todo-tool events)
-  yields a trustworthy progress measure beyond the checklist mandate.
-- **Fallback if infeasible:** checklist self-report with the barber-pole floor is the final model.
-
-**Per-agent cost** *(→ §7.15)*
-- **Desired final behavior:** live per-agent cost/usage figures on each card.
-- **Current blocker:** the bridge emits no cost data at all; any displayed number would be fabricated, so
-  none is shown for bridge agents.
-- **Research/POC must establish:** whether per-session token/cost data can be harvested reliably (JSONL
-  usage fields, `/cost` output scraped via the console path, or an engine telemetry surface).
-- **Fallback if infeasible:** no per-agent cost is shown (an honest boundary, not a missing feature); the
-  account-level usage band (§7.15) remains the cost surface.
-
-**Subagent pending-vs-active status** *(→ §7.17)*
-- **Desired final behavior:** each subagent shows live pending vs active state.
-- **Current blocker:** the bridge cannot distinguish a pending subagent from an active one — identity,
-  naming, and transcript ingestion work, but live status cannot be shown honestly.
-- **Research/POC must establish:** whether subagent-transcript activity (file mtime / last-event recency)
-  or hook context inside the subagent gives a reliable active signal.
-- **Fallback if infeasible:** subagents are listed without a pending/active distinction.
-
-**Console rendering fidelity** *(→ §7.13)*
+**3. Console rendering fidelity** *(→ §7.13)*
 - **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors,
   spinners, and box-drawing.
 - **Current blocker:** plain `capture-pane` output drops ANSI styling; faithful rendering needs `-e`
@@ -1068,7 +1049,35 @@ its natural home, with a Today-marker.
   approximation.
 - **Fallback if infeasible:** a clean plain-text mirror.
 
-**One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)*
+**4. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)*
+- **Desired final behavior:** `ExitPlanMode` / `AskUserQuestion` surface as Plan/Decision inbox cards, and
+  plan-approve from the dashboard resumes the agent out of plan mode.
+- **Current blocker:** `PreToolUse` hook behavior for these tools under the bridge is unproven, and no
+  verified resume-out-of-plan-mode path exists.
+- **Research/POC must establish:** a spike proving the hooks fire with usable payloads, and whether the
+  hook response (or a `keys()` sequence) can drive approval/resume.
+- **Fallback if infeasible:** detect-and-surface — notify-only cards from transcript/screen detection, with
+  the operator answering via the Console passthrough.
+
+### Priority — Medium
+
+**5. Real run-strip completion %** *(→ §7.10)*
+- **Desired final behavior:** the run-strip shows a genuine completion percentage for every run.
+- **Current blocker:** the engine emits no progress signal; the only honest source is the self-reported
+  checklist, and without one the strip shows barber-pole indeterminate.
+- **Research/POC must establish:** whether any engine-side signal (transcript structure, todo-tool events)
+  yields a trustworthy progress measure beyond the checklist mandate.
+- **Fallback if infeasible:** checklist self-report with the barber-pole floor is the final model.
+
+**6. Subagent pending-vs-active status** *(→ §7.17)*
+- **Desired final behavior:** each subagent shows live pending vs active state.
+- **Current blocker:** the bridge cannot distinguish a pending subagent from an active one — identity,
+  naming, and transcript ingestion work, but live status cannot be shown honestly.
+- **Research/POC must establish:** whether subagent-transcript activity (file mtime / last-event recency)
+  or hook context inside the subagent gives a reliable active signal.
+- **Fallback if infeasible:** subagents are listed without a pending/active distinction.
+
+**7. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)*
 - **Desired final behavior:** one icon starts everything; quitting tears it down cleanly through the same
   close dialog as §3.4.
 - **Current blocker:** Electron main is deliberately frontend-only; owning the sidecar means owning the
@@ -1078,15 +1087,16 @@ its natural home, with a Today-marker.
   detach-on-close semantics.
 - **Fallback if infeasible:** `start-dashboard.bat` two-process launch stays the shipped model (§2).
 
-**Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)*
-- **Desired final behavior:** `ExitPlanMode` / `AskUserQuestion` surface as Plan/Decision inbox cards, and
-  plan-approve from the dashboard resumes the agent out of plan mode.
-- **Current blocker:** `PreToolUse` hook behavior for these tools under the bridge is unproven, and no
-  verified resume-out-of-plan-mode path exists.
-- **Research/POC must establish:** a spike proving the hooks fire with usable payloads, and whether the
-  hook response (or a `keys()` sequence) can drive approval/resume.
-- **Fallback if infeasible:** detect-and-surface — notify-only cards from transcript/screen detection, with
-  the operator answering via the Console passthrough.
+### Priority — Low
+
+**8. Per-agent cost** *(→ §7.15)*
+- **Desired final behavior:** live per-agent cost/usage figures on each card.
+- **Current blocker:** the bridge emits no cost data at all; any displayed number would be fabricated, so
+  none is shown for bridge agents.
+- **Research/POC must establish:** whether per-session token/cost data can be harvested reliably (JSONL
+  usage fields, `/cost` output scraped via the console path, or an engine telemetry surface).
+- **Fallback if infeasible:** no per-agent cost is shown (an honest boundary, not a missing feature); the
+  account-level usage band (§7.15) remains the cost surface.
 
 ---
 
@@ -1103,19 +1113,3 @@ its natural home, with a Today-marker.
 | `links.py` · `scratchpad.py` · `watermark.py` · `library.py` · `templates_store.py` · `console_catalog.py` · `checklist.py` · `marquee.py` · `subagents_naming.py` · `settings_io.py` · `utility_llm.py` | Coordination-spine feature modules: linking · scratchpad · read-watermarks · library · templates · console catalog · checklist parse · marquee tail · subagent naming · settings read/write · utility-LLM passes |
 | [`bridge/bridge.py`](../bridge/bridge.py) · `transcript.py` · `paths.py` · `mcp.py` · `registry.py` | tmux/WSL2 control · JSONL transcript resolution · path/net translation · MCP sync · Settings reads |
 | [`start-dashboard.bat`](../start-dashboard.bat) | Launches sidecar + Electron together (§2) |
-
----
-
-## 12. Related docs
-
-- [`design/DESIGN.md`](../design/DESIGN.md) — UI/UX intent: the three-column layout, every panel, the
-  design system. The `design/` mockup is the **visual authority**.
-- [`archive/notes/open-system-decisions-2026-06-29.md`](../archive/notes/open-system-decisions-2026-06-29.md)
-  — the archived decision tracker. Historical decision ids of the form `OD-NN` found in DEVLOG entries and
-  archives resolve there, with the full original deliberation (forks weighed, confidence, rationale); this
-  doc's body carries every one of those decisions as plain prose.
-- [`archive/notes/data-model-map-2026-07-01.md`](../archive/notes/data-model-map-2026-07-01.md) — the
-  archived storage/data-model source that §8 was ported from; historical background only.
-- [`dev/notes/coverage-map.md`](../dev/notes/coverage-map.md) — historical bridge-observability reference:
-  what the bridge can physically observe.
-- [`DEVLOG.md`](../DEVLOG.md) — append-only chronology; the authority on what changed when.

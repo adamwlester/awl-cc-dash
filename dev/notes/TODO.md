@@ -134,3 +134,4 @@
 - Need to track compaction history in context dropdown. Count and what type and when based on turns and time. Maybe put in the rewind/handoff list
 - Output options should include tldr tables with tests/checks and emojis signaling status.
 - I suspect we need support for "workflows" but I need to research these more.
+- All commits need to include an agent id.

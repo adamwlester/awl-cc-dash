@@ -37,11 +37,10 @@ Cross-cutting docs every session should know about — read the relevant one bef
 
 | File | What it is |
 |------|------------|
-| `AGENTS.md` | Codex-specific entry point: points Codex sessions back to this guide and explains that Codex agents are support capacity for focused implementation, review, docs, testing, and repo-management work while Claude Max tokens are constrained. Claude agents should treat it as coordination context, not a replacement for this guide. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The **final-vision system reference** — the intended final system, written as settled architecture: the processes (Electron ↔ FastAPI sidecar `:7690` ↔ driver seam ↔ tmux/WSL2 bridge), the one-project product model, the coordination spine, and the storage model, with every product decision woven into the prose and **"⚠ Today"** markers wherever code hasn't caught up. **The doc leads the build**: builds converge on it and clear markers (the build queue is `dev/notes/TODO.md` → NEXT UP — BUILD); its text changes only when a decision changes. The system counterpart to DESIGN.md (UI intent) and DEVLOG.md (history). |
 | `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling) — the **recent window**. **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. Older entries are rotated into `archive/devlog/` and summarized in the file's **Archived history** index; read those archives **on demand** only when a task needs older history, not by default. |
 | `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the mockups in `design/` (authority: `mockup.html`, with values in `tokens.css`) own the exact visuals. |
-| `archive/dev/notes/repo-migration.md` | Loose, possibly-stale notes from the sandbox→awl-cc-dash migration (target layout, what moved where) — now archived. Background only — trust the actual files over it. |
+| `AGENTS.md` | Codex-specific entry point: points Codex sessions back to this guide and explains that Codex agents are support capacity for focused implementation, review, docs, testing, and repo-management work while Claude Max tokens are constrained. Claude agents should treat it as coordination context, not a replacement for this guide. |
 
 ## Custom Tooling
 
