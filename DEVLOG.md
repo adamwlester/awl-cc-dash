@@ -378,6 +378,14 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-01 22:46:09 — chore: commit leftover design-v11p7 archive snapshot
+
+Tree-cleanup checkpoint while committing + syncing the repo: committed the untracked `archive/design/design-v11p7/` — a concurrent session's snapshot of the six design-system files + `mockup-toolkit.js` (file dates 2026-07-01 16:05–17:25), following the same leftover-checkpoint precedent as `design-v11p6`. Committed, not authored, by this session.
+
+Files: archive/design/design-v11p7/ (7 files), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
