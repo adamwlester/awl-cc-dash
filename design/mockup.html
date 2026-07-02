@@ -672,6 +672,8 @@
                 <div class="summary-row"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
               <div class="acc mb-2.5" id="turns-bd-panel"></div>
+              <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above -->
+              <div class="sec-h">Timeline</div>
               <div data-comp="timeline-mode-switcher" class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
@@ -685,10 +687,11 @@
 
             <!-- OD-13: Subagents audit — read-only history of the focused agent’s subagents, grouped by run. Below the Timeline, above the Retire/Delete footer. The graph-card badge click opens this + highlights the matching row (resolves OQ-1). Representative content; repaints per focused agent in the app. -->
             <div data-comp="subagents-accordion" class="subs-audit" id="det-subs-audit">
-              <button class="subs-audit-head" type="button" onclick="toggleSubsAudit(this)" aria-expanded="false"><i data-lucide="chevron-right" class="sa-chev"></i><span class="sa-title">Subagents</span><span class="sa-count">8</span><span class="sa-hint">read-only audit history</span></button>
+              <button class="subs-audit-head" type="button" onclick="toggleSubsAudit(this)" aria-expanded="false"><i data-lucide="chevron-right" class="sa-chev"></i><span class="sa-title">Subagents</span><span class="sa-count">6</span><span class="sa-hint">read-only audit history</span></button>
               <div class="subs-audit-body">
+                <!-- Next-up item 6: the audit mirrors sandy's graph-card subagent strip (A1–A6, the ground truth — same ids, same run-states, one run), so the Agent panel can't disagree with the card. -->
                 <div class="sa-run">
-                  <div class="sa-run-h">Run A <span class="sa-run-n">· 3 subagents</span></div>
+                  <div class="sa-run-h">Run A <span class="sa-run-n">· 6 subagents</span></div>
                   <div class="sa-row" data-sub="A1">
                     <div class="sa-row-top"><span class="sbadge sb-active">A1</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A1’s transcript" onclick="toast('Open subagent A1 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Map the JWT-middleware call-sites and every validateToken() path</div>
@@ -700,40 +703,24 @@
                     <div class="sa-usage"><span>9.1k tok</span><span class="sep">·</span><span>24 tools</span><span class="sep">·</span><span>1m 48s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
                   </div>
                   <div class="sa-row" data-sub="A3">
-                    <div class="sa-row-top"><span class="sbadge sb-idle">A3</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-done">done</span><button class="ghost-ic sa-tx" title="Open subagent A3’s transcript" onclick="toast('Open subagent A3 transcript')"><i data-lucide="file-text"></i></button></div>
-                    <div class="sa-task">Inventory the auth tests and their coverage gaps</div>
-                    <div class="sa-usage"><span>6.7k tok</span><span class="sep">·</span><span>19 tools</span><span class="sep">·</span><span>1m 02s</span><span class="sep">·</span><span>haiku 4.5</span></div>
-                  </div>
-                </div>
-                <div class="sa-run">
-                  <div class="sa-run-h">Run B <span class="sa-run-n">· 3 subagents</span></div>
-                  <div class="sa-row" data-sub="B1">
-                    <div class="sa-row-top"><span class="sbadge sb-idle">B1</span><span class="sa-type">code-reviewer</span><span class="sa-status sa-st-done">done</span><button class="ghost-ic sa-tx" title="Open subagent B1’s transcript" onclick="toast('Open subagent B1 transcript')"><i data-lucide="file-text"></i></button></div>
-                    <div class="sa-task">Review the expiry-check patch against the remediation plan</div>
-                    <div class="sa-usage"><span>8.2k tok</span><span class="sep">·</span><span>12 tools</span><span class="sep">·</span><span>0m 54s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
-                  </div>
-                  <div class="sa-row" data-sub="B2">
-                    <div class="sa-row-top"><span class="sbadge sb-active">B2</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent B2’s transcript" onclick="toast('Open subagent B2 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span class="sbadge sb-active">A3</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A3’s transcript" onclick="toast('Open subagent A3 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Find every place the staging smoke test asserts expiry</div>
                     <div class="sa-usage"><span>4.0k tok</span><span class="sep">·</span><span>11 tools</span><span class="sep">·</span><span>0m 31s</span><span class="sep">·</span><span>haiku 4.5</span></div>
                   </div>
-                  <div class="sa-row" data-sub="B3">
-                    <div class="sa-row-top"><span class="sbadge sb-error">B3</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-error">error</span><button class="ghost-ic sa-tx" title="Open subagent B3’s transcript" onclick="toast('Open subagent B3 transcript')"><i data-lucide="file-text"></i></button></div>
+                  <div class="sa-row" data-sub="A4">
+                    <div class="sa-row-top"><span class="sbadge sb-idle">A4</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-done">done</span><button class="ghost-ic sa-tx" title="Open subagent A4’s transcript" onclick="toast('Open subagent A4 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-task">Inventory the auth tests and their coverage gaps</div>
+                    <div class="sa-usage"><span>6.7k tok</span><span class="sep">·</span><span>19 tools</span><span class="sep">·</span><span>1m 02s</span><span class="sep">·</span><span>haiku 4.5</span></div>
+                  </div>
+                  <div class="sa-row" data-sub="A5">
+                    <div class="sa-row-top"><span class="sbadge sb-active">A5</span><span class="sa-type">code-reviewer</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A5’s transcript" onclick="toast('Open subagent A5 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-task">Review the expiry-check patch against the remediation plan</div>
+                    <div class="sa-usage"><span>8.2k tok</span><span class="sep">·</span><span>12 tools</span><span class="sep">·</span><span>0m 54s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
+                  </div>
+                  <div class="sa-row" data-sub="A6">
+                    <div class="sa-row-top"><span class="sbadge sb-error">A6</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-error">error</span><button class="ghost-ic sa-tx" title="Open subagent A6’s transcript" onclick="toast('Open subagent A6 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Reproduce the ECONNREFUSED on the rotation branch</div>
                     <div class="sa-usage"><span>2.1k tok</span><span class="sep">·</span><span>6 tools</span><span class="sep">·</span><span>0m 18s</span><span class="sep">·</span><span>haiku 4.5</span></div>
-                  </div>
-                </div>
-                <div class="sa-run">
-                  <div class="sa-run-h">Run C <span class="sa-run-n">· 2 subagents</span></div>
-                  <div class="sa-row" data-sub="C1">
-                    <div class="sa-row-top"><span class="sbadge sb-idle">C1</span><span class="sa-type">Plan</span><span class="sa-status sa-st-done">done</span><button class="ghost-ic sa-tx" title="Open subagent C1’s transcript" onclick="toast('Open subagent C1 transcript')"><i data-lucide="file-text"></i></button></div>
-                    <div class="sa-task">Draft the token-rotation remediation steps for review</div>
-                    <div class="sa-usage"><span>5.5k tok</span><span class="sep">·</span><span>9 tools</span><span class="sep">·</span><span>0m 41s</span><span class="sep">·</span><span>opus 4.8</span></div>
-                  </div>
-                  <div class="sa-row" data-sub="C2">
-                    <div class="sa-row-top"><span class="sbadge sb-active">C2</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent C2’s transcript" onclick="toast('Open subagent C2 transcript')"><i data-lucide="file-text"></i></button></div>
-                    <div class="sa-task">Cross-check the fix against OWASP session-management guidance</div>
-                    <div class="sa-usage"><span>7.3k tok</span><span class="sep">·</span><span>16 tools</span><span class="sep">·</span><span>1m 12s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
                   </div>
                 </div>
               </div>
@@ -1388,21 +1375,48 @@ Short-lived notes for the current run — kept brief on purpose.
         <div data-comp="link-drawer" data-status="planned" id="link-drawer" class="hidden drawer">
           <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
           <div class="p-3 space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5 min-w-0"><span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">researcher</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 sandy</span></span></div>
-              <button data-comp="direction-cycler" id="link-dir" data-dir="ab" onclick="cycleDir(this)" class="dir-cyc" title="A → B">→</button>
-              <div class="flex items-center gap-1.5 min-w-0 justify-end"><span class="agtile" style="width:24px;height:24px;color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="leading-tight min-w-0"><span class="block text-[8px] text-muted font-bold uppercase">synthesizer</span><span class="block text-[11px] font-heading text-foreground truncate" style="font-weight:900">01 kai</span></span></div>
+            <!-- Next-up item 11: the agent pair is two single-select agent dropdowns (the Compose-From source-dropdown
+                 pattern — .src-dd.single + .dd-trig + .src-pop/.aglist, driven by the shared toggleSrcPop/pickSource);
+                 the Team Graph selection still prepopulates them (sandy/kai here = the demo prepopulation), and either
+                 endpoint can be re-picked from the drawer. Next-up items 3+18 on the cycler between them: defaults to
+                 A↔B (both), and the glyphs are Lucide arrows (arrow-right / arrow-left / arrow-left-right), navy ink. -->
+            <div class="link-pair flex items-center gap-2">
+              <div data-comp="source-dropdown" class="src-dd dd single flex-1 min-w-0" id="link-a-dd">
+                <button class="dd-trig" type="button" onclick="toggleSrcPop(this)">
+                  <span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+                  <span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span>
+                  <i data-lucide="chevrons-up-down" class="picker-cv"></i>
+                </button>
+                <div class="src-pop">
+                  <!-- Next-up item 6: the endpoint list renders from the shared roster (agents only) — stays an anchored popover (item 8 converts only the sub-bar selectors) -->
+                  <div data-comp="agent-list" class="aglist" data-agroster="source-agents" data-on="sandy"></div>
+                </div>
+              </div>
+              <button data-comp="direction-cycler" id="link-dir" data-dir="both" onclick="cycleDir(this)" class="dir-cyc" title="A ↔ B (both)"><i data-lucide="arrow-left-right"></i></button>
+              <div data-comp="source-dropdown" class="src-dd dd single flex-1 min-w-0" id="link-b-dd">
+                <button class="dd-trig" type="button" onclick="toggleSrcPop(this)">
+                  <span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span>
+                  <span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span>
+                  <i data-lucide="chevrons-up-down" class="picker-cv"></i>
+                </button>
+                <div class="src-pop src-pop--right">
+                  <!-- Next-up item 6: the endpoint list renders from the shared roster (agents only) — stays an anchored popover (item 8 converts only the sub-bar selectors) -->
+                  <div data-comp="agent-list" class="aglist" data-agroster="source-agents" data-on="kai"></div>
+                </div>
+              </div>
             </div>
-            <!-- OD-06: Relationship — a MULTI-toggle (a link can be both). Direct messaging = reply-to conversation (OD-04); Shared context = passive awareness, revealing its own content-type filter (the Messages Content taxonomy) + a one-time "share all prior context" backfill switch (default off). Replaces the old single-select Payload segment. -->
+            <!-- OD-06 (amended, next-up item 17): Relationship — a SINGLE-select segment: ONE relationship per link (wanting both = two links; supersedes "a link can be both"). Direct messaging = reply-to conversation (OD-04); Shared context = passive awareness, revealing its own content-type filter (the Messages Content taxonomy) + a one-time "share all prior context" backfill switch (default off) — both scoped to SC links. Picking a relationship re-defaults the Trigger dropdown below (DM → Queue · SC → Piggyback); SC keeps the FULL trigger menu (no gating). -->
             <div>
-              <label class="lbl mb-1.5">Relationship <span class="text-muted-2 font-semibold normal-case">— a link can be both</span></label>
-              <div class="flex flex-wrap gap-1.5">
-                <button data-comp="mini-toggle" class="minitog on" data-rel="direct" onclick="linkRel(this)" title="Reply-to conversation between the two agents"><i data-lucide="messages-square"></i>Direct messaging</button>
-                <button class="minitog" data-rel="shared" onclick="linkRel(this)" title="Passive awareness — the target sees the source's selected context, piggybacked on its next prompt"><i data-lucide="radio"></i>Shared context</button>
+              <label class="lbl mb-1.5">Relationship <span class="text-muted-2 font-semibold normal-case">— one per link; both = two links</span></label>
+              <div data-comp="segmented-control" class="seg">
+                <button class="active" data-rel="direct" onclick="linkRel(this)" title="Reply-to conversation between the two agents">Direct messaging</button>
+                <button data-rel="shared" onclick="linkRel(this)" title="Passive awareness — the target sees the source's selected context, delivered per the link's Trigger (default Piggyback — rides the target's next inbound message)">Shared context</button>
               </div>
               <div class="link-shared hidden">
                 <label class="lbl mb-1.5">Shared content <span class="text-muted-2 font-semibold normal-case">— what rides along</span></label>
                 <div class="flex flex-wrap gap-1.5">
+                  <!-- Next-up item 4: Text mirrored here from the Messages Content filter (the two deliberately share one taxonomy) — without it a share never carries what the agent actually said -->
+                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
                   <button class="minitog on" onclick="linkRel(this)">Thoughts</button>
                   <button class="minitog" onclick="linkRel(this)">Read</button>
                   <button class="minitog" onclick="linkRel(this)">Write</button>
@@ -1416,7 +1430,21 @@ Short-lived notes for the current run — kept brief on purpose.
                 </div>
               </div>
             </div>
-            <div><label class="lbl mb-1.5">Trigger</label><div class="seg"><button onclick="segPick(this)">Now</button><button onclick="segPick(this)">Inject</button><button onclick="segPick(this)">Next</button><button class="active" onclick="segPick(this)">Queue</button><button onclick="segPick(this)">Hold</button></div></div>
+            <!-- Next-up item 17: Trigger is a DROPDOWN (menu selector — six options with descriptions exceed an inline segment), its items styled like the Send split-button timing menu (bold label + one-line description). Piggyback is link-only and never initiates. Defaults per relationship: DM → Queue (selected here) · SC → Piggyback; linkRel re-defaults it on a relationship change. -->
+            <div><label class="lbl mb-1.5">Trigger</label>
+              <div data-comp="trigger-dropdown" class="trig-dd">
+                <button class="trig-trig" type="button" onclick="event.stopPropagation();toggleSplitMenu(this)"><span class="trig-lbl">Queue</span><i data-lucide="chevron-down" class="trig-cv"></i></button>
+                <div class="split-menu">
+                  <div class="split-menu-h">When the link delivers</div>
+                  <button class="split-mi" onclick="pickTrig(this)"><span class="lead"><b>Now</b><span class="sub">Interrupt &amp; deliver immediately</span></span><span class="ck">✓</span></button>
+                  <button class="split-mi" onclick="pickTrig(this)"><span class="lead"><b>Inject</b><span class="sub">Deliver to the running target without stopping it</span></span><span class="ck">✓</span></button>
+                  <button class="split-mi" onclick="pickTrig(this)"><span class="lead"><b>Next</b><span class="sub">Deliver at the target's next turn boundary</span></span><span class="ck">✓</span></button>
+                  <button class="split-mi sel" onclick="pickTrig(this)"><span class="lead"><b>Queue</b><span class="sub">Add to the target's prompt queue — the Direct-messaging default</span></span><span class="ck">✓</span></button>
+                  <button class="split-mi" onclick="pickTrig(this)"><span class="lead"><b>Hold</b><span class="sub">Stage for your manual approval before it's sent</span></span><span class="ck">✓</span></button>
+                  <button class="split-mi" onclick="pickTrig(this)"><span class="lead"><b>Piggyback</b><span class="sub">Never initiates — rides the target's next inbound message, from any source · the Shared-context default</span></span><span class="ck">✓</span></button>
+                </div>
+              </div>
+            </div>
             <div>
               <label class="lbl mb-1.5">End After <span class="text-muted-2 font-semibold normal-case">— no limit unless set</span></label>
               <div class="grid grid-cols-2 gap-2">
@@ -1425,9 +1453,8 @@ Short-lived notes for the current run — kept brief on purpose.
               </div>
             </div>
             <div class="flex gap-2 pt-1"><button data-status="planned" class="btn-main flex-1" onclick="linkSave()">Save</button><button data-status="planned" class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div><!-- planned: linkSave/linkDelete are toast + counter only -->
-            <!-- OD-08: link tracking list — every configured link, grouped by agent (each link double-listed under BOTH its agents), each entry showing the other agent + a →/←/↔ arrow relative to that group's agent (the same arrow vocabulary as the pair row). Reuses the registry group-header/row language. -->
+            <!-- OD-08 (amended, next-up item 17): link tracking list — collapsible Active Links / Expired Links sections (the section carries the state; NO gray-out on expired rows) replacing the old static "All links — grouped by agent" heading. Inside each section, links group by agent (double-listed under BOTH endpoints, entries sorted peer-adjacent), each entry showing a directional arrow relative to that group's agent (Lucide arrow-right/arrow-left/arrow-left-right — next-up item 18) + the other agent + its FULL relationship label (one relationship per link). Group-header identity badges carry the corner-count overlay badge (teal >0 / muted at none — the node-inbox envelope convention). Rendered by renderLinkList. -->
             <div>
-              <label class="lbl mb-1.5">All links <span class="text-muted-2 font-semibold normal-case">— grouped by agent</span></label>
               <div data-comp="link-list" id="link-list" class="link-list"></div>
             </div>
           </div>
@@ -1443,7 +1470,7 @@ Short-lived notes for the current run — kept brief on purpose.
             <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
             <button data-tab-group="feed" data-tab="log" onclick="switchTab('feed','log')" class="tab-btn">Log</button>
-            <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span data-comp="count-chip" class="req-badge ml-1" id="inbox-badge">4</span></button>
+            <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span data-comp="count-chip" class="req-badge ml-1" id="inbox-badge">9</span></button>
           </div>
         </div>
         <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
@@ -1451,28 +1478,12 @@ Short-lived notes for the current run — kept brief on purpose.
           <!-- v9p9: agent filter moved into a header sub-bar (multi w/ identity badges) -->
           <div class="subbar">
             <span class="subbar-lab">From/To</span>
-            <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi" data-agscope data-badge-cap="3">
-              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
-              <div class="src-pop">
+            <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team Graph cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
+            <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
+              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+              <div class="src-pop src-acc">
                 <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
-                <div data-comp="agent-list" class="aglist aglist-scroll" style="max-height:300px">
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow agrow--parent on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><span class="ag-subcount" title="1 subagent">1</span><span class="ag-exp" onclick="toggleAgSubs(event,this)" title="Show subagents"><i data-lucide="chevron-right"></i></span><i data-lucide="check" class="ag-ck"></i></button>
-              <div class="agrow-subs"><button class="agrow agrow--sub on" onclick="toggleAgRow(this)" data-sub="A1"><span class="sbadge sb-active sub-fbadge">A1</span><span class="ag-lab"><span class="ag-role">Explore</span><span class="ag-name">running</span></span><i data-lucide="check" class="ag-ck"></i></button></div>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow agrow--parent on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><span class="ag-subcount" title="4 subagents">4</span><span class="ag-exp" onclick="toggleAgSubs(event,this)" title="Show subagents"><i data-lucide="chevron-right"></i></span><i data-lucide="check" class="ag-ck"></i></button>
-              <div class="agrow-subs"><button class="agrow agrow--sub on" onclick="toggleAgRow(this)" data-sub="A1"><span class="sbadge sb-active sub-fbadge">A1</span><span class="ag-lab"><span class="ag-role">Explore</span><span class="ag-name">running</span></span><i data-lucide="check" class="ag-ck"></i></button><button class="agrow agrow--sub on" onclick="toggleAgRow(this)" data-sub="A2"><span class="sbadge sb-active sub-fbadge">A2</span><span class="ag-lab"><span class="ag-role">Explore</span><span class="ag-name">running</span></span><i data-lucide="check" class="ag-ck"></i></button><button class="agrow agrow--sub on" onclick="toggleAgRow(this)" data-sub="A3"><span class="sbadge sb-idle sub-fbadge">A3</span><span class="ag-lab"><span class="ag-role">general-purpose</span><span class="ag-name">done</span></span><i data-lucide="check" class="ag-ck"></i></button><button class="agrow agrow--sub on" onclick="toggleAgRow(this)" data-sub="B1"><span class="sbadge sb-idle sub-fbadge">B1</span><span class="ag-lab"><span class="ag-role">code-reviewer</span><span class="ag-name">done</span></span><i data-lucide="check" class="ag-ck"></i></button></div>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><span class="ag-lab"><span class="ag-role">tester</span><span class="ag-name">01 nova</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><span class="ag-lab"><span class="ag-role">analyst</span><span class="ag-name">01 io</span></span><i data-lucide="check" class="ag-ck"></i></button>
-              <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><span class="ag-lab"><span class="ag-role">scribe</span><span class="ag-name">01 fen</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                </div>
+                <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="tree" data-off="nova,quinn,io" style="max-height:300px"></div>
               </div>
             </div>
           </div>
@@ -1488,6 +1499,8 @@ Short-lived notes for the current run — kept brief on purpose.
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
                 <span class="mini-div"></span>
                 <span class="mini-cap">Content</span>
+                <!-- Next-up item 4: Text leads the Content row (default on) — the main reply text, Claude Code's `text` content block (rail tag "txt"); toggleable like any tool block -->
+                <button class="minitog on" onclick="miniToggle(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
                 <button class="minitog on" onclick="miniToggle(this)">Thoughts</button>
                 <button class="minitog" onclick="miniToggle(this)">Read</button>
                 <button class="minitog" onclick="miniToggle(this)">Write</button>
@@ -1500,7 +1513,8 @@ Short-lived notes for the current run — kept brief on purpose.
 
             <!-- INBOX (approvals you owe — its badge is the fleet total) -->
             <div id="feed-inbox" data-group="feed" class="hidden flex-1 overflow-y-auto px-3 py-3" style="background:var(--background)">
-              <div class="text-[9px] text-muted font-mono mb-2" id="inbox-await">4 agents awaiting your input — one open request each</div>
+              <div class="text-[9px] text-muted font-mono mb-2" id="inbox-await">9 open items — blocking requests first, the non-blocking Response section last</div><!-- next-up item 14: refreshInbox() recomputes this line; Response coalesces per agent and never blocks -->
+
               <!-- v10p1 #15: data-driven (from REQS), like Log — each card collapses to identity + type
                    badge + title and expands to the request detail + actions; the checkbox multi-selects
                    into the shared Copy/Share strip. data-agent lets a Pending badge jump expand + highlight. -->
@@ -1555,8 +1569,8 @@ Short-lived notes for the current run — kept brief on purpose.
             <span data-expmount="feed"></span>
             <button data-comp="button" class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
-            <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab -->
-            <button class="icon-btn icon-btn--danger" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
+            <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab. Next-up item 10: solid --danger fill + white square icon -->
+            <button class="icon-btn icon-btn--danger-solid" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
           </div>
         </div>
       </section>
@@ -1577,45 +1591,32 @@ Short-lived notes for the current run — kept brief on purpose.
               <!-- v9p9: Source/Target moved into a header sub-bar (From single · To multi w/ identity badges) -->
               <div class="subbar">
                 <span class="subbar-lab">From</span>
-                <div class="src-dd dd single" id="source-dd">
-                    <button class="dd-trig" type="button" onclick="toggleSourceDD()">
+                <!-- Next-up items 6+8: Compose's single-select From SOURCE — an in-flow accordion selector whose list renders from the shared roster (User + every agent; nova/quinn/io/fen were missing from the old hand-authored copy). -->
+                <div data-comp="source-dropdown" class="src-dd dd single dd--acc" id="source-dd">
+                    <button class="dd-trig" type="button" onclick="toggleSrcPop(this)">
                       <span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span>
                       <span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span>
-                      <i data-lucide="chevrons-up-down" class="picker-cv"></i>
+                      <i data-lucide="chevron-right" class="acc-cv"></i>
                     </button>
-                    <div class="src-pop" id="source-pop">
-                      <div class="aglist">
-                        <button class="agrow on" onclick="pickSource(this)"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">human</span><span class="ag-name">User</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                        <button class="agrow" onclick="pickSource(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                      </div>
+                    <div class="src-pop src-acc" id="source-pop">
+                      <div data-comp="agent-list" class="aglist" data-agroster="source" data-on="user"></div>
                     </div>
                   </div>
-                <span class="subbar-lab">To</span>
-                <div id="prompt-targets" class="src-dd dd multi" data-agscope data-badge-cap="3">
-                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
-                  <div class="src-pop">
-                  <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
-                  <div class="aglist aglist-scroll" style="max-height:264px">
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile agtile--user" style="background:var(--ag-azure)"><i data-lucide="file-text" class="agtile-luc"></i></span><span class="ag-lab"><span class="ag-role">scratchpad</span><span class="ag-name">Scratch</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">01 sandy</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><span class="ag-lab"><span class="ag-role">synthesizer</span><span class="ag-name">01 kai</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow on" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><span class="ag-lab"><span class="ag-role">auditor</span><span class="ag-name">01 drew</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><span class="ag-lab"><span class="ag-role">coder</span><span class="ag-name">01 max</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><span class="ag-lab"><span class="ag-role">researcher</span><span class="ag-name">02 rowan</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><span class="ag-lab"><span class="ag-role">reviewer</span><span class="ag-name">01 vega</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><span class="ag-lab"><span class="ag-role">planner</span><span class="ag-name">01 quinn</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><span class="ag-lab"><span class="ag-role">docs</span><span class="ag-name">01 wren</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><span class="ag-lab"><span class="ag-role">designer</span><span class="ag-name">01 lex</span></span><i data-lucide="check" class="ag-ck"></i></button>
-                  <button class="agrow" onclick="toggleAgRow(this)"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><span class="ag-lab"><span class="ag-role">ops</span><span class="ag-name">01 sage</span></span><i data-lucide="check" class="ag-ck"></i></button>
+                <!-- Next-up item 9: on the HISTORY tab the From column swaps to this multi-select FILTER (the To list minus Scratch — agents only; your own from-User prompts always show since User isn't a row). Compose keeps the single-select source above; switchTab swaps their visibility. -->
+                <div data-comp="source-dropdown" id="hist-from" class="src-dd dd multi dd--acc hidden" data-agscope data-badge-cap="3">
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+                  <div class="src-pop src-acc">
+                    <div class="src-pop-head"><span class="sec-h" style="margin:0">From</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                    <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="agents" style="max-height:264px"></div>
                   </div>
+                </div>
+                <span class="subbar-lab">To</span>
+                <!-- Next-up items 6+8: the To multi-select — an in-flow accordion selector; the Scratch-led target list renders from the shared roster (all 13 agents — nova/io/fen were missing from the old hand-authored copy). data-on = the demo selection. -->
+                <div data-comp="source-dropdown" id="prompt-targets" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+                  <div class="src-pop src-acc">
+                  <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                  <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="targets" data-on="kai,drew" style="max-height:264px"></div>
                   </div>
                 </div>
               </div>
@@ -1697,7 +1698,7 @@ Short-lived notes for the current run — kept brief on purpose.
                 <span data-expmount="hist"></span>
                 <div class="flex-1"></div>
                 <button class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
-                <button class="icon-btn icon-btn--danger" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>
+                <button class="icon-btn icon-btn--danger-solid" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>   <!-- Next-up item 10: solid --danger fill + white square icon -->
               </div>
             </div>
           </section>
@@ -1714,7 +1715,8 @@ Short-lived notes for the current run — kept brief on purpose.
     <!-- L: the dictation mic moved OUT of this universal footer slot into each Editor header (Compose · Plans · Documents) as a per-field ghost mic. -->
     <div class="flex items-center gap-2 text-[10px] font-semibold text-muted">
       <span><b class="text-foreground">13</b> agents</span><span class="opacity-40">·</span>
-      <span><b class="text-foreground">4</b> subagents</span><span class="opacity-40">·</span>
+      <span><b class="text-foreground">17</b> subagents</span><span class="opacity-40">·</span><!-- Next-up item 6: subagent total = the graph-card roster (sandy 6 + max 1 + lex 2 + fen 8) -->
+
       <span><b class="text-foreground">6</b> links</span><span class="opacity-40">·</span>
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:2px solid var(--border)"></span>5 active</span>
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--muted-2);border:2px solid var(--border)"></span>4 idle</span>

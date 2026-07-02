@@ -36,11 +36,14 @@
     .rz-handle.vstyle{ width:var(--size-10); margin:0 -4px; cursor:col-resize; }
     .rz-handle.hstyle{ height:var(--size-10); margin:-4px 0; cursor:row-resize; }
     /* v9p14 (A7): the adjust-handle nub is removed — major panels are separated by a clear, heavier (3px)
-       navy divider line instead. The strip is still draggable to resize, but it reads as a plain divider. */
-    .rz-handle::before{ content:''; position:absolute; background:var(--border); }
+       divider line instead. The strip is still draggable to resize, but it reads as a plain divider.
+       Next-up item 2: the idle divider recolors navy → pink (--main), joining the title bar + footer as the
+       frame's brand chrome; teal rides :hover AND the .dragging state class initResizers applies for the whole
+       drag (so a fast drag that outruns the 10px strip can't flash back to pink mid-drag). */
+    .rz-handle::before{ content:''; position:absolute; background:var(--main); }
     .rz-handle.vstyle::before{ top:0; bottom:0; left:50%; width:var(--divider-width); transform:translateX(-50%); }
     .rz-handle.hstyle::before{ left:0; right:0; top:50%; height:var(--divider-width); transform:translateY(-50%); }
-    .rz-handle:hover::before{ background:var(--secondary); }
+    .rz-handle:hover::before,.rz-handle.dragging::before{ background:var(--secondary); }
     /* v9p14: the adjust-handle nub (.rz-grip) was display:none; the vestigial markup has since been removed entirely. */
 
     /* #15: panel-size readout that follows the cursor while a splitter is dragged — shows both adjacent
@@ -76,7 +79,7 @@
     .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; height:auto; padding:var(--space-4) var(--space-6); }
     .btn-ghost:hover{ background:rgba(0,24,88,0.06); }
     .btn-sm{ height:25px; padding:0 var(--space-9); font-size:10px; }
-    .btn:disabled,.btn-main:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
+    .btn:disabled,.btn-main:disabled,.btn-secondary:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }   /* next-up item 15: covers the System Error card's disabled Reply — greyed, not removed (the Export-menu convention) */
     /* link-style text button (amber utility action) */
     .link-act{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:var(--space-4); }
     .link-act:hover{ color:var(--link-hover); }
@@ -132,6 +135,7 @@
     .agtile .ag-svg{ width:100%; height:100%; display:block; }
     .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
     .agtile--user{ background:var(--ag-user); }
+    .agtile--system{ background:var(--ag-system); }   /* next-up item 15: the reserved System pseudo-identity — gear glyph on a navy tile (the --foreground ink register, never a jewel) */
     /* the HUMAN user (you): the avatar screenprint becomes the tile fill — a photo-derived
        negative-space cutout on the --ag-user slate, echoing the agent glyphs but subtly photoreal.
        Scoped to .agtile--me so the reused .agtile--user tiles (Scratch source, New-agent slot) are untouched. */
@@ -239,6 +243,19 @@
     .run-seg .rseg.cur.cur-error{ background:var(--danger); }     /* step-scoped error — danger, static */
     .run-seg .rseg.cur.cur-paused::after,
     .run-seg .rseg.cur.cur-error::after{ display:none; }          /* not working → no shimmer */
+    /* Loading-state primitive (data-comp="loading-strip") — the design system's indeterminate
+       "the dashboard is fetching" indicator. Same barber-pole recipe (and run-barber keyframes) as the
+       run-strip's .run-indet, but in the TEAL register (--secondary / --secondary-dim) so a data pull
+       never reads as a run state (green barber-pole = the agent working; teal = the UI working).
+       Standalone it is a bordered track (the .ctxbar height); the --fill variant drops borderless
+       inside an existing bar track (.bd-bar / .ctxbar) and stretches to fill it. First consumer:
+       the Agent-panel context accordion's on-open pull (see .bd.is-loading below). */
+    .loading-strip{ position:relative; height:var(--size-9); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-sm); overflow:hidden; background:var(--surface-3); }
+    .loading-strip::after{ content:''; position:absolute; inset:0;
+      background:repeating-linear-gradient(45deg, var(--secondary) 0 6px, var(--secondary-dim) 6px 12px);
+      animation:run-barber 0.8s linear infinite; }
+    .loading-strip--fill{ flex:1 1 auto; height:auto; align-self:stretch; border:none; border-radius:0; background:transparent; }
     /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed; pauses on hover */
     .node-feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:var(--size-15); }
     .node-feed .trk{ white-space:nowrap; font-family:var(--font-mono); font-size:8px; font-weight:600;
@@ -317,7 +334,7 @@
     .ninb-type--error{ background:var(--danger); }
     .ninb-type--warning{ background:var(--warning); }
     .ninb-type--permission{ background:var(--inbox-permission); }
-    .ninb-type--plan, .ninb-type--decision{ background:var(--muted); }
+    .ninb-type--plan, .ninb-type--decision, .ninb-type--response{ background:var(--muted); }   /* next-up item 14: Response joins the neutral tone (non-blocking, like Plan/Decision) */
     .ninb-row-t{ flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:9px; font-weight:600; color:var(--foreground);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
@@ -415,11 +432,28 @@
     .lim-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }
     .lim-in{ width:100%; margin-top:4px; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-4); font-size:10px; font-weight:700; color:var(--foreground); text-align:center; outline:none; }
     .lim-in:disabled{ opacity:0.45; background:var(--surface-3); cursor:not-allowed; }
-    /* OD-06: Shared-context disclosure — the content-type filter + backfill nest under the Relationship multi-toggle,
-       set off with a navy left rule so it reads as a sub-section of "Shared context". */
+    /* Next-up item 17: Trigger dropdown (link drawer) — the Trigger moved from a segmented control to a MENU
+       selector (six options with one-line descriptions exceed an inline segment — the inline-vs-menu rule). The
+       white trigger shows the current value (a neutral trigger, per the menu-selector rule); the menu reuses the
+       Send split-button timing-menu item style (.split-mi — bold label + one-line description + check),
+       repositioned to open DOWNWARD under the field. Piggyback is the link-only trigger (never initiates — the
+       payload rides the next message delivered to the target from any source); defaults: Direct messaging → Queue ·
+       Shared context → Piggyback. */
+    .trig-dd{ position:relative; }
+    .trig-trig{ display:flex; align-items:center; gap:var(--space-6); width:100%; text-align:left;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      padding:var(--space-6) var(--space-9); font-size:11px; font-weight:800; color:var(--foreground); cursor:pointer; transition:box-shadow .1s; }
+    .trig-trig:hover{ box-shadow:var(--shadow-sm); }
+    .trig-cv{ margin-left:auto; width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; }
+    .trig-dd .split-menu{ top:calc(100% + var(--space-6)); bottom:auto; left:0; right:0; min-width:0; }
+    /* OD-06 (amended — one relationship per link): Shared-context disclosure — the content-type filter + backfill
+       nest under the Relationship single-select segment, set off with a navy left rule so it reads as a
+       sub-section of "Shared context" (both stay scoped to SC links). */
     .link-shared{ margin-top:var(--space-7); padding-left:var(--space-9); border-left:var(--border-width) solid var(--border); }
-    /* OD-08: link tracking list — grouped by agent (reuses the registry group-header + a card-styled row). Each row:
-       a →/←/↔ arrow (same vocabulary as the pair row) · the OTHER agent's identity badge · the relationship summary. */
+    /* OD-08 (amended, next-up item 17): link tracking list — collapsible Active / Expired sections over per-agent
+       groups (the registry group-header + a card-styled row). Each row: a →/←/↔ arrow (same vocabulary as the pair
+       row) · the OTHER agent's identity badge · its FULL relationship label (a link has exactly one). The section
+       header carries the state — expired rows get NO gray-out (the Inbox typed-section precedent). */
     .link-list{ display:flex; flex-direction:column; gap:var(--space-4); }
     .link-grp{ margin:var(--space-9) 0 var(--space-5); }
     .link-grp:first-child{ margin-top:0; }
@@ -428,9 +462,30 @@
     .link-row + .link-row{ margin-top:var(--space-4); }
     .link-row:hover{ background:var(--surface-btn); }
     .link-row.sel{ background:var(--select); }
-    .link-arrow{ flex:0 0 auto; width:var(--size-14); text-align:center; font-family:var(--font-mono); font-size:13px; font-weight:800; color:var(--secondary-foreground); }
+    /* Next-up item 18: list-row direction indicators are Lucide arrows (arrow-right / arrow-left / arrow-left-right) — flex-centred, navy ink (was mono unicode text glyphs) */
+    .link-arrow{ flex:0 0 auto; width:var(--size-14); display:flex; align-items:center; justify-content:center; color:var(--foreground); }
+    .link-arrow svg{ width:var(--size-14); height:var(--size-14); }
     .link-rel{ margin-left:auto; font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); white-space:nowrap; }
     .link-empty{ font-size:10px; font-style:italic; color:var(--muted-2); padding:var(--space-8) 0; }
+    /* Active / Expired link sections — sticky accordion folds (chevron rotates 90° on open, the subs-audit norm);
+       the head reuses the .lbl label style + a mono count. */
+    .link-sec + .link-sec{ margin-top:var(--space-10); }
+    .link-sec-head{ width:100%; display:flex; align-items:center; gap:var(--space-5); background:transparent; border:none; padding:0; cursor:pointer; text-align:left; }
+    .link-sec-head:hover .lbl{ color:var(--foreground); }
+    .link-sec-head .lchev{ width:var(--size-12); height:var(--size-12); color:var(--muted); transition:transform .12s; flex:0 0 auto; }
+    .link-sec.open .lchev{ transform:rotate(90deg); }
+    .link-sec-n{ font-family:var(--font-mono); font-size:9px; font-weight:800; color:var(--muted-2); }
+    .link-sec-body{ display:none; margin-top:var(--space-6); }
+    .link-sec.open .link-sec-body{ display:block; }
+    /* Next-up item 17: corner-count badge — the design system's first OVERLAY badge family. A small mono count
+       square overhanging the TOP-RIGHT corner of a host badge (.ovl-host wraps the host; here the link-list
+       group-header identity badge, counting that agent's links in the section). Teal fill when >0 · dimmed muted
+       outline at none — the node-inbox envelope convention. */
+    .ovl-host{ position:relative; display:inline-flex; }
+    .ovl-count{ position:absolute; top:calc(-1 * var(--space-4)); right:calc(-1 * var(--space-4)); min-width:var(--size-13); height:var(--size-13); padding:0 var(--space-2); z-index:1;
+      display:inline-flex; align-items:center; justify-content:center; border:var(--border-width) solid var(--border); border-radius:var(--radius-xs);
+      background:var(--secondary); color:var(--foreground); font-family:var(--font-mono); font-size:8px; font-weight:900; line-height:1; }
+    .ovl-count--none{ background:var(--secondary-background); border-color:var(--muted-2); color:var(--muted-2); }
 
     /* ============================ model tabs + version ============================ */
     .ro-head{ display:flex; align-items:center; gap:var(--space-8); margin-bottom:6px; }
@@ -492,6 +547,14 @@
       background-repeat:no-repeat; background-position:right center; background-size:11px; }
     .bd-scope:hover{ color:var(--foreground); }
     .bd-scope:focus-visible{ outline:var(--border-width) solid var(--main); outline-offset:2px; border-radius:var(--radius-xs); }
+
+    /* Context accordion in-flight state (the on-open pull) — opening the accordion triggers a fresh
+       context pull; while it's in flight the breakdown carries .is-loading: the bar swaps to the
+       .loading-strip--fill shimmer (JS) and the stale category rows / sub-sections (.bd-rows) + the
+       head total dim until the fresh data lands. The scope <select> stays live — a mid-flight scope
+       change simply renders when the pull lands. */
+    .bd.is-loading .bd-rows{ opacity:.45; pointer-events:none; }
+    .bd.is-loading .bd-tot{ opacity:.45; }
 
     /* ============================ timeline (rewind / handoff) ============================ */
     .tl{ display:flex; flex-direction:column; gap:var(--space-6); max-height:230px; overflow-y:auto; padding:var(--space-8); }
@@ -765,12 +828,15 @@
        and slides in from the left (out from behind the graph). */
     .drawer{ position:absolute; top:0; left:0; height:100%; width:266px; z-index:30; background:var(--secondary-background); border-right:var(--border-width) solid var(--border); box-shadow:6px 0 0 0 rgba(0,24,88,0.08); overflow-y:auto; animation:slideInLeft .15s ease; }
     @keyframes slideInLeft{ from{ transform:translateX(-40px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
-    .dir-cyc{ width:var(--size-30); height:var(--size-30); flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--warning); font-size:15px; font-weight:900; cursor:pointer; box-shadow:var(--shadow-sm); }
+    /* Next-up item 18: the cycler carries a Lucide arrow glyph (arrow-right / arrow-left / arrow-left-right) — flex-centred,
+       inked navy --foreground (was an off-centre unicode text glyph in --warning; no true black exists in the palette). */
+    .dir-cyc{ width:var(--size-30); height:var(--size-30); flex:0 0 auto; display:flex; align-items:center; justify-content:center; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); }
+    .dir-cyc svg{ width:var(--size-15); height:var(--size-15); }
     .dir-cyc:hover{ transform:translate(2px,2px); box-shadow:none; }
 
     /* ============================ title bar / footer ============================ */
     .topbar{ flex-shrink:0; height:var(--size-36); display:flex; align-items:center; justify-content:space-between; padding:0 var(--space-12); background:var(--main); border-bottom:var(--border-width) solid var(--border); }
-    .footbar{ flex-shrink:0; height:var(--size-34); display:flex; align-items:center; justify-content:space-between; padding:0 var(--space-12); background:var(--surface-3); border-top:var(--border-width) solid var(--border); }
+    .footbar{ flex-shrink:0; height:var(--size-34); display:flex; align-items:center; justify-content:space-between; padding:0 var(--space-12); background:var(--main); border-top:var(--border-width) solid var(--border); }   /* Next-up item 2: pink (--main), matching the .topbar — the frame's brand chrome */
     .chip{ display:inline-flex; align-items:center; gap:var(--space-5); padding:var(--space-1) var(--space-8); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); font-size:9.5px; font-weight:700; color:var(--foreground); }
     .tok-pill{ display:inline-flex; align-items:center; gap:var(--space-6); height:var(--size-24); padding:0 var(--space-10); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--main); color:var(--main-foreground); font-family:var(--font-mono); font-size:10px; font-weight:800; }
     .reply-flash{ animation:replyFlash .9s ease; }
@@ -878,6 +944,11 @@
     .icon-btn.is-off:hover{ transform:none; box-shadow:var(--shadow-sm); }
     .icon-btn--danger{ color:var(--danger); }
     .icon-btn--danger:hover{ background:var(--danger-soft); }
+    /* Next-up item 10: the icon-only STOP buttons (Messages + History footers) go SOLID — a --danger fill with
+       a white square icon, joining .btn-danger-solid's heavy tier (Delete agent). The softer red-text-on-cream
+       .icon-btn--danger above stays for the Library Remove trash. */
+    .icon-btn--danger-solid{ background:var(--danger); color:#fff; }
+    .icon-btn--danger-solid:hover{ background:var(--danger); filter:brightness(.92); }
 
     /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
     .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
@@ -897,9 +968,11 @@
     .inbox-card .inbox-acts{ display:flex; align-items:center; gap:var(--space-8); margin-top:11px; flex-wrap:wrap; }
     .inbox-card .fcard-body{ padding-top:var(--space-9); }
     .inbox-card .dbadge{ flex:0 0 auto; }
-    /* P2: Inbox grouped into typed SECTIONS (Permission · Plan · Decision · Error) — the section header
-       carries the label, so cards drop the per-card type badge. Clean headers; danger is reserved for the
-       Error section/cards as the single alarm (supersedes the old reddish→copper attention ramp). */
+    /* P2 (+ next-up item 14): Inbox grouped into typed SECTIONS (Error · Warning · Permission · Plan ·
+       Decision · Response) — the section header carries the label, so cards drop the per-card type badge.
+       Clean headers; danger is reserved for the Error section/cards as the single alarm (supersedes the old
+       reddish→copper attention ramp). Response is the lone NON-blocking section — neutral --muted heading
+       like Plan/Decision (no new tone). */
     #inbox-list{ gap:var(--space-12); }
     .inbox-sec-head{ display:flex; align-items:center; gap:var(--space-7); padding:0 var(--space-2) var(--space-6); }
     .inbox-sec-lab{ font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
@@ -920,6 +993,9 @@
        match the Warning section heading; Error keeps the base (--danger) rule above as the single alarm. */
     .inbox-subtype--warning{ color:var(--warning); border-color:var(--warning); background:var(--warning-soft); }
     .inbox-err{ white-space:pre-wrap; }
+    /* next-up item 14: the Response card's coalesce marker (×N runs) — ONE card per agent; a second unseen
+       run UPDATES the card (this marker), never stacks. Neutral muted chip, same geometry as .inbox-sec-n. */
+    .inbox-runs{ flex:0 0 auto; font-size:8.5px; font-weight:800; font-family:var(--font-mono); color:var(--muted); border:var(--border-width) solid var(--muted); border-radius:var(--radius-sm); padding:0 var(--space-5); line-height:1.5; white-space:nowrap; }
     /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
     .msg-blocks{ display:flex; flex-direction:column; gap:var(--space-3); margin-top:7px; }
     .msg-blk{ font-family:var(--font-mono); font-size:10px; line-height:1.5; padding:var(--space-4) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
@@ -1032,8 +1108,9 @@
     .doc-header .dh-path{ font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .doc-header .dh-dates{ font-family:var(--font-mono); font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
     .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
-    /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach) */
-    .doc-foot{ display:flex; align-items:center; gap:var(--space-7); flex:0 0 auto; margin-top:9px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
+    /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach).
+       NEXT-UP item 12: Documents now carries the Plans action strip (Export · Reviewer chip · right group), so the footer wraps on a narrow column exactly like .plan-foot (the right group reuses .plan-foot-right). */
+    .doc-foot{ display:flex; align-items:center; gap:var(--space-7); flex-wrap:wrap; row-gap:var(--space-7); flex:0 0 auto; margin-top:9px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
     .doc-foot-l{ display:flex; align-items:center; gap:var(--space-7); flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
     .docnav-row{ position:relative; }
@@ -1097,6 +1174,30 @@
     .src-pop-head{ position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; padding:var(--space-1) var(--space-4) var(--space-6); background:var(--secondary-background); }
     .src-dd.multi .src-pop{ min-width:230px; }
     .src-dd.single .src-pop{ min-width:200px; }
+    .src-pop--right{ left:auto; right:0; }   /* Next-up item 11: right-anchored pop variant — the Link pair's B-endpoint dropdown hugs the drawer's right edge, so its (min-width'd) pop grows leftward instead of overflowing the drawer */
+    /* Next-up item 11: the Link pair's two single-select dropdowns sit two-up in the narrow drawer, so their triggers
+       compact (tighter padding/gap, 20px tile, small chevron, badge-size 9.5px name) to keep the two-line identity
+       readable even when the drawer's own scrollbar squeezes the row. */
+    .link-pair .dd-trig{ height:var(--size-34); padding:0 var(--space-3); gap:var(--space-3); }
+    .link-pair .dd-trig > .agtile{ width:var(--size-20); height:var(--size-20); }
+    .link-pair .dd-trig .picker-cv{ width:var(--size-10); height:var(--size-10); }
+    .link-pair .dd-trig .ag-name{ font-size:9.5px; }
+
+    /* Next-up item 8: agent-selector ACCORDIONS — the feed From/To filter, Prompt To, and the Compose/History
+       From selectors convert from floating popovers to IN-FLOW accordion drawers (.dd--acc on the selector +
+       .src-acc on its drawer): the drawer sits in normal flow and pushes the content below it down instead of
+       overlaying it. The toggle is STICKY (no outside-click dismiss; Esc closes — closeSrcAccordions), and the
+       trigger chevron follows the accordion norm (chevron-right, rotating to down while open — the .subs-chev /
+       .ag-exp convention). Contents, sizing, and scroll caps are unchanged from the popover form. The Link-pair
+       and reviewer pickers keep the anchored-popover form (.src-pop without .src-acc). */
+    .src-dd.dd--acc{ display:flex; flex-direction:column; min-width:0; }
+    .src-dd.dd--acc.hidden{ display:none; }   /* item 9: the display:flex above must not beat the utility .hidden — the Compose-From / History-From swap relies on it */
+    .src-pop.src-acc{ position:static; box-shadow:none; margin-top:var(--space-6); }
+    .subbar .dd.dd--acc{ flex:1 1 0; min-width:0; }   /* item 8: From and To take EQUAL space in the header sub-bar */
+    .subbar:has(.src-acc.open){ align-items:flex-start; }   /* an open drawer grows its column downward; the triggers stay top-aligned */
+    .subbar:has(.src-acc.open) .subbar-lab{ height:var(--size-40); display:inline-flex; align-items:center; }   /* keep the labels centred on the trigger row while a drawer is open */
+    .acc-cv{ width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; margin-left:auto; transition:transform .12s; }
+    .src-dd.open > .dd-trig .acc-cv{ transform:rotate(90deg); }
 
     /* ============================ v9p10 ============================ */
     /* compact two-line identity badge for dense card headers (same format as the dropdown badges) */
@@ -1141,7 +1242,7 @@
     .vrow.no-cmt .v-cmt{ opacity:.25; }
 
     /* plan expanded = outline/feedback nav rail + line-numbered body */
-    .plan-rev{ display:flex; gap:var(--space-9); margin-top:9px; max-height:346px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). */
+    .plan-rev{ display:flex; gap:var(--space-9); margin-top:9px; max-height:520px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). NEXT-UP item 13: raised 346→520 so the docked comment popout (which never shrinks — see .plan-cmt-pop) fits below a still-useful stretch of editor. */
     .plan-nav{ flex:0 0 132px; display:flex; flex-direction:column; min-width:0; }
     .nav-tabs{ display:flex; gap:var(--space-4); margin-bottom:6px; }
     .nav-tab{ flex:1; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding:var(--space-4) 0; text-align:center;
@@ -1357,7 +1458,7 @@
     .plan-nav{ flex:0 0 184px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); box-shadow:var(--shadow-sm); padding:var(--space-7); overflow:hidden; }
     .nav-cnt{ font-family:var(--font-mono); font-size:8px; font-weight:800; background:var(--secondary-background); border:1.5px solid var(--border);
       border-radius:var(--radius-sm); padding:0 var(--space-4); line-height:13px; margin-left:5px; color:var(--foreground); }   /* v9p14: rounded square */
-    .fb-list{ max-height:288px; }
+    .fb-list{ max-height:none; flex:1 1 auto; min-height:0; }   /* NEXT-UP item 13: the fixed 288px cap (hardwired to the old 346px .plan-rev row cap) becomes a flex-fill — the list tracks the nav column's height inside whatever the row cap is, and still scrolls internally (overflow-y from the base rule) */
     .fb-card{ display:block; width:100%; text-align:left; cursor:pointer; font-family:inherit; color:inherit; }
     .fb-card:hover{ background:var(--surface-3); }
     .fb-top{ flex-wrap:wrap; row-gap:var(--space-3); }
@@ -1367,18 +1468,24 @@
 
     /* v9p12: inline in-text verdict chips removed — feedback badges now live in the editor's left rail */
 
-    /* comment popout — docked UNDER the plan body, same width as the main text window */
-    .plan-cmt-pop{ display:none; margin-top:8px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+    /* comment popout — docked UNDER the plan body, same width as the main text window.
+       NEXT-UP item 13 (fit/resize): the popout is a flex child of the height-capped .doc-ed column, and
+       it used to shrink with the default flex-shrink — in the Documents tab (and a capped Plans row) that
+       crushed it vertically while overflow:hidden clipped its contents. Root fix: the popout NEVER shrinks
+       (flex:0 0 auto — the editor's .md above yields and scrolls internally instead, resizing the layout to
+       fit), and the popout is itself a flex column whose BODY scrolls past its cap (the .fb-list/.aglist
+       internal-scroll convention) so even a long comment list can't blow the column. */
+    .plan-cmt-pop{ display:none; flex:0 0 auto; margin-top:8px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
       background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
-    .plan-cmt-pop.open{ display:block; }
-    .cmt-pop-head{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-7) var(--space-9); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); }
+    .plan-cmt-pop.open{ display:flex; flex-direction:column; }
+    .cmt-pop-head{ display:flex; align-items:center; gap:var(--space-8); flex:0 0 auto; padding:var(--space-7) var(--space-9); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); }
     .cmt-pop-head .cph-ic{ flex:0 0 auto; } .cmt-pop-head .cph-ic svg{ width:var(--size-14); height:var(--size-14); }
     .cph-ic.v-approve{ color:var(--success); } .cph-ic.v-revise{ color:var(--warning); } .cph-ic.v-block{ color:var(--danger); }
     .cph-sec{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); background:var(--secondary-background);
       border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-5); }
     .cph-lab{ font-size:9px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
     .cph-time{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }
-    .cmt-pop-body{ padding:var(--space-9) var(--space-10); display:flex; flex-direction:column; gap:var(--space-9); }
+    .cmt-pop-body{ padding:var(--space-9) var(--space-10); display:flex; flex-direction:column; gap:var(--space-9); min-height:0; max-height:300px; overflow-y:auto; }   /* NEXT-UP item 13: the body scrolls past its cap (matching .fb-list/.aglist-scroll) instead of the whole popout being crushed/clipped */
     .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); }
     .cmt-pop-item + .cmt-pop-item{ border-top:var(--border-width) solid var(--border); padding-top:var(--space-9); }
     .cpi-h{ display:flex; align-items:center; gap:var(--space-7); margin-bottom:5px; }

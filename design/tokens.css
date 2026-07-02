@@ -54,6 +54,8 @@
   --inbox-permission:#a9710f;   /* blackish-orange — the low end of the ramp */
 
   --ag-user:#7b7fa6;   /* User row / idle tone */
+  --ag-system:#001858; /* reserved System pseudo-identity tile — the app's own ink (the --foreground navy
+                          register, deliberately NOT a jewel --ag-* colour: System is the app, not an agent) */
 
   /* glyph fill for agent tiles: white so identity reads on every colored tile.
      Set transparent for a pure knockout. */
