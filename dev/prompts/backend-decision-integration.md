@@ -66,7 +66,7 @@ Solve once as a shared utility, alongside the hook spike — it is the common de
 - **Subagent live attribution is best-effort** until the result reconciles the `agentId` — the folder-watch join is a heuristic prompt↔first-message match (two near-identical-prompt subagents can mis-join before reconciliation). A `SubagentStart` hook is the cleaner later fix (build-verification-gated, same class as the hook spike).
 - **Deterministic event `id` + a SEPARATE monotonic `seq`** — determinism so re-polls dedup to no-ops and reconnects replay without duplicates; assign `seq` at emit and **never parse the `id` for ordering**.
 - **`generating→idle` is the single proven signal** powering idle-flush (OD-02), link fire (OD-04), and turn segmentation (OD-13 naming) — it already exists in `bridge.py:events`. Build on it; don't reinvent.
-- **`dev/notes/DESIGN_TODO.md` is off-limits as a decision source** — it is reference-only backlog (and currently part of the parallel stream's uncommitted churn); do not resurface anything sourced from it.
+- **`dev/notes/TODO.md` is off-limits as a decision source** — it is reference-only backlog (and currently part of the parallel stream's uncommitted churn); do not resurface anything sourced from it.
 - **Programmatic creation never opens a terminal tab** (the bridge-sessions rule) — fixtures, batch spawns, the sidecar driver, scratch scripts all create tab-less.
 
 ## Working style (ultracode)

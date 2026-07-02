@@ -1,8 +1,8 @@
-You are implementing **every item in the "Next up" section of `dev/notes/DESIGN_TODO.md`** by editing `design/mockup.html`. Deliver **finished, verified work** — not proposals. **Optimize for wall-clock speed: run the independent items as parallel subagents in isolated git worktrees.** Cost is not a concern; quality must match a careful single-agent pass.
+You are implementing **every item in the "Next up" section of `dev/notes/TODO.md`** by editing `design/mockup.html`. Deliver **finished, verified work** — not proposals. **Optimize for wall-clock speed: run the independent items as parallel subagents in isolated git worktrees.** Cost is not a concern; quality must match a careful single-agent pass.
 
 ## Read first
 
-- **`dev/notes/DESIGN_TODO.md` — the "Next up" section is your work list (items 1–19).** Each item is self-contained: it names the exact change plus the real CSS classes / IDs / JS functions to touch. Also read the top of the file: **"How agents maintain this list" → "Next up — implementing items"** (build in `mockup.html`; work from `DESIGN.md` + `tokens.css`; keep `DESIGN.md` in sync; **leave each finished item in place — the human removes it after review, do not delete it**).
+- **`dev/notes/TODO.md` — the "Next up" section is your work list (items 1–19).** Each item is self-contained: it names the exact change plus the real CSS classes / IDs / JS functions to touch. Also read the top of the file: **"How agents maintain this list" → "Next up — implementing items"** (build in `mockup.html`; work from `DESIGN.md` + `tokens.css`; keep `DESIGN.md` in sync; **leave each finished item in place — the human removes it after review, do not delete it**).
 - **`design/DESIGN.md`** (design intent/patterns) and **`design/tokens.css`** (single source of truth for every value — never hardcode a value that belongs there).
 - **`design/ui-snippets/`** — items **1, 2, 4, 5, 6, 7 are snippet-backed**: the design is already built in these standalone files. Your job for those is to **port the snippet into `mockup.html`, mapping its classes back onto the mockup's existing classes** (each item's text says exactly how). The other items are implemented directly.
 - **`CLAUDE.md`** — especially the **UI-verification rule** and the **DEVLOG rule**. Both are mandatory below.
@@ -45,7 +45,7 @@ For each lane, before calling its items done: serve `mockup.html` over **`http:/
 
 ## Finish
 
-- **Leave every Next-up item in place** in `dev/notes/DESIGN_TODO.md` (do not delete — the human removes each after review).
+- **Leave every Next-up item in place** in `dev/notes/TODO.md` (do not delete — the human removes each after review).
 - **Keep `DESIGN.md` in sync** only where an item changes design intent or a pattern (the top TODO instruction governs this; there are no per-item reminders).
 - **Append ONE `DEVLOG.md` entry** per the project rule, summarizing what was built and listing any item-5 open-decision fallbacks you used.
 - **Report back:** what shipped, the open-decision fallbacks, any merge conflicts you resolved, and anything that needs the human.

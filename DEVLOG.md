@@ -312,6 +312,14 @@ Files: design/behavior.js, design/mockup.html, design/gallery.html, DEVLOG.md
 
 ---
 
+### 2026-07-01 19:47:00 — docs: backlog audited + refactored — dev/notes/DESIGN_TODO.md → TODO.md (design & backend staging backlog)
+
+Audited every backlog item (old sections A–D + Next up; Inbox/Scratch untouched) against the live system via three parallel read-only sweeps (design files · frontend/sidecar/bridge · repo+DEVLOG), then refactored per the user. **Removed as done/resolved:** B1 per-agent MCP & plugins (OD-18 Create/Details msels + `--mcp-config`/`enabledPlugins`), B2 custom permissions (Mode + Deny rules in Create/Details; full `permission_rules` at launch), B12 interactive comms (the OD-17 scratchpad is the shared dynamic doc, live-verified), C6 transcript payload (resolved by the OD-06 Relationship model), and B19 lifecycle wind-down (signal half = the OD-10 cap-crossing Warning, built; wind-down half deliberately killed by OD-10 — "do not re-propose"). **Trimmed to the remaining gap:** load past agents, Plans action loop (edit-in-place + approve→resume), subagent management (observability built), save response summary (Summarize is copy-only), notes hub, link edges (grouped link-list exists; on-graph edges deferred). All of old-D kept (none verifiably done). **Restructure:** renamed → `dev/notes/TODO.md` (git mv), four effort sections → three domain sections **D Design · B Backend · H Housekeeping & docs** (former "Needs research" items now carry an **(open)** marker in their domain section), header + maintenance notes rewritten for two-layer staging (backend items point at `docs/ARCHITECTURE.md` + pytest conventions; design items unchanged at the six-file rules). Cross-ref updated (old "see B17" → "see D2"). Updated live path refs: CLAUDE.md design rule + the three dev/prompts files; DEVLOG history left verbatim.
+
+Files: dev/notes/DESIGN_TODO.md → dev/notes/TODO.md (moved + rewritten), CLAUDE.md, dev/prompts/nextup-parallel-execution.md, dev/prompts/link-behavior-refactor.md, dev/prompts/backend-decision-integration.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
