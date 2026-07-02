@@ -614,6 +614,14 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-02 07:50:30 — design: Settings always opens on Projects (settings tab no longer persisted)
+
+Follow-up to the Projects-tab work. The mockup's HTML already defaulted the Settings step-in to Projects, but `settingsTab()` persisted the last-selected tab to `localStorage['awl-v8'].settings` and restored it on load — so any browser that had ever selected **Setups** kept reopening on Setups, overriding the intended default. Removed the settings-tab persistence: dropped the write in `settingsTab()` and skipped the `settings` branch in the on-load restore, so the Settings view always opens on its lead tab (**Projects**) regardless of stale saved state. Scoped to settings only — every other tab group (feed/prompt/library/agent) still persists. Verified in-browser: seeded `localStorage {settings:'setups', feed:'log'}`, reloaded → Settings opens on Projects (stale `setups` ignored) while feed still restores to Log; clicking a settings tab no longer writes localStorage. `node --check` passes.
+
+Files: design/behavior.js, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

@@ -1290,7 +1290,7 @@
     const pane=document.getElementById('set-'+t);if(pane)pane.classList.add('active');
     document.querySelectorAll('[data-set-tab]').forEach(b=>b.classList.toggle('active',b.dataset.setTab===t));
     setGlobalConfirm(false);
-    const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');s.settings=t;localStorage.setItem('awl-v8',JSON.stringify(s));
+    /* Settings intentionally does NOT persist its tab — it always opens on its default lead tab (Projects). */
     LU();
   }
   function setScope(grp,sc,btn){
@@ -2321,7 +2321,7 @@ resize intact.`,
     renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();renderLinkList();eaUpdateAll();
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
-    const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')settingsTab(t);else switchTab(g,t);});
+    const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')return;switchTab(g,t);});   /* settings tab is not restored — it always opens on its default lead tab (Projects), even if a prior session saved another */
     const tas=document.querySelectorAll('textarea.autosize');tas.forEach(t=>t.addEventListener('input',()=>autosize(t)));autosizeAll();
     if(window.ResizeObserver){const ro=new ResizeObserver(es=>es.forEach(e=>autosize(e.target)));tas.forEach(t=>ro.observe(t));const gw=document.getElementById('graph-wrap');if(gw)new ResizeObserver(()=>drawEdges()).observe(gw);
       const pr=document.getElementById('pRight');if(pr)new ResizeObserver(positionConsoleView).observe(pr);}   /* v10p1 #13: keep the Console step-into's right edge pinned to #pRight on splitter/window resize */
