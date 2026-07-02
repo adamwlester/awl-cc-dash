@@ -328,6 +328,48 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-01 20:58:00 — docs: TODO.md Inbox triaged → 13 NEXT UP items + D6 (open); Inbox cleared
+
+Triaged the Inbox against the live design files (mockup/styles/behavior/tokens/DESIGN.md), with the user resolving the open questions in-conversation. Filed **13 items into NEXT UP**: context refresh + on-demand pull (w/ a new loading-state primitive); pink footer + splitters (teal kept on hover **and drag** — needs a drag-state class, teal is `:hover`-only today); link direction defaults 2-way; a **"Text"** content toggle (CC's `text` block; rail tag `msg`→`txt`) mirrored into the Link drawer's shared taxonomy; History card delete (non-Active/Complete); agent-surface data alignment (**Team Graph cards = ground truth**; the feed filter tree is hand-authored and drifts); subagent count badge → selected/total ("2/4"); selector popovers → in-flow accordions (feed filter · Prompt To · From); History From → multi-select filter (Compose stays single); Stop buttons → solid danger fill; Link Config pair dropdowns; Documents footer action strip (Plans strip minus Reject/Approve); comment popout fit fix (`.plan-rev` cap). Filed the idle-unseen indicator as **D6 (open)** — mechanism/clear-condition needs the human's call. Dropped the subagent All/None note as already-wired in the mockup (`agAllNone` walks `.agrow--sub`; superseded by the alignment/accordion items). Inbox now empty; the user self-moved the charcoal note to Scratch and deleted the error-red + from/to-vis-toggle notes before filing.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-01 21:19:52 — docs: D6 idle-unseen indicator resolved → NEXT UP 14 ("Response" Inbox type)
+
+Resolved the D6 (open) design call in-conversation and moved it to **NEXT UP item 14**: a new non-blocking **Response** Inbox section (bottom of the ramp, neutral heading) that opens when a run ends with unreviewed output — one coalesced card per agent, **View** (→ Messages scoped + flashed, completes) · **Reply** (shared routing, completes), status badge untouched (no fifth idle state), envelope counts it like a Warning. Naming settled after weighing Result/Message/Response: the request-vs-response frame won (the five existing sections are agent *requests*; this is the lone *response* to the operator's prompt), and the existing `response-format-control` shares the same referent so the term reinforces rather than collides. D6 removed from the D section (D1–D5 unchanged, no renumbering needed).
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-01 22:05:00 — docs: data-model-map.md rewritten to the new storage model (planning session encoded)
+
+Full rewrite of `dev/notes/data-model-map.md` encoding the 2026-07-01 storage-planning decisions,
+anchored to the final intended system with ⚠ Today markers for current-code divergence. The new
+model: **six homes** (dashboard store · project store · transcripts · launch config · Claude
+config · derived); `.awl/` → **`.awl-cc-dash/`** (committed, not ignored) with a
+`plans/ · docs/ · assets/ · state/` taxonomy; `<project>` = canonical repo root (not raw cwd);
+multi-project first-class (all per-project state incl. the agent roster moves into the project
+folder); an explicit **persist-vs-derive contract** replacing the invisible ⚡ boundary; per-doc
+**`.meta.json` sidecars** (quote-anchored comments, verdicts, provenance) replacing
+`plan-reviews.json`; a **transcript policy** (retention pinned via `cleanupPeriodDays: 3650` in
+per-agent launch settings, resolved path + session-id persisted, reference-never-copy,
+overlay-index keyed to event anchor ids); the **close/reopen restore model** (warm rebind +
+T8 cold-restore via `claude --resume` replacing prune-on-dead-tmux); §10 OD-amendment roll-up
+queue for ARCHITECTURE.md; §11 implementation backlog **T1–T12** to drive the next build run.
+Built ultracode: 3 fact-mapper agents (sidecar state, bridge launch, docs cross-refs) fed the
+draft; 3 adversarial verifiers (facts vs code — ~40 citations checked; decisions vs the 18-item
+session ledger — PASS; consistency) produced 15 findings, all applied (notably: the scratchpad
+board itself is ⚡ and never reloaded — restart wipes it; T7's `plansDirectory` must be an
+absolute canonical-root WSL path, not `./`; inbox type set left open-ended for TODO.md #14's
+queued "Response" type).
+
+Files: dev/notes/data-model-map.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
