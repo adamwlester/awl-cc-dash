@@ -1,0 +1,1776 @@
+/* ============================================================================
+   AWL Multi-Agent Dashboard — Component & layout styles (shared stylesheet)
+   ----------------------------------------------------------------------------
+   Extracted verbatim from mockup.html's two former inline <style> blocks so the
+   mockup and the gallery share one styling source and never diverge. Every raw
+   design VALUE lives in tokens.css (linked alongside this file) and is referenced
+   here via var(--name); DESIGN.md describes the rules. Linked by both
+   mockup.html and gallery.html.
+   ============================================================================ */
+
+    /* ============================ design tokens ============================ */
+    /* All raw token VALUES live in tokens.css (linked in <head>) — the single
+       source of truth. The names below (--main, --secondary-background,
+       --border, --shadow, --radius-base, the 16 --ag-* agent colours, …) are
+       referenced throughout this file via var(). Edit values in tokens.css. */
+    *{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--surface-3); }
+    ::-webkit-scrollbar{ width:var(--size-9); height:var(--size-9); }
+    ::-webkit-scrollbar-track{ background:var(--surface-3); border-left:var(--border-width) solid var(--border); }
+    ::-webkit-scrollbar-thumb{ background:var(--muted); border:var(--border-width) solid var(--border); }
+    ::-webkit-scrollbar-thumb:hover{ background:var(--secondary); }
+    body{ font-weight:var(--font-weight-base); }
+    h1,h2,h3,h4,h5{ font-weight:var(--font-weight-heading); }
+    svg.lucide{ display:inline-block; vertical-align:middle; flex:0 0 auto; }
+
+    /* ============================ app shell ============================ */
+    .app{ height:100vh; display:flex; flex-direction:column; overflow:hidden; background:var(--background); position:relative; }   /* v9p4: positioning context for the step-into Settings view */
+    .three{ flex:1 1 auto; padding:0; min-height:0; overflow:hidden; }   /* v8p7: full-bleed — frame meets header/footer & window edges */
+
+    /* ============================ Resizable (mirrors neobrutalism Resizable) ============================ */
+    .rz-group{ display:flex; height:100%; min-height:0; min-width:0; }
+    .rz-group.horizontal{ flex-direction:row; border-left:none; border-right:none; border-top:var(--border-width) solid var(--border); border-bottom:var(--border-width) solid var(--border);
+      border-radius:0; background:var(--background); overflow:hidden; }   /* v8p7: full-bleed (square, no outer shadow). v9p5: cream content surface (was white) */
+    .rz-group.vertical{ flex-direction:column; width:100%; height:100%; }
+    .rz-panel{ display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; position:relative; }
+    .rz-handle{ position:relative; z-index:6; flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
+    .rz-handle.vstyle{ width:var(--size-10); margin:0 -4px; cursor:col-resize; }
+    .rz-handle.hstyle{ height:var(--size-10); margin:-4px 0; cursor:row-resize; }
+    /* v9p14 (A7): the adjust-handle nub is removed — major panels are separated by a clear, heavier (3px)
+       navy divider line instead. The strip is still draggable to resize, but it reads as a plain divider. */
+    .rz-handle::before{ content:''; position:absolute; background:var(--border); }
+    .rz-handle.vstyle::before{ top:0; bottom:0; left:50%; width:var(--divider-width); transform:translateX(-50%); }
+    .rz-handle.hstyle::before{ left:0; right:0; top:50%; height:var(--divider-width); transform:translateY(-50%); }
+    .rz-handle:hover::before{ background:var(--secondary); }
+    /* v9p14: the adjust-handle nub (.rz-grip) was display:none; the vestigial markup has since been removed entirely. */
+
+    /* #15: panel-size readout that follows the cursor while a splitter is dragged — shows both adjacent
+       panels' sizes in px (left/top first, then right/bottom). Hidden unless .show; positioned via JS. */
+    #rz-readout{ position:fixed; z-index:9998; pointer-events:none; display:none;
+      background:var(--foreground); color:#fff; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
+      padding:var(--space-4) var(--space-7); font-family:var(--font-mono); font-size:10px; font-weight:800; white-space:nowrap; }
+    #rz-readout.show{ display:block; }
+    #rz-readout .rz-ro-sep{ color:var(--secondary); margin:0 4px; }   /* teal separator between the two panel sizes */
+
+    /* ============================ panel internals ============================ */
+    .pcard-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-8); flex-shrink:0;
+      height:var(--size-36); min-height:var(--size-36); padding:0 var(--space-10); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .pcard-head h3{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--foreground); white-space:nowrap; }
+    .pcard-body{ flex:1 1 auto; min-height:0; background:var(--background); }   /* v9p5: cream is the content surface for all panel bodies (matches the Team Graph well); cards/inputs/lists keep their own fills so they pop. The Settings step-into view is separate (.set-*) and unaffected. */
+    .pcard-foot{ flex-shrink:0; background:var(--surface-3); border-top:var(--border-width) solid var(--border); }
+    .panel-divider{ border-bottom:var(--border-width) solid var(--border); }    /* between stacked panels in a group, when no handle */
+    .rz-panel + .rz-handle.hstyle + .rz-panel .pcard-head{ } /* (handle owns the divider line) */
+
+    /* ============================ Button (mirrors neobrutalism Button variants) ============================ */
+    .btn,.btn-main,.btn-secondary,.btn-danger,.btn-danger-solid,.btn-ghost{ display:inline-flex; align-items:center; justify-content:center; gap:var(--space-6);
+      height:var(--size-30); padding:0 var(--space-12); font-size:11px; font-weight:var(--font-weight-heading); cursor:pointer;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); color:var(--foreground);
+      background:var(--surface-btn); box-shadow:var(--shadow-sm); transition:transform .07s ease, box-shadow .07s ease, background .12s; white-space:nowrap; }   /* v9p2: cream neutral (btn-main/secondary override below) */
+    .btn:hover,.btn-main:hover,.btn-secondary:hover,.btn-danger:hover,.btn-danger-solid:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .btn:active,.btn-main:active,.btn-secondary:active,.btn-danger:active,.btn-danger-solid:active{ transform:translate(2px,2px); box-shadow:none; }
+    .btn-main{ background:var(--main); color:var(--main-foreground); }
+    .btn-secondary{ background:var(--secondary); color:var(--secondary-foreground); }
+    .btn-danger{ color:var(--danger); }
+    .btn-danger:hover{ background:var(--danger-soft); }
+    .btn-danger-solid{ background:var(--danger); color:#fff; }   /* R-batch item 11: solid-red Delete-agent variant — irreversible wipe (distinct from btn-danger's softer red-text-on-cream Retire) */
+    .btn-danger-solid:hover{ background:var(--danger); filter:brightness(.92); }
+    .btn-ghost{ border-color:transparent; box-shadow:none; background:transparent; height:auto; padding:var(--space-4) var(--space-6); }
+    .btn-ghost:hover{ background:rgba(0,24,88,0.06); }
+    .btn-sm{ height:25px; padding:0 var(--space-9); font-size:10px; }
+    .btn:disabled,.btn-main:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
+    /* link-style text button (amber utility action) */
+    .link-act{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:var(--space-4); }
+    .link-act:hover{ color:var(--link-hover); }
+
+    /* ghost icon button (faint at rest, emphasized on hover) */
+    .ghost-ic{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-22); height:var(--size-20); padding:0;
+      background:transparent; border:none; color:var(--muted-2); cursor:pointer; border-radius:4px; transition:all .12s; }
+    .ghost-ic:hover{ color:var(--foreground); background:rgba(0,24,88,0.08); }
+    .ghost-ic--danger:hover{ color:var(--danger); background:rgba(210,59,106,0.10); }
+    .ghost-ic svg{ width:var(--size-14); height:var(--size-14); }
+    /* L: per-editor dictation mic recording state — red (var(--danger)), matching the .mic-btn.rec convention (red, not pink) */
+    .ghost-ic.rec{ color:var(--danger); }
+    .ghost-ic.rec:hover{ color:var(--danger); background:rgba(210,59,106,0.10); }
+
+    /* ============================ Tabs (panel headers + sub-tabs) ============================ */
+    .tabset{ display:flex; align-items:center; gap:var(--space-5); height:100%; }
+    .tab-btn{ display:inline-flex; align-items:center; gap:var(--space-5); height:var(--size-24); padding:0 var(--space-9); font-size:10.5px; font-weight:800;
+      color:var(--muted); background:transparent; border:var(--border-width) solid transparent; border-radius:var(--radius-base); cursor:pointer; transition:all .1s; }
+    .tab-btn:hover{ color:var(--foreground); }
+    .tab-btn.active{ color:var(--main-foreground); background:var(--main); border-color:var(--border); box-shadow:var(--shadow-sm); }
+
+    /* ============================ Segmented / toggle group (Mode, Effort, Trigger) ============================ */
+    .seg{ display:flex; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }
+    .seg button{ flex:1; min-width:0; padding:var(--space-6) var(--space-2); font-size:9.5px; font-weight:700; color:var(--muted);
+      background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; transition:all .1s;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .seg button:last-child{ border-right:none; }
+    .seg button:hover:not(.active){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+    .seg button.active{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+    .seg button.seg-danger{ color:var(--danger); font-weight:800; }
+    .seg button.seg-danger.active{ background:var(--danger); color:#fff; }
+
+    /* ============================ inputs ============================ */
+    .in{ width:100%; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      padding:var(--space-6) var(--space-9); font-size:11px; font-weight:600; color:var(--foreground); outline:none; transition:box-shadow .1s; }
+    .in:focus{ box-shadow:var(--shadow-sm); }
+    .in::placeholder{ color:var(--muted-2); font-weight:500; }
+    textarea.in{ line-height:1.5; }
+    textarea.autosize{ resize:none; overflow:hidden; min-height:var(--size-32); }
+    textarea.ta-resize{ resize:vertical; }
+    .lbl{ display:block; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    .in-wrap{ position:relative; display:block; }
+    .in-wrap > input{ padding-right:26px; }
+    .in-x{ position:absolute; top:50%; right:6px; transform:translateY(-50%); width:var(--size-17); height:var(--size-17); display:inline-flex;
+      align-items:center; justify-content:center; color:var(--muted-2); cursor:pointer; border:none; background:transparent; border-radius:var(--radius-sm); }
+    .in-x:hover{ color:var(--foreground); background:rgba(0,24,88,0.08); }
+    .in-x svg{ width:var(--size-11); height:var(--size-11); }
+  
+
+    /* ============================ agent identity tile (recolorable game-icon) ============================ */
+    .agtile{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:currentColor; }   /* P1c: tile bg = agent colour so a non-square tile (badges) has no white strips above/below the icon's square */
+    .agtile .ag-svg{ width:100%; height:100%; display:block; }
+    .agtile .agtile-luc{ width:62%; height:62%; color:var(--icon-fg); }
+    .agtile--user{ background:var(--ag-user); }
+    /* the HUMAN user (you): the avatar screenprint becomes the tile fill — a photo-derived
+       negative-space cutout on the --ag-user slate, echoing the agent glyphs but subtly photoreal.
+       Scoped to .agtile--me so the reused .agtile--user tiles (Scratch source, New-agent slot) are untouched. */
+    .agtile--me{ background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAPJElEQVR4nO2dC47kuA2GpxdziM3NkhNmb5a5xQS1aC9cLr1FShT5fcAgm+rusi2LPx96/fgBAAAAAAAAABH42n0DIMif//6d/PzXX7xnSPIz/TG4MHyACn/UfgHO4/f//vv3P4AaRACOPH3W6F9/RxoACYgAovASAVIFeEBx6CS+Dfjp6b/+9Z+s93/97AOiAfgGAXAgAC18CAEiAKQAZ5L06hU+RIN0ABCAWCRFgNpAaEgBvFX8pSIIUoQQMAwYkLt4jKQT4AciAONe/zLWy1C1J/j8IwhEACFAAIyH/Ktm9DFcGBNSAMNe38y9EQ24hQggqMcvQTQQBwRgNYYNvygERAEuQQBWYjncz4AI+IYawCbjt274SVhV6A5WA67gYONnCrFvEABtDjb+C0TAL9QAtDgw368tMc7OGqRAeCwIQOAq/wiIgC8QAEkO9/q9MEJwPgjALM49fg3WDpwNRcBRCuvooxj/G2wwciTMAxghWKjfDGsHjoMUIOCwnjTFPQUYITANAtAKXr/emdhp6DgQgBYw/v6ORVRwBAhACQxfrqOxstAkjALkwPhFeauVMGJgBkYBnmD4a2DEwAREAHcwflUYMbEHNYADDH90R+DSmYG74agyG5ACKBr/7FbedyN57uVf+s6W6+a++/mz3O+Iw2YjW4gtAJOTerpP5e343p6f9Rhs699r8zzv4ON9MIFoCXFTAAHjz/3dqAfNGWLSWL4/b73WqJGvSCGYM7CPmBGA4nTeUUMrGX/uZ1PGX/OwC4fqOKpsHzEFQND4WwpttZ/3hvy1a5zmUVsjG5DHXGdQ5+bZesLymmdNGeBM2N9DLkWYMv7Fi57YaWgPsSKAzrBW4kDO3mr7/XdbxKHZ+GvPXxEHrSHF63vx+nuIEwEMeLSWTt9TDGwJ02vV+yVRxV0MOiOmWZgfsJaQAqBV9GtNE7aMsyfuqcfr7rg/y3ULL8RoWGUv1psqSKQWGtRSkq33ggiogABINKLhKbczlFKYHddHBOTxvxhocQ574WEY6yrO7XomTiTSx38EsEAAvEYAVhiayARN+I4ABI3fUn4cDdpXD98CIOzhPYT1Vqm17TMdYVchGfwKgKD3xwPpgrDuw68AKIAQ7G9b3oEsPqcCb6r8gy5ECvIQARSgw62hd90DyOFvKAXv7xrOF5CFCACWGe717/r/sB+3AkC4aIensc9MnOK9yuJLADhxBiCwAIBJejcpbU4PEPxpXAoAYeLZ74T3tw4/AoA3OIoZI2dKsBx+BADMg2e3hzsBoJOdwewwIO9ZBh8CQPh/DCqGy/sPLgAAEFQAmPobFtKAec4XADiOrsNMQJWzBQDvfzxiIkAdIKAAwLEQvtvAhQDQmeKmAkwKmsOFALRy72jkn3ZAwPcRRgDuS1Axfl/Gj4CME0YALjB+O/Au9hNGAPAS9uCd7CeMALQc5Q0OogCGA7sIJQBgE1KBfZwrACi9Cz6O/Jr4HogkAAA5cA5xBADlBwgsAK2QZ/oHZ9BPGAEAAC8CQI4HEFgAAECEowWAnA8gsAAAwBwIAEBgwggA6UKwIVoKxU2EEQCwDfM09oAAgKvojEivj1ACQOfwD5FEH6EEAADeCSsAeAqf0RlRXh/hBODqIHQUgIACcBn/KwIgCpCh1JZb25ihwCo/678CERkx3FYRIPqyQ8gIAMqeXNtra38/AtNO2AiATtJojL/++tIIxe8HtcA+wgpAZESMnvzaBQiAkiFZ9W7Zey4ZvZCxP49mWxIFvO5dIopxSmgB6O2APblr7nfvRrBaJK5r/nNvNcNoMPy37xMUPgqHazhTGW8dc4URdYXMA95yhxBkBaBw/xL32WrYEgLQLHSBCR0BtHSeZMcrdajczwqGVbzWCjGriJbWYp1rxCH1/c/IAnQ4UwBeRqZYhLp3PLFO2OBtVwpB6vqWaxhTKRN1AL/zAKS9RC6fVTGIlygkhEHT85We4zqma5Xx1671/BkRgTxnRgBKPI0/GwnMRB+pSOD6bNHQ2rMab83bS0Ea4TkCWFDYUTGMl5Hf/2WeacVsvJXeXopUuxAZjEMEkOlEdwNJdbBew8l20g0Tak4ymFYvzszCMUIJQO94taSXtJLPjob9Lfe7KprA2OU4e3z023u2drzc2PLb57cRhpXhcW3ikOQ1tCY/ad936RqpZ/t4r+CoBqDlTTfNcV+Vj89e4+M+b4aVGuPXjHTY02EeFwLQygkFL81UQa2oWbnGqoJmFry/UwGYeLEt4+G7sFIvuN/LPV2q3Y9027XOxjxB4K0RqgjYwmwnkjKO08awn88lff/J77vVa+5RwEnttpuzIwBhSsZZy2lb89GevNWKR7uMr/d+pGcWvn1Pah5F6XchCRHAhAfq8fajS2YticD9f3dwmnCeQBgB0FwzsOqa0JdenJZG7SBcCpBbejozNv78+5FJNnTUvvZ6gtcfI5wASBta67CX5VGH06Ct5AgnADs65j1/pvPKt28TFAJj1wA0hqV6Pgc52C9QDjcRwMocGiO3Q+1d8K6CCMCKghEhvA0wajnOF4CB6cBU3M9GZc/GoJwvABXwFr4gCpPFlQCUvAGeAsC5ALxgzzj/IOZy+BCASh1gxxp1WAMpXnQBSKwKux8+mYOOcybsByjL+QIA4SB6k+MP79Xh3EIbOhGAIwF4Qqjon9at3cGrAFQWeHxsC83mkEczYszUejwLwOSeewDRcSEAqQ0p38DzHw+hvA4uBGAkVaBDATgWAEJ8gMACkN0aeuER3ADWcS0A4BciPBlcCEDzlN9EFAAQGRcCAAARBaDRkxMu+oL3KcfZAnCjuaDH9tAA/gSgi5sIMBLgG96vdwEgDQAY5mekFYBvh4PczpaPRsiNUhj5cRoBjBI0DTj9Wd0K1CZ8RABOvXmPsc6sjbduVKeLlmXCRQBvnd3RtODa/eeONLdu/DOc/k5XEE4A3jAeNfQaaK7D3z/3bvQQMQVwnj70bGt+fX79zdP4o/CxGxQkCRkB5AzhpJCxFsLnNkM9jZFn8PDcq3AnAN0v37j3b4GwvvD+8f5FSAEOSQNaSIX9z5+FEnqMv4qv3OjbiFs7+6nDYpEYDucx/rgRAGcCBAJDn8JlBPCCKOB8qOTr46sIaMgbeKnCl3g+3/XM3p/bE74EQHBm4AzPsfgo3J93VgTw/mtwKwBDHTCxQGi0I0cx/pLXJxKwj1sB2FlMjGL8mgaf3MwVxPEnAAMLfDTSAM/05PlEAbZxOQwoOTFIIp/3MCwpvTS59XsQEF18CoCwAWsUx6wKwozBWX0myOM33C3kjaUps28pwMC8ghNnHZZWELai8RyMBOjjMwK4G7Lxk4FTG3XsuPb9ulfofQ/BS+G4BRGDMfxGAD1RQa7w17m2oIS26KwyQm3ButdLiAD0iSUAk4KhIgSFSCXH00BWe2DN62YjDkZnVPA3DGicD6N5Gf7r36uDZzr5fb3/M1TfFX5rXff5fKALEUAJwRTgo+FH5igYYMWQZrU4C2LQqItTgI8XQGGtrV0QABVIARqYGR7zsL3XjlGTj3ZgOrAKCMBmA7Bo8E923Z+l4VqvIABGDGGXEKTm9Vta029dHE+HGkBnMdD6VF6PdYe3A11BFL8zARWw4hVnsWrosB5SgMOItvGG52ezACFVL4ILhKANUgA9SAFaYRgKHEIKAKYhBdAFAZg4lJPOOQ5tZwMEYBJLY+Yn0XPk+d8wBKgCAiC0iQa0t9/QPARqMCpQBJzk2Wk9bABqAaKqNRABdJIzblKBufaT+n3oAwFQ8EyckVcGo7YDAjAAB2OsEdbk7kkgCgLQyqMK/eycJa8WPZ9tEUzJg0WhHQSgh8pQFEeMNbTLAKQMejAKILg9dnIbK8LWITD6NRABCEHYSjueCBHAbBqQ8vCJVCHy/IDek4SjttMOEIBZmKJahMjINqQA2iAQXV4d778WIgBJGtOBSLQadOQUaSdEAAshHKZdrIEAKMCkIDgFBGAFwdOAUiRE5X8vCMCGwy1ZOVhoJ1gKRcAecrP6Bjx89IIXG6vYgNC0ldqU3lYRCLiteKrC3ysAbA2uAymA1Dl+zPkvkkt7ooigVRCATu4ddkgEHrWAyEKA8e8HAZhkphNHMYAoz3kiCEAn1TC2IxXwHgGUvD2iYAMEQAPqAcmxfhHjp21FQQA0dgOqddSAE4O8RzunggAIwshAoS0qn3e3LYiAAGwWAU+e8XoWZjqeAwKgQK+38iICtQNT8eL2QACU+BgZeEYCtzpABMOI8IwnwlqAAdi84rM9SmD8dkEAFLk6/j8G8ooCMhuG3n//JLakL1c01brtesBRl1ZIAXqQ6Eiex7ET7aMqaq1t6bnNJ0EZe/nuTNOFvruxDH7nbt6eKeGNtZ6ndVFRsc3hb2iQXiaMNdshEx7KuhhYzPtTqVTxPn8hCKQAC7Fu1B6M//nfxXv583t0JjVKEwQigF4EwvWP0Lnw/ZZGHFoKfjvvtdXwq8/xK05kEOZBpxHMb1vqAVLXWlnhtyBUI1uNfeWeM4AQuH9AERSMMhsFZELRVcY1MqxnwfAl9hv8ClgvcPlQ4jz28ZMaty+mAo/r3q+/3OALAmXN+CU2Hf0KlCK4eRA1Ept4qghAhwh0TT5K/Lzb6A8z/juz7+rLeVRw/AOokunwkjP3mseqtavUpc5sqC6xky+HtYJjb1yFgpGlxpaljEBkwkrtzIKRg0s31yOs8uUoKjjqZtWoeNfcnvaShmBm1lqjCMKP9oKpYVEwe2NLGPRwWot3tohAQ2qB4dcZrqtsxtwNLWEytNVcvacuAo21BIw+Rs3AzI0sQSin1V6+OyUCg8VCDD5mdBBDABSKWctFQBgMfj0Wawa+BUCxir1iE48ZEcDAz+Br86QjvwKgPHa9YxcfjtT2zdcGMfApAAtmrJ28jRfY56sn+psQBn97Ah44XRXgSfOmJqOTvFwJADPWwDG/M06sKAx3myiIwdkpwOZZa5Y26wAYqSOcGQHg8QHGUof7lurHCQCGDyAjBt+2ZF8AWJwCME1unwi7NQAMH0D/JOcfFmEDCoAl2BIADB8gmAAQ6gMEFAAMHyCgADCUBxBQADB8gGACQJgPYJrl+80xdx7AkwBg9AABBYDwHiCYAGD0AMEEoPPUHAA4h64DIS8wegAfNC8HxugBAgoAhg/wwy3/Bz9KDtQDZwOsAAAAAElFTkSuQmCC");
+      background-size:cover; background-position:center top; background-repeat:no-repeat; }
+    .agtile--me .agtile-luc{ display:none; }
+
+    /* ============================ Team Graph node ============================ */
+    .graph-wrap{ position:relative; }
+    .graph-grid{ position:relative; z-index:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:var(--space-14); align-items:start; }   /* R-batch item 3: align-items:start so a card whose subagent drawer is open (taller than a square) grows its row without stretching its square row-mates */
+    .edge-layer{ position:absolute; inset:0; z-index:1; pointer-events:none; overflow:visible; }
+    /* v10p10 (Next-up #5): cards are FIXED SQUARES (aspect-ratio:1) holding a single-column layout
+       (top meta strip → identity → divider → settings → load bars → activity band → subagents),
+       with the activity band pinned to the bottom (margin-top:auto on .band) and overflow clipped so
+       every card stays the same height regardless of subagent count. */
+    .node{ --nc:var(--secondary-background); position:relative; isolation:isolate; display:flex; flex-direction:column; gap:var(--space-6); aspect-ratio:1; overflow:visible; background:color-mix(in srgb, var(--nc) var(--node-tint), var(--secondary-background));
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-9);
+      cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }   /* icon-fill (light): card = a light tint of --nc (per-card agent colour); --node-tint is the knob. isolation+overflow:visible let the icon layer sit behind content and the status badge overhang the corner */
+    .node:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .node.selected{ background:color-mix(in srgb, var(--nc) var(--node-tint-selected), var(--secondary-background)); box-shadow:var(--shadow); transform:none; outline:var(--ring-width) solid var(--ring); outline-offset:-3px; }   /* icon-fill (light): selected = a stronger tint of the agent colour + teal inner ring + hard shadow (bumped to stay distinct from the new 22% base field) */
+    .node.selected:hover{ transform:none; box-shadow:var(--shadow); }
+    .node-dot{ position:absolute; top:-7px; left:-7px; width:var(--size-15); height:var(--size-15); border-radius:50%; border:var(--border-width) solid var(--border); }
+    /* v8p9: removed .node-view ("VIEWING" badge) — selection now reads from the card fill */
+    /* v10p10: .node-meta is now a hidden data carrier (model · mode · effort · think) read by repaintAgentPanel;
+       the visible config is the .node-settings chips. Keep it in the DOM but out of the layout. */
+    .node-meta{ display:none; }
+    .pbar{ position:relative; flex:1; height:var(--size-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface-3); }
+    .pbar > i{ display:block; height:100%; }
+    /* v9p7 (A1) · v9p11: cutoff shade — solid translucent gray over the region above the cutoff so the
+       unusable headroom reads at a glance. Sits over the track + any fill that runs past the cutoff; a
+       2px muted line marks the cutoff itself. */
+    .bar-cut{ position:absolute; top:0; right:0; bottom:0; pointer-events:none; z-index:2;
+      border-left:var(--border-width) solid var(--muted-2); background:rgba(91,95,134,0.30); }
+    /* ---- v10p10 (Next-up #5): square agent-card internals (ported from ui-snippets/agent-card.html) ---- */
+    /* full-bleed divider — breaks past the 9px card padding, navy border colour */
+    .node-div{ height:0; border-top:var(--border-width) solid var(--border); margin:0 -9px; }
+    /* top meta strip: age (left) + status badge (right), in-flow at the very top */
+    .node-meta-strip{ display:flex; align-items:flex-end; gap:var(--space-6); min-height:var(--size-9); margin-top:-5px; padding-right:34px; }   /* badge now overhangs (absolute); the date rides high in the header, bottom-aligned toward the badge's lower edge, clear of the overhang via padding-right */
+    .node-age{ flex:1 1 auto; min-width:0; text-align:left; font-family:var(--font-mono); font-size:7.5px; font-weight:600;
+      color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* status badge RE-PINNED to overhang the card's top-right ledge (the old look): the de-pin override
+       is removed, so .node-badge uses its base position:absolute; top:-8px; right:-8px (z-index:3, above the
+       icon-fill layer). overflow:visible on .node lets it overhang the corner. */
+    /* identity row: tile + role/name (left), model + opus-only FAST bolt (right, bottom-aligned to name) */
+    .node-id{ display:flex; align-items:flex-end; gap:var(--space-7); }
+    .node-id .agtile{ width:var(--size-26); height:var(--size-26); align-self:center; }
+    .node-idblk{ min-width:0; line-height:1.05; flex:1 1 auto; }
+    .node-role{ font-size:8px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-name{ font-family:var(--font-sans); font-weight:900; font-size:11.5px; color:var(--foreground);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .node-model{ flex:0 0 auto; display:flex; align-items:center; font-family:var(--font-mono); font-weight:700;
+      font-size:9px; color:var(--foreground); padding-bottom:var(--space-1); }   /* bottom-aligns to name via .node-id align-items:flex-end */
+    .node-bolt{ width:var(--size-11); height:var(--size-11); margin-left:4px; color:var(--warning); }      /* FAST on (opus) */
+    .node-bolt.off{ color:var(--muted-2); opacity:0.45; }                              /* FAST off (opus, inactive) */
+    /* settings: three icon chips (mode · effort · think) spread full width, aligned to the bar rows */
+    .node-settings{ display:flex; align-items:center; justify-content:space-between; }
+    .node-chip{ display:flex; align-items:center; gap:var(--space-4); font-family:var(--font-mono); font-weight:700;
+      font-size:9px; color:var(--foreground); }
+    .node-chip svg{ width:var(--size-11); height:var(--size-11); color:var(--muted); flex:0 0 auto; }
+    /* activity band: Run strip + divider + Marquee, full-bleed, pinned to the bottom directly above subagents.
+       Its top/bottom borders are two of the three dividers; the .node-div inside is the third. */
+    .node-band{ margin:auto -9px 0; border-top:var(--border-width) solid var(--border); border-bottom:var(--border-width) solid var(--border); }
+    .node-band .node-div{ margin:0; }   /* the inner divider is already full-bleed within the band */
+    /* Run progress strip — textless, single flat colour (opposite polarity to the load bars for the live states),
+       keys off status: active green · pending warm · idle muted/empty · error danger (R-batch item 1 — the 4th run
+       state: a solid full-width danger bar for a halted/failed run); barber-pole indeterminate when % unknown */
+    .run-strip{ position:relative; height:var(--size-6); overflow:hidden; background:var(--surface-3); }
+    .run-strip > i{ display:block; height:100%; width:0; }
+    .run-active  > i{ background:var(--success); }
+    .run-pending > i{ background:var(--warning); }
+    .run-error   > i{ background:var(--danger); width:100%; }   /* R-batch item 1: run errored — solid danger fill (the 4th run state), static (no barber-pole — it's halted, not working) */
+    .run-idle{ opacity:0.5; }
+    .run-indet > i{ width:100%; background:var(--success); position:relative; }
+    .run-indet > i::after{ content:''; position:absolute; inset:0;
+      background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
+      animation:run-barber 0.8s linear infinite; }
+    @keyframes run-barber{ to{ background-position:24px 0; } }
+    /* OD-11: SEGMENTED run-strip — the agent self-reports a checklist of major steps and the strip renders done÷total
+       as equal segments split by navy separators (reusing --border / --border-width). The current (in-progress)
+       segment carries the RUN'S STATE (running → green + barber-pole shimmer · paused/pending → warm · errored →
+       danger; see the .cur-* rules below) instead of the bar collapsing to a flat colour. The segmented bar is the SAME --size-6 height as every other .run-strip,
+       so every card's bar seats identically in .node-band (no card's bar is taller or misaligned). The current step
+       NAME is hover-only — carried on the bar's `title` (e.g. "Step 4 of 5 · Run typecheck") — so it never adds an
+       always-on label line and never changes the card layout. The plain single-fill + barber-pole stay the floor for
+       runs with no checklist. (The denominator can grow mid-run — the bar can step back — never a fabricated %.) */
+    .run-seg{ display:flex; align-items:stretch; height:var(--size-6); }
+    .run-seg .rseg{ flex:1; min-width:0; height:100%; background:var(--surface-3); border-right:var(--border-width) solid var(--border); }
+    .run-seg .rseg:last-of-type{ border-right:none; }
+    .run-seg .rseg.done{ background:var(--success); }
+    /* Current-segment STATE recolor (OD-11). The default .cur is RUNNING — green + barber-pole shimmer. State
+       modifiers recolour it and drop the shimmer (a paused/errored segment isn't working, so it's static):
+         · .cur-paused → warm (--warning): a blocking pause (Permission / Plan / Decision / max-turns) — the run is
+           waiting on you and the graph badge reads pending. "Paused BETWEEN steps" puts .cur-paused on the NEXT
+           (upcoming) segment. A non-blocking Warning does NOT pause — the current segment keeps shimmering.
+         · .cur-error → danger (--danger): a STEP-scoped failure recolours just that segment. A structural / whole-run
+           error (session died, rate limit) skips the segments and uses the flat .run-error whole-bar danger fallback.
+       Retry redoes the whole run from the last command → the segments RESET (done÷total recomputed), never a
+       step-level resume. */
+    .run-seg .rseg.cur{ background:var(--success); position:relative; overflow:hidden; }   /* running (default) */
+    .run-seg .rseg.cur::after{ content:''; position:absolute; inset:0;
+      background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
+      animation:run-barber 0.8s linear infinite; }
+    .run-seg .rseg.cur.cur-paused{ background:var(--warning); }   /* blocking pause — warm, static */
+    .run-seg .rseg.cur.cur-error{ background:var(--danger); }     /* step-scoped error — danger, static */
+    .run-seg .rseg.cur.cur-paused::after,
+    .run-seg .rseg.cur.cur-error::after{ display:none; }          /* not working → no shimmer */
+    /* live feed — neobrutalism marquee (two-track), no fill / no padding / full bleed; pauses on hover */
+    .node-feed{ position:relative; display:flex; align-items:center; overflow:hidden; height:var(--size-15); }
+    .node-feed .trk{ white-space:nowrap; font-family:var(--font-mono); font-size:8px; font-weight:600;
+      color:var(--muted); will-change:transform; }
+    .node-feed .trk.a{ animation:node-marquee 9s linear infinite; }
+    .node-feed .trk.b{ position:absolute; top:0; height:100%; display:flex; align-items:center; animation:node-marquee2 9s linear infinite; }
+    .node-feed:hover .trk{ animation-play-state:paused; }
+    @keyframes node-marquee{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-100%); } }
+    @keyframes node-marquee2{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(0); } }
+    .node-feed.idle .trk{ color:var(--muted-2); font-style:italic; animation:none; }   /* idle — static, muted, no scroll */
+    .node-feed.idle .trk.b{ display:none; }
+    /* subagents: RECTANGULAR clickable id-badges, each FILLED with the sub's run-state status colour + BOLD INVERSE
+       (white) id text — the exact .node-badge .nb-* treatment (--success active / --warning pending / --muted idle,
+       #fff ink). The id (OD-13: group + member — A1/A2/B1…, no `s` prefix) is the label, not a count. A badge
+       click is isolated from the parent card (stopPropagation), then runs subBadgeClick — focus the parent +
+       open Details → Subagents (scrolled/highlighted) + scope the Team Feed to that subagent (resolved OQ-1).
+       R-batch item 3: the strip is an IN-FLOW ACCORDION DRAWER (replaces the old +N popover). Collapsed shows only
+       the first row of badges (vertically centred in the trigger) + a chevron on the right; clicking the strip
+       toggles it OPEN, which grows the card downward (.node.subs-open drops the square) to reveal the remaining
+       badges wrapped onto new rows. State sticks (a toggle, not a hover popover). The chevron + drawer appear only
+       when the badges wrap past one row (.has-more, set by JS measuring wrap). One open card grows its grid row;
+       siblings stay square (.graph-grid is align-items:start). */
+    .node-subs{ min-height:var(--size-18); display:flex; flex-direction:column; gap:var(--space-4); padding-top:var(--space-1); }
+    .node-subs-bar{ display:flex; align-items:flex-start; gap:var(--space-6); width:100%; }   /* footer top row: subagents (left) + inbox envelope (right) */
+    .subs-acc{ flex:1 1 auto; min-width:0; display:flex; align-items:flex-start; gap:var(--space-5); }
+    .subs-acc.has-more{ cursor:pointer; }
+    .subs-badges{ flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-5);
+      max-height:var(--size-16); overflow:hidden; }   /* COLLAPSED: clip to one badge row (16px) */
+    .subs-acc.open .subs-badges{ max-height:none; overflow:visible; }
+    .sbadge{ height:var(--size-16); flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; padding:0 var(--space-5);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--surface-btn);
+      font-family:var(--font-mono); font-size:9px; font-weight:900; color:var(--foreground); cursor:pointer;
+      transition:transform .07s; }
+    .sbadge:hover{ transform:translate(1px,1px); }
+    /* status-fill variants — reuse the exact status tokens used by .nb-* / .run-*, white ink, the id stays bold */
+    .sbadge.sb-active{ background:var(--success); color:#fff; }
+    .sbadge.sb-pending{ background:var(--warning); color:#fff; }
+    .sbadge.sb-idle{ background:var(--muted); color:#fff; }
+    .sbadge.sb-error{ background:var(--danger); color:#fff; }   /* the 4th subagent run-state — a failed subagent; solid danger fill + inverse text, matching .nb-error / .db-error */
+    /* chevron action icon (right of the first row, toggleFcard-style) — shown only when the badges wrap (.has-more);
+       points right collapsed, rotates 90° to point down when open */
+    .subs-chev{ flex:0 0 auto; display:none; align-items:center; justify-content:center; width:var(--size-16); height:var(--size-16); padding:0;
+      border:none; background:transparent; color:var(--muted); cursor:pointer; }
+    .subs-acc.has-more .subs-chev{ display:inline-flex; }
+    .subs-chev:hover{ color:var(--foreground); }
+    .subs-chev svg{ width:var(--size-14); height:var(--size-14); transition:transform .12s; }
+    .subs-acc.open .subs-chev svg{ transform:rotate(90deg); }
+    .node.subs-open{ aspect-ratio:auto; }   /* item 3: an open subagent drawer grows the card past its fixed square */
+    .subs-empty{ align-self:center; font-family:var(--font-mono); font-size:8px; font-style:italic; color:var(--muted-2); }
+
+    /* ===== Per-card inbox footer — a small envelope+count on the RIGHT of the footer bar (subagents keep the left).
+       A FAITHFUL MIRROR of the agent's open Inbox items (the parallel path to the status badge): teal + count when there
+       are open items, expandable to a drawer of typed rows that deep-link into the Team Feed → Inbox; dimmed + non-
+       expandable when there are none. Count = OPEN/unaddressed items (not read) — the count can be >1 and can be >0 while
+       the binary status badge reads *active* (a non-blocking Warning is an open item that doesn't block). The drawer is
+       INDEPENDENT of the subagents drawer (both may be open) and grows the card downward (.node.ninb-open, like
+       .subs-open). Built from REQS at boot (renderNodeInboxes), so it can't drift from the Inbox tab or the badge. */
+    .node-inbox{ flex:0 0 auto; margin-left:auto; align-self:flex-start; display:inline-flex; align-items:center; gap:var(--space-3);
+      height:var(--size-16); padding:0 var(--space-4); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
+      background:var(--secondary); color:var(--foreground); cursor:pointer; transition:transform .07s; }
+    .node-inbox:hover{ transform:translate(1px,1px); }
+    .node-inbox .ninb-ic{ width:var(--size-11); height:var(--size-11); }
+    .node-inbox .ninb-n{ font-family:var(--font-mono); font-size:9px; font-weight:900; line-height:1; }
+    .node-inbox--empty{ background:transparent; border-color:var(--muted-2); color:var(--muted-2); cursor:default; opacity:0.6; }   /* no open items → dimmed, non-expandable, no count */
+    .node-inbox--empty:hover{ transform:none; }
+    .node.ninb-open .node-inbox{ background:var(--secondary); box-shadow:var(--shadow-sm); }
+    /* the expandable drawer — a full-width list below the footer bar, shown only when the card is .ninb-open */
+    .ninb-drawer{ display:none; width:100%; flex-direction:column; gap:var(--space-3); padding-top:var(--space-2); }
+    .node.ninb-open .ninb-drawer{ display:flex; }
+    .node.ninb-open{ aspect-ratio:auto; }   /* the inbox drawer grows the card past its square — independent of .subs-open */
+    .ninb-row{ display:flex; align-items:center; gap:var(--space-5); width:100%; text-align:left; padding:var(--space-3) var(--space-4);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--surface-btn); cursor:pointer; transition:transform .07s; }
+    .ninb-row:hover{ transform:translate(1px,1px); background:var(--select); }
+    .ninb-type{ flex:0 0 auto; font-family:var(--font-mono); font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.02em;
+      padding:var(--space-1) var(--space-3); border-radius:var(--radius-xs); color:var(--icon-fg); }   /* type chip — reuses the Inbox section severity ramp */
+    .ninb-type--error{ background:var(--danger); }
+    .ninb-type--warning{ background:var(--warning); }
+    .ninb-type--permission{ background:var(--inbox-permission); }
+    .ninb-type--plan, .ninb-type--decision{ background:var(--muted); }
+    .ninb-row-t{ flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:9px; font-weight:600; color:var(--foreground);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ===================== OD-13: Details → "Subagents" audit accordion ===================== */
+    /* A read-only history of the focused agent's subagents, grouped by run. Pinned below the Timeline,
+       above the Retire/Delete footer. Clicking a graph-card subagent badge focuses the parent, opens
+       this accordion, and scrolls/highlights the matching row (resolves OQ-1). Reuses the disclosure
+       pattern of the node subagent drawer (chevron rotates 90° on open). */
+    .subs-audit{ flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow:hidden; }
+    .subs-audit-head{ width:100%; display:flex; align-items:center; gap:var(--space-6); padding:var(--space-7) var(--space-8); background:var(--surface-3); border:none; cursor:pointer; text-align:left; font:inherit; }
+    .subs-audit-head:hover{ background:var(--background); }
+    .sa-chev{ width:var(--size-14); height:var(--size-14); color:var(--muted); transition:transform .12s; flex:0 0 auto; }
+    .subs-audit.open .sa-chev{ transform:rotate(90deg); }
+    .sa-title{ font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--foreground); }
+    .sa-count{ display:inline-flex; align-items:center; justify-content:center; min-width:var(--size-16); height:var(--size-16); padding:0 var(--space-4); border-radius:var(--radius-sm); background:var(--secondary); color:var(--secondary-foreground); font-family:var(--font-mono); font-weight:800; font-size:10px; }
+    .sa-hint{ margin-left:auto; font-size:10px; font-weight:600; color:var(--muted-2); }
+    .subs-audit-body{ display:none; flex-direction:column; padding:var(--space-8); gap:var(--space-8); }
+    .subs-audit.open .subs-audit-body{ display:flex; }
+    .sa-run-h{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:var(--space-5); }
+    .sa-run-n{ color:var(--muted-2); font-weight:600; text-transform:none; letter-spacing:0; }
+    .sa-row{ border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--background); padding:var(--space-6) var(--space-7); display:flex; flex-direction:column; gap:var(--space-4); }
+    .sa-row + .sa-row{ margin-top:var(--space-5); }
+    .sa-row.sa-hl{ background:var(--select); border-color:var(--secondary); }
+    .sa-row-top{ display:flex; align-items:center; gap:var(--space-6); }
+    .sa-type{ font-weight:700; font-size:11px; color:var(--foreground); }
+    .sa-status{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:0 var(--space-4); border-radius:var(--radius-xs); border:var(--border-width) solid var(--border); }
+    .sa-st-running{ color:#fff; background:var(--success); border-color:var(--success); }
+    .sa-st-done{ color:var(--muted); background:transparent; }
+    .sa-st-error{ color:#fff; background:var(--danger); border-color:var(--danger); }
+    .sa-tx{ margin-left:auto; flex:0 0 auto; }
+    .sa-task{ font-size:11px; color:var(--foreground); line-height:1.35; }
+    .sa-usage{ display:flex; flex-wrap:wrap; gap:var(--space-5); font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--muted); }
+    .sa-usage .sep{ color:var(--muted-2); }
+
+    /* ===================== ICON-FILL agent cards (light tint) ===================== */
+    /* The card's game-icon echoes the real identity tiles' POLARITY — a slightly DARKER tinted field
+       with a LIGHTER glyph (solid tiles = coloured background + light glyph) — just kept pale, and the
+       two tints close together. STANDARD navy text/borders so the cards sit with the rest of the light
+       UI. --nc (per-card inline) is the agent colour; --node-tint = the FIELD tint (the darker part,
+       on .node); --node-icon-pct = the GLYPH tint (the lighter part). .node-bg reuses the SAME #ag-*
+       symbol as a behind-content layer (z-index:-1, contained by the card's isolation); its colour
+       square is knocked out (color:transparent) so the field shows through, and the glyph is an OPAQUE
+       lighter tint painted over it. */
+    .node-bg{ position:absolute; inset:0; z-index:-1; width:100%; height:100%; pointer-events:none;
+      color:transparent;
+      --icon-fg:color-mix(in srgb, var(--nc) var(--node-icon-pct), var(--secondary-background));   /* glyph = a LIGHTER tint than the field (--node-tint), echoing the white glyph on the solid tiles */
+      border-radius:var(--radius-base); overflow:hidden; }
+    .node-bg use, .node-bg > svg{ width:100%; height:100%; display:block; }
+
+    /* ============================ pickers — Color (Select) + Icon (Combobox), current always visible ============================ */
+    .picker{ position:relative; }
+    .picker-trig{ width:100%; display:flex; align-items:center; gap:var(--space-7); padding:var(--space-5) var(--space-8); background:var(--secondary-background);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s; text-align:left; }
+    .picker-trig:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .picker-sw{ width:var(--size-22); height:var(--size-22); flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); }  /* matches .picker-ico so both pickers are the same height */
+    .picker-ico{ width:var(--size-22); height:var(--size-22); }
+    .picker-val{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .picker-cv{ width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; }
+    .picker-pop{ display:none; position:absolute; z-index:70; top:calc(100% + 6px); left:0; min-width:100%;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-8); }
+    .picker-pop.up{ top:auto; bottom:calc(100% + 6px); }
+    .picker-pop.open{ display:block; }
+    .picker-pop--wide{ width:248px; left:auto; right:0; }
+    .picker-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:var(--space-6); }
+    .picker-grid.ico-grid{ grid-template-columns:repeat(5,1fr); max-height:182px; overflow-y:auto; padding-right:var(--space-2); }
+    .sw{ width:100%; aspect-ratio:1; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); cursor:pointer; transition:transform .08s; }
+    .sw:hover{ transform:scale(1.08); }
+    .sw.on{ outline:var(--ring-width) solid var(--secondary); outline-offset:1px; }
+    .icotile{ display:flex; align-items:center; justify-content:center; padding:var(--space-4); background:var(--secondary-background);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); cursor:pointer; transition:transform .08s; }
+    .icotile:hover{ transform:translate(1px,1px); }
+    .icotile.on{ outline:var(--ring-width) solid var(--secondary); outline-offset:1px; }
+    .icotile .agtile{ width:var(--size-26); height:var(--size-26); pointer-events:none; }
+    .picker-search{ display:flex; align-items:center; gap:var(--space-6); margin-bottom:8px; padding:var(--space-5) var(--space-8); background:var(--background);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); }
+    .picker-search svg{ width:var(--size-13); height:var(--size-13); color:var(--muted); }
+    .picker-search input{ flex:1; min-width:0; border:none; background:transparent; outline:none; font-size:11px; font-weight:600; color:var(--foreground); }
+
+    /* ============================ per-field edit lock (Details) ============================ */
+    .field .edit-ic{ background:none; border:none; cursor:pointer; color:var(--muted-2); display:inline-flex; padding:0; }
+    .field .edit-ic:hover{ color:var(--warning); }
+    .field.editing .edit-ic{ color:var(--success); }
+    .field .ic-save{ display:none; } .field.editing .ic-pencil{ display:none; } .field.editing .ic-save{ display:inline-flex; }
+    .field:not(.editing) .lockable{ opacity:0.5; pointer-events:none; filter:saturate(0.5); }
+    .grp-div{ border-top:var(--border-width) solid var(--border); height:0; opacity:0.85; }
+
+    /* ============================ stepper (Lifecycle) ============================ */
+    .stepper{ display:flex; align-items:stretch; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    .stepper button{ width:var(--size-26); border:none; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; font-weight:900; border-right:var(--border-width) solid var(--border); }
+    .stepper button:last-child{ border-right:none; border-left:var(--border-width) solid var(--border); }
+    .stepper button:hover{ color:var(--foreground); background:rgba(0,24,88,0.06); }
+    .stepper input{ flex:1; min-width:0; border:none; background:transparent; text-align:center; font-size:11px; font-weight:800; color:var(--foreground); outline:none; -moz-appearance:textfield; }
+    .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+    .lim-tog{ width:100%; font-size:10px; font-weight:800; padding:var(--space-5) 0; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--muted); cursor:pointer; }
+    .lim-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }
+    .lim-in{ width:100%; margin-top:4px; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-4); font-size:10px; font-weight:700; color:var(--foreground); text-align:center; outline:none; }
+    .lim-in:disabled{ opacity:0.45; background:var(--surface-3); cursor:not-allowed; }
+    /* OD-06: Shared-context disclosure — the content-type filter + backfill nest under the Relationship multi-toggle,
+       set off with a navy left rule so it reads as a sub-section of "Shared context". */
+    .link-shared{ margin-top:var(--space-7); padding-left:var(--space-9); border-left:var(--border-width) solid var(--border); }
+    /* OD-08: link tracking list — grouped by agent (reuses the registry group-header + a card-styled row). Each row:
+       a →/←/↔ arrow (same vocabulary as the pair row) · the OTHER agent's identity badge · the relationship summary. */
+    .link-list{ display:flex; flex-direction:column; gap:var(--space-4); }
+    .link-grp{ margin:var(--space-9) 0 var(--space-5); }
+    .link-grp:first-child{ margin-top:0; }
+    .link-row{ display:flex; align-items:center; gap:var(--space-8); width:100%; text-align:left; padding:var(--space-5) var(--space-7);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); cursor:pointer; }
+    .link-row + .link-row{ margin-top:var(--space-4); }
+    .link-row:hover{ background:var(--surface-btn); }
+    .link-row.sel{ background:var(--select); }
+    .link-arrow{ flex:0 0 auto; width:var(--size-14); text-align:center; font-family:var(--font-mono); font-size:13px; font-weight:800; color:var(--secondary-foreground); }
+    .link-rel{ margin-left:auto; font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); white-space:nowrap; }
+    .link-empty{ font-size:10px; font-style:italic; color:var(--muted-2); padding:var(--space-8) 0; }
+
+    /* ============================ model tabs + version ============================ */
+    .ro-head{ display:flex; align-items:center; gap:var(--space-8); margin-bottom:6px; }
+    .ro-label{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    .model-tabs{ display:flex; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; versions open as a separate popout below */
+    .model-tabs.flat{ border-radius:var(--radius-base); }
+    .model-tab{ flex:1; min-width:0; font-size:9.5px; font-weight:700; padding:var(--space-7) var(--space-3); color:var(--muted); background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; }
+    .model-tab:last-child{ border-right:none; }
+    .model-tab:hover:not(.active){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+    .model-tab.active{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+    .ver-panel{ display:none; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:var(--space-6); margin-top:6px; }   /* v9p3: standalone rounded popout (button group above is self-contained) */
+    .ver-panel.open{ display:block; }
+    .ver-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-8); font-size:11px; font-weight:700; color:var(--foreground); padding:var(--space-6) var(--space-8); border-radius:var(--radius-sm); cursor:pointer; border:var(--border-width) solid transparent; }
+    .ver-row + .ver-row{ margin-top:2px; }
+    .ver-row:hover{ background:var(--surface-3); }
+    .ver-row.sel{ border-color:var(--border); background:var(--select); }
+    .ver-name{ font-family:var(--font-mono); }
+    .ver-check{ color:var(--main-foreground); font-weight:900; opacity:0; } .ver-row.sel .ver-check{ opacity:1; }
+
+    /* ============================ context (Progress + Accordion) ============================ */
+    .ctx-trigger{ width:100%; text-align:left; background:var(--secondary-background); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); padding:var(--space-8) var(--space-9); cursor:pointer; }
+    .ctx-trigger.open{ border-radius:var(--radius-base) var(--radius-base) 0 0; border-bottom:none; }
+    .summary-row{ display:flex; align-items:center; gap:var(--space-9); }
+    .ctxbar{ position:relative; flex:1; height:var(--size-9); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface-3); }
+    .ctxbar > i{ display:block; height:100%; }
+    .chev{ width:var(--size-13); height:var(--size-13); color:var(--muted); transition:transform .18s; }
+    .chev.up{ transform:rotate(180deg); }
+    .acc{ display:none; border:var(--border-width) solid var(--border); border-top:none; border-radius:0 0 var(--radius-base) var(--radius-base); background:var(--secondary-background); }
+    .acc.open{ display:block; }
+    .bd{ padding:var(--space-10); } .bd-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+    .bd-model{ font-size:11px; font-weight:800; font-family:var(--font-mono); color:var(--foreground); }
+    .bd-tot{ font-size:10px; font-weight:700; font-family:var(--font-mono); color:var(--muted); }
+    .bd-bar{ position:relative; display:flex; height:var(--size-11); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface-3); margin-bottom:10px; }
+    .bd-bar > i{ display:block; height:100%; }
+    .cat{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-4) var(--space-2); font-size:11px; }
+    .cat + .cat{ border-top:1px solid var(--border); }
+    .cat .sw2{ width:var(--size-10); height:var(--size-10); border:1.5px solid var(--border); border-radius:var(--radius-xs); flex:0 0 auto; }
+    .cat .nm{ flex:1; color:var(--foreground); font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cat .tk{ font-family:var(--font-mono); font-weight:700; color:var(--foreground); font-size:10.5px; }
+    .cat .pc{ font-family:var(--font-mono); color:var(--muted); font-size:10px; width:var(--size-40); text-align:right; }
+    .bd-sub{ margin-top:10px; padding-top:var(--space-8); border-top:var(--border-width) solid var(--border); }
+    .bd-sub h5{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:0 0 6px; }
+    .ml{ display:flex; gap:var(--space-8); padding:var(--space-3) 0; font-size:10px; }
+    .ml .p{ flex:1; color:var(--foreground); font-family:var(--font-mono); word-break:break-all; }
+    .ml .t{ font-family:var(--font-mono); font-weight:700; color:var(--foreground); }
+
+    /* Context turn-scope select (Next-up item 6) — the Context breakdown head swaps its
+       static .bd-model model text for a native <select> (Total / Turn n…1). Native on
+       purpose: free scroll / keyboard / a11y for the long turn list. Two deltas vs the
+       old head: the head centers (a <select> won't baseline-align cleanly against text),
+       and the trailing .bd-tot ratio is enlarged so the select + ratio read as inline peers. */
+    .bd-head.bd-head--scope{ align-items:center; }
+    .bd-head.bd-head--scope .bd-tot{ font-size:13px; font-weight:800; color:var(--foreground); }
+    .bd-scope{ appearance:none; -webkit-appearance:none;
+      font-family:var(--font-sans); font-weight:800; font-size:12px; line-height:1.1;
+      color:var(--muted); background:transparent; border:none; padding:0 var(--space-15) 0 0; margin:0; cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b5f86' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right center; background-size:11px; }
+    .bd-scope:hover{ color:var(--foreground); }
+    .bd-scope:focus-visible{ outline:var(--border-width) solid var(--main); outline-offset:2px; border-radius:var(--radius-xs); }
+
+    /* ============================ timeline (rewind / handoff) ============================ */
+    .tl{ display:flex; flex-direction:column; gap:var(--space-6); max-height:230px; overflow-y:auto; padding:var(--space-8); }
+    .tl-row{ display:flex; align-items:center; gap:var(--space-9); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-6) var(--space-7) var(--space-6) var(--space-9); background:var(--secondary-background); }
+    /* v8p9: current ("now") row no longer gets a pink fill — the "now" pill alone marks it */
+    .tl-main{ flex:1; min-width:0; }
+    .tl-top{ display:flex; align-items:center; flex-wrap:wrap; gap:0; margin-bottom:2px; }
+    .tl-turn{ font-size:10px; font-weight:800; font-family:var(--font-mono); color:var(--foreground); }
+    .tl-now{ font-size:7.5px; font-weight:900; text-transform:uppercase; color:var(--main-foreground); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); padding:0 var(--space-4); margin-left:6px; }
+    .tl-time{ font-size:9.5px; color:var(--muted); font-family:var(--font-mono); }
+    .tl-time::before{ content:'·'; margin:0 5px; color:var(--muted-2); }
+    .tl-ctx{ font-size:9.5px; font-weight:800; font-family:var(--font-mono); } .tl-ctx::before{ content:'·'; margin:0 5px; color:var(--muted-2); font-weight:400; }
+    .tl-desc{ font-size:11px; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85; }
+    .tl-ic{ flex:0 0 auto; width:var(--size-28); height:var(--size-28); display:inline-flex; align-items:center; justify-content:center; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+    .tl-ic:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .tl-ic svg{ width:var(--size-14); height:var(--size-14); }
+    .tl-phead{ padding:var(--space-7) var(--space-10); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+    .tl-confirm{ display:none; align-items:center; gap:var(--space-7); margin:8px; padding:var(--space-7) var(--space-9); border-radius:var(--radius-base); background:var(--success-soft); border:var(--border-width) solid var(--success); color:var(--success-text); font-size:10px; font-weight:700; }
+    .foot-confirm--danger{ background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }   /* R-batch item 11: the irreversible Delete confirm reads as severe (danger), vs Retire's success-soft confirm */
+    .tri-tabs{ display:flex; flex-shrink:0; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; timeline opens as a separate popout below */
+    .tri-tab{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:var(--space-6); font-size:10px; font-weight:800; padding:var(--space-6) 0; color:var(--muted); background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; }
+    .tri-tab:last-child{ border-right:none; }
+    .tri-tab svg{ width:var(--size-12); height:var(--size-12); }
+    .tri-tab.active{ background:var(--secondary); color:var(--secondary-foreground); }
+
+    /* ============================ split button (Send+timing, Revise+strength) ============================ */
+    .split{ position:relative; display:inline-flex; align-items:stretch; height:var(--size-30); }
+    .split-drop{ display:inline-flex; align-items:center; gap:var(--space-6); padding:0 var(--space-10); font-size:11px; font-weight:800; border:var(--border-width) solid var(--border); border-right:none; border-radius:var(--radius-base) 0 0 var(--radius-base); cursor:pointer; }
+    .split-drop svg{ width:var(--size-11); height:var(--size-11); }
+    .split-act{ display:inline-flex; align-items:center; justify-content:center; width:38px; border:var(--border-width) solid var(--border); border-radius:0 var(--radius-base) var(--radius-base) 0; cursor:pointer; transition:transform .07s, box-shadow .07s; }
+    .split-act svg{ width:var(--size-15); height:var(--size-15); }
+    .split--primary .split-drop{ background:var(--main-dim); color:var(--main-foreground); }
+    .split--primary .split-act{ background:var(--main); color:var(--main-foreground); box-shadow:var(--shadow-sm); }
+    .split--outline .split-drop{ background:var(--secondary-dim); color:var(--foreground); }
+    .split--outline .split-act{ background:var(--secondary); color:var(--secondary-foreground); box-shadow:var(--shadow-sm); }
+    .split-act:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .split-menu{ position:absolute; bottom:calc(100% + 6px); left:0; z-index:60; min-width:208px; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); display:none; }
+    .split-menu--right{ left:auto; right:0; }
+    .split-menu.open{ display:block; }
+    .split-menu-h{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); padding:var(--space-5) var(--space-8) var(--space-4); }
+    .split-mi{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-10); width:100%; text-align:left; font-size:11px; padding:var(--space-7) var(--space-8); border:var(--border-width) solid transparent; border-radius:var(--radius-sm); background:transparent; color:var(--foreground); cursor:pointer; }
+    .split-mi:hover{ background:var(--surface-3); }
+    .split-mi.sel{ border-color:var(--border); background:var(--select); }
+    .split-mi .lead{ display:flex; flex-direction:column; gap:var(--space-1); } .split-mi .lead b{ font-size:11px; font-weight:800; } .split-mi .sub{ font-size:9px; color:var(--muted); font-weight:600; }
+    .split-mi.sel .sub{ color:var(--main-foreground); opacity:.7; }
+    .split-mi .ck{ opacity:0; font-weight:900; } .split-mi.sel .ck{ opacity:1; }
+
+    /* ============================ response/format grouped multi-select ============================ */
+    .fmt{ position:relative; display:inline-flex; }
+    .fmt-btn{ height:var(--size-30); display:inline-flex; align-items:center; gap:var(--space-7); padding:0 var(--space-11); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+    .fmt-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    /* v9p2: Response is a menu selector → trigger stays neutral; "N selected" reads from the teal count badge below, not by recoloring the trigger */
+    .fmt-btn svg.ic{ width:var(--size-14); height:var(--size-14); } .fmt-btn .fmt-lbl{ font-size:11px; font-weight:800; } .fmt-btn svg.cv{ width:var(--size-11); height:var(--size-11); }
+    .fmt-badge{ display:none; min-width:var(--size-16); height:var(--size-16); padding:0 var(--space-4); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--secondary); color:var(--secondary-foreground); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:var(--font-mono); }   /* v9p2: teal = "N selected" state signal · v9p14: rounded square */
+    .fmt-btn.active .fmt-badge{ display:inline-flex; }
+    /* v10p10 (Next-up #2): wider popover with graded segmented/toggle axes + STYLE/BEHAVIOR sections + Pace.
+       max-width keeps it on-screen when the Prompt panel is narrow (trigger is left-anchored → grows rightward). */
+    .fmt-menu{ position:absolute; z-index:60; width:340px; max-width:calc(100vw - 24px); background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-10); display:none; }
+    .fmt-menu.up{ bottom:calc(100% + 6px); } .fmt-menu.left{ left:0; }
+    .fmt-menu.open{ display:block; }
+    /* section bands — STYLE (how it reads) vs BEHAVIOR (how it works) */
+    .fmt-section + .fmt-section{ margin-top:9px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
+    .fmt-sh{ display:flex; align-items:center; gap:var(--space-6); margin:0 1px 7px; }
+    .fmt-sh .lbl{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:900; color:var(--foreground); }
+    .fmt-sh .sub{ font-size:8px; font-weight:700; color:var(--muted-2); }
+    .fmt-sh svg{ width:var(--size-12); height:var(--size-12); color:var(--muted); }
+    /* one axis */
+    .fmt-group{ padding:var(--space-4) var(--space-1); }
+    .fmt-gh{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+    .fmt-gh .nm{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); }
+    .fmt-gh .mode{ font-size:7.5px; font-weight:700; color:var(--muted-2); text-transform:uppercase; }
+    /* segmented axes reuse the shared .seg control (single-select, ordered → reads as a gradient).
+       toggle-grid (multi-select, independent) — SAME text+sizing as .seg buttons, just not connected. */
+    .fmt-grid{ display:grid; gap:var(--space-6); }
+    .fmt-grid.c2{ grid-template-columns:1fr 1fr; }
+    .fmt-grid.c3{ grid-template-columns:1fr 1fr 1fr; }
+    .tog-cell{ width:100%; padding:var(--space-6) var(--space-6); font-size:9.5px; font-weight:700; color:var(--muted);
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      cursor:pointer; transition:all .1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      text-align:center; font-family:inherit; }
+    .tog-cell:hover:not(.on){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+    .tog-cell.on{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+    /* the Pace note — flags it's behavioral and independent of Effort */
+    .fmt-note{ margin-top:6px; font-size:8.5px; line-height:1.45; color:var(--muted); }
+    .fmt-note b{ color:var(--foreground); }
+    .fmt-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
+    .fmt-count{ font-size:9px; font-weight:700; color:var(--muted); }
+    .fmt-reset{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+    .fmt-reset:hover{ color:var(--link-hover); }
+
+    /* ============================ agent selectors (Source / Target / Filter) — Templates-style list ============================ */
+    /* plain section heading + bordered divided list of filled identity rows (no internal filled header bar) */
+    .aglist{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    /* v9p6 fix: the base .aglist{overflow:hidden} (for corner-clipping) was overriding Tailwind's overflow-y-auto, so the persistent lists clipped without a scrollbar. This higher-specificity rule restores vertical scroll (x stays hidden). */
+    .aglist.aglist-scroll{ overflow:hidden; overflow-y:auto; }
+    .agrow{ display:flex; align-items:center; gap:var(--space-8); width:100%; text-align:left; padding:var(--space-6) var(--space-8); background:transparent; border:none; border-top:var(--border-width) solid var(--border); cursor:pointer; transition:background .1s; }
+    .agrow:first-child{ border-top:none; }
+    .agrow:hover:not(.on){ background:var(--surface-3); }
+    .agrow.on{ background:var(--select); }
+    .agrow .agtile{ width:var(--size-28); height:var(--size-28); }
+    .ag-lab{ display:flex; flex-direction:column; line-height:1.12; min-width:0; flex:1; }
+    .ag-role{ font-size:7.5px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ag-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .agrow.on .ag-role{ color:var(--main-foreground); opacity:.7; }
+    .ag-ck{ width:var(--size-14); height:var(--size-14); color:var(--main-foreground); opacity:0; flex:0 0 auto; }
+    .agrow.on .ag-ck{ opacity:1; }
+    /* ===== OD-13: nested From/To FEED filter — agents (top) → subagents (indented, sender-side). Parent-select = whole
+       subtree, leaf-select = one subagent. Feed-filter ONLY: the Prompt compose-To stays flat (subagents are filter-only
+       senders, never addressable targets). ===== */
+    .agrow--parent .ag-exp{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-16); height:var(--size-16); padding:0; color:var(--muted); cursor:pointer; border-radius:var(--radius-xs); }
+    .agrow--parent .ag-exp:hover{ color:var(--foreground); background:var(--surface-3); }
+    .agrow--parent .ag-exp svg{ width:var(--size-12); height:var(--size-12); transition:transform .12s; }
+    .agrow--parent.subs-open .ag-exp svg{ transform:rotate(90deg); }
+    .ag-subcount{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; min-width:var(--size-15); height:var(--size-15); padding:0 var(--space-4); border-radius:var(--radius-xs); background:var(--surface-3); border:var(--border-width) solid var(--border); color:var(--muted); font-family:var(--font-mono); font-weight:800; font-size:9px; }
+    .agrow.on .ag-subcount{ background:var(--secondary); border-color:var(--secondary); color:var(--secondary-foreground); }
+    .agrow-subs{ display:none; flex-direction:column; background:var(--background); }
+    .agrow-subs.open{ display:flex; }
+    .agrow--sub{ padding-left:var(--size-26); gap:var(--space-6); }
+    .agrow--sub .ag-role{ font-size:8px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.03em; }
+    .agrow--sub .ag-name{ font-size:10px; }
+    .sub-fbadge{ flex:0 0 auto; }
+    .badge-sub .sbadge{ flex:0 0 auto; }
+    /* OD-13: subagent message cards nest indented under their parent in the Messages feed (always Received).
+       A left teal edge + indent marks them as a child of the agent above; the sub-id badge sits after the parent identity. */
+    .msgcard--sub{ margin-left:var(--size-20); border-left-color:var(--secondary); }
+    .msg-subbadge{ flex:0 0 auto; }
+    /* OD-22: recipient mini-badge — a deliberately-SMALLER identity badge (the recipient/subagent mini-badge exception)
+       showing who a message is addressed-to (routing). Sender → "→" → recipient(s) → status → dir; multi collapses to +N. */
+    .rcpt-to{ flex:0 0 auto; margin:0 var(--space-1); font-size:9px; font-weight:800; color:var(--muted-2); }
+    .rcpt{ display:inline-flex; align-items:center; flex:0 0 auto; height:var(--size-18); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--secondary-background); overflow:hidden; }
+    .rcpt + .rcpt{ margin-left:var(--space-3); }
+    .rcpt .agtile{ width:var(--size-16); height:100%; border:none; border-right:var(--border-width) solid var(--border); border-radius:0; flex:0 0 auto; }
+    .rcpt .agtile .ag-svg,.rcpt .agtile .agtile-luc{ width:var(--size-12); height:var(--size-12); }
+    .rcpt-scratch{ color:var(--muted-2); display:inline-flex; align-items:center; justify-content:center; }
+    .rcpt-nm{ padding:0 var(--space-4); font-size:7.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    .rcpt-more{ flex:0 0 auto; margin-left:var(--space-3); font-size:7.5px; font-weight:800; color:var(--muted); }
+    .mini-link{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; }
+    .mini-link:hover{ color:var(--link-hover); }
+
+    /* ============================ readout cards (feed/history/scratch/requests) ============================ */
+    .rcard{ position:relative; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-8) var(--space-10); }
+    .rcard .rc-copy{ position:absolute; top:6px; right:7px; opacity:0; transition:opacity .12s; }
+    .rcard:hover .rc-copy,.rcard:focus-within .rc-copy{ opacity:1; }
+    .rc-name{ font-size:11px; font-weight:800; }
+    .rc-time{ font-size:9px; color:var(--muted); font-family:var(--font-mono); }
+    .rc-body{ font-size:11px; color:var(--foreground); line-height:1.45; margin-top:2px; opacity:.92; }
+    .rc-log{ font-family:var(--font-mono); font-size:10px; padding:var(--space-5) var(--space-9); }
+    .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:var(--space-1) var(--space-6); border-radius:var(--radius-sm); border:var(--border-width) solid var(--border); background:transparent; color:var(--muted); }
+    .dir-out,.dir-in{ background:transparent; color:var(--muted); }   /* direction is conveyed by the label alone — no special tint */
+    .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:var(--space-1) var(--space-7); border-radius:var(--radius-sm); border:var(--border-width) solid var(--border); }
+    .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
+    .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
+    .hist-acts{ display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:7px; padding-top:var(--space-6); border-top:var(--border-width) solid var(--border); }
+    .opt{ display:block; width:100%; text-align:left; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:var(--space-6) var(--space-9); cursor:pointer; transition:transform .06s, box-shadow .06s; }
+    .opt:hover:not(.on){ box-shadow:var(--shadow-sm); transform:translate(-1px,-1px); }
+    .opt.on{ background:var(--select); }
+    .opt-nm{ display:block; font-size:11px; font-weight:800; color:var(--foreground); }
+    .opt-desc{ display:block; font-size:9.5px; color:var(--muted); line-height:1.3; margin-top:1px; }
+    .opt.on .opt-desc{ color:var(--main-foreground); opacity:.75; }
+    .req-badge{ min-width:var(--size-18); height:var(--size-16); padding:0 var(--space-5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); display:inline-flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:900; background:var(--secondary); color:var(--secondary-foreground); }   /* v9p14: rounded square · #17: teal (was --main pink) — matches the Compose Response .fmt-badge count badge */
+
+    /* ============================ mini toggles (feed direction / include) ============================ */
+    .minibar{ display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-6); padding:var(--space-7) var(--space-2) var(--space-9); }
+    .minitog{ display:inline-flex; align-items:center; gap:var(--space-5); font-size:9.5px; font-weight:800; padding:var(--space-3) var(--space-9); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); color:var(--muted); cursor:pointer; }
+    .minitog.on{ background:var(--secondary); color:var(--secondary-foreground); }
+    .minitog svg{ width:var(--size-11); height:var(--size-11); }
+    .mini-div{ width:var(--size-2); align-self:stretch; background:var(--border); margin:2px 3px; }
+    .mini-cap{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted-2); }
+
+    /* ============================ library ============================ */
+    .sec-h{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+    .lib-list{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
+    .lib-row{ display:flex; align-items:center; gap:var(--space-7); width:100%; text-align:left; font-size:11px; font-weight:600; padding:var(--space-6) var(--space-9); color:var(--foreground); background:transparent; border:none; border-top:var(--border-width) solid var(--border); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lib-row:first-child{ border-top:none; }
+    .lib-row:hover:not(.on){ background:var(--surface-3); }
+    .lib-row.on{ background:var(--select); color:var(--foreground); font-weight:800; }
+    .lib-row svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; color:var(--muted); } .lib-row.on svg{ color:var(--foreground); }
+    .tpl-view{ background:var(--background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-9) var(--space-11); font-size:12px; line-height:1.9; color:var(--foreground); overflow-y:auto; }
+    .ph-text{ font-weight:800; cursor:pointer; border-bottom:var(--border-width) dashed currentColor; padding-bottom:var(--space-1); }
+    .ph-text:hover{ background:rgba(0,24,88,0.06); }
+    .ph-text.filled{ font-style:italic; border-bottom-style:solid; }
+    .ph-text.sel{ background:var(--secondary); outline:var(--border-width) solid var(--border); border-radius:var(--radius-xs); }
+    .tpl-fill{ display:flex; align-items:stretch; gap:var(--space-6); }
+    .tpl-fill textarea{ flex:1; min-width:0; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-6) var(--space-9); font-size:11px; font-weight:700; line-height:1.3; resize:none; outline:none; }
+    /* Reset + Apply live OUTSIDE the input as trailing icon buttons */
+    .fill-btn{ flex:0 0 auto; width:var(--size-30); display:inline-flex; align-items:center; justify-content:center; color:var(--foreground); background:var(--surface-btn); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s; }
+    .fill-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .fill-btn svg{ width:var(--size-14); height:var(--size-14); }
+    .fill-btn--go{ background:var(--main); color:var(--main-foreground); }   /* Apply = primary commit */
+    .fill-btn:disabled{ opacity:.45; cursor:not-allowed; box-shadow:var(--shadow-sm); transform:none; }
+    .tpl-fill textarea:disabled{ opacity:.5; background:var(--surface-3); cursor:not-allowed; }
+    /* v10p1 #22: the merged Compose box is a contenteditable rich field (so it can hold clickable
+       placeholder pills inline alongside free text); placeholders are contenteditable=false atoms. */
+    .compose-rich{ overflow-y:auto; resize:none; outline:none; white-space:pre-wrap; word-break:break-word; }
+    .compose-rich:focus{ box-shadow:var(--shadow-sm); }
+    .compose-rich .ph-text{ font-size:inherit; }
+    select.tpl-select{ cursor:pointer; height:var(--size-32); padding:0 var(--space-9); }
+
+    /* ============================ P1a — the inserted-block primitive (embed | template | citation) ============================ */
+    /* One block component the Editor holds inline, stacked vertically as delimited blocks. The boundary
+       uses the card-OUTLINE colour (--border), NOT the tan divider (--rule). Muted, small font, a static
+       "from <source>" header, a remove (×), and (for embeds) click-to-source + clamp/expand when long.
+       Consumed by P2 (Reply reference block), P3 (templates / editor body), P4 (embeds / citations). */
+    .ed-block{ margin:8px 0; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow:hidden; }
+    .ed-block:first-child{ margin-top:0; }
+    .ed-block-head{ display:flex; align-items:center; gap:var(--space-6); padding:var(--space-3) var(--space-5) var(--space-3) var(--space-8); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .ed-block-from{ font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .ed-block-from b{ font-weight:900; color:var(--foreground); }
+    .ed-block-from.clickable{ cursor:pointer; }
+    .ed-block-from.clickable:hover{ color:var(--link-hover); text-decoration:underline; }
+    .ed-block-kind{ flex:0 0 auto; font-size:7px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-2); }
+    .ed-block-x{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-18); height:var(--size-18); padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:var(--radius-sm); }
+    .ed-block-x:hover{ color:var(--danger); background:var(--danger-soft); }
+    .ed-block-x svg{ width:var(--size-13); height:var(--size-13); }
+    .ed-block-body{ padding:var(--space-7) var(--space-9); font-size:10px; line-height:1.5; color:var(--muted); background:var(--secondary-background); white-space:pre-wrap; word-break:break-word; }
+    .ed-block-body.clamp{ max-height:62px; overflow:hidden; -webkit-mask-image:linear-gradient(var(--foreground) 58%, transparent); mask-image:linear-gradient(var(--foreground) 58%, transparent); }
+    .ed-block-more{ display:block; width:100%; padding:var(--space-3); border:none; border-top:var(--border-width) solid var(--border); background:var(--surface-3); color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+    .ed-block-more:hover{ color:var(--foreground); }
+    /* template variant — interactive/selectable; selecting makes it the active template the fill input drives */
+    .ed-block--template{ cursor:pointer; }
+    .ed-block--template.sel{ box-shadow:0 0 0 2px var(--secondary) inset; }
+    .ed-block--template.sel .ed-block-head{ background:var(--select); }
+    /* inline citation pill — points at an attachment chip (P4) */
+    .ed-cite{ display:inline-flex; align-items:center; gap:var(--space-3); padding:0 var(--space-5); margin:0 1px; height:var(--size-16); vertical-align:-2px; border:var(--border-width) solid var(--secondary); border-radius:var(--radius-sm); background:var(--secondary-dim); color:var(--secondary-foreground); font-size:9px; font-weight:800; cursor:pointer; }
+    .ed-cite svg{ width:var(--size-9); height:var(--size-9); }
+    .ed-cite:hover{ background:var(--secondary); }
+
+    /* ============================ P3 — attachment-chip strip (above the Editor) ============================ */
+    .attach-strip{ display:flex; flex-wrap:wrap; gap:var(--space-6); margin-bottom:8px; }
+    .att-card{ display:inline-flex; align-items:center; gap:var(--space-5); max-width:172px; height:var(--size-26); padding:0 var(--space-3) 0 var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); box-shadow:var(--shadow-sm); }
+    .att-card-ic{ width:var(--size-12); height:var(--size-12); flex:0 0 auto; color:var(--muted); }
+    .att-card-nm{ flex:1 1 auto; min-width:0; font-size:9.5px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+    .att-card-nm:hover{ color:var(--link-hover); text-decoration:underline; }
+    .att-card.att-flash{ animation:attFlash 1s ease; }   /* R-batch item 8: flash a freshly attached chip when Attach-as-file reveals it on Compose */
+    @keyframes attFlash{ 0%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} 30%{ box-shadow:0 0 0 4px var(--secondary);} 100%{ box-shadow:var(--shadow-sm);} }
+    .att-card-cite{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-17); height:var(--size-17); padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:var(--radius-sm); }
+    .att-card-cite:hover{ color:var(--secondary-foreground); background:var(--secondary-dim); }
+    .att-card-cite svg{ width:var(--size-11); height:var(--size-11); }
+    .att-card-x{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-17); height:var(--size-17); padding:0; border:none; background:transparent; color:var(--muted); cursor:pointer; border-radius:var(--radius-sm); }
+    .att-card-x:hover{ color:var(--danger); background:var(--danger-soft); }
+    .att-card-x svg{ width:var(--size-11); height:var(--size-11); }
+    /* P3 (#119): the Library Plans/Documents "Editor" header — mirrors the Compose Editor header (label left,
+       ghost Copy·Edit·Comment right). Assets has no header (an image isn't text-editable). */
+    .lib-edit-head{ display:flex; align-items:center; gap:var(--space-5); margin-bottom:6px; }
+    .lib-edit-lab{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+
+    /* ============================ the merged Export control (R-batch items 6-10) ============================ */
+    /* ONE dropdown (.exp.ea-dd, data-eahost) reused across feed / hist / doc-* / plan / asset — replaces the old
+       separate Output Export + Embed/Attach controls. Two sections: "Export" (Copy selected · Export selected → file)
+       and "Add to prompt" (Embed in prompt · Attach as file). Selection-gated per item by eaUpdate(); built by
+       expMenuHTML(). The .ea-dd class + eaSend wiring are kept so all existing selection-change callers still work. */
+
+    /* ============================ P4c — the Review chip (single-agent reviewer select + icon-only send) ============================ */
+    .rev-chip{ display:inline-flex; align-items:stretch; height:var(--size-30); position:relative; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+    .rev-trig{ display:inline-flex; align-items:center; gap:var(--space-4); padding:0 var(--space-4) 0 0; background:var(--secondary-background); border:none; border-right:var(--border-width) solid var(--border); border-radius:var(--radius-base) 0 0 var(--radius-base); cursor:pointer; }
+    .rev-trig:hover{ background:var(--surface-3); }
+    .rev-chip .badge{ height:var(--size-26); border:none; box-shadow:none; }
+    .rev-trig .picker-cv{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; color:var(--muted); }
+    .rev-act{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-30); flex:0 0 auto; background:var(--secondary); color:var(--secondary-foreground); border:none; border-radius:0 var(--radius-base) var(--radius-base) 0; cursor:pointer; }
+    .rev-act:hover{ filter:brightness(.95); }
+    .rev-act svg{ width:var(--size-14); height:var(--size-14); }
+    /* R11 item 5: open UPWARD (above the footer), matching the neighbouring Export .exp-menu — a footer dropdown
+       opening downward was clipped by the card AND ran past the panel's scroll bottom; opening up keeps it a raised
+       overlay within the editor, never clipped. Two-class selector so it beats the base .src-pop (top/right) it extends. */
+    .src-pop.rev-pop{ left:0; right:auto; min-width:210px; top:auto; bottom:calc(100% + 6px); }
+
+    /* ============================ link drawer (Sheet) ============================ */
+    /* v1.x #3 (rev): the Link Config drawer opens against the LEFT edge of the right pane (#pRight) — i.e.
+       immediately to the RIGHT of the Team Graph panel it's launched from — so the whole Team Graph stays
+       visible. It's a child of #pRight, absolutely positioned and clipped to that pane (not the window),
+       and slides in from the left (out from behind the graph). */
+    .drawer{ position:absolute; top:0; left:0; height:100%; width:266px; z-index:30; background:var(--secondary-background); border-right:var(--border-width) solid var(--border); box-shadow:6px 0 0 0 rgba(0,24,88,0.08); overflow-y:auto; animation:slideInLeft .15s ease; }
+    @keyframes slideInLeft{ from{ transform:translateX(-40px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
+    .dir-cyc{ width:var(--size-30); height:var(--size-30); flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--warning); font-size:15px; font-weight:900; cursor:pointer; box-shadow:var(--shadow-sm); }
+    .dir-cyc:hover{ transform:translate(2px,2px); box-shadow:none; }
+
+    /* ============================ title bar / footer ============================ */
+    .topbar{ flex-shrink:0; height:var(--size-36); display:flex; align-items:center; justify-content:space-between; padding:0 var(--space-12); background:var(--main); border-bottom:var(--border-width) solid var(--border); }
+    .footbar{ flex-shrink:0; height:var(--size-34); display:flex; align-items:center; justify-content:space-between; padding:0 var(--space-12); background:var(--surface-3); border-top:var(--border-width) solid var(--border); }
+    .chip{ display:inline-flex; align-items:center; gap:var(--space-5); padding:var(--space-1) var(--space-8); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); font-size:9.5px; font-weight:700; color:var(--foreground); }
+    .tok-pill{ display:inline-flex; align-items:center; gap:var(--space-6); height:var(--size-24); padding:0 var(--space-10); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--main); color:var(--main-foreground); font-family:var(--font-mono); font-size:10px; font-weight:800; }
+    .reply-flash{ animation:replyFlash .9s ease; }
+    @keyframes replyFlash{ 0%{ box-shadow:0 0 0 0 rgba(245,130,174,0);} 30%{ box-shadow:0 0 0 4px var(--main);} 100%{ box-shadow:0 0 0 0 rgba(245,130,174,0);} }
+    /* v9p8: Inbox → Plan cross-link flash (teal ring, mirrors .reply-flash) — marks the plan a Review jump landed on */
+    .plan-card.plan-flash{ animation:planFlash 1s ease; }
+    @keyframes planFlash{ 0%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} 25%{ box-shadow:0 0 0 4px var(--secondary);} 100%{ box-shadow:0 0 0 0 rgba(139,211,221,0);} }
+
+    /* ============================ v8p6 — thinking toggle (inline, trailing the Mode group) ============================ */
+    .think-tog{ display:inline-flex; align-items:center; gap:var(--space-5); flex:0 0 auto; height:var(--size-30); padding:0 var(--space-10); font-size:9.5px; font-weight:800;
+      text-transform:uppercase; letter-spacing:0.03em; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); color:var(--muted); cursor:pointer; box-shadow:var(--shadow-sm); white-space:nowrap;
+      transition:transform .07s, box-shadow .07s, background .12s; }
+    .think-tog:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .think-tog.on{ background:var(--secondary); color:var(--secondary-foreground); }   /* labeled toggle-button: the whole button fills teal when on */
+    .think-tog svg{ width:var(--size-12); height:var(--size-12); }
+    /* Mode toggles are labeled toggle BUTTONS — icon + a label that reads its own Off/On state
+       ("Opus Fast-Mode Off/On" · "Thinking Mode Off/On"), two evenly spaced across one row
+       (grid-cols-2). The whole button fills teal when on (.think-tog.on). */
+    .think-tog.tog-cell{ width:100%; flex:0 0 auto; justify-content:center; gap:var(--space-4); padding:0 var(--space-4); min-width:0; }
+    .think-tog.tog-cell .tt-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    .think-tog.tog-cell svg{ flex:0 0 auto; }
+    /* Opus Fast-Mode toggle is gated to the Opus model — dimmed + inert unless Model = Opus */
+    .think-tog.gated{ opacity:.4; cursor:not-allowed; }
+    .think-tog.gated:hover{ transform:none; box-shadow:var(--shadow-sm); background:var(--secondary-background); }
+
+    /* ============================ v8p6 — Team Graph status badge (replaces .node-dot) ============================ */
+    .node-badge{ position:absolute; top:-8px; right:-8px; z-index:3; display:inline-flex; align-items:center;
+      padding:var(--space-1) var(--space-6); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); font-size:7px; font-weight:900;
+      letter-spacing:0.07em; text-transform:uppercase; cursor:pointer; box-shadow:var(--shadow-sm);
+      transition:transform .07s, box-shadow .07s; }
+    .node-badge:hover{ transform:translate(1px,1px); box-shadow:none; }
+    .nb-pending{ background:var(--warning); color:#fff; }
+    .nb-active{ background:var(--success); color:#fff; }
+    .nb-idle{ background:var(--muted); color:#fff; }   /* v1.1: solid slate-gray fill + white text, matching the active/pending badges */
+    .nb-error{ background:var(--danger); color:#fff; }   /* R-batch item 1: Error — the 4th run state. Solid danger fill + inverse text, matching the active/idle/pending solid badges. */
+    .node-think{ font-weight:800; } /* thinking on/off chip inside node-meta */
+
+    /* ============================ v8p6 — combobox (single-select + custom text) — Role ============================ */
+    .combo{ position:relative; }
+    .combo-trig{ display:flex; align-items:center; background:var(--secondary-background); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); overflow:hidden; }
+    .combo-trig:focus-within{ box-shadow:var(--shadow-sm); }
+    .combo-in{ flex:1; min-width:0; border:none; background:transparent; outline:none; padding:var(--space-6) var(--space-9); font-size:11px; font-weight:700; color:var(--foreground); }
+    .combo-in::placeholder{ color:var(--muted-2); font-weight:500; }
+    .combo-cv{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-26); align-self:stretch;
+      border:none; border-left:var(--border-width) solid var(--border); background:var(--surface-3); color:var(--muted); cursor:pointer; }
+    .combo-cv:hover{ color:var(--foreground); background:rgba(0,24,88,0.06); }
+    .combo-cv svg{ width:var(--size-13); height:var(--size-13); }
+    .combo-pop{ display:none; position:absolute; z-index:70; top:calc(100% + 6px); left:0; right:0; max-height:230px; overflow-y:auto;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .combo-pop.open{ display:block; }
+    .combo-gh{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); padding:var(--space-6) var(--space-7) var(--space-3); }
+    .combo-opt{ display:flex; flex-direction:column; gap:var(--space-1); width:100%; text-align:left; padding:var(--space-6) var(--space-8); border:var(--border-width) solid transparent;
+      border-radius:var(--radius-sm); background:transparent; cursor:pointer; }
+    .combo-opt:hover{ background:var(--surface-3); }
+    .combo-opt.sel{ border-color:var(--border); background:var(--select); }
+    .combo-opt b{ font-size:11px; font-weight:800; color:var(--foreground); }
+    .combo-opt .sub{ font-size:9px; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ============================ v8p6 — multi-select dropdown (chips + checklist) — Skills / Tools ============================ */
+    .msel{ position:relative; }
+    .msel-box{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-5); width:100%; min-height:var(--size-34); padding:var(--space-5) 30px var(--space-5) var(--space-6);
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); cursor:pointer; }
+    .msel-cv{ position:absolute; top:8px; right:8px; width:var(--size-14); height:var(--size-14); color:var(--muted); pointer-events:none; }
+    .msel-chip{ display:inline-flex; align-items:center; gap:var(--space-3); font-size:10px; font-weight:800; color:var(--foreground);
+      background:var(--surface-3); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-1) var(--space-3) var(--space-1) var(--space-7); }
+    .msel-chip button{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-14); height:var(--size-14); padding:0; border:none;
+      background:transparent; color:var(--muted-2); cursor:pointer; border-radius:var(--radius-sm); }
+    .msel-chip button:hover{ color:var(--danger); background:rgba(210,59,106,0.12); }
+    .msel-chip button svg{ width:var(--size-9); height:var(--size-9); }
+    .msel-ph{ font-size:11px; font-weight:600; color:var(--muted-2); padding:var(--space-1) var(--space-2); }
+    .msel-pop{ display:none; position:absolute; z-index:70; top:calc(100% + 6px); left:0; right:0; max-height:236px; overflow-y:auto;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .msel-pop.open{ display:block; }
+    .msel-gh{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); padding:var(--space-6) var(--space-7) var(--space-3); }
+    .msel-opt{ display:flex; align-items:center; gap:var(--space-7); width:100%; text-align:left; padding:var(--space-6) var(--space-8); border:var(--border-width) solid transparent;
+      border-radius:var(--radius-sm); background:transparent; cursor:pointer; font-size:11px; font-weight:700; color:var(--foreground); }
+    .msel-opt:hover{ background:var(--surface-3); }
+    .msel-opt .mck{ width:var(--size-13); height:var(--size-13); color:var(--foreground); opacity:0; flex:0 0 auto; }
+    .msel-opt.on{ background:var(--select); } .msel-opt.on .mck{ opacity:1; }
+    .msel-opt .mname{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .msel-opt .mtag{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted-2); }
+
+    /* ============================ v8p6 — mic icon button (voice dictation) — v8p8: lives in the Prompts footer ============================ */
+    .mic-btn{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-30); height:var(--size-30); flex:0 0 auto; padding:0;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);   /* v1.x #9: low-emphasis action button → warm cream (neutral tier), not white (which is reserved for fillable inputs/selectors) */
+      cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
+    .mic-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .mic-btn.rec{ background:var(--danger); color:#fff; }
+    .mic-btn svg{ width:var(--size-14); height:var(--size-14); }
+    /* A13: footer mic starts disabled/muted (no editable field focused) — inert + low-contrast, no hover lift */
+    .mic-btn:disabled{ color:var(--muted-2); opacity:.55; cursor:default; box-shadow:var(--shadow-sm); }
+    .mic-btn:disabled:hover{ transform:none; box-shadow:var(--shadow-sm); }
+    /* icon-only action button (cream mic-button style + hover tooltip via title) — used for Copy / Retry in
+       the Team Feed + History action strips, plus the danger Stop. (Plans/Documents Copy·Edit·Comment moved
+       to the Editor header in P3 and use the ghost icon style — see .ghost-ic / .lib-edit-head.) Labeled
+       buttons (Summarize, Revise, Reject, Approve) keep their text. */
+    .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-30); height:var(--size-30); flex:0 0 auto; padding:0;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);   /* v1.x #9: neutral-tier cream (unified with .btn low-emphasis); white stays for fillable inputs/selectors only */
+      cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
+    .icon-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .icon-btn svg{ width:var(--size-14); height:var(--size-14); }
+    .icon-btn.is-off{ opacity:.5; cursor:not-allowed; }
+    .icon-btn.is-off:hover{ transform:none; box-shadow:var(--shadow-sm); }
+    .icon-btn--danger{ color:var(--danger); }
+    .icon-btn--danger:hover{ background:var(--danger-soft); }
+
+    /* ============================ v8p6 — History status badges (Prompts → History) ============================ */
+    .db-active{ background:var(--status-active); color:var(--icon-fg); }   /* darker green = in-flight */
+    .db-complete{ background:var(--status-done-soft); color:var(--success-text); }  /* lighter green = finished */
+    .db-error{ background:var(--danger); color:#fff; }   /* R-batch item 1: Error run errored (alongside Active / Complete) — now a SOLID danger fill + inverse text, matching the graph status badges (.nb-error) and db-active, not the old soft-red/red-text */
+
+    /* ============================ v9p7 (A3) — Documentation panel (Plan + doc viewers) ============================ */
+    /* plan-status badges (reuse the .dbadge shell) */
+    .db-draft{ background:var(--surface-3); color:var(--muted); }
+    .db-review{ background:var(--warning-soft); color:var(--warning-text); }     /* amber = awaiting review */
+    /* (the old per-card Inbox request-type badges + their reddish→copper ramp were retired in P2 — the
+       Inbox now groups by typed section; the --req-* tokens stay in tokens.css but are no longer used here) */
+    /* v10p1 #15: Inbox cards reuse the expandable .fcard shell — collapsed = identity + type badge +
+       title; expanded reveals the request detail + action row. */
+    .inbox-card .inbox-title{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .inbox-card .inbox-detail{ margin-top:2px; }
+    .inbox-card .inbox-acts{ display:flex; align-items:center; gap:var(--space-8); margin-top:11px; flex-wrap:wrap; }
+    .inbox-card .fcard-body{ padding-top:var(--space-9); }
+    .inbox-card .dbadge{ flex:0 0 auto; }
+    /* P2: Inbox grouped into typed SECTIONS (Permission · Plan · Decision · Error) — the section header
+       carries the label, so cards drop the per-card type badge. Clean headers; danger is reserved for the
+       Error section/cards as the single alarm (supersedes the old reddish→copper attention ramp). */
+    #inbox-list{ gap:var(--space-12); }
+    .inbox-sec-head{ display:flex; align-items:center; gap:var(--space-7); padding:0 var(--space-2) var(--space-6); }
+    .inbox-sec-lab{ font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+    /* count badge matches its section label (was a fainter --muted-2/--rule — barely visible) */
+    .inbox-sec-n{ font-size:8.5px; font-weight:800; font-family:var(--font-mono); color:var(--muted); border:var(--border-width) solid var(--muted); border-radius:var(--radius-sm); padding:0 var(--space-5); line-height:1.5; }
+    .inbox-sec-cards{ display:flex; flex-direction:column; gap:var(--space-8); }
+    /* Section-heading ramp (label + matching badge): Permission → Warning → Error escalate;
+       Plan + Decision stay the neutral --muted base above. Card left-edge stays Error-only. */
+    .inbox-sec--permission .inbox-sec-lab{ color:var(--inbox-permission); }
+    .inbox-sec--permission .inbox-sec-n{ color:var(--inbox-permission); border-color:var(--inbox-permission); }
+    .inbox-sec--warning .inbox-sec-lab{ color:var(--warning); }
+    .inbox-sec--warning .inbox-sec-n{ color:var(--warning); border-color:var(--warning); }
+    .inbox-sec--error .inbox-sec-lab{ color:var(--danger); }
+    .inbox-sec--error .inbox-sec-n{ color:var(--danger); border-color:var(--danger); }
+    .inbox-card.inbox-card--error{ border-left:6px solid var(--danger); }   /* Error = the alarm; other types stay edge-free (2-class to beat .fcard's border shorthand) */
+    .inbox-subtype{ flex:0 0 auto; font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--danger); border:var(--border-width) solid var(--danger); border-radius:var(--radius-sm); padding:0 var(--space-5); background:var(--danger-soft); }
+    /* R11 item 1: Warning subtype badge (e.g. "Max turns") — same chip geometry, swapped onto the --warning ramp to
+       match the Warning section heading; Error keeps the base (--danger) rule above as the single alarm. */
+    .inbox-subtype--warning{ color:var(--warning); border-color:var(--warning); background:var(--warning-soft); }
+    .inbox-err{ white-space:pre-wrap; }
+    /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
+    .msg-blocks{ display:flex; flex-direction:column; gap:var(--space-3); margin-top:7px; }
+    .msg-blk{ font-family:var(--font-mono); font-size:10px; line-height:1.5; padding:var(--space-4) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
+    .msg-blk-lbl{ display:inline-block; font-weight:800; text-transform:uppercase; font-size:7.5px; letter-spacing:.05em; color:var(--muted); margin-right:6px; }
+    .msg-blk.blk-think{ background:var(--secondary-background); color:var(--muted); font-style:italic; }
+    .msg-blk.blk-meta{ background:var(--secondary-background); color:var(--muted-2); }
+    .msg-blk.blk-diff .blk-add{ color:var(--success); } .msg-blk.blk-diff .blk-del{ color:var(--danger); }
+    /* ===== hover cards — documentation-through-design popovers (anchored + transient, not floating windows) ===== */
+    /* v10p1 #9: a no-chrome muted info glyph beside the panel label (no circle/border/fill — the circle
+       broke the "rounded squares" rule and mis-centered the icon); vertically centered to the title, it
+       just brightens on hover. The data-hc hover-card behavior is unchanged. */
+    .hc-glyph{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-15); height:var(--size-15); margin-left:5px; margin-right:auto; border:none; border-radius:0; background:transparent; color:var(--muted-2); cursor:help; flex:0 0 auto; padding:0; vertical-align:middle; transition:color .12s; }   /* v1.x: margin-right:auto keeps the glyph trailing right after the panel label (h3), pushing the header's right controls to the end — instead of space-between centering it */
+    .hc-glyph svg{ width:var(--size-13); height:var(--size-13); stroke-width:2.5; }
+    .hc-glyph:hover,.hc-glyph:focus-visible{ background:transparent; color:var(--foreground); outline:none; }
+    [data-hc]:not(.hc-glyph){ cursor:help; }
+    #hcpop{ position:fixed; z-index:9999; max-width:264px; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-8) var(--space-10); pointer-events:none; opacity:0; transform:translateY(-3px); transition:opacity .1s ease; }
+    #hcpop.open{ opacity:1; transform:none; }
+    #hcpop .hc-title{ font-weight:800; font-size:10.5px; letter-spacing:.01em; color:var(--foreground); margin-bottom:3px; }
+    #hcpop .hc-body{ font-size:10.5px; line-height:1.5; color:var(--muted); }
+    .db-approved{ background:var(--status-done-soft); color:var(--success-text); }   /* green = approved */
+    /* "+" add-doc affordance in the tabset */
+    .doc-add{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-24); height:var(--size-24); flex:0 0 auto;
+      border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; color:var(--muted); cursor:pointer; }
+    .doc-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--secondary-background); }
+    .doc-add svg{ width:var(--size-13); height:var(--size-13); }
+    /* plan cards (expandable) */
+    .plan-card{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
+    /* R11 item 5: footer popovers (the reviewer-chip .rev-pop, the merged Export .ea-dd, the verdict .vpop) are
+       absolutely-positioned inside the plan editor; .plan-card's overflow:hidden was clipping the downward-opening
+       reviewer dropdown to the card's bottom edge. While any of them is open the card releases its clip and lifts
+       above sibling cards (mirrors the .fcard.att-open escape). Cleared by closeAllPopups(). */
+    .plan-card.pop-open{ overflow:visible; position:relative; z-index:5; }
+    .plan-head{ display:flex; align-items:center; gap:var(--space-8); width:100%; text-align:left; padding:var(--space-8) var(--space-9); background:transparent; border:none; cursor:pointer; }
+    .plan-head:hover{ background:var(--surface-3); }
+    .plan-chev{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); transition:transform .15s; }
+    .plan-card.open .plan-chev{ transform:rotate(90deg); }
+    .plan-title{ font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
+    .plan-meta{ font-size:8.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); flex:0 0 auto; }
+    .plan-body{ display:none; padding:0 var(--space-10) var(--space-10); border-top:var(--border-width) solid var(--border); }
+    .plan-card.open .plan-body{ display:block; }
+    .plan-desc{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin:9px 0 9px; }
+    .plan-steps{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--space-5); }
+    .plan-steps li{ display:flex; align-items:flex-start; gap:var(--space-7); font-size:11px; line-height:1.35; color:var(--foreground); }
+    .plan-steps li svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; margin-top:1px; }
+    .plan-steps li.done{ color:var(--muted); }
+    .plan-steps li.done svg{ color:var(--success); }
+    .plan-steps li.doing svg{ color:var(--warning); }
+    .plan-steps li .step-dot{ width:var(--size-11); height:var(--size-11); flex:0 0 auto; margin-top:1px; border:var(--border-width) solid var(--muted-2); border-radius:50%; }
+    .plan-foot{ display:flex; align-items:center; gap:var(--space-7); margin-top:11px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
+    /* doc viewer (README / CLAUDE / TODO) */
+    .doc-toolbar{ display:flex; align-items:center; gap:var(--space-7); margin-bottom:8px; flex:0 0 auto; }
+    .doc-path{ font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--muted); padding:var(--space-3) var(--space-8);
+      background:var(--surface-3); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .doc-view{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-12) var(--space-14); font-size:12px; line-height:1.6; color:var(--foreground); }
+    .doc-view h4{ font-size:13px; font-weight:900; margin:0 0 6px; color:var(--foreground); }
+    .doc-view h5{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin:14px 0 5px; }
+    .doc-view p{ margin:0 0 9px; opacity:.94; }
+    .doc-view ul{ margin:0 0 9px; padding-left:17px; } .doc-view li{ margin:2px 0; opacity:.94; }
+    .doc-view code{ font-family:var(--font-mono); font-size:10.5px; background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-4); }
+    .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
+    .doc-view .doc-hr{ border:none; border-top:var(--border-width) solid var(--border); margin:12px 0; }
+    .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:var(--font-mono); font-size:11px; line-height:1.55; }
+
+    /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
+    .docdoc{ display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
+    .docdoc.on{ display:flex; }
+    .docmain{ min-width:0; }
+    /* doc-switcher: icon · name · path (path disambiguates project vs user CLAUDE.md) */
+    .docnav{ flex:0 0 184px; display:flex; flex-direction:column; gap:var(--space-4); overflow-y:auto;   /* A18: widened 162→184px to reclaim filename width now that each row leads with a per-type file icon */
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:var(--space-5); }
+    .docnav-row{ display:flex; align-items:center; gap:var(--space-7); width:100%; text-align:left; cursor:pointer;
+      padding:var(--space-6) var(--space-7); border:var(--border-width) solid transparent; border-radius:var(--radius-base); background:transparent; }
+    .docnav-row:hover{ background:var(--surface-3); }
+    .docnav-row.on{ background:var(--select); border-color:var(--border); }
+    .docnav-ic{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); }
+    .docnav-row.on .docnav-ic{ color:var(--foreground); }
+    .docnav-lab{ display:flex; flex-direction:column; gap:var(--space-1); min-width:0; }
+    .docnav-name{ font-size:11px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .docnav-path{ font-family:var(--font-mono); font-size:8px; font-weight:700; color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }   /* A18: shrunk secondary line (path/size) so the filename line keeps the width */
+    .docnav-add{ display:flex; align-items:center; gap:var(--space-5); margin-top:auto; padding:var(--space-6) var(--space-7); font-size:10px; font-weight:800;
+      color:var(--muted); cursor:pointer; border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; }
+    .docnav-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--surface-3); }
+    .docnav-add svg{ width:var(--size-13); height:var(--size-13); }
+
+    /* ---- Library: Assets tab — thumbnail grid IS the nav, + selected-asset detail strip ---- */
+    .asset-grid{ flex:1 1 auto; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:var(--space-9); align-content:start; padding:var(--space-2); }
+    .asset-tile{ display:flex; flex-direction:column; gap:var(--space-5); cursor:pointer; text-align:left;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:var(--space-5);
+      transition:transform .07s, box-shadow .07s; }
+    .asset-tile:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .asset-tile.on{ outline:var(--ring-width) solid var(--ring); outline-offset:1px; }
+    .asset-thumb{ display:flex; align-items:center; justify-content:center; aspect-ratio:4/3; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); color:var(--icon-fg); }
+    .asset-thumb svg{ width:var(--size-22); height:var(--size-22); opacity:.85; }
+    .asset-name{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .asset-detail{ flex:0 0 auto; display:none; align-items:center; gap:var(--space-11); margin-top:9px; padding:var(--space-9);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); }
+    .asset-detail.on{ display:flex; }
+    .asset-detail-thumb{ display:flex; align-items:center; justify-content:center; width:64px; height:48px; flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); color:var(--icon-fg); }
+    .asset-detail-thumb svg{ width:var(--size-20); height:var(--size-20); opacity:.85; }
+    .asset-detail-info{ min-width:0; display:flex; flex-direction:column; gap:var(--space-3); }
+    .asset-detail-name{ font-family:var(--font-mono); font-size:11px; font-weight:800; color:var(--foreground); }
+    .asset-detail-meta{ font-size:9.5px; font-weight:600; color:var(--muted); }
+    .asset-detail-actions{ display:flex; gap:var(--space-6); margin-top:2px; }
+
+    /* ============================ v10p1 #18-21 — Library: unified Documents/Assets cards, Assets rail+preview, nav rename/delete + Add menu ============================ */
+    /* shared header — file path + Created/Edited dates (a simplified Plans header; no owner/title/tally/steps) */
+    .doc-header{ display:flex; align-items:center; gap:var(--space-8) var(--space-14); flex-wrap:wrap; flex:0 0 auto; margin-bottom:8px; padding:var(--space-7) var(--space-10);
+      background:var(--surface-3); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); }
+    .doc-header .dh-path{ font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .doc-header .dh-dates{ font-family:var(--font-mono); font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; margin-left:auto; flex:0 0 auto; }
+    .doc-header .dh-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
+    /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach) */
+    .doc-foot{ display:flex; align-items:center; gap:var(--space-7); flex:0 0 auto; margin-top:9px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
+    .doc-foot-l{ display:flex; align-items:center; gap:var(--space-7); flex:1 1 auto; min-width:0; flex-wrap:wrap; }
+    /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
+    .docnav-row{ position:relative; }
+    .docnav-acts{ display:flex; align-items:center; gap:var(--space-1); margin-left:auto; flex:0 0 auto; opacity:0; transition:opacity .12s; }
+    .docnav-row:hover .docnav-acts,.docnav-row.on .docnav-acts,.docnav-row:focus-within .docnav-acts{ opacity:1; }
+    .docnav-name-edit{ font-size:11px; font-weight:800; color:var(--foreground); background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); padding:0 var(--space-3); width:100%; outline:none; font-family:inherit; }
+    /* Add menu (#20) — Add file / Paste, replacing the Assets Paste/Upload toolbar */
+    .docnav-addwrap{ position:relative; margin-top:auto; }
+    .docnav-addwrap .docnav-add{ width:100%; margin-top:0; }
+    .add-menu{ display:none; position:absolute; bottom:calc(100% + 5px); left:0; right:0; z-index:60; flex-direction:column; gap:var(--space-2);
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .add-menu.open{ display:flex; }
+    .add-mi{ display:flex; flex-direction:column; gap:var(--space-1); width:100%; text-align:left; padding:var(--space-6) var(--space-8); border:var(--border-width) solid transparent; border-radius:var(--radius-sm); background:transparent; cursor:pointer; }
+    .add-mi:hover{ background:var(--surface-3); }
+    .add-mi b{ display:flex; align-items:center; gap:var(--space-6); font-size:11px; font-weight:800; color:var(--foreground); }
+    .add-mi b svg{ width:var(--size-13); height:var(--size-13); color:var(--muted); }
+    .add-mi .add-sub{ font-size:9px; color:var(--muted); font-weight:600; padding-left:19px; }
+    /* Assets rail + preview (#18) — mirrors Documents (a rail of thumbnail + name, the selected asset's preview on the right) */
+    .assetdoc{ display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
+    .assetdoc.on{ display:flex; }
+    .asset-preview{ flex:1 1 auto; min-height:0; overflow:hidden; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); }
+    .asset-preview .ap-img{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--icon-fg); }
+    .asset-preview .ap-img svg{ width:var(--size-54); height:var(--size-54); opacity:.85; }
+
+    /* ============================ v8p7 — Source dropdown (single-select, shows active selection) ============================ */
+    .src-dd{ position:relative; }
+    .src-trig{ width:100%; display:flex; align-items:center; gap:var(--space-8); padding:var(--space-6) var(--space-8); text-align:left; cursor:pointer;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
+      transition:transform .07s, box-shadow .07s; }
+    .src-trig:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .src-trig .agtile{ width:var(--size-28); height:var(--size-28); flex:0 0 auto; }
+    .src-trig .picker-cv{ margin-left:auto; }
+    .src-pop{ display:none; position:absolute; z-index:70; top:calc(100% + 6px); left:0; right:0; max-height:266px; overflow-y:auto;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .src-pop.open{ display:block; }
+    .src-pop .aglist{ border:none; }
+
+    /* ============================ v9p9 — agent selectors as header dropdowns + identity badges ============================ */
+    .subbar{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-7) var(--space-10); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); flex-shrink:0; }
+    .subbar-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); flex:0 0 auto; }
+    .subbar .dd.single{ flex:0 0 146px; }
+    .subbar .dd.multi{ flex:1 1 auto; min-width:0; }
+    .dd-trig{ width:100%; display:flex; align-items:center; gap:var(--space-7); height:var(--size-40); padding:0 var(--space-8); cursor:pointer; text-align:left;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
+      transition:transform .07s, box-shadow .07s; }
+    .dd-trig:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .dd-trig > .agtile{ width:var(--size-26); height:var(--size-26); }
+    .dd-trig .picker-cv{ margin-left:auto; }
+    .dd-badges{ display:flex; align-items:center; gap:var(--space-5); flex:1; min-width:0; overflow:hidden; }
+    .b-empty{ font-size:10px; font-weight:700; color:var(--muted-2); }
+    /* identity badge (full-height stamped icon + two-line role over number·name — saves horizontal space) */
+    /* v9p13: identity badge is a non-interactive LABEL → flat (no offset shadow); interactivity lives on its container (the dropdown trigger field + chevron, or the clickable card) */
+    .badge{ display:inline-flex; align-items:center; flex:0 0 auto; height:var(--size-30); border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); box-shadow:none; overflow:hidden; }   /* P1c: dropdown agent badges match the 30px footer action-button footprint */
+    .badge-c .agtile{ height:100%; width:var(--size-28); border:none; border-right:var(--border-width) solid var(--border); border-radius:0; }
+    .badge-c .b-lab{ display:flex; flex-direction:column; justify-content:center; line-height:1.05; padding:0 var(--space-8); min-width:0; }
+    .badge-c .b-role{ font-size:6.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; color:var(--muted); white-space:nowrap; }
+    .badge-c .b-name{ font-size:9.5px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    .badge-more{ height:var(--size-30); padding:0 var(--space-9); display:inline-flex; align-items:center; flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--surface-3); font-family:var(--font-mono); font-size:10px; font-weight:800; color:var(--muted); }
+    .src-pop-head{ position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; padding:var(--space-1) var(--space-4) var(--space-6); background:var(--secondary-background); }
+    .src-dd.multi .src-pop{ min-width:230px; }
+    .src-dd.single .src-pop{ min-width:200px; }
+
+    /* ============================ v9p10 ============================ */
+    /* compact two-line identity badge for dense card headers (same format as the dropdown badges) */
+    .badge-sm{ height:var(--size-26); }
+    .badge-sm .agtile{ width:23px; }
+    .badge-sm .b-role{ font-size:6px; }
+    .badge-sm .b-name{ font-size:9px; }
+    .badge.ag-user-badge .agtile{ background-color:var(--ag-user); }   /* not shorthand: keep the .agtile--me avatar background-image (the user photo) visible in card badges */
+
+    /* line-numbered markdown render (shared by Plan body + doc viewers) — numbers match the raw .md file */
+    .md{ font-family:var(--font-mono); font-size:10.5px; line-height:1.6; background:var(--secondary-background);
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); overflow:auto; }
+    .md-row{ display:flex; align-items:stretch; }   /* A4 bullet 2: stretch so the rail cell covers a wrapped line's FULL height (was flex-start) */
+    .md-row:hover{ background:var(--surface-3); }
+    .md-row.md-target{ background:var(--select); }
+    .md-num{ flex:0 0 auto; width:var(--size-34); padding:0 var(--space-8) 0 0; text-align:right; color:var(--muted-2); font-size:9.5px;
+      user-select:none; border-right:var(--border-width) solid var(--border); background:var(--surface-3); }   /* A4: structural gutter divider tan(--rule)→navy(--border) */
+    .md-line{ flex:1 1 auto; min-width:0; padding:0 var(--space-9); white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
+    .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
+    .md-h2{ font-weight:800; color:var(--ag-azure); }
+    .md-blank{ min-height:0.9em; }
+    .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-3); }
+    .md-task{ color:var(--foreground); } .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
+    .md-h2-row{ position:relative; }
+    /* the section heading carries a verdict tally on the right */
+    .vtally{ display:inline-flex; align-items:center; gap:var(--space-4); margin-left:8px; vertical-align:middle; }
+    .vchip{ display:inline-flex; align-items:center; gap:var(--space-3); height:var(--size-17); padding:0 var(--space-5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
+      background:var(--secondary-background); cursor:pointer; font-family:var(--font-mono); font-size:9px; font-weight:800; box-shadow:var(--shadow-sm); }
+    .vchip:hover{ transform:translate(1px,1px); box-shadow:none; }
+    .vchip svg{ width:var(--size-11); height:var(--size-11); }
+    .vchip.v-approve{ color:var(--success); } .vchip.v-revise{ color:var(--warning); } .vchip.v-block{ color:var(--danger); }
+    .vchip .vc-n{ color:var(--foreground); }
+    /* verdict-detail popover (who responded + comment indicator) */
+    .vpop{ position:absolute; z-index:70; right:0; top:100%; margin-top:4px; min-width:188px; background:var(--secondary-background);   /* R11 item 5: raised 30→70 to sit above neighbouring footer content, matching .rev-pop/.exp-menu (vpop is not instantiated in the current mockup — defensive) */
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-6); display:none; }
+    .vpop.open{ display:block; }
+    .vpop-h{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:var(--space-1) var(--space-3) var(--space-5); }
+    .vrow{ display:flex; align-items:center; gap:var(--space-6); width:100%; text-align:left; padding:var(--space-4); border:none; background:transparent; cursor:pointer; border-radius:4px; }
+    .vrow:hover{ background:var(--surface-3); }
+    .vrow .v-ic{ flex:0 0 auto; } .vrow .v-ic svg{ width:var(--size-12); height:var(--size-12); }
+    .vrow .v-cmt{ margin-left:auto; flex:0 0 auto; color:var(--muted); } .vrow .v-cmt svg{ width:var(--size-12); height:var(--size-12); }
+    .vrow.no-cmt .v-cmt{ opacity:.25; }
+
+    /* plan expanded = outline/feedback nav rail + line-numbered body */
+    .plan-rev{ display:flex; gap:var(--space-9); margin-top:9px; max-height:346px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). */
+    .plan-nav{ flex:0 0 132px; display:flex; flex-direction:column; min-width:0; }
+    .nav-tabs{ display:flex; gap:var(--space-4); margin-bottom:6px; }
+    .nav-tab{ flex:1; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding:var(--space-4) 0; text-align:center;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--muted); cursor:pointer; }
+    .nav-tab.on{ background:var(--secondary); color:var(--secondary-foreground); box-shadow:var(--shadow-sm); }
+    .ol-cap{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted-2); margin:2px 0 5px; }
+    .ol-list{ display:flex; flex-direction:column; gap:var(--space-2); }
+    .ol-item{ display:flex; align-items:center; gap:var(--space-6); width:100%; text-align:left; padding:var(--space-5) var(--space-7); border:var(--border-width) solid transparent; border-radius:var(--radius-base);
+      background:transparent; cursor:pointer; font-size:10px; font-weight:700; color:var(--foreground); }
+    .ol-item:hover{ background:var(--surface-3); }
+    .ol-item.on{ background:var(--secondary-background); border-color:var(--border); box-shadow:var(--shadow-sm); }
+    .ol-dot{ width:var(--size-9); height:var(--size-9); flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:50%; background:var(--muted-2); }
+    .ol-dot.d-approve{ background:var(--success); } .ol-dot.d-revise{ background:var(--warning); } .ol-dot.d-block{ background:var(--danger); }
+    .ol-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+    .ol-c{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); flex:0 0 auto; }
+    .plan-main{ flex:1 1 auto; min-width:0; }
+    /* feedback cards (the comment detail, in the nav rail's Feedback mode) */
+    .fb-list{ display:flex; flex-direction:column; gap:var(--space-6); max-height:300px; overflow-y:auto; }
+    .fb-card{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:var(--space-6) var(--space-7); }
+    .fb-top{ display:flex; align-items:center; gap:var(--space-6); margin-bottom:4px; }
+    .fb-sec{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); margin-left:auto; flex:0 0 auto;
+      background:var(--surface-3); border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-5); }
+    .fb-vic{ flex:0 0 auto; } .fb-vic svg{ width:var(--size-13); height:var(--size-13); }
+    .fb-vic.v-approve{ color:var(--success); } .fb-vic.v-revise{ color:var(--warning); } .fb-vic.v-block{ color:var(--danger); }
+    .fb-cmt{ font-size:10.5px; line-height:1.4; color:var(--foreground); opacity:.92; }
+    .fb-empty{ font-size:10px; font-weight:700; color:var(--muted-2); padding:var(--space-10) var(--space-4); text-align:center; }
+
+    .plan-review-bar{ display:flex; align-items:center; gap:var(--space-8); margin-top:10px; padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); flex-wrap:wrap; }
+    .prb-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+    .prb-sent{ font-size:9px; font-weight:700; font-family:var(--font-mono); color:var(--success); display:none; }
+
+    /* expandable feed/history cards (Plan-style) + header checkbox multi-select */
+    .fcard{ position:relative; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); overflow:hidden; }
+    .fcard.sel{ background:var(--select); box-shadow:var(--shadow); }
+    #feed-requests .rcard.sel{ background:var(--select); box-shadow:var(--shadow); }
+    .fcard-head{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-7) var(--space-9); }
+    .fcard-exp{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:var(--space-8); text-align:left; background:transparent; border:none; cursor:pointer; padding:0; }
+    .fcard-chev{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); transition:transform .15s; margin-left:auto; }
+    .fcard.open .fcard-chev{ transform:rotate(90deg); }
+    .fcard-dir{ flex:0 0 auto; }
+    /* v10p1 #12: the timestamp stays pinned to the card's right edge in BOTH states. Collapsed, the
+       grow-prev already pushes it right; expanded (prev hidden), margin-left:auto keeps it right instead
+       of collapsing left next to the badge. Applies to Messages / Scratch / Log / Inbox / History. */
+    .fcard-time{ font-size:9px; font-weight:700; font-family:var(--font-mono); color:var(--muted); flex:0 0 auto; margin-left:auto; }
+    .fcard-prev{ flex:1 1 auto; min-width:0; font-size:10.5px; color:var(--foreground); opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fcard-body{ display:none; padding:0 var(--space-10) var(--space-9) var(--space-10); border-top:var(--border-width) solid var(--border); }
+    /* D (JUMP): an expanded feed/history card body caps its height + scrolls internally so one long card can't
+       dominate the tab; its jump pills (attached on open in toggleFcard) show when it overflows + is scrolled away. */
+    .fcard.open .fcard-body{ display:block; max-height:340px; overflow-y:auto; }
+    /* R-batch item 2: a selected card's header→body divider STAYS NAVY in every state — the --select fill
+       shows BEHIND the navy line, not repainting it. This retires the old Messages-only seam-blend
+       (.msgcard.sel used to recolour this divider to the band fill); now Messages matches Scratch/Log/
+       Inbox/History — every navy structural divider stays navy on hover/select (the base .fcard-body
+       border-top:var(--border-width) solid var(--border) is left untouched). */
+    .fcard.open .fcard-prev{ display:none; }
+    .fcard-full{ font-size:11px; line-height:1.45; color:var(--foreground); margin-top:8px; }
+    /* v1.2: History attachment chip (count) in the card header + click-to-open popover (History only) */
+    .att-chip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:var(--space-3); height:var(--size-18); padding:0 var(--space-5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--surface-3); color:var(--muted); cursor:pointer; }
+    .att-chip:hover{ color:var(--foreground); background:var(--secondary-background); }
+    .att-chip svg{ width:var(--size-11); height:var(--size-11); }
+    .att-n{ font-size:9px; font-weight:900; font-family:var(--font-mono); }
+    .fcard.att-open{ overflow:visible; z-index:20; }
+    .att-pop{ display:none; position:absolute; top:36px; right:8px; z-index:40; min-width:188px; max-width:252px;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .att-pop.open{ display:block; }
+    .att-pop-head{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); padding:var(--space-2) var(--space-5) var(--space-5); }
+    .att-item{ width:100%; display:flex; align-items:center; gap:var(--space-7); padding:var(--space-5) var(--space-6); background:transparent; border:none; border-radius:4px; cursor:pointer; text-align:left; }
+    .att-item:hover{ background:var(--surface-3); }
+    .att-ic{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; color:var(--muted); }
+    .att-name{ flex:1 1 auto; min-width:0; font-size:10px; font-weight:600; color:var(--foreground); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .att-go{ width:var(--size-12); height:var(--size-12); flex:0 0 auto; color:var(--muted); }
+    .fcard-log{ font-family:var(--font-mono); font-size:10px; }
+
+    /* ============================ A7 — Feed (Messages) rail restyle + contiguous blocks + MULTI-select (teal only) ============================ */
+    /* Mirrors the Library doc rail. The rail is now ONE contiguous Library-style TAN panel: rows butt together with
+       hairline dividers (no gaps), the rail cell flush against the content. Each rail box carries a tight 3-char type
+       tag; the top title row is empty and select-alls the whole message ("Turn N" rides in its content). Selection is
+       teal-only and MULTI within a card (a contiguous run reads as one unbroken --select band, rail+content, no seam).
+       Click a card header to select the WHOLE message (teal); the chevron expands (select ≠ expand). The rail respects
+       the active Content filter. (Replaces the old pink whole-card + single teal block model.) */
+    .msgcard.sel{ background:var(--select); box-shadow:var(--shadow); }   /* whole-card select = light teal (no pink) */
+    /* R-batch item 4 (finishes C): the contiguous rail panel fills the whole Messages card surface — the
+       shared .fcard-body inset (padding:0 10px 9px 10px) is dropped for Messages ONLY so the rail/rows reach
+       all four edges (top was already flush). Text breathing room comes from each row's own cell padding, not
+       the body inset. Scratch/Log/Inbox keep their body padding (no rail). */
+    .msgcard .fcard-body{ padding:0; }
+    .msel-head{ cursor:pointer; }
+    /* E1: flush SQUARE — side = full .fcard-head height (a constant 44px across every card type: the fixed badge row + 7px×2 padding). align-self:stretch + the negative -7px top/bottom & -9px right margins make the border-box fill the head flush to its top/bottom/right edges; width:var(--size-44) squares it — aspect-ratio:1 is dropped by flexbox here (the auto main-size collapses to content), so the side is set explicitly. chevron centers. */
+    .fcard-chevbtn{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-44); padding:0; margin:-7px -9px -7px 0; align-self:stretch; background:transparent; border:none; border-left:var(--border-width) solid var(--border); cursor:pointer; }
+    .fcard-chevbtn:hover{ background:var(--surface-3); }
+    .fcard-chevbtn .fcard-chev{ margin-left:0; }
+    /* contiguous Library-style panel: one bordered box; rows butt together with hairline dividers (no gaps) */
+    .mrail-wrap{ display:flex; flex-direction:column; gap:0; background:var(--secondary-background); }
+    .mrow{ display:flex; align-items:stretch; gap:0; }   /* gap:0 so the rail box butts flush against the content — no white gap between rail and text on select */
+    .mrow + .mrow{ border-top:var(--border-width) solid var(--border); }
+    /* rail = plain narrow TAN box (no colour strip); a continuous select handle down the panel. The top whole-select
+       row is identified by its bold turn-number content, not a strip (.mrail--title is a JS hook only). */
+    .mrail{ flex:0 0 auto; width:var(--size-34); align-self:stretch; display:flex; align-items:flex-start; justify-content:center; padding:var(--space-7) 0 0; cursor:pointer; border:none; border-right:var(--border-width) solid var(--border); border-radius:0; background:var(--surface-3); }
+    .msg-turn{ font-weight:900; font-size:12px; color:var(--foreground); }   /* turn number in the doc-title style (mirrors Library .md-h1) */
+    /* SELECTION = light teal (--select), the universal select fill (no pink): rail cell + content the SAME teal.
+       R-batch item 2: the navy rail/text divider (the rail's border-right) and the navy hairline BETWEEN two
+       stacked selected rows (.mrow + .mrow border-top) STAY NAVY — the teal fill shows behind them, no longer
+       blended away. Only the backgrounds are recoloured now; the navy structural lines are left intact. */
+    .mrow.bsel .mrail{ background:var(--select); }
+    .mrow.bsel .mrow-c{ background:var(--select); }
+    /* HOVER (lights AFTER .bsel so a hover preview reads over selection): a block rail lights its own row cream;
+       the empty title rail lights EVERY row cream (it select-alls). */
+    .mrail:hover{ background:var(--background); }
+    .mrow.hl .mrow-c{ background:var(--background); }
+    .mrow.hl .mrail{ background:var(--background); }
+    /* type tag lives INSIDE the rail box (left gutter), top-aligned — minimal: transparent (shows the rail's tan),
+       no pill/border. Font size + weight match the Plans review badge (.vbadge): 9px / 800. Tight lowercase
+       abbreviations (msg · tht · rd · bsh · dif · wrt · mta). */
+    .rail-tag{ font-family:var(--font-sans); font-size:9px; font-weight:800; letter-spacing:0.02em; line-height:1; color:var(--muted); white-space:nowrap; pointer-events:none; }
+    .mrow.bsel .mrail .rail-tag{ color:var(--foreground); }   /* tag stays legible on the teal selected rail */
+    .mrow-c{ flex:1 1 auto; min-width:0; }
+    /* blocks shed their individual border/bg so they read as contiguous rows within the panel */
+    .mrow-c .fcard-full{ margin:0; padding:var(--space-6) var(--space-9); }
+    .mrow-c .msg-blk{ margin:0; border:none; border-radius:0; background:transparent; padding:var(--space-5) var(--space-9); }
+
+    /* ============================ A11 — Output Export menu (extends per-card Copy to larger spans) ============================ */
+    /* neutral-tier cream trigger (white/teal reserved); a Menu selector — neutral trigger, options in the popout */
+    .exp{ position:relative; flex:0 0 auto; }
+    .exp-btn{ display:inline-flex; align-items:center; gap:var(--space-2); height:var(--size-30); padding:0 var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+    .exp-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    /* R-batch items 6a/7: a selection-gated trigger (link-dd + Output Export) reads disabled until there's a
+       selection — dimmed, no press transform, can't open. */
+    .exp-btn:disabled{ opacity:.4; cursor:not-allowed; }
+    .exp-btn:disabled:hover{ transform:none; box-shadow:var(--shadow-sm); }
+    .exp-btn .ic{ width:var(--size-14); height:var(--size-14); } .exp-btn .cv{ width:var(--size-12); height:var(--size-12); color:var(--muted); }
+    .exp.open .exp-btn{ background:var(--secondary-background); }
+    .exp-menu{ display:none; position:absolute; bottom:calc(100% + 6px); left:0; z-index:60; min-width:218px;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .exp.open .exp-menu{ display:block; }
+    /* H1: right-aligned menu for footer link-dd controls in the right group (anchor to the trigger's right edge so it never overflows off the left) */
+    .exp-menu--right{ left:auto; right:0; }
+    /* H1: link-dd menu items grey when the current selection can't use that mode (selection-gating) */
+    .exp-mi:disabled{ opacity:.4; cursor:not-allowed; }
+    .exp-mi:disabled:hover{ background:transparent; }
+    .exp-h{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); padding:var(--space-5) var(--space-6) var(--space-3); }
+    .exp-mi{ width:100%; display:flex; align-items:flex-start; gap:var(--space-8); padding:var(--space-6) var(--space-7); background:transparent; border:none; border-radius:4px; cursor:pointer; text-align:left; }
+    .exp-mi:hover{ background:var(--surface-3); }
+    .exp-mi>svg{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); margin-top:1px; }
+    .exp-mi .lead{ display:flex; flex-direction:column; min-width:0; line-height:1.25; }
+    .exp-mi .lead b{ font-size:10.5px; font-weight:800; color:var(--foreground); }
+    .exp-mi .lead .sub{ font-size:9px; color:var(--muted); }
+    /* (R-batch item 6: the .fcard.cut-out fly-out was removed with the "Cut selected" action in the export consolidation) */
+
+    /* ============================ A12 + A3 — generic Jump-to-End pill (ONE control for every scroll region) ============================ */
+    /* A small floating pill in the corner of a scroll region; appears only when scrolled away from that edge, snaps to
+       the very top/bottom on click, hides at the edge (Slack/Discord/terminal). Native scrollbars still do incremental
+       movement. Auto-attached by JS to every scroll region; the pills live INSIDE the region (position:absolute) and JS
+       repositions them on scroll so they stay pinned to the visible bottom-right corner. Neutral cream tier. */
+    .jump-pills{ position:absolute; z-index:25; display:flex; flex-direction:column; gap:var(--space-6); pointer-events:none; }
+    .jump-pill{ pointer-events:auto; display:none; align-items:center; justify-content:center; width:var(--size-26); height:var(--size-26); padding:0;
+      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground);
+      cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, opacity .12s; opacity:.92; }
+    .jump-pill:hover{ transform:translate(2px,2px); box-shadow:none; opacity:1; }
+    .jump-pill.show{ display:inline-flex; }
+    .jump-pill svg{ width:var(--size-14); height:var(--size-14); }
+    /* D: outer-mounted jump overlay for the contenteditable compose field — pills CSS-pinned to the field's
+       bottom-right corner (never injected inside .compose-rich, which would corrupt its text). */
+    .compose-jump-wrap{ position:relative; min-width:0; }
+    .jump-pills--outer{ bottom:10px; right:10px; top:auto; left:auto; }
+
+    /* Summarize slide-over overlay (covers just the message list, toggled by the footer button) */
+    .feed-body-wrap{ position:relative; }
+    .feed-overlay{ position:absolute; inset:0; z-index:20; background:var(--background); border-left:0;
+      display:flex; flex-direction:column; transform:translateY(8px); opacity:0; pointer-events:none; transition:opacity .14s, transform .14s; }
+    .feed-overlay.open{ transform:none; opacity:1; pointer-events:auto; }
+    .fo-head{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-9) var(--space-11); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); flex:0 0 auto; }
+    .fo-title{ font-size:11px; font-weight:900; color:var(--foreground); display:flex; align-items:center; gap:var(--space-6); }
+    .fo-title svg{ width:var(--size-14); height:var(--size-14); color:var(--main); }
+    .fo-sub{ font-size:8.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); }
+    .fo-body{ flex:1 1 auto; min-height:0; overflow-y:auto; padding:var(--space-12) 13px; }
+    .fo-body h4{ font-size:12px; font-weight:900; margin:0 0 7px; color:var(--foreground); }
+    .fo-body h5{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin:13px 0 5px; }
+    .fo-body p{ font-size:11.5px; line-height:1.5; margin:0 0 9px; color:var(--foreground); opacity:.94; }
+    .fo-body ul{ margin:0 0 9px; padding-left:18px; } .fo-body li{ font-size:11.5px; line-height:1.5; margin:3px 0; opacity:.94; }
+    .fo-body b.k{ color:var(--foreground); }
+    /* plan file path chip (each card shows its source file) */
+    .plan-file{ display:inline-flex; align-items:center; gap:var(--space-5); font-family:var(--font-mono); font-size:9px; font-weight:700;
+      color:var(--muted); background:var(--surface-3); border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:var(--space-2) var(--space-7); margin:9px 0 2px; }
+    .plan-file svg{ color:var(--muted); }
+    .plan-head .badge{ flex:0 0 auto; } .plan-title{ flex:1 1 auto; }
+    /* mock toast (action confirmations) */
+    .toast{ position:fixed; left:50%; bottom:56px; transform:translateX(-50%) translateY(8px); z-index:200; max-width:70vw;
+      background:var(--foreground); color:#fff; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow);
+      padding:var(--space-9) var(--space-15); font-size:11px; font-weight:800; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
+    .toast.show{ opacity:1; transform:translateX(-50%); }
+
+    /* two-row plan header (row 1: owner badge → state → title · row 2: filename · counts · dates) */
+    .plan-head{ align-items:flex-start; }
+    .plan-head .plan-chev{ margin-top:3px; }
+    .plan-head-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--space-5); }
+    .plan-head-row1{ display:flex; align-items:center; gap:var(--space-8); min-width:0; }
+    .plan-head-row1 .badge{ flex:0 0 auto; }
+    .plan-head-row1 .plan-title{ flex:1 1 auto; min-width:0; }
+    .plan-sub{ display:flex; align-items:center; gap:var(--space-10) var(--space-12); flex-wrap:wrap; }
+    .plan-fname{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .plan-dates{ font-family:var(--font-mono); font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; flex:0 0 auto; }
+    .plan-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
+    /* counts strip — display-only tallies (steps done + per-verdict) */
+    .cnt-strip{ display:inline-flex; align-items:center; gap:var(--space-5); flex:0 0 auto; }
+    .cnt-chip{ display:inline-flex; align-items:center; gap:var(--space-4); height:var(--size-18); padding:0 var(--space-6); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
+      background:var(--secondary-background); font-family:var(--font-mono); font-size:9px; font-weight:800; color:var(--foreground); }
+    .cnt-chip svg{ width:var(--size-11); height:var(--size-11); }
+    .cnt-chip.c-steps{ color:var(--muted); } .cnt-chip.c-steps svg{ color:var(--success); }
+    .cnt-chip.c-approve svg{ color:var(--success); } .cnt-chip.c-revise svg{ color:var(--warning); } .cnt-chip.c-block svg{ color:var(--danger); }
+
+    /* nav pane — outlined, fixed-width hug; no horizontal scroll, content wraps inside each card */
+    .plan-nav{ flex:0 0 184px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); box-shadow:var(--shadow-sm); padding:var(--space-7); overflow:hidden; }
+    .nav-cnt{ font-family:var(--font-mono); font-size:8px; font-weight:800; background:var(--secondary-background); border:1.5px solid var(--border);
+      border-radius:var(--radius-sm); padding:0 var(--space-4); line-height:13px; margin-left:5px; color:var(--foreground); }   /* v9p14: rounded square */
+    .fb-list{ max-height:288px; }
+    .fb-card{ display:block; width:100%; text-align:left; cursor:pointer; font-family:inherit; color:inherit; }
+    .fb-card:hover{ background:var(--surface-3); }
+    .fb-top{ flex-wrap:wrap; row-gap:var(--space-3); }
+    .fb-top .badge{ flex:0 0 auto; }
+    .fb-sec{ margin-left:0; }
+    .fb-cmt{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+    /* v9p12: inline in-text verdict chips removed — feedback badges now live in the editor's left rail */
+
+    /* comment popout — docked UNDER the plan body, same width as the main text window */
+    .plan-cmt-pop{ display:none; margin-top:8px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base);
+      background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
+    .plan-cmt-pop.open{ display:block; }
+    .cmt-pop-head{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-7) var(--space-9); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); }
+    .cmt-pop-head .cph-ic{ flex:0 0 auto; } .cmt-pop-head .cph-ic svg{ width:var(--size-14); height:var(--size-14); }
+    .cph-ic.v-approve{ color:var(--success); } .cph-ic.v-revise{ color:var(--warning); } .cph-ic.v-block{ color:var(--danger); }
+    .cph-sec{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); background:var(--secondary-background);
+      border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-5); }
+    .cph-lab{ font-size:9px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .cph-time{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }
+    .cmt-pop-body{ padding:var(--space-9) var(--space-10); display:flex; flex-direction:column; gap:var(--space-9); }
+    .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); }
+    .cmt-pop-item + .cmt-pop-item{ border-top:var(--border-width) solid var(--border); padding-top:var(--space-9); }
+    .cpi-h{ display:flex; align-items:center; gap:var(--space-7); margin-bottom:5px; }
+    .cpi-none{ color:var(--muted-2); font-style:italic; }
+
+    /* plan footer holds Edit + Share + Review groups; lets them wrap on a narrow column */
+    .plan-foot{ flex-wrap:wrap; row-gap:var(--space-7); }
+
+    /* ============================ v9p12 — line/section commenting · 3-row header · doc editor ============================ */
+    /* 3-row plan header + chevron on the right */
+    .plan-head{ align-items:center; }
+    .plan-head .plan-chev{ margin-top:0; margin-left:6px; }
+    .plan-head-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--space-4); }
+    .plan-row{ display:flex; align-items:center; gap:var(--space-8); min-width:0; }
+    .plan-row.r1 .badge{ flex:0 0 auto; }
+    .plan-row.r1 .plan-title{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .steps-txt{ font-family:var(--font-mono); font-size:9px; font-weight:800; color:var(--muted); white-space:nowrap; flex:0 0 auto; }
+    .steps-txt.all{ color:var(--success); }
+    .fb-none{ font-size:9px; font-weight:700; font-style:italic; color:var(--muted-2); }
+    .plan-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
+
+    /* doc editor — interactive left rail (line + section index) and the rendered body */
+    .doc-ed{ display:flex; flex-direction:column; min-width:0; }
+    .doc-view-host{ display:flex; flex-direction:column; }
+    .doc-view-host .doc-ed{ flex:1 1 auto; min-height:0; }
+    .doc-view-host .doc-ed > .md{ flex:1 1 auto; min-height:0; max-height:none; display:flex; flex-direction:column; }   /* A4: flex column so the .md-fill row runs the rail track to the bottom of the doc editor too */
+    /* A4: the rail is now a PLAIN TAN BOX — the coloured selection strips (light teal line / dark teal section /
+       pink title) are removed; what a click selects is shown by the selection fill alone (teal), not a strip.
+       align-items:flex-start + padding-top top-aligns the line number to the first visual line of a wrapped row;
+       the rail/gutter separator (border-right) recolours tan(--rule)→navy(--border) per A4's divider rule. */
+    .md-rail{ flex:0 0 auto; width:60px; display:flex; align-items:flex-start; justify-content:flex-end; gap:var(--space-4); padding:var(--space-3) var(--space-6) 0 var(--space-4);
+      border:none; border-right:var(--border-width) solid var(--border); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); color:var(--muted-2); cursor:pointer; font-family:var(--font-mono); }   /* F1: navy horizontal divider per rail cell so each selectable row is easy to eyeball — confined to the 60px rail, never spans .md-line */
+    .md-row:last-of-type .md-rail{ border-bottom:none; }   /* F1: no trailing divider before the .md-fill filler row */
+    /* A4: rail-cell hover preview = canvas cream (--background), not pink */
+    .md-rail:hover{ background:var(--background); color:var(--foreground); }
+    .md-rail .rn{ font-size:9.5px; }
+    /* A4: rail-based selection (line / section / whole-doc) = light teal (--select), no pink; the rail cell + the
+       content share the teal fill. R-batch item 2: the navy gutter/text separator (border-right) and the navy
+       per-row divider (border-bottom) STAY NAVY — the teal fill shows behind them (the old seam-blend that
+       recoloured them to --select is removed; only the backgrounds + ink recolour now). */
+    .md-row.rsel:not(.md-fill) .md-rail,.md-row.rsel-sec:not(.md-fill) .md-rail{ background:var(--select); color:var(--foreground); }
+    .md-row.rsel:not(.md-fill),.md-row.rsel-sec:not(.md-fill){ background:var(--select); }   /* R11 item 4: clamp the selection fill at the last real line — the trailing .md-fill filler row never paints even when JS adds rsel/rsel-sec to it on a whole-doc / last-section select (SELby + railClick left untouched) */
+    .rd{ display:inline-flex; align-items:center; gap:var(--space-2); height:var(--size-14); padding:0 var(--space-3); border:1.5px solid var(--border); border-radius:var(--radius-sm); background:var(--secondary-background); }   /* v9p14: rounded square */
+    .rd svg{ width:var(--size-9); height:var(--size-9); } .rd .rd-n{ font-size:8px; font-weight:800; color:var(--foreground); }
+    .rd.v-approve{ color:var(--success); } .rd.v-revise{ color:var(--warning); } .rd.v-block{ color:var(--danger); }
+    /* clearer fill differentiation between body text and inline code chips */
+    .md-code-i{ background:var(--secondary-dim); border:1.5px solid var(--secondary); color:var(--foreground); }
+
+    /* verdict text colors everywhere (A12) + merged verdict badge (A13) */
+    .v-approve{ color:var(--success); } .v-revise{ color:var(--warning); } .v-block{ color:var(--danger); }
+    .vbadge{ display:inline-flex; align-items:center; gap:var(--space-4); height:var(--size-18); padding:0 var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
+      background:var(--secondary-background); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap; }
+    .vbadge svg{ width:var(--size-12); height:var(--size-12); }
+    .sel-badge{ font-family:var(--font-mono); font-size:8.5px; font-weight:800; color:var(--muted); background:var(--surface-3);
+      border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:var(--space-1) var(--space-6); white-space:nowrap; }
+
+    /* thumbs agree / disagree toggle (default = agree) */
+    .thumbs{ display:inline-flex; flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; box-shadow:var(--shadow-sm); }
+    .thumb{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-24); height:var(--size-21); border:none; background:var(--secondary-background); color:var(--muted); cursor:pointer; padding:0; }
+    .thumb + .thumb{ border-left:var(--border-width) solid var(--border); }
+    .thumb svg{ width:var(--size-12); height:var(--size-12); }
+    .thumb.up.on{ background:var(--secondary); color:var(--secondary-foreground); }
+    .thumb.down.on{ background:var(--danger); color:#fff; }
+
+    /* comment composer (inside the popout) */
+    .cmt-compose{ display:flex; flex-direction:column; gap:var(--space-8); }
+    .cmt-ta{ width:100%; min-height:var(--size-54); resize:vertical; font-size:11px; line-height:1.5; }
+    .cmt-foot{ display:flex; align-items:center; gap:var(--space-7); }
+    .cpi-txt{ font-size:11px; line-height:1.45; color:var(--foreground); }
+    .cpi-h .cph-lab{ font-size:8.5px; }
+
+    /* Comment split control (before Edit) — disabled until a line/section is selected */
+    .cmt-ctl{ height:var(--size-30); }
+    .cmt-ctl.is-off{ opacity:.5; }
+    .cmt-ctl.is-off .split-drop,.cmt-ctl.is-off .split-act{ cursor:not-allowed; }
+    .cmt-ctl--down .split-menu{ top:calc(100% + 6px); bottom:auto; }
+
+    /* nav feedback card (row 1 badge + thumbs · row 2 verdict badge + section badge · comment) */
+    .fb-mid{ display:flex; align-items:center; gap:var(--space-6); flex-wrap:wrap; row-gap:var(--space-3); margin:5px 0 4px; }
+    .fb-card .fb-top{ align-items:center; }
+    /* v9p13: keep row 1 (agent badge + thumbs) on ONE line in the narrow nav — the badge shrinks (ellipsis on a long role) instead of bumping the thumbs to a second row */
+    .plan-nav .fb-top{ flex-wrap:nowrap; gap:var(--space-5); }
+    .plan-nav .fb-top .badge{ flex:0 1 auto; min-width:0; }
+    .plan-nav .fb-top .badge .b-lab{ overflow:hidden; }
+    .plan-nav .fb-top .badge .b-role,.plan-nav .fb-top .badge .b-name{ overflow:hidden; text-overflow:ellipsis; }
+    .plan-nav .fb-top .thumbs{ flex:0 0 auto; }
+    .plan-nav .fb-top .thumb{ width:var(--size-22); }  /* trim the toggle a touch so a full role label (e.g. "researcher") still fits on row 1 without ellipsis */
+
+    /* footer buttons share the send-group height (30px); the decision trio stays grouped + right-justified */
+    .plan-foot > .btn{ height:var(--size-30); }
+    .plan-foot-right{ display:flex; align-items:center; gap:var(--space-7); margin-left:auto; }
+    .plan-foot-right > .btn,.plan-foot-right > .btn-main,.plan-foot-right > .btn-danger{ height:var(--size-30); }
+
+    /* doc toolbar control alignment */
+    .doc-toolbar{ align-items:center; }
+    .doc-cmt-slot{ display:inline-flex; }
+
+    /* ============================ v9p14 — Plan nav resize/flush, footer strip, send-group alignment ============================ */
+    /* A1+A6: the nav is a flex COLUMN that stretches to the text column's height (so it grows when the
+       comment interface opens, instead of clipping the cards); the list fills the remaining height and
+       scrolls, with the scrollbar FLUSH to the nav's right edge (right padding moved off the scroll area
+       onto the cards). Widened so the verdict + section badges sit side by side. */
+    .plan-nav{ flex:0 0 212px; padding:var(--space-7) 0 var(--space-7) var(--space-7); display:flex; flex-direction:column; min-height:0; }
+    .plan-nav > .nav-tabs, .plan-nav > .ol-cap{ margin-right:7px; }
+    /* v9p14b: cards already fit the nav width, so there's no horizontal scroll — only vertical. The cards
+       are width:auto (not 100%) so the 7px right inset doesn't push them past the scroll area */
+    .fb-list, .ol-list{ flex:1 1 0; min-height:0; max-height:none; overflow-y:auto; overflow-x:hidden; }
+    .fb-list > .fb-card, .ol-list > .ol-item{ width:auto; margin-right:7px; }
+    /* A6: verdict badge + section badge stay on one line; the section chip ellipsizes if tight */
+    .plan-nav .fb-mid{ flex-wrap:nowrap; }
+    .plan-nav .fb-mid .vbadge{ flex:0 0 auto; }
+    .plan-nav .fb-mid .sel-badge{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    /* v9p14b (A2): a feedback nav card is selectable like the other cards — light-teal fill + raised shadow,
+       persisting until deselected or its popout closes */
+    .fb-card{ transition:background .12s; }
+    .fb-card.sel, .fb-card.sel:hover{ background:var(--select); box-shadow:var(--shadow); }
+
+    /* v9p14c: all plan actions live in the shared footer again (the separate upper strip was removed).
+       The footer wraps on a narrow column; the decision trio (.plan-foot-right) stays grouped + right. */
+    .plan-foot > .btn{ height:var(--size-30); }
+    /* the Comment control is now a plain icon button; greyed (but still clickable → toast) until a line/
+       section is selected */
+    .cmt-btn.is-off{ opacity:.5; }
+    .plan-main .md{ max-height:none; min-height:0; }   /* R-batch item 4: cap moved to .plan-rev — .md now flex-fills the capped row (and scrolls internally past it) so .md-fill carries the rail track to the editor's bottom */
+
+    /* v9p14c: "Mark as" verdict dropdown inside the comment composer */
+    .vdd{ position:relative; display:inline-flex; }
+    .vdd-trig{ display:inline-flex; align-items:center; gap:var(--space-4); border:none; background:transparent; cursor:pointer; padding:0; }
+    .vdd-cv{ width:var(--size-12); height:var(--size-12); color:var(--muted); flex:0 0 auto; }
+    .vdd-menu{ position:absolute; top:calc(100% + 5px); left:0; z-index:70; display:none; flex-direction:column; gap:var(--space-4);
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
+    .vdd.open .vdd-menu{ display:flex; }
+    .vdd-opt{ display:inline-flex; border:none; background:transparent; cursor:pointer; padding:var(--space-2); border-radius:var(--radius-sm); }
+    .vdd-opt:hover{ background:var(--surface-3); }
+
+    /* A4: the feedback/badge highlight (click a Feedback card → its section) = DARK TEAL (--rail-section) — the one
+       place dark teal is used now, distinct from the user's light-teal (--select) line/section selection. White ink
+       (--icon-fg) for legibility on the saturated fill. R-batch item 2: the navy gutter/text + per-row dividers
+       STAY NAVY here too — the dark-teal fill shows behind them (the old seam-blend recolour is removed). */
+    .md-row.fbhl, .md-row.fbhl-sec{ background:var(--rail-section); }
+    .md-row.fbhl .md-rail, .md-row.fbhl-sec .md-rail{ background:var(--rail-section); color:var(--icon-fg); }
+    .md-row.fbhl .md-line, .md-row.fbhl-sec .md-line{ color:var(--icon-fg); }
+
+    /* ============================ A4 — Plans/Documents editor rail: layout · hover preview · filler · title box ============================ */
+    /* bullet 2 — rail-hover preview lights the row + its rail cell canvas cream (--background); the rail cell rule is
+       above (.md-rail:hover) for the directly-hovered cell, this lights the WHOLE set a click would select (.hl). */
+    .md-row.hl{ background:var(--background); }
+    .md-row.hl .md-rail{ background:var(--background); color:var(--foreground); }
+    /* bullet 2 — fill-to-bottom: a trailing filler row continues the rail track past the last line so the rail box
+       runs to the bottom of the editor. The editor body flex-fills its container so the filler has room to grow. */
+    .md-fill{ flex:1 1 auto; min-height:var(--size-24); }
+    .md-fill .md-line{ background:transparent; }
+    /* R11 item 3: the empty filler track was an undifferentiated tan block (faint vs the cream body, no number to
+       anchor it). Carry continued hairline row-dividers into it (repeating --rule over the --surface-3 base) so it
+       reads as a ruled gutter that runs to the editor's bottom; the navy --border right edge (from .md-rail) closes it. */
+    .md-rail--fill{ cursor:default; background:var(--surface-3) repeating-linear-gradient(to bottom, transparent 0, transparent 19px, var(--border) 19px, var(--border) 20px); }   /* navy 1px hairlines at the row pitch — echoes the real navy per-row dividers (lighter 1px reads as "empty continuation"), so the rail clearly continues past the last line */
+    /* bullet 1 — the Editor header sits over the editor box ONLY (moved inside .plan-main in JS), so the Outline/
+       Feedback nav rail rises to the top, full height (Documents-style). The editor body flex-fills. */
+    .plan-main{ display:flex; flex-direction:column; min-height:0; }
+    .plan-main .doc-ed{ flex:1 1 auto; min-height:0; }
+    .plan-main .md{ display:flex; flex-direction:column; flex:1 1 auto; }   /* a flex column that fills .plan-main so .md-fill runs the rail to the bottom (keeps its max-height/overflow from below) */
+    /* enlarge the title row so its whole-doc select-all rail box matches the Messages title box */
+    .md-line.md-h1{ padding-top:var(--space-5); padding-bottom:var(--space-5); }
+    /* the Link (Embed/Attach) chip now rides in the right action group (leading Revise), widening it; let that group
+       wrap (Approve drops to its own line, still right-aligned) so nothing clips at the narrow extreme. */
+    .plan-foot-right{ flex-wrap:wrap; justify-content:flex-end; row-gap:var(--space-7); }
+
+    /* ============================ v8p7/v8p8 — selectable cards (History single-select · Messages multi-select), mirror Team Graph .node ============================ */
+    #prompt-history .rcard, #feed-messages .rcard{ box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }
+    #prompt-history .rcard:hover, #feed-messages .rcard:hover{ transform:translate(2px,2px); box-shadow:none; }
+    #prompt-history .rcard.sel, #feed-messages .rcard.sel{ background:var(--select); box-shadow:var(--shadow); transform:none; }   /* v9p1: --select selection fill (light teal), matches .node.selected */
+    #prompt-history .rcard.sel:hover, #feed-messages .rcard.sel:hover{ transform:none; box-shadow:var(--shadow); }
+
+    /* ============================ v8p8 — Team Graph live turn count (health-colored, precedes the context bar) ============================ */
+    .node-turns{ font-size:8px; font-family:var(--font-mono); font-weight:700; white-space:nowrap; flex:0 0 auto; }
+    /* v9p14 (A13): agent-card status bars — a leading label, the health-colored bar, then the inline value; turns + context aligned */
+    .node-bars{ display:flex; flex-direction:column; gap:var(--space-4); }
+    .nbar-row{ display:flex; align-items:center; gap:var(--space-6); }
+    .nbar-row .nbl{ flex:0 0 auto; width:var(--size-30); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.02em; color:var(--muted); font-family:var(--font-mono); }
+    .nbar-row .pbar{ flex:1 1 auto; }
+    .nbar-row .nbv{ flex:0 0 auto; min-width:var(--size-30); text-align:right; font-size:8.5px; font-weight:700; color:var(--muted); font-family:var(--font-mono); }
+
+    /* ============================ v9p4 — title-bar gear (opens Settings) ============================ */
+    .topbar-gear{ display:inline-flex; align-items:center; justify-content:center; width:27px; height:var(--size-24); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); background:var(--secondary-background); color:var(--foreground); cursor:pointer;
+      box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s, background .12s; }
+    .topbar-gear:hover{ transform:translate(1px,1px); box-shadow:none; }
+    .topbar-gear.on{ background:var(--select); }
+    .topbar-gear svg{ width:var(--size-15); height:var(--size-15); }
+
+    /* ============================ v1.2 — Console: raw terminal feed + slash-command catalog (Agent panel tab + step-into) ============================ */
+    /* --- shared bits (used in-column AND in the step-into view) --- */
+    /* v10p1 #14: the feed faithfully mimics a real Claude Code CLI on a dark terminal — a self-contained
+       --term-* palette (a DOCUMENTED EXCEPTION to the design-token rule, since a native terminal is not the
+       dashboard's neobrutalism surface). FEED ONLY: the agent bar, command catalog, run bar + Expand
+       control stay neobrutalism. Markers are rendered natively: `>` input · `●` tool calls with `⎿`
+       results · `✻ Thinking…` · a model/status line · `+`/`−` diffs · a permission-prompt box. */
+    .con-feed{ flex:1 1 auto; min-height:0; overflow-y:auto; border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-10) var(--space-12); margin:0;
+      font-family:var(--font-mono); font-size:10.5px; line-height:1.65; letter-spacing:-0.01em;
+      --term-bg:#0e0e10; --term-fg:#d7d7d9; --term-dim:#7d7d82; --term-prompt:#8db1e6; --term-user:#eaeaec;
+      --term-bullet:#d18f6a; --term-tool:#eaeaec; --term-result:#9a9aa0; --term-think:#b89bd9; --term-asst:#d7d7d9;
+      --term-add:#7fc08a; --term-del:#e0828f; --term-success:#7fc08a; --term-accent:#d18f6a; --term-warn:#d9a05b;
+      --term-border:#34343a; --term-sel:#161620;
+      background:var(--term-bg); color:var(--term-fg); }
+    .con-line{ white-space:pre-wrap; word-break:break-word; padding:0.5px 0; }
+    .con-line .cmk-bullet{ color:var(--term-bullet); font-weight:800; }
+    .con-line .cmk-pipe{ color:var(--term-dim); }
+    .con-line .cmk-think{ color:var(--term-think); }
+    .con-line .cmk-prompt{ color:var(--term-prompt); font-weight:800; }
+    .con-line.l-cmd{ color:var(--term-user); background:transparent; border:none; padding:var(--space-1) 0; margin:4px 0 1px; font-weight:600; }
+    .con-line.l-tool{ color:var(--term-tool); font-weight:600; margin-top:2px; }
+    .con-line.l-out,.con-line.l-result{ color:var(--term-result); }
+    .con-line.l-think{ color:var(--term-think); font-style:italic; }
+    .con-line.l-asst{ color:var(--term-asst); }
+    .con-line.l-sys{ color:var(--term-dim); }
+    .con-line.l-status{ color:var(--term-dim); border-bottom:1px solid var(--term-border); padding-bottom:var(--space-5); margin-bottom:4px; }
+    .con-line.l-ok{ color:var(--term-success); }
+    /* native +/− diff block */
+    .con-diff{ margin:1px 0 3px 1.5em; border-left:var(--border-width) solid var(--term-border); }
+    .con-diff-ln{ white-space:pre-wrap; word-break:break-word; padding:0 var(--space-9); }
+    .con-diff-ln.cdiff-add{ color:var(--term-add); background:rgba(127,192,138,0.10); }
+    .con-diff-ln.cdiff-del{ color:var(--term-del); background:rgba(224,130,143,0.10); }
+    .con-diff-ln.cdiff-ctx{ color:var(--term-dim); }
+    /* native permission-prompt box */
+    .con-perm{ margin:7px 0 7px 1.5em; max-width:560px; border:1px solid var(--term-accent); border-radius:6px; background:var(--term-sel); padding:var(--space-9) var(--space-12); }
+    .con-perm-h{ font-weight:800; color:var(--term-tool); margin-bottom:2px; }
+    .con-perm-cmd{ color:var(--term-warn); margin-bottom:7px; white-space:pre-wrap; word-break:break-word; }
+    .con-perm-q{ color:var(--term-fg); margin-bottom:6px; }
+    .con-perm-opts{ display:flex; flex-direction:column; gap:var(--space-2); }
+    .con-perm-opt{ color:var(--term-dim); white-space:pre-wrap; }
+    .con-perm-opt.sel{ color:var(--term-accent); font-weight:700; }
+
+    /* run bar (footer in-column — .pcard-foot pads it · bottom strip in the step-into view) */
+    .con-run{ align-items:center; gap:var(--space-6); }
+    .con-cmds-btn{ display:inline-flex; align-items:center; gap:var(--space-3); flex:0 0 auto; height:var(--size-30); padding:0 var(--space-8); font-family:var(--font-mono);
+      font-size:12px; font-weight:800; color:var(--foreground); background:var(--surface-btn); border:var(--border-width) solid var(--border);
+      border-radius:var(--radius-base); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s, background .12s; }
+    .con-cmds-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+    .con-cmds-btn.on{ background:var(--select); }
+    .con-cmds-btn svg{ width:var(--size-13); height:var(--size-13); }
+    .con-input{ flex:1 1 auto; min-width:0; height:var(--size-30); padding:0 var(--space-9); font-family:var(--font-mono); font-size:11px; font-weight:600;
+      color:var(--foreground); background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); }
+    .con-input::placeholder{ color:var(--muted-2); font-style:italic; }
+    .con-run-btn{ flex:0 0 auto; }
+
+    /* command catalog — grouped, scrollable, described (shared list markup; rendered by JS into [data-cmdlist]) */
+    .con-cat-head{ display:flex; align-items:center; gap:var(--space-8); flex-shrink:0; padding:var(--space-7) var(--space-9); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .con-cat-title{ font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:0.06em; color:var(--foreground); white-space:nowrap; }
+    .con-search{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:var(--space-6); height:var(--size-26); padding:0 var(--space-8); background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); }
+    .con-search svg{ width:var(--size-12); height:var(--size-12); color:var(--muted-2); flex:0 0 auto; }
+    .con-search input{ flex:1 1 auto; min-width:0; border:none; background:transparent; font-size:10.5px; font-weight:600; color:var(--foreground); }
+    .con-cat-list{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); padding:var(--space-4) var(--space-6) var(--space-8); }
+    /* group: an uppercase label with a trailing hairline rule, so clusters read as distinct bands while scrolling */
+    .cmd-group + .cmd-group{ margin-top:3px; }
+    .cmd-group-h{ position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:var(--space-8); padding:var(--space-8) var(--space-4) var(--space-5);
+      font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted-2); background:var(--secondary-background); }
+    .cmd-group-h::after{ content:""; flex:1 1 auto; height:var(--size-2); border-radius:var(--radius-xs); background:var(--border); }
+    /* row: TWO lines — command (mono, bold) over its description (sans, muted) — so the eye tracks the mono command column and the helper text reads as clearly subordinate */
+    .cmd-row{ display:block; width:100%; text-align:left; padding:var(--space-5) var(--space-7); border:none; border-radius:var(--radius-base);
+      background:transparent; cursor:pointer; font-family:inherit; transition:background .1s; }
+    .cmd-row:hover, .cmd-row:focus-visible{ background:var(--select); outline:none; }
+    .cmd-row-top{ display:flex; align-items:center; gap:var(--space-8); }
+    .cmd-name{ flex:0 1 auto; min-width:0; font-family:var(--font-mono); font-size:11px; font-weight:800; color:var(--foreground); letter-spacing:-0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* "also-in-X" tag: deliberately faint metadata (small · muted · flat · no chrome) so it never competes with the command */
+    .cmd-also{ flex:0 0 auto; margin-left:auto; display:inline-flex; align-items:center; gap:var(--space-2); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted-2); white-space:nowrap; }
+    .cmd-also svg{ width:var(--size-9); height:var(--size-9); }
+    .cmd-desc{ display:block; margin-top:1px; font-size:9.5px; font-weight:500; color:var(--muted); line-height:1.4; }
+
+    /* --- in-column placement: pane fills the body; catalog slides up over the feed --- */
+    .console-pane{ position:relative; flex:1 1 auto; min-height:0; padding:var(--space-9); gap:var(--space-8); }
+    .con-agentbar{ display:flex; align-items:center; gap:var(--space-8); flex-shrink:0; }
+    .con-live{ display:inline-flex; align-items:center; gap:var(--space-5); font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+    .con-dot{ width:var(--size-7); height:var(--size-7); border-radius:50%; background:var(--success); box-shadow:0 0 0 2px var(--border); }
+    .con-expand{ flex:0 0 auto; }
+    .console-pane .con-catalog{ position:absolute; left:9px; right:9px; bottom:9px; max-height:62%; z-index:5; display:none; flex-direction:column;
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); overflow:hidden; }
+    .console-pane .con-catalog.open{ display:flex; }
+
+    /* --- step-into full-window view (mirrors .settings-view) --- */
+    .console-view{ position:absolute; left:0; right:0; top:36px; bottom:34px; z-index:40; display:none; flex-direction:column; background:var(--background); }
+    .console-view.open{ display:flex; }
+    .con-head{ flex-shrink:0; display:flex; align-items:center; gap:var(--space-12); height:var(--size-42); padding:0 var(--space-14); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .con-title{ font-size:13px; font-weight:900; letter-spacing:0.01em; display:flex; align-items:center; gap:var(--space-8); white-space:nowrap; }
+    .con-title svg{ width:var(--size-16); height:var(--size-16); }
+    .con-head-agent{ flex:0 0 auto; }
+    .con-head .con-live{ margin-left:2px; }
+    .con-close{ margin-left:auto; flex:0 0 auto; }
+    .con-body{ flex:1 1 auto; min-height:0; display:flex; }
+    .con-rail{ flex:0 0 270px; min-width:0; display:flex; flex-direction:column; border-right:var(--border-width) solid var(--border); background:var(--background); }
+    .con-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; padding:var(--space-14); gap:var(--space-10); }
+    .con-main .con-feed{ font-size:11.5px; }
+    .con-run--full{ padding:0; }
+    @media (max-width:720px){ .con-rail{ flex-basis:200px; } }
+
+    /* ============================ v9p4 — Settings: step-into full-window view (covers the 3-pane body; NOT a floating popup) ============================ */
+    .settings-view{ position:absolute; left:0; right:0; top:36px; bottom:34px; z-index:40; display:none; flex-direction:column; background:var(--background); }
+    .settings-view.open{ display:flex; }
+    .set-head{ flex-shrink:0; display:flex; align-items:center; gap:var(--space-12); height:var(--size-42); padding:0 var(--space-14); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .set-title{ font-size:13px; font-weight:900; letter-spacing:0.01em; display:flex; align-items:center; gap:var(--space-8); white-space:nowrap; }
+    .set-title svg{ width:var(--size-16); height:var(--size-16); }
+    .set-tabs{ display:flex; align-items:center; gap:var(--space-5); overflow-x:auto; }
+    .set-close{ margin-left:auto; flex:0 0 auto; }
+    .set-body{ flex:1 1 auto; min-height:0; overflow-y:auto; padding:var(--space-16) var(--space-16) 28px; }
+    .set-wrap{ max-width:960px; margin:0 auto; }
+    .set-pane{ display:none; } .set-pane.active{ display:block; }
+
+    /* intro note + non-duplication caption */
+    .set-note{ display:flex; gap:var(--space-8); align-items:flex-start; font-size:10.5px; font-weight:600; color:var(--muted); line-height:1.5; margin-bottom:15px; }
+    .set-note svg{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; margin-top:1px; color:var(--muted-2); }
+
+    /* secondary SCOPE segment (inside a subject — never splits a subject across tabs) */
+    .set-scopebar{ display:flex; align-items:center; gap:var(--space-11); flex-wrap:wrap; margin-bottom:15px; }
+    .set-scope{ display:inline-flex; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); box-shadow:var(--shadow-sm); }
+    .set-scope button{ padding:var(--space-6) var(--space-15); font-size:10px; font-weight:800; color:var(--muted); background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; transition:background .1s; }
+    .set-scope button:last-child{ border-right:none; }
+    .set-scope button:hover:not(.active){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+    .set-scope button.active{ background:var(--secondary); color:var(--secondary-foreground); }
+    .set-scope-note{ font-size:9.5px; font-weight:700; color:var(--muted); font-family:var(--font-mono); }
+
+    /* section block: read-only (status/health/usage) vs editable (config) — kept visually separate */
+    .set-sec{ background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); margin-bottom:15px; overflow:hidden; }
+    .set-sec-h{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-8); padding:var(--space-9) var(--space-12); background:var(--surface-3); border-bottom:var(--border-width) solid var(--border); }
+    .set-sec-h .nm{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--foreground); display:flex; align-items:center; gap:var(--space-7); }
+    .set-sec-h .nm svg{ width:var(--size-13); height:var(--size-13); }
+    .set-kind{ font-size:7.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.05em; padding:var(--space-2) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); white-space:nowrap; }
+    .set-kind.ro{ background:var(--secondary-background); color:var(--muted); }    /* read-only */
+    .set-kind.edit{ background:var(--secondary); color:var(--secondary-foreground); } /* editable config */
+    .set-sec-b{ padding:var(--space-6) var(--space-12) var(--space-10); }
+
+    /* generic key/value rows */
+    .set-row{ display:flex; align-items:center; gap:var(--space-12); padding:var(--space-9) var(--space-1); }
+    .set-row + .set-row{ border-top:1px solid var(--border); }
+    .set-row .rk{ font-size:11px; font-weight:800; color:var(--foreground); min-width:150px; flex:0 0 auto; display:flex; align-items:center; gap:var(--space-7); }
+    .set-row .rv{ flex:1 1 auto; min-width:0; font-size:11px; font-weight:700; color:var(--foreground); font-family:var(--font-mono); word-break:break-word; }
+    .set-row .rv.plain{ font-family:inherit; font-weight:600; }
+    .set-row .rt{ flex:0 0 auto; display:flex; align-items:center; gap:var(--space-7); }
+    .set-sub{ font-size:9.5px; font-weight:600; color:var(--muted); line-height:1.45; margin-top:3px; }
+
+    /* lifecycle badges (Config: LIVE vs NEW SESSION, per the CLI lifecycle map) */
+    .lc-badge{ font-size:7.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.04em; padding:var(--space-2) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); white-space:nowrap; }
+    .lc-live{ background:var(--success-soft); color:var(--success-text); }
+    .lc-session{ background:var(--warning-soft); color:var(--warning-text); }
+
+    /* usage limit bars (health-colored: success -> warning -> danger) */
+    .use-row{ padding:var(--space-11) var(--space-1); } .use-row + .use-row{ border-top:1px solid var(--border); }
+    .use-top{ display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-10); margin-bottom:7px; }
+    .use-nm{ font-size:11px; font-weight:800; color:var(--foreground); }
+    .use-pct{ font-size:11px; font-weight:800; font-family:var(--font-mono); }
+    .use-bar{ height:var(--size-10); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); overflow:hidden; background:var(--surface-3); }
+    .use-bar > i{ display:block; height:100%; }
+    .use-reset{ font-size:9px; font-weight:600; color:var(--muted); font-family:var(--font-mono); margin-top:5px; }
+
+    /* registry rows (MCP servers · plugins · setups) */
+    .reg-grp{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:6px 0 9px; display:flex; align-items:center; gap:var(--space-8); }
+    .reg-grp .ct{ font-family:var(--font-mono); color:var(--muted-2); font-weight:700; }
+    .reg-grp + .reg-grp, .reg-row + .reg-grp{ margin-top:16px; }
+    .reg-row{ display:flex; align-items:center; gap:var(--space-11); padding:var(--space-9) var(--space-11); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); }
+    .reg-row + .reg-row{ margin-top:8px; }
+    .reg-row.off{ box-shadow:none; background:var(--surface-3); opacity:0.82; }
+    .reg-main{ min-width:0; flex:1 1 auto; }
+    .reg-name{ font-family:var(--font-mono); font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .reg-meta{ font-size:9px; font-weight:600; color:var(--muted); margin-top:2px; }
+    .reg-rt{ flex:0 0 auto; display:flex; align-items:center; gap:var(--space-9); }
+
+    /* health badge */
+    .hbadge{ font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.04em; padding:var(--space-2) var(--space-8); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); display:inline-flex; align-items:center; gap:var(--space-5); white-space:nowrap; }
+    .hbadge .hd{ width:var(--size-7); height:var(--size-7); border-radius:50%; border:1.5px solid var(--border); }
+    .hb-conn{ background:var(--success-soft); color:var(--success-text); }
+    .hb-oauth{ background:var(--select); color:var(--main-foreground); }
+    .hb-parked{ background:var(--surface-3); color:var(--muted); }
+    .hb-warn{ background:var(--warning-soft); color:var(--warning-text); }
+
+    /* compact on/off switch (enable/disable · plugins) — teal when on (active-value semantics) */
+    .swh{ position:relative; width:var(--size-40); height:var(--size-21); border:var(--border-width) solid var(--border); border-radius:11px; background:var(--surface-3); cursor:pointer; flex:0 0 auto; padding:0; transition:background .12s; }
+    .swh::after{ content:''; position:absolute; top:1px; left:1px; width:var(--size-15); height:var(--size-15); border:var(--border-width) solid var(--border); border-radius:50%; background:var(--secondary-background); transition:left .13s; }
+    .swh.on{ background:var(--secondary); } .swh.on::after{ left:20px; }
+
+    /* plugin skill chips (emulating the VS Code "Manage Plugins" rows) */
+    .pl-chips{ display:flex; flex-wrap:wrap; gap:var(--space-5); margin-top:7px; }
+    .pl-chip{ display:inline-flex; align-items:center; gap:var(--space-5); font-size:8.5px; font-weight:800; padding:var(--space-2) var(--space-8); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--surface-3); color:var(--muted); }
+    .pl-chip .pd{ width:var(--size-6); height:var(--size-6); border-radius:50%; background:var(--muted-2); flex:0 0 auto; }
+
+    /* global-edit warning banner + explicit confirm gate */
+    .set-warn{ display:flex; align-items:center; gap:var(--space-9); padding:var(--space-8) var(--space-12); border:var(--border-width) dashed var(--warning); border-radius:var(--radius-base); background:var(--warning-soft-pale); color:var(--warning-text); font-size:10px; font-weight:800; margin-bottom:14px; }
+    .set-warn svg{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; }
+    .set-confirm{ display:none; align-items:center; gap:var(--space-10); margin-top:12px; padding:var(--space-9) var(--space-12); border:var(--border-width) solid var(--danger); border-radius:var(--radius-base); background:var(--danger-soft); color:var(--danger); font-size:10px; font-weight:800; }
+    .set-confirm.show{ display:flex; }
+
+    /* search field (plugins) */
+    .set-search{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-7) var(--space-11); background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); margin-bottom:14px; }
+    .set-search svg{ width:var(--size-14); height:var(--size-14); color:var(--muted); flex:0 0 auto; }
+    .set-search input{ flex:1; min-width:0; border:none; background:transparent; outline:none; font-size:11px; font-weight:600; color:var(--foreground); }
+    .set-scopepane{ display:none; } .set-scopepane.active{ display:block; }
+  
