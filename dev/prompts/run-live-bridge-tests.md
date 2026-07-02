@@ -49,29 +49,25 @@ Notes:
 
 ## What to report back
 
-Fill in this template and return it verbatim — nothing else needs changing in the repo:
+**The run writes its own durable results record** — you do not hand-assemble a report.
+As of the conftest results-logging change, every run drops these into `tests\log\`
+(gitignored):
 
-```
-## Live bridge test run — <date/time>
+- `results_latest.txt` — human-readable: PASS/FAIL, counts, duration, the git commit +
+  tier + selection + env (incl. WSL distro & Claude CLI version) it was verified against,
+  and any failures with one-line reasons.
+- `results_<stamp>.xml` — JUnit XML equivalent for tooling.
 
-Environment: WSL distro = <name>, Claude Code in WSL = <version or "present/absent">
-Command: <the exact pytest command you ran>
+So your report is just:
 
-Result line: <paste the final pytest summary line, e.g. "29 passed in 214s">
+1. Run the command above.
+2. Paste the **entire contents of `tests\log\results_latest.txt`** verbatim. That file
+   *is* the report — it self-documents pass/fail and the environment.
+   `Get-Content tests\log\results_latest.txt`
+3. **Only if it shows any failures:** also paste a 10–30 line excerpt around the failure
+   from the newest debug log, and then **stop** (do not attempt a fix — a Claude session
+   triages against the docs and `ARCHITECTURE.md §10`).
+   `Get-ChildItem tests\log\tmux_bridge_*.log | Sort-Object LastWriteTime | Select-Object -Last 1`
 
-Per-file:
-- test_tmux_bridge.py:            <N passed / M failed / K errored>
-- test_bridge_finisher_live.py:   <N passed / M failed / K errored>
-
-Failures (if any) — for EACH failed/errored test:
-- <test node id>
-  - one-line reason (from the assertion / error)
-  - the relevant excerpt from the newest tests\log\*.log (10-30 lines around the failure)
-
-Anything that looked wrong but didn't fail (warnings, slowness, flaky retries):
-- <notes, or "none">
-```
-
-If **every** test passes: say so plainly and paste the summary line — that confirms the
-live bridge foundation is current. If **any** fail: report per the template and **stop**
-(no fixes) so a Claude session can triage against the docs and `ARCHITECTURE.md §10`.
+That's it. No manual template — the `results_latest.txt` file is the artifact, so the
+result doesn't depend on you transcribing it correctly.

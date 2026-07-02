@@ -1308,6 +1308,75 @@
   function setGlobalConfirm(show){const c=document.getElementById('config-confirm');if(c)c.classList.toggle('show',!!show);}
   function askGlobalEdit(){setGlobalConfirm(true);const c=document.getElementById('config-confirm');if(c)c.scrollIntoView({block:'nearest',behavior:'smooth'});}
 
+  /* ===== Projects (Settings → Projects tab) — open/close/register + the one-at-a-time rule =====
+     The tab itself switches through the shared settingsTab() mechanism (data-set-tab="projects" → #set-projects);
+     this block wires the pane's own behavior. Guarded on #proj-list so it no-ops on the gallery. */
+  const PROJ = [
+    { name:'awl-cc-dash',         path:'~/MeDocuments/AppData/Anthropic/awl-cc-dash',         agents:13, running:true,  last:'2026-07-01 18:42' },
+    { name:'claude-code-sandbox', path:'~/MeDocuments/AppData/Anthropic/claude-code-sandbox', agents:6,  running:false, last:'2026-06-21 11:05' },
+    { name:'vault-notes',         path:'~/MeDocuments/Obsidian/vault-notes',                  agents:2,  running:false, last:'2026-06-28 09:30' },
+  ];
+  const PROJ_POOL = [   /* demo folders for "Open other folder…" (the real control opens the OS folder picker) */
+    { name:'n8n-flows',     path:'~/MeDocuments/Automation/n8n-flows',            agents:0, running:false, last:'never' },
+    { name:'gsd-workbench', path:'~/MeDocuments/AppData/Anthropic/gsd-workbench', agents:0, running:false, last:'never' },
+  ];
+  let projOpenIdx = 0;     /* index into PROJ of the open project, or null (the mockup ships one open) */
+  let projFlashIdx = null; /* a freshly-registered row to flash once */
+  function projStamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+  function projAgentsLabel(p){if(!p.agents)return 'no agents yet';return `${p.agents} agent${p.agents===1?'':'s'}${p.running?' running':''}`;}
+  function projRowHtml(p,i){
+    const isOpen = projOpenIdx===i;
+    const badge = isOpen
+      ? `<span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Open</span>`
+      : (p.running ? `<span data-comp="connector-health-badge" class="hbadge hb-warn">Agents running</span>` : '');
+    const action = isOpen ? '' :
+      `<button class="btn-secondary btn-sm" onclick="projOpen(${i})" ${projOpenIdx!==null?'disabled title="One project at a time — close the current project first."':''}><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button>`;
+    return `<div data-comp="registry-row" class="reg-row${isOpen?' proj-open':''}${projFlashIdx===i?' proj-flash':''}">`
+      +`<div class="reg-main"><div class="reg-name">${p.name}</div><div class="reg-meta">${p.path} · ${projAgentsLabel(p)} · last opened ${p.last}</div></div>`
+      +`<div class="reg-rt">${badge}${action}</div></div>`;
+  }
+  function projRender(){
+    const list=document.getElementById('proj-list');if(!list)return;   /* not the mockup (e.g. gallery) → no-op */
+    const act=document.getElementById('proj-active'),empty=document.getElementById('proj-empty');
+    if(projOpenIdx===null){ if(act)act.hidden=true; if(empty)empty.hidden=false; }
+    else{
+      const p=PROJ[projOpenIdx];
+      const set=(id,html)=>{const el=document.getElementById(id);if(el)el.innerHTML=html;};
+      set('proj-a-name',p.name); set('proj-a-path',p.path);
+      set('proj-a-agents',p.agents?`<b>${p.agents}</b> agent${p.agents===1?'':'s'} attached`:'no agents yet');
+      set('proj-a-opened',`${p.last} · just now`);
+      if(act)act.hidden=false; if(empty)empty.hidden=true;
+    }
+    const cnt=document.getElementById('proj-count');if(cnt)cnt.textContent=`${PROJ.length} · open / register`;
+    list.innerHTML=PROJ.map(projRowHtml).join('');
+    projUpdateChip(); LU();
+    if(projFlashIdx!==null){const row=list.querySelectorAll('.reg-row')[projFlashIdx];projFlashIdx=null;if(row){row.scrollIntoView({block:'nearest'});setTimeout(()=>row.classList.remove('proj-flash'),700);}}
+  }
+  function projUpdateChip(){
+    const chip=document.getElementById('proj-chip'),nm=document.getElementById('proj-chip-nm');if(!chip||!nm)return;
+    if(projOpenIdx===null){nm.textContent='No project';chip.title='No project open — open Settings → Projects';}
+    else{nm.textContent=PROJ[projOpenIdx].name;chip.title='Active project — open Settings → Projects';}
+  }
+  function projOpen(i){
+    if(projOpenIdx!==null)return;                 /* one project at a time — no second open path */
+    projOpenIdx=i;const p=PROJ[i];p.last=projStamp();p.running=p.agents>0;
+    projRender();toast(`Opened ${p.name} — the dashboard now works in this project.`);
+  }
+  function projAskClose(){const c=document.getElementById('proj-close-confirm');if(c)c.classList.add('show');}   /* always opens (never toggles) — dismiss is the ghost-x / Esc, per the confirm-gate precedent */
+  function projCancelClose(){const c=document.getElementById('proj-close-confirm');if(c)c.classList.remove('show');}
+  function projClose(stopAgents){
+    if(projOpenIdx===null)return;const p=PROJ[projOpenIdx];projCancelClose();
+    if(stopAgents){p.running=false;toast(`Closed ${p.name} — ${p.agents?p.agents+' agents stopped.':'no agents were running.'}`);}
+    else          {toast(`Closed ${p.name} — ${p.agents?p.agents+' agents keep running in tmux.':'no agents were running.'}`);}
+    p.last=projStamp();projOpenIdx=null;projRender();
+  }
+  function projOpenOther(){
+    if(!PROJ_POOL.length){toast('No more demo folders — the real control opens the OS folder picker.');return;}
+    const p=PROJ_POOL.shift();PROJ.push(p);projFlashIdx=PROJ.length-1;projRender();
+    toast(`Registered ${p.name} — open it from the list.`);
+  }
+  function projInit(){ if(document.getElementById('proj-list'))projRender(); }
+
   /* ============================ v9p10 ============================ */
   /* shared agent model + identity badges (one source of truth for badges everywhere).
      Next-up item 6: each agent's `subs` array is the ONE shared SUBAGENT roster — it mirrors that agent's
@@ -1786,11 +1855,35 @@ resize intact.`,
      so the toggles have real content to filter. A block's data-blk = its kind; the main reply text has no blocks
      entry — it's every card's `text` row (next-up item 4). One card is an agent→agent relay. */
   const MSGS=[
-    {ag:'sandy',dir:'in',status:'complete',turn:8,time:'14:41',body:`Found 3 auth vulnerabilities in the JWT middleware. Token refresh doesn't validate expiry before issuing a new token, so an attacker can keep a session alive indefinitely once they hold any refresh token.`,
+    {ag:'sandy',dir:'in',status:'active',turn:8,time:'14:41',body:`Fanned out six explorers across the auth surface — JWT middleware, session store, token rotation — to map every validateToken() path in parallel. Aggregating their findings into the vulnerability report now.`,
      blocks:[
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
+    /* Multi-subagent stream, demo 1 of 2 — researcher-01-sandy's full run-A fan-out (A1–A6, matching sandy's Team-Graph roster: 3 Explore active · 1 general-purpose done · 1 code-reviewer active · 1 general-purpose error). The full multi-subagent stream is split across TWO different agents (sandy here, fen below), not two runs on one agent, so each fits the timespan of its example card. */
+    {ag:'sandy',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`JWT middleware mapped — 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check.`,
+     blocks:[
+       {k:'read',t:'● Read  src/auth/middleware/jwt.ts (164 lines)'},
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+    {ag:'sandy',sub:'A2',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Session store swept — the refresh handler reissues the cookie without re-checking expiry, so a held refresh token renews indefinitely.`,
+     blocks:[
+       {k:'bash',t:'● Bash  grep -rn "refresh" src/auth/session.ts\n  ⎿ 4 matches (reissue path at :88)'},
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+    {ag:'sandy',sub:'A3',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Token-rotation path traced — no sliding window on the refresh secret; rotation reuses the same signing key across sessions.`,
+     blocks:[
+       {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+    {ag:'sandy',sub:'A4',subtype:'general-purpose',substate:'sb-idle',dir:'in',status:'complete',turn:8,time:'14:41',body:`Cross-checked the three findings against the OWASP JWT cheatsheet — all map to known weaknesses; handing the summary back to sandy.`,
+     blocks:[
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+    {ag:'sandy',sub:'A5',subtype:'code-reviewer',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Reviewing the exp-enforcement approach — the fix belongs inside validateToken() itself, not the caller, or the bypass reopens on the next refresh path.`,
+     blocks:[
+       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts'},
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+    {ag:'sandy',sub:'A6',subtype:'general-purpose',substate:'sb-error',dir:'in',status:'error',turn:8,time:'14:41',body:`Run failed — couldn't reach the staging auth service to confirm the bypass live (ECONNREFUSED). The static findings still stand.`,
+     blocks:[
+       {k:'bash',t:'● Bash  curl -s https://staging.internal/auth/health\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
+       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40 · errored 14:41'}]},
     {ag:'user',dir:'out',recipients:['sandy','drew'],turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},   /* a user send carries its To/Target selection as recipients[] (multi) — drives the → recipient mini-badges; the rest default to [user] */
     {ag:'drew',dir:'in',status:'complete',turn:11,time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
@@ -1805,6 +1898,22 @@ resize intact.`,
     {ag:'sandy',dir:'in',status:'complete',turn:15,time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
+    /* Multi-subagent stream, demo 2 of 2 — scribe-01-fen's run-B helpers (B1–B3, matching fen's Team-Graph roster: code-reviewer done · Explore active · general-purpose error). fen's card also carries an A and a C run; only run B is streamed here so the example fits one card's timespan (the companion 6-subagent fan-out is demo 1 on sandy, above). */
+    {ag:'fen',dir:'in',status:'active',turn:6,time:'14:46',body:`Compiling the auth-fix changelog — dispatched a review + exploration pass over the rotation patch so the writeup cites the exact call-sites and carries the reviewer's verdict.`,
+     blocks:[
+       {k:'write',t:'● Write  docs/CHANGELOG.md (+12 −0)'},
+       {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'}]},
+    {ag:'fen',sub:'B1',subtype:'code-reviewer',substate:'sb-idle',dir:'in',status:'complete',turn:6,time:'14:46',body:`Reviewed the rotation patch for the changelog — the exp check now gates every refresh; verdict Approve with one note on the flaky timing test.`,
+     blocks:[
+       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45'}]},
+    {ag:'fen',sub:'B2',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:6,time:'14:46',body:`Pulling the exact call-sites for the writeup — validateToken() is touched in three files; session.ts:142 is the line the fix closes.`,
+     blocks:[
+       {k:'read',t:'● Read  src/auth/session.ts · middleware/jwt.ts'},
+       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45'}]},
+    {ag:'fen',sub:'B3',subtype:'general-purpose',substate:'sb-error',dir:'in',status:'error',turn:6,time:'14:46',body:`Run failed — tried to render the changelog diff against the staging docs but the docs service timed out. Retrying once it's reachable.`,
+     blocks:[
+       {k:'bash',t:'● Bash  make docs-preview\n  ⎿ Error: gateway timeout after 30s · exit 1'},
+       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45 · errored 14:46'}]},
     {ag:'max',dir:'in',status:'active',turn:17,time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
@@ -1815,9 +1924,6 @@ resize intact.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/session.ts · tokens.ts · middleware/jwt.ts'},
        {k:'meta',t:'subagent of coder-01-max · run A · spawned 14:46'}]},
-    {ag:'max',sub:'B1',subtype:'code-reviewer',substate:'sb-idle',dir:'in',status:'complete',turn:17,time:'14:47',body:`Reviewed the exp-enforcement patch against the remediation plan — covers the bypass; flagged the missing rotation-path test (max has since added it).`,
-     blocks:[
-       {k:'meta',t:'subagent of coder-01-max · run B · spawned 14:47'}]},
     {ag:'drew',dir:'in',status:'error',turn:18,time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
@@ -2228,11 +2334,11 @@ resize intact.`,
     initSubsAcc();   /* R-batch item 3: detect subagent-strip wrap (→ chevron/drawer) on load */
     {const gg=document.getElementById('graph-grid');if(gg&&window.ResizeObserver)new ResizeObserver(()=>initSubsAcc()).observe(gg);else window.addEventListener('resize',initSubsAcc);}   /* recompute wrap on any graph-grid resize (splitter drag OR window resize), falling back to the window event */
   }
-  if(document.readyState!=='loading')boot();else window.addEventListener('DOMContentLoaded',boot);
+  if(document.readyState!=='loading'){boot();projInit();}else window.addEventListener('DOMContentLoaded',()=>{boot();projInit();});
   window.addEventListener('load',()=>{autosizeAll();drawEdgesSoon();LU();});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{autosizeAll();drawEdgesSoon();});
   document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.rev-chip')&&!e.target.closest('.vtally')&&!e.target.closest('.exp'))closeAllPopups();});   /* R-batch item 5: exempt .rev-chip — its menu carries the .src-pop class, so without this the chip's own opening click bubbled here and closeAllPopups() instantly re-closed the just-opened reviewer menu */
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){closeSettings();}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();if(typeof closeSrcAccordions==='function')closeSrcAccordions();}}});   /* Next-up item 8: Esc also closes the sticky accordion-selector drawers (outside clicks don't) */
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){const pc=document.getElementById('proj-close-confirm');if(pc&&pc.classList.contains('show')){projCancelClose();}else{closeSettings();}}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();if(typeof closeSrcAccordions==='function')closeSrcAccordions();}}});   /* Next-up item 8: Esc also closes the sticky accordion-selector drawers (outside clicks don't) */
   setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
   /* live-reload on save (design iteration) */
   (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},500);})();

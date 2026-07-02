@@ -479,6 +479,7 @@
     <div class="flex items-center gap-3 min-w-0">
       <span class="text-[13px] font-heading text-main-foreground tracking-tight" style="font-weight:900">AWL Multi-Agent Dashboard</span>
       <span data-comp="chip" class="chip" style="font-family:'JetBrains Mono',monospace">v1.2</span>
+      <span data-comp="active-project-chip" class="chip proj-chip" id="proj-chip" title="Active project — open Settings → Projects" onclick="openSettings('projects')"><i data-lucide="folder-open"></i><span class="proj-chip-nm" id="proj-chip-nm">awl-cc-dash</span></span>
       <span class="text-[11px] font-bold text-main-foreground/80">13 agents</span>
     </div>
     <div class="flex items-center gap-2">
@@ -671,7 +672,7 @@
               <button class="ctx-trigger" id="turns-btn" type="button">
                 <div class="summary-row"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
-              <div class="acc mb-2.5" id="turns-bd-panel"></div>
+              <div class="acc mb-3" id="turns-bd-panel"></div>
               <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above -->
               <div class="sec-h">Timeline</div>
               <div data-comp="timeline-mode-switcher" class="tri-tabs" id="hist-tabs">
@@ -1480,7 +1481,7 @@ Short-lived notes for the current run — kept brief on purpose.
             <span class="subbar-lab">From/To</span>
             <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team Graph cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
             <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
-              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
               <div class="src-pop src-acc">
                 <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                 <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="tree" data-off="nova,quinn,io" style="max-height:300px"></div>
@@ -1604,7 +1605,7 @@ Short-lived notes for the current run — kept brief on purpose.
                   </div>
                 <!-- Next-up item 9: on the HISTORY tab the From column swaps to this multi-select FILTER (the To list minus Scratch — agents only; your own from-User prompts always show since User isn't a row). Compose keeps the single-select source above; switchTab swaps their visibility. -->
                 <div data-comp="source-dropdown" id="hist-from" class="src-dd dd multi dd--acc hidden" data-agscope data-badge-cap="3">
-                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
                   <div class="src-pop src-acc">
                     <div class="src-pop-head"><span class="sec-h" style="margin:0">From</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                     <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="agents" style="max-height:264px"></div>
@@ -1613,7 +1614,7 @@ Short-lived notes for the current run — kept brief on purpose.
                 <span class="subbar-lab">To</span>
                 <!-- Next-up items 6+8: the To multi-select — an in-flow accordion selector; the Scratch-led target list renders from the shared roster (all 13 agents — nova/io/fen were missing from the old hand-authored copy). data-on = the demo selection. -->
                 <div data-comp="source-dropdown" id="prompt-targets" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
-                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><i data-lucide="chevron-right" class="acc-cv"></i></button>
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
                   <div class="src-pop src-acc">
                   <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                   <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="targets" data-on="kai,drew" style="max-height:264px"></div>
@@ -1737,7 +1738,8 @@ Short-lived notes for the current run — kept brief on purpose.
     <div class="set-head">
       <span class="set-title"><i data-lucide="settings"></i>Settings</span>
       <div class="set-tabs">
-        <button class="tab-btn active" data-set-tab="setups" onclick="settingsTab('setups')">Setups</button>
+        <button class="tab-btn active" data-set-tab="projects" onclick="settingsTab('projects')">Projects</button>
+        <button class="tab-btn" data-set-tab="setups" onclick="settingsTab('setups')">Setups</button>
         <button class="tab-btn" data-set-tab="usage" onclick="settingsTab('usage')">Usage</button>
         <button class="tab-btn" data-set-tab="mcp" onclick="settingsTab('mcp')">MCP</button>
         <button class="tab-btn" data-set-tab="plugins" onclick="settingsTab('plugins')">Plugins</button>
@@ -1747,6 +1749,57 @@ Short-lived notes for the current run — kept brief on purpose.
     </div>
     <div class="set-body">
       <div class="set-wrap">
+
+        <!-- ========== PROJECTS (first tab · shipped in the PROJECT-OPEN state) ========== -->
+        <div class="set-pane active" id="set-projects">
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Open, switch, and register <b>projects</b> — the repo/folder a fleet of agents works in. <b>One project is open at a time</b>; close the current project before opening another. Closing can leave its agents running in tmux (reopening reattaches them) or stop them.</span></div>
+
+          <!-- ACTIVE PROJECT — pinned on top; hidden when no project is open -->
+          <div data-comp="active-project-card" class="set-sec" id="proj-active">
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-open"></i>Active project</span><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Open</span></div>
+            <div class="set-sec-b">
+              <div data-comp="settings-row" class="set-row"><span class="rk">Project</span><span class="rv" id="proj-a-name">awl-cc-dash</span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Repo path</span><span class="rv" id="proj-a-path">~/MeDocuments/AppData/Anthropic/awl-cc-dash</span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Agents</span><span class="rv plain" id="proj-a-agents"><b>13</b> agents attached</span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Last opened</span><span class="rv" id="proj-a-opened">2026-07-01 18:42 · just now</span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Close</span><span class="rv plain" style="color:var(--muted)">Returns the dashboard to no-project. Its agents can keep running in tmux, or be stopped.</span><span class="rt"><button class="btn btn-sm" id="proj-close-btn" onclick="projAskClose()"><i data-lucide="x-circle" class="w-3 h-3"></i>Close project</button></span></div>
+
+              <!-- two-button close confirm (initially hidden; ghost-x / Esc cancels) -->
+              <div data-comp="project-close-confirm" class="proj-close-confirm" id="proj-close-confirm" role="group" aria-label="Close project confirm">
+                <div class="proj-cc-head"><i data-lucide="alert-triangle"></i><span>Close this project?</span><button class="ghost-ic" title="Cancel (Esc)" onclick="projCancelClose()"><i data-lucide="x"></i></button></div>
+                <div class="proj-opt">
+                  <button class="btn-main btn-sm" onclick="projClose(false)"><i data-lucide="x-circle" class="w-3 h-3"></i>Close</button>
+                  <span class="proj-opt-note">Agents keep running in tmux — reopening the project reattaches them.</span>
+                </div>
+                <div class="proj-opt">
+                  <button class="btn-danger btn-sm" onclick="projClose(true)"><i data-lucide="square" class="w-3 h-3"></i>Close &amp; stop agents</button>
+                  <span class="proj-opt-note">Ends every agent session in this project first.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- no-project-open placeholder (hidden while a project is open — the mockup ships open) -->
+          <div data-comp="project-empty" class="proj-empty" id="proj-empty" hidden><i data-lucide="folder"></i><span>No project open — open one from the list below, or open another folder.</span></div>
+
+          <!-- KNOWN PROJECTS — the registry (JS renders the rows from the project model) -->
+          <div class="set-sec">
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-git-2"></i>Known projects</span><span class="set-kind edit" id="proj-count">3 · open / register</span></div>
+            <div class="set-sec-b" id="proj-list">
+              <div data-comp="registry-row" class="reg-row proj-open"><div class="reg-main"><div class="reg-name">awl-cc-dash</div><div class="reg-meta">~/MeDocuments/AppData/Anthropic/awl-cc-dash · 13 agents running · last opened 2026-07-01 18:42</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Open</span></div></div>
+              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">claude-code-sandbox</div><div class="reg-meta">~/MeDocuments/AppData/Anthropic/claude-code-sandbox · 6 agents · last opened 2026-06-21 11:05</div></div><div class="reg-rt"><button class="btn-secondary btn-sm" disabled title="One project at a time — close the current project first."><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button></div></div>
+              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">vault-notes</div><div class="reg-meta">~/MeDocuments/Obsidian/vault-notes · 2 agents · last opened 2026-06-28 09:30</div></div><div class="reg-rt"><button class="btn-secondary btn-sm" disabled title="One project at a time — close the current project first."><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button></div></div>
+            </div>
+          </div>
+
+          <!-- REGISTER — add any folder as a new project -->
+          <div class="set-sec">
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-plus"></i>Register</span><span class="set-kind edit">Editable</span></div>
+            <div class="set-sec-b">
+              <div data-comp="settings-row" class="set-row"><span class="rk">Other folder</span><span class="rv plain" style="color:var(--muted)">Register any folder as a new project — it joins the list above.</span><span class="rt"><button class="btn btn-sm" onclick="projOpenOther()"><i data-lucide="folder-plus" class="w-3 h-3"></i>Open other folder…</button></span></div>
+            </div>
+          </div>
+        </div>
 
         <!-- ========== USAGE ========== -->
         <div class="set-pane" id="set-usage">
@@ -1985,7 +2038,7 @@ Short-lived notes for the current run — kept brief on purpose.
         </div>
 
         <!-- ========== SETUPS ========== -->
-        <div class="set-pane active" id="set-setups">
+        <div class="set-pane" id="set-setups">
           <div class="set-note"><i data-lucide="info"></i><span>Save &amp; load a full dashboard setup — its agents and the links between them. The full list lives here.</span></div>
 
           <div class="set-sec">

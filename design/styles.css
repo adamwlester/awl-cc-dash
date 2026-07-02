@@ -1197,7 +1197,18 @@
     .subbar:has(.src-acc.open){ align-items:flex-start; }   /* an open drawer grows its column downward; the triggers stay top-aligned */
     .subbar:has(.src-acc.open) .subbar-lab{ height:var(--size-40); display:inline-flex; align-items:center; }   /* keep the labels centred on the trigger row while a drawer is open */
     .acc-cv{ width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; margin-left:auto; transition:transform .12s; }
-    .src-dd.open > .dd-trig .acc-cv{ transform:rotate(90deg); }
+    .src-dd.open > .dd-trig .acc-cv{ transform:rotate(90deg); }   /* descendant combinator on .acc-cv — still matches when the chevron is nested inside the multi picker's .acc-chevcell */
+    /* item 4 — MULTI-picker accordion chevron cell. The Prompt From (#hist-from) and To (#prompt-targets)
+       selectors — plus the Team Feed From/To filter (#feed-filter), all .src-dd.dd.multi — seat their trigger
+       chevron in a flush SQUARE, divider-flanked cell at the trailing edge, mirroring the feed/history card
+       accordions' .fcard-chevbtn (a border-left divider + centred chevron). Scoped to .src-dd.dd.multi so the
+       single-select source picker keeps its plain floating chevron. The .dd-trig is size-40 tall (border-box)
+       → size-36 between its top/bottom borders, so the cell is a true size-36 square (equal aspect ratio):
+       align-self:stretch runs the divider the full inner height, and the negative right margin cancels the
+       .dd-trig right padding so the cell sits flush to the right border. .dd-badges (flex:1) keeps the rest. */
+    .src-dd.dd.multi .acc-chevcell{ flex:0 0 auto; align-self:stretch; display:inline-flex; align-items:center; justify-content:center;
+      width:var(--size-36); margin-right:calc(var(--space-8) * -1); border-left:var(--border-width) solid var(--border); }
+    .src-dd.dd.multi .acc-chevcell .acc-cv{ margin-left:0; }   /* centre the chevron in its cell — cancel the base .acc-cv margin-left:auto (which floats the single picker's chevron to the right edge) */
 
     /* ============================ v9p10 ============================ */
     /* compact two-line identity badge for dense card headers (same format as the dropdown badges) */
@@ -1880,4 +1891,35 @@
     .set-search svg{ width:var(--size-14); height:var(--size-14); color:var(--muted); flex:0 0 auto; }
     .set-search input{ flex:1; min-width:0; border:none; background:transparent; outline:none; font-size:11px; font-weight:600; color:var(--foreground); }
     .set-scopepane{ display:none; } .set-scopepane.active{ display:block; }
+
+    /* ============================ Projects (Settings → Projects tab) ============================ */
+    /* quiet empty / no-project-open state — a dashed muted placeholder, deliberately NOT a card */
+    .proj-empty{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-11) var(--space-12);
+      margin-bottom:15px; border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base);
+      color:var(--muted); font-size:11px; font-weight:600; }
+    .proj-empty svg{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted-2); }
+
+    /* the currently-open project's registry-row — selection FILL (--select), matching selected list rows/cards */
+    .reg-row.proj-open{ background:var(--select); }
+    /* transient flash on a freshly-registered row (transition sits on the base row so the fade-out animates) */
+    #proj-list .reg-row{ transition:background .6s ease; }
+    .reg-row.proj-flash{ background:var(--select); }
+
+    /* Close-project confirm strip — the two-choice quick-confirm (Close / Close & stop agents).
+       Warning-toned: an attention decision sitting between Retire's soft confirm and Delete's danger gate. */
+    .proj-close-confirm{ display:none; margin-top:var(--space-10); padding:var(--space-9) var(--space-12) var(--space-10);
+      border:var(--border-width) solid var(--warning); border-radius:var(--radius-base); background:var(--warning-soft-pale); }
+    .proj-close-confirm.show{ display:block; }
+    .proj-cc-head{ display:flex; align-items:center; gap:var(--space-8); color:var(--warning-text); font-size:10px; font-weight:800; }
+    .proj-cc-head svg{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; }
+    .proj-cc-head .ghost-ic{ margin-left:auto; }
+    .proj-opt{ display:flex; align-items:center; gap:var(--space-11); margin-top:var(--space-8); flex-wrap:wrap; }
+    .proj-opt > button{ min-width:172px; flex:0 0 auto; }   /* one-off layout width — a measurement, per styles.css practice */
+    .proj-opt-note{ font-size:10px; font-weight:600; color:var(--muted); line-height:1.45; }
+
+    /* active-project chip in the title bar — display + shortcut affordance only (opens Settings → Projects) */
+    .proj-chip{ cursor:pointer; max-width:210px; }
+    .proj-chip svg{ width:var(--size-11); height:var(--size-11); flex:0 0 auto; }
+    .proj-chip .proj-chip-nm{ font-family:var(--font-mono); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .proj-chip:hover{ background:var(--select); }
   

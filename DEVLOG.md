@@ -570,6 +570,22 @@ Files: tests/README.md, dev/prompts/run-live-bridge-tests.md (new), DEVLOG.md
 
 ---
 
+### 2026-07-02 06:45:42 — docs: promoted 2 Inbox tweaks into NEXT UP — DESIGN (#3, #4)
+
+Filed both Inbox notes into NEXT UP — DESIGN with disambiguated component refs, then cleared the Inbox. #3 **Turns → Timeline Gap** — balance the Agent-panel Details gap between the Turns accordion (`#turns-bd-panel`) and the "Timeline" `.sec-h` heading to match the Context→Turns gap. #4 **Picker Accordion Chevron Control** — give the Prompt-panel From/To multi-select pickers (`.src-dd.dd.multi.dd--acc`) a square, divider-flanked toggle like the card accordions' `.fcard-chevbtn` (replacing the inline `.acc-cv`). No design files touched yet — implementation pending user go-ahead.
+
+Files: dev/notes/TODO.md
+
+---
+
+### 2026-07-02 07:16:37 — test: durable per-run results records + retention + Codex prompt
+
+Wired `tests/conftest.py` to emit JUnit XML (`results_*.xml`) + a human-readable summary (`results_*.txt` + `results_latest.txt`) into `tests/log/` each run — PASS/FAIL, counts (incl. deselected/skipped), duration, and the commit + tier + selection + env it was verified against, plus any failures with one-line reasons. Prunes `tmux_bridge_*.log` to the newest 20 (results records never pruned). Verified on the hermetic tier (395 passed; debug logs pruned 132→21). Updated `tests/README.md` to document the records, and `dev/prompts/run-live-bridge-tests.md` so the Codex live-run reports by pasting `results_latest.txt` instead of hand-assembling a template. Test infra was committed as `42e8b06` (conftest + README only) to avoid entangling a concurrent session's DEVLOG/TODO edits.
+
+Files: tests/conftest.py, tests/README.md, dev/prompts/run-live-bridge-tests.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
