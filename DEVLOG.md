@@ -622,6 +622,14 @@ Files: design/behavior.js, DEVLOG.md
 
 ---
 
+### 2026-07-02 08:18:32 — docs: §10 corrected — needs-spike/needs-research tags, Fast/Thinking un-omitted, entry loosened, §11 tests pointer
+
+Corrective pass over §10 (supersedes the 083e991 tag pass) after cross-checking the forked review + mode-control research. **Fixed the real error:** Fast/Thinking were mis-filed in "Decided omissions" as ⛔ impossible; the research surfaced untested `Meta+T`/`Meta+O` keybind levers (action-confirmed, integration-untested — same class as #1), so both moved back into the queue as 🧪 needs-spike (now items #2, #3). Decided omissions is now "None currently" (an item lands there only after a spike proves no path — a code no-op isn't proof). **Split the `❓ unproven` tag into two:** 🧪 **needs-spike** (mechanism known, run the experiment — 9 items) and 🔬 **needs-research** (mechanism unknown, investigate first — path materialization #12, native primitives #13); retired the off-legend `research` tag. Renumbered continuously 1–13. **Loosened §10 entry** guidelines (half-formed items welcome, mature toward the full template; kept the strict exit rules and the §10-vs-TODO boundary; added "holding pen, not a scorecard" + "body + §10 should account for the whole system" framing). **Added the tests-as-specs signal:** a `tests/` row in the §11 repo map + a callout that `test_*_unit.py` docstrings are executable specs to read before building. Confirmed the doc-sync items (Delete/Usage/Settings) are homed in the body + TODO, not orphaned.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

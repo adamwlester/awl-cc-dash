@@ -1008,34 +1008,48 @@ retire the number permanently (§7.12).
 
 ## 10. Open questions & research queue
 
-The home for unresolved items. The numbered **open-questions queue** below holds only things that are still
-open; a short **Decided omissions** ledger at the end records engine limits that are *settled* (so they are
-not re-litigated as open questions). Framing: the product works within Claude Code's engine limits, but this
-doc describes the intended end-user experience — each limit gets an honest attempt at a tractable solution
-before a fallback is promoted to final intent. An entry closes one of two ways: **sorted** (a mechanism is
-found and woven into the body) or **explicitly omitted** (moved to Decided omissions). The body text above
-already states each intended behavior at its natural home, with a Today-marker.
+The single home for everything the system needs but the settled body above can't yet specify — at **any
+maturity**, from a vague "we should figure out X" to a POC-ready item. This is a **holding pen, not a
+scorecard**: the *proven* product lives in the body (§1–§9) and the test suite; §10 holds only what's still
+unsettled, so it reads as mostly-open by design — that is not a measure of progress. Between the settled body
+and this queue, the whole intended system should be accounted for; a behavior that is neither settled above
+nor listed here has fallen through a crack and belongs here.
+
+**Entry is deliberately cheap.** An item may enter half-formed — as little as *roughly what we want / what we
+don't yet know / what would settle it* — and **mature toward** the full template (Desired / Blocker /
+Research·POC / Fallback) as it's understood. Don't withhold an under-baked item because it isn't fully
+specced; parking it here *is* the point.
+
+**Exit is strict** (unchanged): an item leaves only by being **sorted** (a mechanism is found and woven into
+the settled body) or **explicitly omitted** (a recorded decision → Decided omissions). Nothing is deleted.
+
+**§10 vs [`TODO.md`](../dev/notes/TODO.md) — keep the line sharp:** §10 = *don't-yet-know-if-or-how* (not
+buildable; needs research, a spike, or a decision first). TODO = *know-how, queued to build*. When a spike
+settles a §10 item into "buildable," it graduates to the body + TODO and leaves the queue.
 
 Each entry carries a **status tag** — the reality of the capability *today*, not whether the question is
-resolved (everything in the queue is unresolved) — plus an **Evidence** line citing the test that backs the
-claim, marked **live** (real WSL2/tmux, strongest) or **unit** (hermetic contract):
+resolved (everything here is unresolved) — plus an **Evidence** line citing the test that backs it, marked
+**live** (real WSL2/tmux, strongest) or **unit** (hermetic contract):
 
 - ✅ **proven** — a test or live run establishes it
 - ◐ **partially proven** — part is built & tested; part is still open
-- ❓ **unproven** — a plausible path exists; needs a POC/spike
-- ⛔ **impossible-today** — current findings show no path on the bridge as-is (a decided limitation → Decided omissions, not the queue)
+- 🧪 **needs-spike** — unproven, but a concrete mechanism is known; next step is a live experiment
+- 🔬 **needs-research** — unproven, and the mechanism/approach is unknown; next step is investigation before it can even be spiked
+- ⛔ **impossible-today** — a spike found no path on the bridge as-is (a decided limitation → Decided omissions, not the queue)
 
 Live citations below reference the **2026-07-02 full-suite pass — 428/428 (395 unit + 33 live) @ commit
 `c73a526`, Claude CLI 2.1.198** (`results_20260702T142448Z`).
 
 Maintenance note: when adding, removing, or moving entries, renumber them continuously across the priority
 subsections in display order (High → Medium → Low); do not restart numbering inside each subsection. Keep a
-status tag + Evidence line on every entry. An item that resolves to ⛔ moves to **Decided omissions** (which
-is *not* part of the numbered queue), never deleted.
+status tag + Evidence line on every entry (a fresh, half-formed item may carry `🧪`/`🔬` with a one-line
+Evidence and grow the rest later). An item resolves to ⛔ only **after a spike** actually proves no path (a
+code no-op is not a proof); it then moves to **Decided omissions** (not part of the numbered queue), never
+deleted.
 
 ### Priority — High
 
-**1. Mid-run permission-mode change** *(→ §6.2, §7.11)* — ❓ **unproven**
+**1. Mid-run permission-mode change** *(→ §6.2, §7.11)* — 🧪 **needs-spike**
 - **Evidence:** no test covers mode-change; the live finisher suite proves permission approve/deny, resume,
   and model+effort (`test_bridge_finisher_live`, **live**) but **not** mode. `set_mode` is an honest no-op
   today; the Shift+Tab/`keys()` POC below is plausible but unproven.
@@ -1048,7 +1062,31 @@ is *not* part of the numbered queue), never deleted.
 - **Fallback if infeasible:** mode stays launch-only; the UI presents it as a launch-time choice, never a
   fake-live control.
 
-**2. True mid-run Inject** *(→ §7.3)* — ◐ **partially proven**
+**2. Thinking-mode toggle (`Meta+T`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike**
+- **Evidence:** no test; `set_thinking()` is a deliberate no-op today (there is no `/thinking` command). The
+  mode-control research surfaces an untested keybinding lever (`chat:thinkingToggle`, default `Meta+T`) —
+  **action-confirmed, integration-untested**, the same confidence class as #1. (Formerly mis-filed as a
+  decided omission; a code no-op is not a proven dead-end.)
+- **Desired final behavior:** the operator toggles thinking on/off on a running agent from the UI.
+- **Current blocker:** no slash command and `set_thinking()` is a no-op; the only known lever is the `Meta+T`
+  keybinding — a toggle with no absolute on/off, so current state must be read first.
+- **Research/POC must establish:** whether sending `Meta+T` via the bridge's `keys()` toggles thinking, and
+  whether the result is observable (thinking blocks appearing in the transcript) so state is read-backable.
+- **Fallback if infeasible:** thinking is a launch-time choice or an omitted control — never a fake-live
+  toggle.
+
+**3. Fast-mode toggle (`Meta+O`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike**
+- **Evidence:** no test; `set_fast()` is a deliberate no-op today (`/fast` only opens a messy panel). The
+  research surfaces an untested keybinding lever (`Meta+O`) — action-confirmed, integration-untested,
+  symmetric with #1/#2. (Formerly mis-filed as a decided omission.)
+- **Desired final behavior:** the operator toggles Fast (Opus) mode on a running agent from the UI.
+- **Current blocker:** no clean slash command and `set_fast()` is a no-op; the only known lever is the
+  `Meta+O` keybinding toggle.
+- **Research/POC must establish:** whether `Meta+O` via `keys()` toggles Fast mode and whether the resulting
+  state is observable/read-backable.
+- **Fallback if infeasible:** Fast is a launch-time choice or an omitted control — never a fake-live toggle.
+
+**4. True mid-run Inject** *(→ §7.3)* — ◐ **partially proven**
 - **Evidence:** hook-boundary delivery is **unit-proven** (`test_hookbus_unit`, `test_sidecar_unit`); only
   the *immediate, mid-turn* variant is open. (This corrects any framing that treats all Inject as unbuilt —
   hook-boundary Inject ships.)
@@ -1060,7 +1098,7 @@ is *not* part of the numbered queue), never deleted.
 - **Fallback if infeasible:** hook-boundary delivery plus the transparent Next/Queue degrade is the final
   model.
 
-**3. Console rendering fidelity** *(→ §7.13)* — ❓ **unproven**
+**5. Console rendering fidelity** *(→ §7.13)* — 🧪 **needs-spike**
 - **Evidence:** no test; plain `capture-pane` demonstrably drops ANSI. Track as two gaps: live-mirror +
   keystroke passthrough *wiring* is separate from ANSI/xterm-level *fidelity* — prove the wiring first, then
   decide if fidelity is worth it.
@@ -1072,7 +1110,7 @@ is *not* part of the numbered queue), never deleted.
   approximation.
 - **Fallback if infeasible:** a clean plain-text mirror.
 
-**4. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)* — ❓ **unproven**
+**6. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)* — 🧪 **needs-spike**
 - **Evidence:** no test exercises `PreToolUse` for `ExitPlanMode`/`AskUserQuestion` under the bridge. Split
   the question: *detection* (surface a card) may be feasible from transcript/screen; the *answer/resume*
   loop (hold-for-answer, `updatedInput`, resume-out-of-plan-mode) is the unproven part.
@@ -1087,7 +1125,7 @@ is *not* part of the numbered queue), never deleted.
 
 ### Priority — Medium
 
-**5. Real run-strip completion %** *(→ §7.10)* — ◐ **partially proven**
+**7. Real run-strip completion %** *(→ §7.10)* — ◐ **partially proven**
 - **Evidence:** the self-reported checklist parser — the honest floor — is **unit-proven**
   (`test_checklist_unit`, 19 cases); a *genuine* progress signal beyond the checklist is unproven (the
   engine emits none).
@@ -1098,7 +1136,7 @@ is *not* part of the numbered queue), never deleted.
   yields a trustworthy progress measure beyond the checklist mandate.
 - **Fallback if infeasible:** checklist self-report with the barber-pole floor is the final model.
 
-**6. Subagent pending-vs-active status** *(→ §7.17)* — ❓ **unproven**
+**8. Subagent pending-vs-active status** *(→ §7.17)* — 🧪 **needs-spike**
 - **Evidence:** subagent identity/naming/ingestion is **unit-proven** (`test_subagents_naming_unit`); the
   *live pending-vs-active* signal is the unproven part.
 - **Desired final behavior:** each subagent shows live pending vs active state.
@@ -1108,7 +1146,7 @@ is *not* part of the numbered queue), never deleted.
   or hook context inside the subagent gives a reliable active signal.
 - **Fallback if infeasible:** subagents are listed without a pending/active distinction.
 
-**7. Context breakdown & Compact controls** *(→ §7, DESIGN context dropdown)* — ❓ **unproven**
+**9. Context breakdown & Compact controls** *(→ §7, DESIGN context dropdown)* — 🧪 **needs-spike**
 - **Evidence:** the bridge derives *total* context usage + turn count from JSONL (unit-covered in
   `test_bridge_unit`'s context-derivation); the per-category breakdown DESIGN shows, and richer compact
   multi-select/history, are neither built nor tested.
@@ -1120,7 +1158,7 @@ is *not* part of the numbered queue), never deleted.
   compaction controls to an SDK path; and whether `compact_boundary` reliably marks compaction events.
 - **Fallback if infeasible:** show total usage + turn count only (proven today); no per-category rows.
 
-**8. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)* — ❓ **unproven**
+**10. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)* — 🧪 **needs-spike**
 - **Evidence:** no test; Electron main is deliberately frontend-only today. Test this *together with*
   project close/reopen semantics (what happens to running tmux agents when the app/project closes), not as
   a standalone packaging chore.
@@ -1135,7 +1173,7 @@ is *not* part of the numbered queue), never deleted.
 
 ### Priority — Low
 
-**9. Per-agent cost** *(→ §7.15)* — ❓ **unproven**
+**11. Per-agent cost** *(→ §7.15)* — 🧪 **needs-spike**
 - **Evidence:** the bridge emits no cost data; any per-agent figure would be fabricated, so none is shown. A
   harvest path (JSONL usage fields, `/cost` scrape) is plausible but unproven.
 - **Desired final behavior:** live per-agent cost/usage figures on each card.
@@ -1146,7 +1184,7 @@ is *not* part of the numbered queue), never deleted.
 - **Fallback if infeasible:** no per-agent cost is shown (an honest boundary, not a missing feature); the
   account-level usage band (§7.15) remains the cost surface.
 
-**10. Attachment / citation path materialization** *(→ §7, `library.py`)* — ❓ **unproven**
+**12. Attachment / citation path materialization** *(→ §7, `library.py`)* — 🔬 **needs-research**
 - **Evidence:** `library.py` defers assets/media and doc write-back; the file/path story — how a *receiver*
   reliably reads a referenced file across the WSL↔Windows boundary — is an untested investigation item.
 - **Desired final behavior:** attachments and citations route to a real on-disk home a receiving agent can
@@ -1157,7 +1195,7 @@ is *not* part of the numbered queue), never deleted.
   Windows renderer and a WSL agent resolve it.
 - **Fallback if infeasible:** attachments stay display-only chips until a storage/path story lands.
 
-**11. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — ❓ **research**
+**13. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — 🔬 **needs-research**
 - **Evidence:** research files describe native `Task`/`TodoWrite`/`Workflow`/`SendMessage`/team-spawn
   concepts; the dashboard hasn't decided how much to adopt versus its own wrappers. No code yet — pure
   research.
@@ -1171,15 +1209,13 @@ is *not* part of the numbered queue), never deleted.
 
 ### Decided omissions (not open questions)
 
-Settled engine limits — recorded here so they are not re-raised as open questions. **Not** part of the
-numbered queue.
+Settled engine limits — recorded here so they are not re-raised as open questions, and **not** part of the
+numbered queue. An item lands here only after a **spike** actually proves no path exists (a code no-op is not
+a proof).
 
-- **Fast Mode / Thinking Mode live control** *(→ §7.11, DESIGN mode toggles)* — ⛔ **impossible-today.** The
-  bridge's `set_fast()` / `set_thinking()` are deliberate no-ops; current findings show no flag, API, or
-  keybind to toggle these mid-run on the TUI. **Disposition:** treat as launch-time choices or omitted
-  controls — never fake-live toggles. If DESIGN implies live Fast/Thinking controls, that is a design-sync
-  fix, not a research item. Re-opens only if a keybind POC (cf. the mode-change BTab approach in #1) proves
-  a mechanism.
+- **None currently.** Nothing has been spike-proven impossible. (Fast/Thinking live control was previously
+  parked here on a code-no-op assumption; the mode-control research surfaced untested `Meta+T` / `Meta+O`
+  keybinding levers, so both moved back into the queue as 🧪 needs-spike — items #2 and #3.)
 
 ---
 
@@ -1196,3 +1232,8 @@ numbered queue.
 | `links.py` · `scratchpad.py` · `watermark.py` · `library.py` · `templates_store.py` · `console_catalog.py` · `checklist.py` · `marquee.py` · `subagents_naming.py` · `settings_io.py` · `utility_llm.py` | Coordination-spine feature modules: linking · scratchpad · read-watermarks · library · templates · console catalog · checklist parse · marquee tail · subagent naming · settings read/write · utility-LLM passes |
 | [`bridge/bridge.py`](../bridge/bridge.py) · `transcript.py` · `paths.py` · `mcp.py` · `registry.py` | tmux/WSL2 control · JSONL transcript resolution · path/net translation · MCP sync · Settings reads |
 | [`start-dashboard.bat`](../start-dashboard.bat) | Launches sidecar + Electron together (§2) |
+| [`tests/`](../tests/) | The pytest suite — **and a primary spec source, not just verification.** Each `test_*_unit.py` opens with a docstring stating the *decided behavioral contract* its module must satisfy — **read it before building or changing that module.** The live tier (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`, and the `tests/ui/` slice) proves bridge + client behavior end-to-end. Index + coverage map: [`tests/README.md`](../tests/README.md). |
+
+> **The tests are executable specs.** A chunk of the buildable contract lives in the `test_*_unit.py`
+> docstrings, not only in this document — read the matching test before implementing a feature. The §10
+> Evidence lines cite the specific test that proves each claim.
