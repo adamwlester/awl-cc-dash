@@ -594,6 +594,18 @@ Files: DEVLOG.md
 
 ---
 
+### 2026-07-02 07:35:14 — design: NEXT UP — DESIGN items 1–4 built across the six-file system (4-way parallel + rendered-verified)
+
+Implemented all four NEXT UP — DESIGN items via a 4-way parallel worktree workflow (one agent per item, isolated worktrees, full six-file propagation + diff export), then merged the four diffs to main and drove the rendered UI to verify. (1) **Projects tab + close flow** — new *first* Settings tab (Projects · Setups · Usage · MCP · Plugins · Config), active-project card, one-project-at-a-time registry, two-button warning-toned close-confirm (Close / Close & stop agents; ghost-x + layered Esc), topbar active-project chip, empty state shipped as a gallery-only variant. (2) **Subagent demo-message roster fit** — MSGS now references only real subagents (max→A1, fen→B1–B3, sandy→A1–A6; dropped the phantom `max›B1`), cross-checked against the card rosters. (4) **Picker accordion chevron** — the multi From/To pickers (`#feed-filter`, `#hist-from`, `#prompt-targets`) seat their chevron in a flush 36px square, `border-left`-divider cell (`.acc-chevcell`) mirroring `.fcard-chevbtn`, scoped to `.dd.multi` so the single source picker is unchanged. (3) **Turns→Timeline gap** — the build agent's `mb-3` on `#turns-bd-panel` was a no-op (the accordion body is `display:none` when collapsed); rendered measurement caught it, so the 12px moved onto the always-rendered `.sec-h` via `mt-3` — now equal to the Context→Turns gap (12px == 12px, confirmed narrow + wide).
+
+Verification: Playwright drive of every touched surface (open → close-confirm → Esc → close branch → register → reopen; picker open + chevron rotation; gap measurement; Messages nesting; gallery cards) at narrow (1080) + wide (1920); the browser renders headed/new-headless (normal UA), so pixel-identical to a headed pass. `node --check design/behavior.js` passes; 0 console errors (favicon 404 only).
+
+History note: items 1/2/4 + the Projects/picker parts of `mockup.html` landed in HEAD via the concurrent commit `6b4f425` (the sweep documented above); this commit carries the item-3 gap fix, the TODO.md promotion of #3/#4 into NEXT UP — DESIGN, and this log — committed with explicit `git commit -- <paths>` per that corrective practice.
+
+Files: design/mockup.html, dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

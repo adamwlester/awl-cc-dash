@@ -672,9 +672,10 @@
               <button class="ctx-trigger" id="turns-btn" type="button">
                 <div class="summary-row"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
-              <div class="acc mb-3" id="turns-bd-panel"></div>
-              <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above -->
-              <div class="sec-h">Timeline</div>
+              <div class="acc" id="turns-bd-panel"></div>
+              <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above.
+                   Turns→Timeline gap: the accordion body is display:none when collapsed (so a margin on it is a no-op) — the 12px gap that matches the Context→Turns section gap lives on the always-rendered heading via mt-3 (collapses with the panel's own spacing when expanded). -->
+              <div class="sec-h mt-3">Timeline</div>
               <div data-comp="timeline-mode-switcher" class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
