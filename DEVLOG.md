@@ -586,6 +586,14 @@ Files: tests/conftest.py, tests/README.md, dev/prompts/run-live-bridge-tests.md,
 
 ---
 
+### 2026-07-02 07:25:22 — note: commit 6b4f425 also carried a concurrent design propagation
+
+History-clarity note. Commit `6b4f425` (logged above as the results-record + Codex-prompt change) was made with a pathspec-less `git commit`, so it also swept in a concurrent session's already-staged six-file design propagation — `design/DESIGN.md`, `behavior.js`, `gallery.html`, `mockup.html`, `styles.css` — alongside the intended `DEVLOG.md` + `dev/prompts/run-live-bridge-tests.md`. No work was lost: the design unit is complete and committed; only the commit message under-describes it. Not reverted (main is shared + pushed). Corrective practice: commits here now use explicit `git commit -- <paths>` to isolate from the shared index.
+
+Files: DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
