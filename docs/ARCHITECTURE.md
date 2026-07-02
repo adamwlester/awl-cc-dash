@@ -1008,20 +1008,37 @@ retire the number permanently (§7.12).
 
 ## 10. Open questions & research queue
 
-The **only** home for unresolved items — nothing here is decided, and nothing decided lives here. Framing:
-the product works within Claude Code's engine limits, but this doc describes the intended end-user
-experience — each limit gets an honest attempt at a tractable solution before a fallback is promoted to
-final intent. An entry closes one of two ways: **sorted** (a mechanism is found and woven into the body) or
-**explicitly omitted** (a recorded decision). The body text above already states each intended behavior at
-its natural home, with a Today-marker.
+The home for unresolved items. The numbered **open-questions queue** below holds only things that are still
+open; a short **Decided omissions** ledger at the end records engine limits that are *settled* (so they are
+not re-litigated as open questions). Framing: the product works within Claude Code's engine limits, but this
+doc describes the intended end-user experience — each limit gets an honest attempt at a tractable solution
+before a fallback is promoted to final intent. An entry closes one of two ways: **sorted** (a mechanism is
+found and woven into the body) or **explicitly omitted** (moved to Decided omissions). The body text above
+already states each intended behavior at its natural home, with a Today-marker.
 
-Maintenance note: when adding, removing, or moving entries, renumber them continuously across the
-priority subsections in display order (High → Medium → Low); do not restart numbering inside each
-subsection.
+Each entry carries a **status tag** — the reality of the capability *today*, not whether the question is
+resolved (everything in the queue is unresolved) — plus an **Evidence** line citing the test that backs the
+claim, marked **live** (real WSL2/tmux, strongest) or **unit** (hermetic contract):
+
+- ✅ **proven** — a test or live run establishes it
+- ◐ **partially proven** — part is built & tested; part is still open
+- ❓ **unproven** — a plausible path exists; needs a POC/spike
+- ⛔ **impossible-today** — current findings show no path on the bridge as-is (a decided limitation → Decided omissions, not the queue)
+
+Live citations below reference the **2026-07-02 full-suite pass — 428/428 (395 unit + 33 live) @ commit
+`c73a526`, Claude CLI 2.1.198** (`results_20260702T142448Z`).
+
+Maintenance note: when adding, removing, or moving entries, renumber them continuously across the priority
+subsections in display order (High → Medium → Low); do not restart numbering inside each subsection. Keep a
+status tag + Evidence line on every entry. An item that resolves to ⛔ moves to **Decided omissions** (which
+is *not* part of the numbered queue), never deleted.
 
 ### Priority — High
 
-**1. Mid-run permission-mode change** *(→ §6.2, §7.11)*
+**1. Mid-run permission-mode change** *(→ §6.2, §7.11)* — ❓ **unproven**
+- **Evidence:** no test covers mode-change; the live finisher suite proves permission approve/deny, resume,
+  and model+effort (`test_bridge_finisher_live`, **live**) but **not** mode. `set_mode` is an honest no-op
+  today; the Shift+Tab/`keys()` POC below is plausible but unproven.
 - **Desired final behavior:** the operator changes an agent's permission mode live, mid-run, from the UI.
 - **Current blocker:** the CLI only cycles modes via Shift+Tab inside the TUI — no flag, no slash command,
   no API; the bridge driver doesn't advertise `set_mode` and `POST /sessions/{id}/mode` returns an honest
@@ -1031,7 +1048,10 @@ subsection.
 - **Fallback if infeasible:** mode stays launch-only; the UI presents it as a launch-time choice, never a
   fake-live control.
 
-**2. True mid-run Inject** *(→ §7.3)*
+**2. True mid-run Inject** *(→ §7.3)* — ◐ **partially proven**
+- **Evidence:** hook-boundary delivery is **unit-proven** (`test_hookbus_unit`, `test_sidecar_unit`); only
+  the *immediate, mid-turn* variant is open. (This corrects any framing that treats all Inject as unbuilt —
+  hook-boundary Inject ships.)
 - **Desired final behavior:** an Inject-disposition message reaches a running agent immediately, mid-turn.
 - **Current blocker:** no safe arbitrary injection point exists on a live TUI; the hook channel delivers
   only at tool boundaries (`PostToolUse`) or turn end (`Stop`), so Inject degrades to Next/Queue.
@@ -1040,7 +1060,10 @@ subsection.
 - **Fallback if infeasible:** hook-boundary delivery plus the transparent Next/Queue degrade is the final
   model.
 
-**3. Console rendering fidelity** *(→ §7.13)*
+**3. Console rendering fidelity** *(→ §7.13)* — ❓ **unproven**
+- **Evidence:** no test; plain `capture-pane` demonstrably drops ANSI. Track as two gaps: live-mirror +
+  keystroke passthrough *wiring* is separate from ANSI/xterm-level *fidelity* — prove the wiring first, then
+  decide if fidelity is worth it.
 - **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors,
   spinners, and box-drawing.
 - **Current blocker:** plain `capture-pane` output drops ANSI styling; faithful rendering needs `-e`
@@ -1049,7 +1072,10 @@ subsection.
   approximation.
 - **Fallback if infeasible:** a clean plain-text mirror.
 
-**4. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)*
+**4. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)* — ❓ **unproven**
+- **Evidence:** no test exercises `PreToolUse` for `ExitPlanMode`/`AskUserQuestion` under the bridge. Split
+  the question: *detection* (surface a card) may be feasible from transcript/screen; the *answer/resume*
+  loop (hold-for-answer, `updatedInput`, resume-out-of-plan-mode) is the unproven part.
 - **Desired final behavior:** `ExitPlanMode` / `AskUserQuestion` surface as Plan/Decision inbox cards, and
   plan-approve from the dashboard resumes the agent out of plan mode.
 - **Current blocker:** `PreToolUse` hook behavior for these tools under the bridge is unproven, and no
@@ -1061,7 +1087,10 @@ subsection.
 
 ### Priority — Medium
 
-**5. Real run-strip completion %** *(→ §7.10)*
+**5. Real run-strip completion %** *(→ §7.10)* — ◐ **partially proven**
+- **Evidence:** the self-reported checklist parser — the honest floor — is **unit-proven**
+  (`test_checklist_unit`, 19 cases); a *genuine* progress signal beyond the checklist is unproven (the
+  engine emits none).
 - **Desired final behavior:** the run-strip shows a genuine completion percentage for every run.
 - **Current blocker:** the engine emits no progress signal; the only honest source is the self-reported
   checklist, and without one the strip shows barber-pole indeterminate.
@@ -1069,7 +1098,9 @@ subsection.
   yields a trustworthy progress measure beyond the checklist mandate.
 - **Fallback if infeasible:** checklist self-report with the barber-pole floor is the final model.
 
-**6. Subagent pending-vs-active status** *(→ §7.17)*
+**6. Subagent pending-vs-active status** *(→ §7.17)* — ❓ **unproven**
+- **Evidence:** subagent identity/naming/ingestion is **unit-proven** (`test_subagents_naming_unit`); the
+  *live pending-vs-active* signal is the unproven part.
 - **Desired final behavior:** each subagent shows live pending vs active state.
 - **Current blocker:** the bridge cannot distinguish a pending subagent from an active one — identity,
   naming, and transcript ingestion work, but live status cannot be shown honestly.
@@ -1077,7 +1108,22 @@ subsection.
   or hook context inside the subagent gives a reliable active signal.
 - **Fallback if infeasible:** subagents are listed without a pending/active distinction.
 
-**7. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)*
+**7. Context breakdown & Compact controls** *(→ §7, DESIGN context dropdown)* — ❓ **unproven**
+- **Evidence:** the bridge derives *total* context usage + turn count from JSONL (unit-covered in
+  `test_bridge_unit`'s context-derivation); the per-category breakdown DESIGN shows, and richer compact
+  multi-select/history, are neither built nor tested.
+- **Desired final behavior:** an on-demand context pull with per-category rows, plus compact controls
+  (multi-select options) and a compaction history (count / type / when).
+- **Current blocker:** category breakdown isn't derivable from JSONL alone — it needs `/context` table
+  scraping; compaction events are only inferable from `compact_boundary` transcript metadata.
+- **Research/POC must establish:** whether to parse `/context`, settle for total/turn usage, or move richer
+  compaction controls to an SDK path; and whether `compact_boundary` reliably marks compaction events.
+- **Fallback if infeasible:** show total usage + turn count only (proven today); no per-category rows.
+
+**8. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)* — ❓ **unproven**
+- **Evidence:** no test; Electron main is deliberately frontend-only today. Test this *together with*
+  project close/reopen semantics (what happens to running tmux agents when the app/project closes), not as
+  a standalone packaging chore.
 - **Desired final behavior:** one icon starts everything; quitting tears it down cleanly through the same
   close dialog as §3.4.
 - **Current blocker:** Electron main is deliberately frontend-only; owning the sidecar means owning the
@@ -1089,7 +1135,9 @@ subsection.
 
 ### Priority — Low
 
-**8. Per-agent cost** *(→ §7.15)*
+**9. Per-agent cost** *(→ §7.15)* — ❓ **unproven**
+- **Evidence:** the bridge emits no cost data; any per-agent figure would be fabricated, so none is shown. A
+  harvest path (JSONL usage fields, `/cost` scrape) is plausible but unproven.
 - **Desired final behavior:** live per-agent cost/usage figures on each card.
 - **Current blocker:** the bridge emits no cost data at all; any displayed number would be fabricated, so
   none is shown for bridge agents.
@@ -1097,6 +1145,41 @@ subsection.
   usage fields, `/cost` output scraped via the console path, or an engine telemetry surface).
 - **Fallback if infeasible:** no per-agent cost is shown (an honest boundary, not a missing feature); the
   account-level usage band (§7.15) remains the cost surface.
+
+**10. Attachment / citation path materialization** *(→ §7, `library.py`)* — ❓ **unproven**
+- **Evidence:** `library.py` defers assets/media and doc write-back; the file/path story — how a *receiver*
+  reliably reads a referenced file across the WSL↔Windows boundary — is an untested investigation item.
+- **Desired final behavior:** attachments and citations route to a real on-disk home a receiving agent can
+  open.
+- **Current blocker:** no `.awl-cc-dash/assets/` home exists yet, and WSL↔Windows path rewriting for
+  referenced files is unproven.
+- **Research/POC must establish:** where attachments materialize, and how a path is rewritten so both a
+  Windows renderer and a WSL agent resolve it.
+- **Fallback if infeasible:** attachments stay display-only chips until a storage/path story lands.
+
+**11. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — ❓ **research**
+- **Evidence:** research files describe native `Task`/`TodoWrite`/`Workflow`/`SendMessage`/team-spawn
+  concepts; the dashboard hasn't decided how much to adopt versus its own wrappers. No code yet — pure
+  research.
+- **Desired final behavior:** the dashboard's coordination (tasks, agent-team messaging) reuses native
+  Claude Code primitives where they fit, rather than reinventing them.
+- **Current blocker:** the trade-off (native adoption vs custom wrappers) is undecided, and native surfaces
+  under the bridge are unmapped.
+- **Research/POC must establish:** which native primitives are reachable/observable via the bridge, and
+  which the product should adopt.
+- **Fallback if infeasible:** keep the current custom coordination spine (inbox, links, scratchpad).
+
+### Decided omissions (not open questions)
+
+Settled engine limits — recorded here so they are not re-raised as open questions. **Not** part of the
+numbered queue.
+
+- **Fast Mode / Thinking Mode live control** *(→ §7.11, DESIGN mode toggles)* — ⛔ **impossible-today.** The
+  bridge's `set_fast()` / `set_thinking()` are deliberate no-ops; current findings show no flag, API, or
+  keybind to toggle these mid-run on the TUI. **Disposition:** treat as launch-time choices or omitted
+  controls — never fake-live toggles. If DESIGN implies live Fast/Thinking controls, that is a design-sync
+  fix, not a research item. Re-opens only if a keybind POC (cf. the mode-change BTab approach in #1) proves
+  a mechanism.
 
 ---
 

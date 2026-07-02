@@ -606,6 +606,14 @@ Files: design/mockup.html, dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-02 07:44:40 — docs: §10 open-questions queue → evidence-backed status board
+
+Reworked `docs/ARCHITECTURE.md` §10 into a status board. Added a status-tag legend (✅ proven / ◐ partially proven / ❓ unproven / ⛔ impossible-today) + an **Evidence** line on every entry citing the test that backs it (unit vs live), anchored to the 2026-07-02 full-suite pass (428/428 @ `c73a526`, CLI 2.1.198, `results_20260702T142448Z`). Tagged all 8 existing items (e.g. Inject → ◐ hook-boundary unit-proven / mid-turn open; run-strip % → ◐ checklist parser proven / true % open). Added 3 new open items — **7** Context breakdown & Compact, **10** Attachment/citation path materialization, **11** Native coordination primitives — renumbered continuously 1–11. Relocated Fast/Thinking-mode into a new **Decided omissions** ledger (⛔ impossible-today) instead of deleting it, per the "nothing leaves §10 without a home" rule. Existing Desired/Blocker/Research/Fallback bullets preserved verbatim.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
