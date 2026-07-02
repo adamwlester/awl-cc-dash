@@ -562,6 +562,14 @@ Files: (review only — committing CLAUDE.md, DEVLOG.md, dev/notes/TODO.md, docs
 
 ---
 
+### 2026-07-02 06:27:02 — tests: durable README rewrite + live-suite Codex hand-off
+
+Ran the hermetic unit tier for ground truth (`395 passed, 33 deselected` in ~1.7s — imports the real modules, so confirmed current). Rewrote `tests/README.md` from the stale bridge-only summary into a **durable** map: the two-tier model (hermetic default vs live/integration opt-in), a file→module coverage table, an explicit **established-vs-not** section (frontend has zero tests; `serialize.py`/`runtime_store.py`/`drivers/sdk.py` are gaps), run commands, and a maintenance rule (no pass-count snapshots). Left the 20 `test_*` files flat per decision (no folder reorg). Added `dev/prompts/run-live-bridge-tests.md` — a mechanical run-and-report hand-off for Codex to execute the 33-test live tier (needs WSL2/tmux) and report via a fixed template without fixing anything.
+
+Files: tests/README.md, dev/prompts/run-live-bridge-tests.md (new), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
