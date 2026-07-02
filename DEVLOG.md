@@ -370,6 +370,14 @@ Files: dev/notes/data-model-map.md, DEVLOG.md
 
 ---
 
+### 2026-07-01 22:37:04 — docs: second Inbox batch triaged → NEXT UP 15–18; Inbox cleared
+
+Thought through the four new Inbox notes with the user (no-edit discussion rounds), then filed all four into **NEXT UP**: **15 — "System" identity** (gear-on-navy reserved pseudo-identity via an additive `--ag-system` token; Inbox Error cards for system-wide failures + Log lines; filter-only-never-addressable per the subagent precedent — feed-filter row #2 after User, excluded from Compose To/From + History From; Reply disabled, not removed). **16 — Timeline heading** (`.sec-h` label over the `timeline-mode-switcher`). **17 — Link restructure** (supersedes OD-06 "a link can be both": one relationship per link, Relationship → single-select button group; Trigger segmented → dropdown with a new link-only **Piggyback** trigger, defaults DM→Queue / SC→Piggyback, SC ungated; OD-07 amendment — on a one-way link each fire counts as an exchange; All-links → collapsible **Active/Expired** sections, peer-adjacent ordering, full relationship labels per entry, corner count badge on group headers = a new overlay badge family; one-shot context sharing explicitly dropped as a goal — the user handles that via Messages → Embed/Attach). **18 — Lucide direction arrows** (replace the unicode `→ ← ↔` text glyphs in the direction-cycler + links-list rows with `arrow-right`/`arrow-left`/`arrow-left-right`, `--foreground` ink, flex-centred). Inbox now empty; NEXT UP holds 18 items.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
