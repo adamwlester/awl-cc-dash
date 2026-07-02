@@ -294,6 +294,16 @@ Files: design/TODO.md → dev/notes/DESIGN_TODO.md (moved), CLAUDE.md, dev/promp
 
 ---
 
+### 2026-07-01 17:01:17 — docs: CLAUDE.md audit — fixed stale claims + surfaced ARCHITECTURE.md
+
+Audited CLAUDE.md against the live tree and fixed the drift the user flagged. **Added [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) to Key files** (the system/structure reference) and named it in the `docs/` folder row — the highest-value add, and the lever that lets the rest stay terse (point to ARCHITECTURE.md for module/endpoint/component detail instead of enumerating it here). Fixes: **frontend** row "largely one App.tsx" → the componentized renderer (App.tsx shell + the six panels + shared events/api/tokens/ui); **serialize.py** corrected in prose to the `sidecar/` root (not `drivers/`) + a §4 pointer; **design/** row gained `styles.css`; **archive/** row broadened (devlog + retired notes/docs); the dangling **`dev/notes/repo-migration.md`** Key-files link repointed to `archive/dev/notes/`; the **tests/** + Testing blurbs updated from the stale 4-file list to the ~18-file per-module unit suite; and the bridge's 4 internal helpers noted beyond the 20 documented methods. No behavioral-rule changes; edits landed on the concurrent stream's committed base (its `design/TODO.md`→`DESIGN_TODO.md` CLAUDE.md tweak was in a different region — no collision).
+
+Prior commit this turn (`4741614`) was a tree-cleanup checkpoint of leftover untracked files (a concurrent session's `data-model-map.md` + `archive/design/design-v11p6/`, plus two `.claude/plans/` files) — committed, not authored, per the user's request to clean the tree. (Timestamp is my Git-Bash clock; the 18:25 entry above reflects the other session's clock skew.)
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

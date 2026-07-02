@@ -12,14 +12,14 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 
 | Folder | Purpose |
 |--------|---------|
-| `frontend/` | The desktop app — Electron + React (electron-vite); the **working MVP**, built in place. The UI today is largely one `src/renderer/App.tsx`. |
-| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`) with shared `serialize.py`. The **`bridge` driver (real Claude Code TUI via tmux/WSL2) is the primary path the dashboard is built around** — **live-verified below the UI** (run-state, permission round-trips, resume, model/effort) **and now proven end-to-end *through the dashboard UI*** — creating an agent with no driver named comes up on `bridge`, spawns a real tmux session (no tab), and runs live turns that render in the feed (the verifying pass also caught & fixed an `EventRenderer` crash on the bridge's string-content user-prompt events). The `sdk` driver (in-process Claude Agent SDK) is a **limited-use engine** reserved for specific non-interactive tasks (e.g. programmatic flows that don't need a real TUI, such as the Revise / Summarize utility-LLM passes) — **not** the default. **`bridge` is the default when no driver is named**; select `sdk` explicitly with `AWL_DRIVER=sdk` or the per-session `driver` field (an explicitly-named *unknown* driver still falls back to `sdk`). |
+| `frontend/` | The desktop app — Electron + React (electron-vite); the **working MVP**, built in place. A **componentized** React renderer — an `App.tsx` shell (layout, polling, the merged SSE bus) + `AgentPanel` / `TeamGraph` / `TeamFeed` / `PromptPanel` / `WorkPanel` / `Settings` panels + shared `events`/`api`/`tokens`/`ui`. Full map: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §3. |
+| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`); `serialize.py` (driver→event normalization) sits at the `sidecar/` root, alongside ~15 feature modules (event bus, hooks, inbox, links, scratchpad, library, console, …) — full module + endpoint map in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4. The **`bridge` driver (real Claude Code TUI via tmux/WSL2) is the primary path the dashboard is built around** — **live-verified below the UI** (run-state, permission round-trips, resume, model/effort) **and now proven end-to-end *through the dashboard UI*** — creating an agent with no driver named comes up on `bridge`, spawns a real tmux session (no tab), and runs live turns that render in the feed (the verifying pass also caught & fixed an `EventRenderer` crash on the bridge's string-content user-prompt events). The `sdk` driver (in-process Claude Agent SDK) is a **limited-use engine** reserved for specific non-interactive tasks (e.g. programmatic flows that don't need a real TUI, such as the Revise / Summarize utility-LLM passes) — **not** the default. **`bridge` is the default when no driver is named**; select `sdk` explicitly with `AWL_DRIVER=sdk` or the per-session `driver` field (an explicitly-named *unknown* driver still falls back to `sdk`). |
 | `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **Custom Tooling**. |
-| `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `mockup.html` is the current visual authority; `tokens.css` is the single source of truth for every design value (colors, type, spacing, radius, shadow); `behavior.js` is the **shared component behavior** (interaction logic), loaded by **both** `mockup.html` and `gallery.html` so they can't drift; `gallery.html` is the **interactive component catalog**; `mockup-toolkit.js` is the `Ctrl+G` annotation overlay. |
-| `archive/` | Retired-but-referenced material: the design lineage (old mockups, ui-plans). |
+| `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `mockup.html` is the current visual authority; `tokens.css` is the single source of truth for every design value (colors, type, spacing, radius, shadow); `behavior.js` is the **shared component behavior** (interaction logic), loaded by **both** `mockup.html` and `gallery.html` so they can't drift; `styles.css` is the **shared component CSS** linked by both; `gallery.html` is the **interactive component catalog**; `mockup-toolkit.js` is the `Ctrl+G` annotation overlay. |
+| `archive/` | Retired-but-referenced material: the design lineage (old mockups/ui-plans under `design/`), rotated DEVLOG archives (`devlog/`), and retired notes/docs (`notes/`, `dev/notes/`, `docs/`). |
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
-| `tests/` | pytest suite — live bridge/sidecar integration (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) + hermetic unit tests (`test_bridge_unit.py`, `test_sidecar_unit.py`). See **Testing** below. |
-| `docs/` | Committed, curated product reference docs. |
+| `tests/` | pytest suite — live bridge/sidecar integration (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) + a **per-module hermetic unit suite** (`test_*_unit.py`, ~18 files — one per sidecar module, plus bridge/sidecar). See **Testing** below. |
+| `docs/` | Committed, curated product reference docs — home of [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), the system/structure reference (see **Key files**). |
 
 **Build workflow & config:**
 
@@ -37,9 +37,10 @@ Cross-cutting docs every session should know about — read the relevant one bef
 
 | File | What it is |
 |------|------------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The **system/structure reference** — how the processes are wired (Electron ↔ FastAPI sidecar `:7690` ↔ driver seam ↔ tmux/WSL2 bridge), where each piece of code lives, and the integrated `OD-01…OD-23` decision record. Read it for *what talks to what, and where that code lives* — the system counterpart to DESIGN.md (UI intent) and DEVLOG.md (history). |
 | `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling) — the **recent window**. **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. Older entries are rotated into `archive/devlog/` and summarized in the file's **Archived history** index; read those archives **on demand** only when a task needs older history, not by default. |
 | `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the mockups in `design/` (authority: `mockup.html`, with values in `tokens.css`) own the exact visuals. |
-| `dev/notes/repo-migration.md` | Loose, possibly-stale notes from the sandbox→awl-cc-dash migration (target layout, what moved where). Background only — trust the actual files over it. |
+| `archive/dev/notes/repo-migration.md` | Loose, possibly-stale notes from the sandbox→awl-cc-dash migration (target layout, what moved where) — now archived. Background only — trust the actual files over it. |
 
 ## Custom Tooling
 
@@ -63,7 +64,7 @@ from bridge import TmuxBridge
 
 **CLI:** `python -m bridge <command>` (run from the repo root or with `PYTHONPATH=<repo-root>`).
 
-**20 methods:** create, send, keys, read, read_log, list, show, close, shutdown, rename, resume, status, batch_create, broadcast, interrupt, scrollback, watch, wait_idle, export, mcp_sync. Plus config setters: set_cwd, set_model.
+**20 documented methods:** create, send, keys, read, read_log, list, show, close, shutdown, rename, resume, status, batch_create, broadcast, interrupt, scrollback, watch, wait_idle, export, mcp_sync. Plus config setters (set_cwd, set_model) and internal helpers (session_id_for, register_session_id, wsl_host_ip, sidecar_hook_base_url).
 
 **Key capabilities:**
 - Screen state detection (`status`) — idle, generating, permission_prompt, unknown
@@ -93,7 +94,7 @@ Pulls a full **claude.ai** (web/desktop) conversation via the internal API — t
 
 ## Testing
 
-**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root — live bridge/sidecar integration suites (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) plus hermetic unit tests (`test_bridge_unit.py`, `test_sidecar_unit.py`). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
+**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root — live bridge/sidecar integration suites (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) plus a **per-module hermetic unit suite** (`test_*_unit.py`, ~18 files — one per sidecar module, plus `test_bridge_unit.py` / `test_sidecar_unit.py`). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
 
 **How to run** (uses a repo-root `.venv`):
 ```powershell
