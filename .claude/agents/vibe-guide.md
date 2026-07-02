@@ -2,6 +2,7 @@
 name: vibe-guide
 description: Use this agent when users want to build applications through conversation, focusing on the vision and feel of their app rather than technical implementation details. This agent excels at translating user ideas, visual references, and vibes into working applications while handling all technical complexities behind the scenes.
 model: opus
+#model: fable
 color: pink
 maxTurns: 30
 effort: max

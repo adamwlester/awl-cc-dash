@@ -3,6 +3,7 @@ name: echo
 description: Session distiller and intent archaeologist. Extracts structured implementation briefs from messy, multi-turn Claude Code sessions — pulling signal from noise, capturing granular decisions, and packaging intent for downstream humans and AI agents.
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 model: opus
+#model: fable
 color: purple
 maxTurns: 25
 effort: max
