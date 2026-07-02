@@ -32,7 +32,7 @@
       • ICON-ONLY ACTIONS (#10): Copy / Edit / Comment / Retry are mic-button-style icon-only buttons
         everywhere (Plans footer, Team Feed strip, History strip, Documents/Assets footers); labeled
         buttons (Summarize, Share, Review, Revise, Reject, Approve, Stop, Link to prompt) keep text.
-      • INBOX DANGER (#11): Deny + Reject use --danger; Approve stays pink. Permission is binary Approve/Deny (+Reply) — "Always allow" removed (OD-14).
+      • INBOX DANGER (#11): Deny + Reject use --danger; Approve stays pink. Permission is binary Approve/Deny (+Reply) — "Always allow" removed.
       • EXPANDED TIMESTAMP (#12): .fcard-time gets margin-left:auto so it stays right-pinned when expanded.
       • CONSOLE PARTIAL EXPAND (#13): the Console step-into now stops at the left edge of #pRight (covers
         left+middle only, right column stays visible); positionConsoleView() recomputes on resize/splitter.
@@ -559,7 +559,7 @@
               </div>
             </div>
 
-            <!-- OD-18: per-agent scoping — which MCP servers / plugins this agent may use + the deny rules that hard-block it. Lockable like the rest of the on-demand config; MCP/plugins take effect at the agent's next launch, deny is the reliable hard-block. -->
+            <!-- per-agent scoping — which MCP servers / plugins this agent may use + the deny rules that hard-block it. Lockable like the rest of the on-demand config; MCP/plugins take effect at the agent's next launch, deny is the reliable hard-block. -->
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">MCP servers</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
               <div class="lockable msel" data-msel="mcp" data-sel='["playwright","github"]'>
@@ -685,7 +685,7 @@
               </div>
             </div>
 
-            <!-- OD-13: Subagents audit — read-only history of the focused agent’s subagents, grouped by run. Below the Timeline, above the Retire/Delete footer. The graph-card badge click opens this + highlights the matching row (resolves OQ-1). Representative content; repaints per focused agent in the app. -->
+            <!-- Subagents audit — read-only history of the focused agent’s subagents, grouped by run. Below the Timeline, above the Retire/Delete footer. The graph-card badge click opens this + highlights the matching row (resolves OQ-1). Representative content; repaints per focused agent in the app. -->
             <div data-comp="subagents-accordion" class="subs-audit" id="det-subs-audit">
               <button class="subs-audit-head" type="button" onclick="toggleSubsAudit(this)" aria-expanded="false"><i data-lucide="chevron-right" class="sa-chev"></i><span class="sa-title">Subagents</span><span class="sa-count">6</span><span class="sa-hint">read-only audit history</span></button>
               <div class="subs-audit-body">
@@ -759,7 +759,7 @@
                 <div class="msel-pop"></div>
               </div>
             </div>
-            <!-- OD-18: per-agent scoping at create — MCP servers / Plugins this agent may use + deny rules (the hard-block); same multi-select primitive as Skills/Tools. -->
+            <!-- per-agent scoping at create — MCP servers / Plugins this agent may use + deny rules (the hard-block); same multi-select primitive as Skills/Tools. -->
             <div><label class="lbl mb-1">MCP servers <span class="normal-case font-semibold text-muted-2">— none = all · at launch</span></label>
               <div class="msel" data-msel="mcp" data-sel='[]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
@@ -841,7 +841,7 @@
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main" onclick="createAgent()">Create agent</button><button class="btn px-3" onclick="resetCreate()">Reset</button><button class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
-            <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- OD-20: Console surface (feed · catalog · run bar) is design-final/built; the live raw-terminal feed + slash-route are BACKEND wiring (separate stream), so runConsoleCmd stays a static-mockup demo -->
+            <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface (feed · catalog · run bar) is design-final/built; the live raw-terminal feed + slash-route are BACKEND wiring (separate stream), so runConsoleCmd stays a static-mockup demo -->
             <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
           </div>
         </div>
@@ -880,7 +880,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:68%;background:var(--warning)"></i></div><span class="nbv">34/50</span></div>
                     </div>
                     <div class="node-band">
-                      <!-- OD-11 segment-recolor: sandy self-reported a 6-step checklist and is PAUSED at step 3 — blocked awaiting your permission on the settings.json edit. A BLOCKING pause, so the current segment recolours WARM (.cur-paused — static, no shimmer) and the graph badge reads Pending. Step name stays hover-only (the bar's title). (A non-blocking Warning would keep the segment shimmering; a structural whole-run error would fall back to the flat .run-error whole-bar.) -->
+                      <!-- segment-recolor: sandy self-reported a 6-step checklist and is PAUSED at step 3 — blocked awaiting your permission on the settings.json edit. A BLOCKING pause, so the current segment recolours WARM (.cur-paused — static, no shimmer) and the graph badge reads Pending. Step name stays hover-only (the bar's title). (A non-blocking Warning would keep the segment shimmering; a structural whole-run error would fall back to the flat .run-error whole-bar.) -->
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 3 of 6 · Apply settings.json edit (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div data-comp="marquee" class="node-feed">
@@ -930,7 +930,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:10%;background:var(--success)"></i></div><span class="nbv">5/50</span></div>
                     </div>
                     <div class="node-band">
-                      <!-- OD-11 segment-recolor: drew failed on a STRUCTURAL / whole-run error (staging unreachable — ECONNREFUSED; the session can't proceed), so the strip uses the flat .run-error whole-bar danger fallback, not a segmented per-step recolour (a STEP-scoped failure would instead recolour just the current segment via .cur-error on a segmented bar). Static — halted, not working. -->
+                      <!-- segment-recolor: drew failed on a STRUCTURAL / whole-run error (staging unreachable — ECONNREFUSED; the session can't proceed), so the strip uses the flat .run-error whole-bar danger fallback, not a segmented per-step recolour (a STEP-scoped failure would instead recolour just the current segment via .cur-error on a segmented bar). Static — halted, not working. -->
                       <div class="run-strip run-error"><i></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
@@ -957,7 +957,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:44%;background:var(--success)"></i></div><span class="nbv">22/50</span></div>
                     </div>
                     <div class="node-band">
-                      <!-- OD-11: segmented run-strip — the agent self-reported a 5-step checklist; 3 done, step 4 (Run typecheck) in progress (barber-pole shimmer on the current segment), 1 remaining. The step NAME is hover-only (the bar's title, "Step 4 of 5 · Run typecheck") so it never adds an always-on label or changes the card layout. Separate from the marquee below (liveness). The barber-pole single-fill stays the floor on cards with no checklist. -->
+                      <!-- segmented run-strip — the agent self-reported a 5-step checklist; 3 done, step 4 (Run typecheck) in progress (barber-pole shimmer on the current segment), 1 remaining. The step NAME is hover-only (the bar's title, "Step 4 of 5 · Run typecheck") so it never adds an always-on label or changes the card layout. Separate from the marquee below (liveness). The barber-pole single-fill stays the floor on cards with no checklist. -->
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 4 of 5 · Run typecheck"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
@@ -1082,7 +1082,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:56%;background:var(--warning)"></i></div><span class="nbv">28/50</span></div>
                     </div>
                     <div class="node-band">
-                      <!-- OD-11: segmented run-strip — 4-step checklist, 2 done, step 3 (Regenerate API table) in progress. Step name is hover-only (the bar's title). -->
+                      <!-- segmented run-strip — 4-step checklist, 2 done, step 3 (Regenerate API table) in progress. Step name is hover-only (the bar's title). -->
                       <div class="run-strip run-seg" title="Step 3 of 4 · Regenerate API table"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
@@ -1184,7 +1184,7 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:14%;background:var(--success)"></i></div><span class="nbv">7/50</span></div>
                     </div>
                     <div class="node-band">
-                      <!-- OD-11: segmented run-strip — 3-step checklist, 1 done, step 2 (Summarise turns) in progress. Step name is hover-only (the bar's title). -->
+                      <!-- segmented run-strip — 3-step checklist, 1 done, step 2 (Summarise turns) in progress. Step name is hover-only (the bar's title). -->
                       <div class="run-strip run-seg" title="Step 2 of 3 · Summarise turns"><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
                       <div class="node-feed">
@@ -1405,7 +1405,7 @@ Short-lived notes for the current run — kept brief on purpose.
                 </div>
               </div>
             </div>
-            <!-- OD-06 (amended, next-up item 17): Relationship — a SINGLE-select segment: ONE relationship per link (wanting both = two links; supersedes "a link can be both"). Direct messaging = reply-to conversation (OD-04); Shared context = passive awareness, revealing its own content-type filter (the Messages Content taxonomy) + a one-time "share all prior context" backfill switch (default off) — both scoped to SC links. Picking a relationship re-defaults the Trigger dropdown below (DM → Queue · SC → Piggyback); SC keeps the FULL trigger menu (no gating). -->
+            <!-- Relationship (amended, next-up item 17) — a SINGLE-select segment: ONE relationship per link (wanting both = two links; supersedes "a link can be both"). Direct messaging = reply-to conversation; Shared context = passive awareness, revealing its own content-type filter (the Messages Content taxonomy) + a one-time "share all prior context" backfill switch (default off) — both scoped to SC links. Picking a relationship re-defaults the Trigger dropdown below (DM → Queue · SC → Piggyback); SC keeps the FULL trigger menu (no gating). -->
             <div>
               <label class="lbl mb-1.5">Relationship <span class="text-muted-2 font-semibold normal-case">— one per link; both = two links</span></label>
               <div data-comp="segmented-control" class="seg">
@@ -1453,7 +1453,7 @@ Short-lived notes for the current run — kept brief on purpose.
               </div>
             </div>
             <div class="flex gap-2 pt-1"><button data-status="planned" class="btn-main flex-1" onclick="linkSave()">Save</button><button data-status="planned" class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div><!-- planned: linkSave/linkDelete are toast + counter only -->
-            <!-- OD-08 (amended, next-up item 17): link tracking list — collapsible Active Links / Expired Links sections (the section carries the state; NO gray-out on expired rows) replacing the old static "All links — grouped by agent" heading. Inside each section, links group by agent (double-listed under BOTH endpoints, entries sorted peer-adjacent), each entry showing a directional arrow relative to that group's agent (Lucide arrow-right/arrow-left/arrow-left-right — next-up item 18) + the other agent + its FULL relationship label (one relationship per link). Group-header identity badges carry the corner-count overlay badge (teal >0 / muted at none — the node-inbox envelope convention). Rendered by renderLinkList. -->
+            <!-- link tracking list (amended, next-up item 17) — collapsible Active Links / Expired Links sections (the section carries the state; NO gray-out on expired rows) replacing the old static "All links — grouped by agent" heading. Inside each section, links group by agent (double-listed under BOTH endpoints, entries sorted peer-adjacent), each entry showing a directional arrow relative to that group's agent (Lucide arrow-right/arrow-left/arrow-left-right — next-up item 18) + the other agent + its FULL relationship label (one relationship per link). Group-header identity badges carry the corner-count overlay badge (teal >0 / muted at none — the node-inbox envelope convention). Rendered by renderLinkList. -->
             <div>
               <div data-comp="link-list" id="link-list" class="link-list"></div>
             </div>
@@ -1523,7 +1523,7 @@ Short-lived notes for the current run — kept brief on purpose.
 
             <!-- SCRATCH -->
             <div id="feed-scratch" data-group="feed" class="hidden flex-1 overflow-y-auto px-3 py-3" style="background:var(--background)">
-              <div class="text-[9px] text-muted font-mono mb-2">&lt;project&gt;/.awl/scratchpad.md — live posts</div><!-- OD-17/OD-23: scratchpad lives with the project (.awl/), WSL-reachable -->
+              <div class="text-[9px] text-muted font-mono mb-2">&lt;project&gt;/.awl/scratchpad.md — live posts</div><!-- scratchpad lives with the project (.awl/), WSL-reachable -->
               <div id="scratch-list" class="flex flex-col gap-2"></div>
                           </div>
 
@@ -2027,7 +2027,7 @@ Short-lived notes for the current run — kept brief on purpose.
         <div class="con-feed" id="con-feed-full"></div>
         <div class="con-run con-run--full">
           <button class="con-cmds-btn" onclick="filterFocus(this)" title="Jump to the command filter"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
-          <input class="con-input" id="con-input-full" placeholder="Type a command, or pick one from the list…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- OD-20: Console surface is design-final/built; live feed + slash-route are BACKEND wiring (separate stream) -->
+          <input class="con-input" id="con-input-full" placeholder="Type a command, or pick one from the list…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface is design-final/built; live feed + slash-route are BACKEND wiring (separate stream) -->
           <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
         </div>
       </main>

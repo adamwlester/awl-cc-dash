@@ -214,7 +214,7 @@
       background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,0.40) 6px 12px);
       animation:run-barber 0.8s linear infinite; }
     @keyframes run-barber{ to{ background-position:24px 0; } }
-    /* OD-11: SEGMENTED run-strip — the agent self-reports a checklist of major steps and the strip renders done÷total
+    /* SEGMENTED run-strip — the agent self-reports a checklist of major steps and the strip renders done÷total
        as equal segments split by navy separators (reusing --border / --border-width). The current (in-progress)
        segment carries the RUN'S STATE (running → green + barber-pole shimmer · paused/pending → warm · errored →
        danger; see the .cur-* rules below) instead of the bar collapsing to a flat colour. The segmented bar is the SAME --size-6 height as every other .run-strip,
@@ -226,7 +226,7 @@
     .run-seg .rseg{ flex:1; min-width:0; height:100%; background:var(--surface-3); border-right:var(--border-width) solid var(--border); }
     .run-seg .rseg:last-of-type{ border-right:none; }
     .run-seg .rseg.done{ background:var(--success); }
-    /* Current-segment STATE recolor (OD-11). The default .cur is RUNNING — green + barber-pole shimmer. State
+    /* Current-segment STATE recolor. The default .cur is RUNNING — green + barber-pole shimmer. State
        modifiers recolour it and drop the shimmer (a paused/errored segment isn't working, so it's static):
          · .cur-paused → warm (--warning): a blocking pause (Permission / Plan / Decision / max-turns) — the run is
            waiting on you and the graph badge reads pending. "Paused BETWEEN steps" puts .cur-paused on the NEXT
@@ -269,7 +269,7 @@
     .node-feed.idle .trk.b{ display:none; }
     /* subagents: RECTANGULAR clickable id-badges, each FILLED with the sub's run-state status colour + BOLD INVERSE
        (white) id text — the exact .node-badge .nb-* treatment (--success active / --warning pending / --muted idle,
-       #fff ink). The id (OD-13: group + member — A1/A2/B1…, no `s` prefix) is the label, not a count. A badge
+       #fff ink). The id (group + member — A1/A2/B1…, no `s` prefix) is the label, not a count. A badge
        click is isolated from the parent card (stopPropagation), then runs subBadgeClick — focus the parent +
        open Details → Subagents (scrolled/highlighted) + scope the Team Feed to that subagent (resolved OQ-1).
        R-batch item 3: the strip is an IN-FLOW ACCORDION DRAWER (replaces the old +N popover). Collapsed shows only
@@ -338,7 +338,7 @@
     .ninb-row-t{ flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:9px; font-weight:600; color:var(--foreground);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-    /* ===================== OD-13: Details → "Subagents" audit accordion ===================== */
+    /* ===================== Details → "Subagents" audit accordion ===================== */
     /* A read-only history of the focused agent's subagents, grouped by run. Pinned below the Timeline,
        above the Retire/Delete footer. Clicking a graph-card subagent badge focuses the parent, opens
        this accordion, and scrolls/highlights the matching row (resolves OQ-1). Reuses the disclosure
@@ -446,11 +446,11 @@
     .trig-trig:hover{ box-shadow:var(--shadow-sm); }
     .trig-cv{ margin-left:auto; width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; }
     .trig-dd .split-menu{ top:calc(100% + var(--space-6)); bottom:auto; left:0; right:0; min-width:0; }
-    /* OD-06 (amended — one relationship per link): Shared-context disclosure — the content-type filter + backfill
+    /* One relationship per link (amended): Shared-context disclosure — the content-type filter + backfill
        nest under the Relationship single-select segment, set off with a navy left rule so it reads as a
        sub-section of "Shared context" (both stay scoped to SC links). */
     .link-shared{ margin-top:var(--space-7); padding-left:var(--space-9); border-left:var(--border-width) solid var(--border); }
-    /* OD-08 (amended, next-up item 17): link tracking list — collapsible Active / Expired sections over per-agent
+    /* Link tracking list (amended, next-up item 17) — collapsible Active / Expired sections over per-agent
        groups (the registry group-header + a card-styled row). Each row: a →/←/↔ arrow (same vocabulary as the pair
        row) · the OTHER agent's identity badge · its FULL relationship label (a link has exactly one). The section
        header carries the state — expired rows get NO gray-out (the Inbox typed-section precedent). */
@@ -661,7 +661,7 @@
     .agrow.on .ag-role{ color:var(--main-foreground); opacity:.7; }
     .ag-ck{ width:var(--size-14); height:var(--size-14); color:var(--main-foreground); opacity:0; flex:0 0 auto; }
     .agrow.on .ag-ck{ opacity:1; }
-    /* ===== OD-13: nested From/To FEED filter — agents (top) → subagents (indented, sender-side). Parent-select = whole
+    /* ===== nested From/To FEED filter — agents (top) → subagents (indented, sender-side). Parent-select = whole
        subtree, leaf-select = one subagent. Feed-filter ONLY: the Prompt compose-To stays flat (subagents are filter-only
        senders, never addressable targets). ===== */
     .agrow--parent .ag-exp{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:var(--size-16); height:var(--size-16); padding:0; color:var(--muted); cursor:pointer; border-radius:var(--radius-xs); }
@@ -677,11 +677,11 @@
     .agrow--sub .ag-name{ font-size:10px; }
     .sub-fbadge{ flex:0 0 auto; }
     .badge-sub .sbadge{ flex:0 0 auto; }
-    /* OD-13: subagent message cards nest indented under their parent in the Messages feed (always Received).
+    /* subagent message cards nest indented under their parent in the Messages feed (always Received).
        A left teal edge + indent marks them as a child of the agent above; the sub-id badge sits after the parent identity. */
     .msgcard--sub{ margin-left:var(--size-20); border-left-color:var(--secondary); }
     .msg-subbadge{ flex:0 0 auto; }
-    /* OD-22: recipient mini-badge — a deliberately-SMALLER identity badge (the recipient/subagent mini-badge exception)
+    /* recipient mini-badge — a deliberately-SMALLER identity badge (the recipient/subagent mini-badge exception)
        showing who a message is addressed-to (routing). Sender → "→" → recipient(s) → status → dir; multi collapses to +N. */
     .rcpt-to{ flex:0 0 auto; margin:0 var(--space-1); font-size:9px; font-weight:800; color:var(--muted-2); }
     .rcpt{ display:inline-flex; align-items:center; flex:0 0 auto; height:var(--size-18); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--secondary-background); overflow:hidden; }

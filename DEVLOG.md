@@ -418,6 +418,14 @@ Files: design/tokens.css, design/styles.css, design/behavior.js, design/mockup.h
 
 ---
 
+### 2026-07-02 02:28:00 — design/ OD-reference sweep (closes NEXT UP — DESIGN #20)
+
+Removed all 85 retired `OD-NN` tokens from the five design files, completing the repo-wide OD dissolution: DESIGN.md prose rewritten to plain decision names with `docs/ARCHITECTURE.md` § pointers at each first substantive mention; behavior.js / styles.css / mockup.html refs were all comments; gallery.html additionally had 12 `gx-blurb` rendered-text spots — strict token deletions only (text shortens, no layout risk; browser pass skipped by user call). Zero `OD-[0-9]` hits remain in `design/`; `node --check behavior.js` passes; diff verified 79−/79+ with every removed line containing an OD token. TODO #20 left in place for human review/removal.
+
+Files: design/DESIGN.md, design/mockup.html, design/gallery.html, design/behavior.js, design/styles.css, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

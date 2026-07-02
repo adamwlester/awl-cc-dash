@@ -51,11 +51,11 @@
   function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden');}
   function agSync(scope){const link=scope.querySelector('[data-allnone]');if(!link)return;const rows=[...scope.querySelectorAll('.agrow')];const allOn=rows.length>0&&rows.every(r=>r.classList.contains('on'));link.dataset.act=allOn?'none':'all';link.textContent=allOn?'None':'All';}  /* show only the useful action */
   function toggleAgRow(el){el.classList.toggle('on');
-    if(el.classList.contains('agrow--parent')){const subs=el.nextElementSibling;const on=el.classList.contains('on');   /* OD-13: parent select = the whole subtree (parent + its subagents) */
+    if(el.classList.contains('agrow--parent')){const subs=el.nextElementSibling;const on=el.classList.contains('on');   /* parent select = the whole subtree (parent + its subagents) */
       if(subs&&subs.classList.contains('agrow-subs'))subs.querySelectorAll('.agrow--sub').forEach(r=>r.classList.toggle('on',on));}
     const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);updateSubCounts(sc);if(sc.id==='hist-from'&&typeof applyHistFilters==='function')applyHistFilters();}}   /* multi-select (Target / Filter); item 7 recount + item 9 History-From filter */
-  function toggleAgSubs(e,btn){e.stopPropagation();const row=btn.closest('.agrow');if(!row)return;const subs=row.nextElementSibling;if(!subs||!subs.classList.contains('agrow-subs'))return;const open=subs.classList.toggle('open');row.classList.toggle('subs-open',open);}   /* OD-13: expand/collapse a parent's subagent sub-rows (does NOT change selection) */
-  function setFeedSubFilter(node,id){const fil=document.getElementById('feed-filter');if(!fil)return false;   /* OD-13: scope the Team Feed filter to one subagent (called by subBadgeClick) */
+  function toggleAgSubs(e,btn){e.stopPropagation();const row=btn.closest('.agrow');if(!row)return;const subs=row.nextElementSibling;if(!subs||!subs.classList.contains('agrow-subs'))return;const open=subs.classList.toggle('open');row.classList.toggle('subs-open',open);}   /* expand/collapse a parent's subagent sub-rows (does NOT change selection) */
+  function setFeedSubFilter(node,id){const fil=document.getElementById('feed-filter');if(!fil)return false;   /* scope the Team Feed filter to one subagent (called by subBadgeClick) */
     const key=node?agKeyFromNode(node):'';   /* Next-up item 6: sub ids repeat across parents (every run starts at A1), so scope the lookup to the clicked card's agent (rows carry data-par from the shared roster) */
     const sub=[...fil.querySelectorAll('.agrow--sub')].find(r=>r.dataset.sub===id&&(!key||!r.dataset.par||r.dataset.par===key));if(!sub)return false;
     fil.querySelectorAll('.agrow.on').forEach(r=>r.classList.remove('on'));sub.classList.add('on');
@@ -73,11 +73,11 @@
   function closeSrcAccordions(){document.querySelectorAll('.src-dd.dd--acc.open').forEach(dd=>{dd.classList.remove('open');const p=dd.querySelector('.src-pop');if(p)p.classList.remove('open');});}
   function updateAgBadges(scope){const wrap=scope.querySelector('[data-badges]');if(!wrap)return;
     const on=[...scope.querySelectorAll('.aglist .agrow.on')].filter(r=>{
-      if(r.classList.contains('agrow--sub')){const subs=r.closest('.agrow-subs');const par=subs&&subs.previousElementSibling;if(par&&par.classList.contains('on'))return false;}   /* OD-13: a fully-selected parent's badge stands in for its subagents */
+      if(r.classList.contains('agrow--sub')){const subs=r.closest('.agrow-subs');const par=subs&&subs.previousElementSibling;if(par&&par.classList.contains('on'))return false;}   /* a fully-selected parent's badge stands in for its subagents */
       return true;});
     const cap=scope.dataset.badgeCap?parseInt(scope.dataset.badgeCap,10):3;
     let html=on.slice(0,cap).map(r=>{
-      if(r.classList.contains('agrow--sub')){const id=r.dataset.sub||'';const st=[...r.classList].find(c=>c.indexOf('sb-')===0)||'sb-idle';   /* OD-13: subagent leaf → compact badge, parent identity in the name */
+      if(r.classList.contains('agrow--sub')){const id=r.dataset.sub||'';const st=[...r.classList].find(c=>c.indexOf('sb-')===0)||'sb-idle';   /* subagent leaf → compact badge, parent identity in the name */
         const subs=r.closest('.agrow-subs');const par=subs&&subs.previousElementSibling;const pn=par?((par.querySelector('.ag-name')||{}).textContent||''):'';
         return '<span data-comp="identity-badge" class="badge badge-c badge-sub"><span class="sbadge '+st+' sub-fbadge">'+id+'</span><span class="b-lab"><span class="b-role">subagent</span><span class="b-name">'+pn+' › '+id+'</span></span></span>';}
       const tileEl=r.querySelector('.agtile');if(!tileEl)return '';const tile=tileEl.outerHTML;const role=(r.querySelector('.ag-role')||{}).textContent||'';const name=(r.querySelector('.ag-name')||{}).textContent||'';
@@ -282,7 +282,7 @@
   function subsTrig(e,el){const acc=el.closest('.subs-acc');if(!acc||!acc.classList.contains('has-more'))return;   /* one row → no drawer; let the click bubble up to select the node */
     e.stopPropagation();const open=acc.classList.toggle('open');const n=acc.closest('.node');if(n)n.classList.toggle('subs-open',open);LU();}
 
-  /* ===== OD-13: subagent model — group+member badges (A2), Details audit accordion, badge-click (resolves OQ-1) ===== */
+  /* ===== subagent model — group+member badges (A2), Details audit accordion, badge-click (resolves OQ-1) ===== */
   /* Details → "Subagents" audit accordion: a sticky disclosure (like the node drawer, NOT a popup → not closed by closeAllPopups). */
   function toggleSubsAudit(btn){const acc=btn.closest('.subs-audit');if(!acc)return;const open=acc.classList.toggle('open');btn.setAttribute('aria-expanded',open?'true':'false');if(typeof refreshJumpPills==='function')setTimeout(refreshJumpPills,30);}
   /* Open the audit accordion on Details and scroll + highlight the row for `subId` (e.g. "A2"). */
@@ -1068,7 +1068,7 @@
   function bumpLinks(d){const el=document.getElementById('foot-links');if(el){el.textContent=Math.max(0,(parseInt(el.textContent,10)||0)+d);}}
   function linkSave(){const dir=((document.getElementById('link-dir')||{}).title||'A ↔ B (both)');   /* Next-up item 3: the fallback mirrors the cycler's new A↔B default */
     const trig=(((document.querySelector('#link-drawer .trig-dd .split-mi.sel b')||{}).textContent)||'Queue').trim();   /* Next-up item 17: Trigger is a dropdown now (.split-mi menu items), not a seg */
-    const rel=((document.querySelector('#link-drawer .seg button[data-rel].active')||{}).textContent||'Direct messaging').trim();   /* OD-06 (amended): ONE relationship per link — read the single-select segment */
+    const rel=((document.querySelector('#link-drawer .seg button[data-rel].active')||{}).textContent||'Direct messaging').trim();   /* ONE relationship per link — read the single-select segment */
     toast('Link saved — '+dir+' · '+trig+' · '+rel);toggleDrawer();bumpLinks(1);}
   function linkDelete(){toast('Link removed');toggleDrawer();bumpLinks(-1);}
 
@@ -1104,7 +1104,7 @@
       {group:'Core tools',items:['Bash','Read','Write','Edit','Glob','Grep','WebSearch','WebFetch']},
       {group:'More native tools',items:['Agent','AskUserQuestion','NotebookEdit','TodoWrite','ExitPlanMode','Skill','SendMessage','LSP','EnterWorktree','ExitWorktree','BashOutput','KillShell','SlashCommand','PowerShell']},
     ],
-    /* OD-18: per-agent scoping — which MCP servers / plugins this agent may use, and the deny rules that hard-block it.
+    /* per-agent scoping — which MCP servers / plugins this agent may use, and the deny rules that hard-block it.
        MCP / plugins take effect at the agent's next launch/restart; deny is the reliable hard-block (allow-lists are ignored under bypass — a claude bug). */
     mcp:[
       {group:'Configured MCP servers — none = all available',items:['playwright','github','supabase','firecrawl','exa','notion','docker','brave-search','rentcast','attom-api']},
@@ -1126,7 +1126,7 @@
   function mselPick(e,btn){e.stopPropagation();const el=btn.closest('.msel');const sel=mselState(el);const it=btn.dataset.it;if(sel.has(it))sel.delete(it);else sel.add(it);buildMsel(el);el.querySelector('.msel-pop').classList.add('open');}
   function mselRemove(e,btn){e.stopPropagation();const el=btn.closest('.msel');mselState(el).delete(btn.dataset.it);buildMsel(el);}
 
-  /* ===== OD-06 (amended, next-up item 17): Link Config — Relationship single-select + Shared-context disclosure =====
+  /* ===== Link Config (amended, next-up item 17) — Relationship single-select + Shared-context disclosure =====
      ONE relationship per link (wanting both = two links — supersedes the old "a link can be both" multi-toggle), so
      Relationship is a single-select segment (data-rel buttons in a .seg). Picking one re-defaults the Trigger
      dropdown to that relationship's natural delivery — Direct messaging → Queue · Shared context → Piggyback —
@@ -1154,7 +1154,7 @@
   /* the backfill is the shared switch primitive (.swh) — a plain config toggle (no registry-enable toast) */
   function linkSwitch(el){el.classList.toggle('on');el.title=el.classList.contains('on')?'On — backfill all prior context once':'Off — incremental updates only';}
 
-  /* ===== OD-08 (amended, next-up item 17): Link tracking list — collapsible Active / Expired sections =====
+  /* ===== Link tracking list (amended, next-up item 17) — collapsible Active / Expired sections =====
      The list splits into Active Links / Expired Links accordion sections (the SECTION carries the state — expired
      rows get NO gray-out, per the Inbox typed-section precedent, and stay legible for the future master/detail
      "load + re-arm" extension). Within each section links group by agent: each link joins two agents, so it is
@@ -1369,7 +1369,7 @@
   function subRowHTML(par,s,on){return '<button class="agrow agrow--sub'+(on?' on':'')+'" onclick="toggleAgRow(this)" data-sub="'+s.id+'" data-par="'+par+'"><span class="sbadge '+s.st+' sub-fbadge">'+s.id+'</span><span class="ag-lab"><span class="ag-role">'+s.type+'</span><span class="ag-name">'+(SUB_LAB[s.st]||'')+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
   function agrowTreeHTML(k,on,expand){const a=AG[k];const subs=agSubs(k);
     if(!subs.length)return agrowHTML(k,on);
-    const n=subs.length,selN=on?n:0;   /* initial state: parent on = whole subtree on (OD-13) */
+    const n=subs.length,selN=on?n:0;   /* initial state: parent on = whole subtree on */
     return '<button class="agrow agrow--parent'+(on?' on':'')+(expand?' subs-open':'')+'" onclick="toggleAgRow(this)" data-ag="'+k+'">'
       +agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span>'
       +'<span class="ag-subcount" title="'+selN+' of '+n+' subagent'+(n===1?'':'s')+' selected">'+selN+'/'+n+'</span>'
@@ -1636,7 +1636,7 @@ resize intact.`,
 
   /* FEED + HISTORY — expandable cards (Plan-style) with two-line agent badges; checkbox = multi-select */
   function dirTag(d){return d==='out'?'<span data-comp="dir-tag" class="dir-tag dir-out">sent</span>':'<span data-comp="dir-tag" class="dir-tag dir-in">recv</span>';}
-  /* OD-22: recipient mini-badge — every message carries a typed recipients[] (user | <agent-id> | scratch, default
+  /* recipient mini-badge — every message carries a typed recipients[] (user | <agent-id> | scratch, default
      [user]). It's ADDRESSED-TO / routing (drives the From/To filter + Sent/Received direction), NOT visibility —
      every message still shows regardless. Rendered as a deliberately-SMALLER identity badge (the recipient-badge
      exception) after the sender: sender → "→" → recipient(s) → status → dir. Reuses agent identity (tile + short
@@ -1681,8 +1681,8 @@ resize intact.`,
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
     +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
-    +(o.sub?'<span data-comp="subagent-badge" class="sbadge '+(o.substate||'sb-active')+' msg-subbadge" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — nested under '+a.role+' '+a.name+'">'+o.sub+'</span>':'')   /* OD-13: subagent events nest under their parent — the sub-id badge after the parent identity */
-    +recipientsHTML(o)   /* OD-22: → recipient mini-badge(s) — who it's addressed to (routing) */
+    +(o.sub?'<span data-comp="subagent-badge" class="sbadge '+(o.substate||'sb-active')+' msg-subbadge" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — nested under '+a.role+' '+a.name+'">'+o.sub+'</span>':'')   /* subagent events nest under their parent — the sub-id badge after the parent identity */
+    +recipientsHTML(o)   /* → recipient mini-badge(s) — who it's addressed to (routing) */
     +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed) */
     +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → recipient → status → dir */
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
@@ -1791,7 +1791,7 @@ resize intact.`,
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
-    {ag:'user',dir:'out',recipients:['sandy','drew'],turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},   /* OD-22: a user send carries its To/Target selection as recipients[] (multi) — drives the → recipient mini-badges; the rest default to [user] */
+    {ag:'user',dir:'out',recipients:['sandy','drew'],turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},   /* a user send carries its To/Target selection as recipients[] (multi) — drives the → recipient mini-badges; the rest default to [user] */
     {ag:'drew',dir:'in',status:'complete',turn:11,time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
@@ -1801,7 +1801,7 @@ resize intact.`,
        {k:'diff',t:'  function validateToken(token) {\n-   return decode(token)\n+   const c = decode(token)\n+   if (c.exp < now()) throw new TokenExpired()\n+   return c\n  }'}]},
     {ag:'kai',dir:'in',status:'complete',turn:14,time:'14:45',body:`Synthesizing findings into a remediation plan: critical → high → medium, each with an owner and a checklist. Writing it to the shared scratchpad now.`,
      blocks:[
-       {k:'write',t:'● Write  <project>/.awl/scratchpad.md (+18 −0)'}]},   /* OD-17/OD-23: scratchpad lives with the project (.awl/) */
+       {k:'write',t:'● Write  <project>/.awl/scratchpad.md (+18 −0)'}]},   /* scratchpad lives with the project (.awl/) */
     {ag:'sandy',dir:'in',status:'complete',turn:15,time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
@@ -1810,7 +1810,7 @@ resize intact.`,
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
        {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
-    /* OD-13: subagent events stream nested/indented UNDER their parent (here, coder-01-max). Always Received (helpers never receive operator sends); sub = the group+member id, subtype = the agent type. */
+    /* subagent events stream nested/indented UNDER their parent (here, coder-01-max). Always Received (helpers never receive operator sends); sub = the group+member id, subtype = the agent type. */
     {ag:'max',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:17,time:'14:47',body:`Mapped 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check — that's the bypass max is patching.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/session.ts · tokens.ts · middleware/jwt.ts'},
@@ -1924,7 +1924,7 @@ resize intact.`,
   /* ===== Inbox (approvals you owe) — data-driven (REQS), expandable + selectable like Log =====
      v10p1 #15: each card collapses to identity + type badge + title; expand reveals the detail + actions.
      The checkbox multi-selects (shared Copy/Share strip). data-agent lets a Pending badge jump-expand it.
-     #11: Reject + Deny use the danger color; Approve stays pink-primary. OD-14: Permission is binary Approve/Deny (+Reply) — "Always allow" fully removed. */
+     #11: Reject + Deny use the danger color; Approve stays pink-primary. Permission is binary Approve/Deny (+Reply) — "Always allow" fully removed. */
   /* P2: Inbox grouped into typed SECTIONS — Error · Warning · Permission · Plan · Decision · Response. The
      section header carries the type label, so cards drop the per-card type badge (this supersedes the old
      reddish→copper attention ramp). Approval → Plan. Decision is the AskUserQuestion surface — one question
@@ -1954,21 +1954,21 @@ resize intact.`,
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
       {nm:'B · One-time rotation',desc:'Each refresh invalidates the prior token; strongest, more churn.'}]},
     {ag:'drew',type:'error',subtype:'Connection',time:'14:48',title:'Staging smoke test unreachable',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED 10.0.3.12:8443 · exit 1). Re-run once staging is back up.`,cmd:'pnpm test:smoke --env staging'},   /* wired from the Messages status:'error' drew/ECONNREFUSED card → the agent-card→Inbox path */
-    {ag:'rowan',type:'warning',subtype:'Max turns',time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — a notify-only heads-up (it never auto-kills). Dismiss to clear it from the Inbox, or Reply to weigh in.`},   /* OD-10 (simplified): a Warning is a plain FYI — Dismiss (pink, the completion action) + Reply only; the old cap-specific Continue/Raise cap/Stop set is gone (no per-warning dependency). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge). */
-    {ag:'max',type:'warning',subtype:'Context 82%',time:'14:52',title:'Nearing the context limit — compaction imminent',body:`max is at ~82% of its context window; an auto-compaction will trigger soon. No hard block — a heads-up while the run keeps going. Dismiss to clear it, or Reply to weigh in.`},   /* OD-10 + inbox-footer demo: a NON-blocking warning on an ACTIVE agent (max's graph card stays Active) — the case the per-card inbox footer exists for: an open item that doesn't flip the binary status badge. Its footer envelope shows a count while the badge reads active. */
+    {ag:'rowan',type:'warning',subtype:'Max turns',time:'14:46',title:'Max turns reached — run paused at the limit',body:`rowan hit its Max-turns auto-stop limit (50 / 50 turns) and paused mid-task — a notify-only heads-up (it never auto-kills). Dismiss to clear it from the Inbox, or Reply to weigh in.`},   /* Warning simplification: a Warning is a plain FYI — Dismiss (pink, the completion action) + Reply only; the old cap-specific Continue/Raise cap/Stop set is gone (no per-warning dependency). subtype 'Max turns' drives the --warning header badge. Warning = attention-needed, not a hard block: a --warning heading + badge, no danger card edge (Error keeps the single alarm edge). */
+    {ag:'max',type:'warning',subtype:'Context 82%',time:'14:52',title:'Nearing the context limit — compaction imminent',body:`max is at ~82% of its context window; an auto-compaction will trigger soon. No hard block — a heads-up while the run keeps going. Dismiss to clear it, or Reply to weigh in.`},   /* warning-model + inbox-footer demo: a NON-blocking warning on an ACTIVE agent (max's graph card stays Active) — the case the per-card inbox footer exists for: an open item that doesn't flip the binary status badge. Its footer envelope shows a count while the badge reads active. */
     {ag:'system',type:'error',subtype:'Infrastructure',time:'14:50',title:'tmux bridge unreachable — agent control suspended',body:`The sidecar lost the tmux/WSL2 bridge (connect timeout after 3 retries) — run control, sends, and reads are suspended fleet-wide until the bridge is back. One System card stands in for 13 identical per-agent errors.`,cmd:'wsl.exe -d Ubuntu -- tmux ls'},   /* Next-up item 15: a SYSTEM-WIDE failure fronts the reserved System identity (infrastructure / account-level / shared services). Reply renders DISABLED — greyed, not removed (the Export-menu convention): System is never addressable. No graph card exists, so there's no node-inbox envelope mirror. */
     {ag:'kai',type:'response',time:'14:49',runs:2,title:'Run ended — final reply not yet reviewed',body:`kai's last 2 runs ended with replies you haven't reviewed — latest: the remediation-plan synthesis (Turn 14). View jumps to the run's final reply in Messages, scoped to kai; Reply quotes it in the Editor. Either completes this item; it also clears on Retire/Delete — never on a glance.`}   /* Next-up item 14: the Response demo — kai's graph card stays plain IDLE (no fifth badge state) while his node-inbox envelope counts this like a Warning. runs:2 = two unseen runs COALESCED into the one card (the ×2 runs marker), never stacked. */
   ];
   function inboxReplyHTML(dis){return '<button class="btn-secondary btn-sm ml-auto"'+(dis?' disabled':'')+' onclick="inboxReply(this)" title="'+(dis?'Reply is unavailable — System isn\'t addressable':'Reply via the Editor (quotes the request as a reference block)')+'"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. Item 15: dis=true on a System Error card — DISABLED, greyed not removed (the Export-menu convention). */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* OD-14: binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
+      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
     else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plan: Review (→ Plans) + Reply only — no Approve/Reject */
       acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
     else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
-      /* OD-10 (simplified per user): a Warning is a plain FYI — the cap-specific actions (Continue / Raise cap / Stop)
+      /* Warning simplified per user: a Warning is a plain FYI — the cap-specific actions (Continue / Raise cap / Stop)
          and the generic Acknowledge are ALL gone, so a Warning carries no warning-specific dependency. Just two actions:
            · Dismiss — the completion action (clears the warning; a warning never auto-clears, only manual Dismiss).
              Styled PINK (btn-main) as this card's sole primary "commit here" (like the old Continue), NOT danger —
