@@ -8,6 +8,7 @@ exact WSL/tmux commands the bridge ran, raw screen captures, and full tracebacks
 
 import datetime
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -25,15 +26,163 @@ os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 from bridge import TmuxBridge  # noqa: E402
 
 LOG_DIR = Path(__file__).parent / "log"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Retention: keep only the newest N bulky DEBUG logs (tmux_bridge_*.log). The
+# small durable results_*.{xml,txt} artifacts are NOT pruned — they are the
+# verification record. All of tests/log/ is gitignored, so this is local-disk
+# housekeeping only.
+DEBUG_LOG_KEEP = 20
+
+# The two live/integration files. Used to decide whether to capture WSL/CLI env
+# info in the results summary (only meaningful when the live tier actually ran).
+LIVE_TEST_FILES = ("test_tmux_bridge.py", "test_bridge_finisher_live.py")
 
 
 def pytest_configure(config):
-    """Route pytest's file logging to a fresh timestamped file per run."""
+    """Per run: route the DEBUG file log + a durable JUnit XML results file into
+    tests/log/, stash run metadata for the summary, and prune old DEBUG logs."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    # Only set if the user didn't pass --log-file explicitly.
+    config._awl_stamp = stamp
+    config._awl_start = time.time()
+
+    # Verbose DEBUG file log (bridge commands, raw screens) — existing behavior.
     if not getattr(config.option, "log_file", None):
         config.option.log_file = str(LOG_DIR / f"tmux_bridge_{stamp}.log")
+
+    # Durable machine-readable results (pass/fail/skip + timing). Set the junitxml
+    # plugin's option before it configures; the human-readable companion is
+    # written in pytest_terminal_summary. A user-supplied --junitxml wins.
+    if not getattr(config.option, "xmlpath", None):
+        config.option.xmlpath = str(LOG_DIR / f"results_{stamp}.xml")
+
+    _prune_debug_logs(DEBUG_LOG_KEEP)
+
+
+def _prune_debug_logs(keep):
+    """Delete all but the newest `keep` tmux_bridge_*.log files. Best-effort."""
+    try:
+        logs = sorted(LOG_DIR.glob("tmux_bridge_*.log"))
+        stale = logs[:-keep] if keep > 0 else logs
+        for old in stale:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
+def _git_sha():
+    """Short HEAD sha (+ '-dirty' if the tree has uncommitted changes)."""
+    try:
+        rev = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=5,
+        ).stdout.strip() or "unknown"
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        return rev + ("-dirty" if dirty else "")
+    except Exception:
+        return "unknown"
+
+
+def _claude_cli_version():
+    """Best-effort Claude Code CLI version inside WSL (live runs only)."""
+    try:
+        r = subprocess.run(
+            ["wsl", "-d", "Ubuntu", "--", "bash", "-lc", "claude --version"],
+            capture_output=True, text=True, timeout=20,
+        )
+        return (r.stdout.strip() or r.stderr.strip() or "unknown").splitlines()[0][:120]
+    except Exception:
+        return "unknown"
+
+
+def _live_ran(terminalreporter):
+    for key in ("passed", "failed", "error", "skipped"):
+        for rep in terminalreporter.stats.get(key, []):
+            nodeid = getattr(rep, "nodeid", "")
+            if any(f in nodeid for f in LIVE_TEST_FILES):
+                return True
+    return False
+
+
+def _one_line_reason(rep):
+    try:
+        lr = getattr(rep, "longrepr", None)
+        if lr is None:
+            return "(no detail)"
+        crash = getattr(getattr(lr, "reprcrash", None), "message", None)
+        return (crash or str(lr)).strip().splitlines()[0][:200]
+    except Exception:
+        return "(unparseable)"
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Write a durable, human-readable results record next to the JUnit XML:
+    outcome + counts + the commit / selection / env it was verified against."""
+    try:
+        if getattr(config.option, "collectonly", False):
+            return
+        stamp = getattr(config, "_awl_stamp", None)
+        if not stamp:
+            return
+        tr = terminalreporter
+        stats = tr.stats
+
+        def c(k):
+            return len(stats.get(k, []))
+
+        passed, failed, errors = c("passed"), c("failed"), c("error")
+        skipped, deselected = c("skipped"), c("deselected")
+        xfailed, xpassed = c("xfailed"), c("xpassed")
+        if passed + failed + errors + skipped == 0:
+            return  # nothing actually ran
+
+        start = getattr(config, "_awl_start", None)
+        duration = f"{time.time() - start:.1f}s" if start else "unknown"
+        markexpr = getattr(config.option, "markexpr", "") or "(none)"
+        keyword = getattr(config.option, "keyword", "") or "(none)"
+        live = _live_ran(tr)
+        result = "PASS" if (failed == 0 and errors == 0) else "FAIL"
+        xml_name = Path(getattr(config.option, "xmlpath", "") or "").name or "(none)"
+
+        lines = [
+            f"AWL test results — {stamp}",
+            f"Result:     {result}  (pytest exit {exitstatus})",
+            f"Commit:     {_git_sha()}",
+            f"Tier:       {'live (WSL2/tmux)' if live else 'hermetic'}",
+            f"Selection:  -m {markexpr!r}  -k {keyword!r}",
+            f"Counts:     passed={passed} failed={failed} errors={errors} "
+            f"skipped={skipped} xfailed={xfailed} xpassed={xpassed} deselected={deselected}",
+            f"Duration:   {duration}",
+            f"Python:     {platform.python_version()}",
+        ]
+        if live:
+            lines.append("WSL distro: Ubuntu")
+            lines.append(f"Claude CLI: {_claude_cli_version()}")
+        lines.append(f"JUnit XML:  {xml_name}")
+
+        fails = stats.get("failed", []) + stats.get("error", [])
+        if fails:
+            lines.append("")
+            lines.append("Failures:")
+            for rep in fails:
+                lines.append(f"  - {getattr(rep, 'nodeid', '?')}: {_one_line_reason(rep)}")
+
+        text = "\n".join(lines) + "\n"
+        (LOG_DIR / f"results_{stamp}.txt").write_text(text, encoding="utf-8")
+        try:
+            (LOG_DIR / "results_latest.txt").write_text(text, encoding="utf-8")
+        except Exception:
+            pass
+        tr.write_line(f"[awl] durable results -> {LOG_DIR / f'results_{stamp}.txt'}")
+    except Exception:
+        pass
 
 
 def _kill_all_tmux():

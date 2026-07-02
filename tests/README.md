@@ -71,7 +71,7 @@ it encodes — read that docstring first; it is the spec.
 |------|---------|
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) + per-run timestamped DEBUG log setup. Adds the repo root to `sys.path`. |
 | `run.ps1` | Convenience runner — resolves the local `.venv` and passes all args through to pytest. |
-| `log/` | Timestamped DEBUG logs, one file per run. Gitignored. |
+| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). |
 
 ---
 
@@ -137,11 +137,26 @@ No `testpaths` is configured — pass the path you want.
 
 ---
 
-## Where to look when something fails
+## Results records & where to look when something fails
 
-Console output is intentionally concise. The full story — exact WSL/tmux commands,
-raw screen captures, detected states, payloads, and tracebacks — is in the newest
-file under `tests/log/` (one timestamped file per run, wired up in `conftest.py`).
+Every run writes durable artifacts into `tests/log/` (all gitignored), so "did it
+pass?" is answered by a **file**, not by scrollback or an agent's paste:
+
+- **`results_<stamp>.txt`** (+ **`results_latest.txt`**) — human-readable record:
+  PASS/FAIL, counts (incl. skipped/deselected), duration, **the git commit it was
+  verified against**, the tier (hermetic vs live), the selection (`-m`/`-k`), Python
+  version, and — for live runs — the WSL distro + Claude Code CLI version. Any
+  failures are listed with a one-line reason.
+- **`results_<stamp>.xml`** — JUnit XML, the machine-readable equivalent (per-test
+  pass/fail/skip + timing) for tooling.
+- **`tmux_bridge_<stamp>.log`** — the verbose DEBUG story for *diagnosing* a failure:
+  exact WSL/tmux commands, raw screen captures, detected states, tracebacks. Bulky,
+  so only the newest 20 are kept; the small results records are never pruned.
+
+The results record's `Commit:` field carries `-dirty` when the tree had uncommitted
+changes at run time — a sha alone doesn't fully capture what was tested. The durable,
+**committed** "what's verified" ledger lives in `DEVLOG.md` and the `ARCHITECTURE.md
+§10` evidence citations; these per-run files are the raw evidence that feeds it.
 
 ---
 
