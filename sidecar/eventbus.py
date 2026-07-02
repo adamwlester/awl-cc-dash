@@ -1,4 +1,4 @@
-"""Cross-agent event bus (OD-01) + message addressing (OD-22).
+"""Cross-agent event bus + message addressing.
 
 The sidecar owns ONE aggregated, identity-stamped event stream the whole
 dashboard subscribes to — replacing the per-session `/history` poll. This module
@@ -7,7 +7,7 @@ into a **bounded global ring** that the merged `/events` endpoint replays + stre
 
 **Envelope** (stamped in :func:`stamp`):
   ``{id, agent_id, seq, type, ts, source, recipients, ...payload}``
-  * ``agent_id`` — the sender (the OD-01 identity stamp = the session id).
+  * ``agent_id`` — the sender (the identity stamp = the session id).
   * ``seq`` — a **separate monotonic** ordering key the sidecar assigns at emit.
     *Never parse the id for order* — order by ``seq``.
   * ``id`` — a **deterministic** composite ``{agent_id}:{source_kind}:{anchor}``.
@@ -15,7 +15,7 @@ into a **bounded global ring** that the merged `/events` endpoint replays + stre
     + ``source_kind='t'``, so re-polling the same entry dedups to a no-op and a
     reconnect replays without duplicates. Synthesized events (no anchor) get a
     unique ``{agent_id}:s:seq{n}`` id and never dedup.
-  * ``source`` + ``recipients[]`` (OD-22) — who it's from + a typed list of
+  * ``source`` + ``recipients[]`` — who it's from + a typed list of
     addressees (``user | <agent-id> | scratch``), default ``source=agent_id`` /
     ``recipients=['user']``. **Addressed-to drives routing + the From/To filter +
     Sent/Received direction — NOT visibility** (every event still shows in the feed).
@@ -64,7 +64,7 @@ def stamp(
     source: str | None = None,
     recipients: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """Stamp the OD-01/OD-22 envelope onto ``event`` in place.
+    """Stamp the identity/addressing envelope onto ``event`` in place.
 
     Returns the stamped event, or ``None`` when it duplicates an already-emitted
     **anchored** event (the re-poll/reconnect dedup → no-op). Synthesized events

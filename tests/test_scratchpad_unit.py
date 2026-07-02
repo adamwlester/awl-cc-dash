@@ -1,4 +1,4 @@
-"""Hermetic tests for the OD-17 shared scratchpad log + auto-read delta
+"""Hermetic tests for the shared scratchpad log + auto-read delta
 (`sidecar/scratchpad.py`). Pure/in-memory + optional md persistence on tmp_path.
 """
 import sys

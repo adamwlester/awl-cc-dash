@@ -356,7 +356,7 @@ def derive_subagents(entries: list[dict]) -> dict:
 def _entry_to_event(entry: dict) -> dict | None:
     """Convert a transcript JSONL entry into a frontend event, or None to skip.
 
-    OD-01: each transcript event carries ``anchor`` = the JSONL entry's own
+    Each transcript event carries ``anchor`` = the JSONL entry's own
     ``uuid`` and ``source_kind='t'`` so the sidecar can mint a *deterministic*
     event id (``{agent_id}:t:{uuid}``). Re-polling the same entry then dedups to
     a no-op and a reconnect replays without duplicates. A missing uuid leaves
@@ -450,7 +450,7 @@ class BridgeDriver(AgentDriver):
         return self._name
 
     def _build_hook_settings(self) -> dict | None:
-        """OD-02 hook channel — the per-agent PostToolUse + Stop HTTP hooks.
+        """Hook channel — the per-agent PostToolUse + Stop HTTP hooks.
 
         Points each agent at the sidecar's inbox-drain endpoints (keyed by THIS
         agent's sidecar session id) over the WSL-reachable host gateway URL — the
@@ -470,7 +470,7 @@ class BridgeDriver(AgentDriver):
             return None
         agent = self._session_id
         # agent id rides the PATH (claude's http-hook client doesn't reliably
-        # forward a query string — verified in the OD-02 spike).
+        # forward a query string — verified in the hook-channel spike).
         return {
             "hooks": {
                 "PostToolUse": [{"matcher": "", "hooks": [{
@@ -483,7 +483,7 @@ class BridgeDriver(AgentDriver):
                     "url": f"{base}/internal/hooks/stop/{agent}",
                     "timeout": 5,
                 }]}],
-                # OD-09: surface the agent's own Plan (ExitPlanMode) and Decision
+                # Inbox detection: surface the agent's own Plan (ExitPlanMode) and Decision
                 # (AskUserQuestion) tool calls as typed Inbox cards — these are
                 # screen-blind but hook-visible. Returns allow (detect-and-surface).
                 "PreToolUse": [
@@ -507,7 +507,7 @@ class BridgeDriver(AgentDriver):
         ``permission_rules`` {allow,deny,ask} -> ``permissions`` (deny is the
         reliable hard-block in all modes); ``enabled_plugins`` {"id": bool} ->
         ``enabledPlugins`` (per-agent plugin enable/disable — live-verified); plus
-        the OD-02 ``hooks`` block (the inject channel). Returns None when nothing
+        the hook-channel ``hooks`` block (the inject channel). Returns None when nothing
         is set (no --settings file is written).
         """
         settings: dict[str, Any] = {}

@@ -1,4 +1,4 @@
-"""Hermetic tests for the OD-16 utility-LLM pass helpers (`sidecar/utility_llm.py`).
+"""Hermetic tests for the utility-LLM pass helpers (`sidecar/utility_llm.py`).
 Pure parts only — the actual one-shot SDK call is exercised live (needs auth)."""
 import sys
 from pathlib import Path

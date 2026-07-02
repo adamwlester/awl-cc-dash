@@ -6,8 +6,8 @@ consumer keeps its own pointer and receives only NEW items past it, which then
 advances.
 
 Used by:
-- OD-17 (scratchpad delta) — keys like ``f"scratch:{agent}"``
-- OD-06 (shared-context delta) — keys like ``f"shared:{source}:{target}"``
+- the scratchpad delta — keys like ``f"scratch:{agent}"``
+- the link shared-context delta — keys like ``f"shared:{source}:{target}"``
 
 Sequence numbers are assumed to start at 1, so a never-advanced key has a
 watermark of 0. Sequences are typically strictly monotonic increasing, but

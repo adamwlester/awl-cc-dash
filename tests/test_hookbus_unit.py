@@ -1,7 +1,7 @@
-"""Hermetic unit tests for the OD-02 hook channel inbox (`sidecar/hookbus.py`).
+"""Hermetic unit tests for the hook channel inbox (`sidecar/hookbus.py`).
 
 Pure-logic: the durable per-agent inject inbox + the exact hook-output JSON the
-installed build consumes (proved out live by the OD-02 spike). No live env.
+installed build consumes (proved out live by the hook-channel spike). No live env.
 """
 import sys
 from pathlib import Path

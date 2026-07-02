@@ -1,4 +1,4 @@
-"""Safe, path-explicit read/write primitives for Claude Code settings JSON (OD-18).
+"""Safe, path-explicit read/write primitives for Claude Code settings JSON.
 
 The Settings surface (Config / MCP / Plugins tabs) becomes interactive: this
 module is the low-level file layer under it. It reads and writes the real Claude

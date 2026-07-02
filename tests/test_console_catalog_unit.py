@@ -1,4 +1,4 @@
-"""Hermetic unit tests for the Console slash-command runner catalog (OD-20).
+"""Hermetic unit tests for the Console slash-command runner catalog.
 
 Pure logic: no server, no tmux/WSL2, no bridge, no driver. Exercises the
 ``console_catalog`` module's catalog data and classification helpers directly.
@@ -22,7 +22,7 @@ if str(SIDECAR) not in sys.path:
 import console_catalog as cc  # noqa: E402
 
 
-# The six clusters, in the authoritative display order (OD-20 Decision).
+# The six clusters, in the authoritative decided display order.
 EXPECTED_CLUSTERS = [
     "Session & context",
     "Model & behavior",

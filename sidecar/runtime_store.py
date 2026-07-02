@@ -24,7 +24,7 @@ logger = logging.getLogger("awl-sidecar.runtime")
 
 
 def runtime_dir() -> Path:
-    """The dashboard runtime store directory (the 🏠 Dashboard home, OD-23).
+    """The dashboard runtime store directory (the 🏠 Dashboard home in the storage & scoping model).
 
     ``sidecar/runtime/`` by default, overridable via ``AWL_SIDECAR_RUNTIME``.
     This is the single source of truth for the dashboard-owned store location —

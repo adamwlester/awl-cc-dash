@@ -188,7 +188,7 @@ export function EventRenderer({ event }: { event: SDKEvent }) {
 
   if (sdk === 'RateLimitEvent' || t === 'rate_limit') return <RateLimitBanner />
 
-  // ---- merged-bus system events (OD-01/02/04/09/17) ----
+  // ---- merged-bus system events (stream / queue / link / inbox / scratch) ----
   const preview = (s: any, n = 90) => { const str = String(s ?? ''); return str.length > n ? str.slice(0, n - 1) + '…' : str }
   if (t === 'link_fire') return <SystemLine accent={C.teal} icon="🔗" label="Linked reply" detail={preview(event.text)} />
   if (t === 'inject' || t === 'inject_delivered') return <SystemLine accent={C.secondary} icon="⇢" label={event.kind === 'context' ? 'Context inject' : 'Inject'} detail={preview(event.text)} />

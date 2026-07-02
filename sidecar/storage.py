@@ -1,4 +1,4 @@
-"""Storage & scoping homes (OD-23) — the one canonical model for *where data lives*.
+"""Storage & scoping homes — the one canonical model for *where data lives*.
 
 One rule: **dashboard data lives with the dashboard; project data lives with the
 project; teams (Setups) are reusable and live with the dashboard.** Three homes,
@@ -12,8 +12,8 @@ is free to change with no rearchitecting:
 
   📁 **Project** — ``<project>/.awl/`` where ``<project>`` = the agent's ``cwd``:
       dashboard-owned *project* data that must travel with the repo and be
-      WSL-reachable so the agents can read it — the team **scratchpad** (OD-17)
-      and the **plan-review side-store** (OD-15). Nothing project-specific leaks
+      WSL-reachable so the agents can read it — the team **scratchpad**
+      and the **plan-review side-store**. Nothing project-specific leaks
       up into the dashboard store.
 
   👥 **Setup** — a reusable team (roster only: agents, roles/models/identities,
@@ -66,12 +66,12 @@ except Exception:  # pragma: no cover - exercised only when bridge is unavailabl
 
 # Project-home directory + the files that live in it.
 _AWL_DIRNAME = ".awl"
-_SCRATCHPAD_NAME = "scratchpad.md"   # OD-17 shared scratchpad
-_PLAN_REVIEWS_NAME = "plan-reviews.json"  # OD-15 plans review side-store
+_SCRATCHPAD_NAME = "scratchpad.md"   # shared team scratchpad
+_PLAN_REVIEWS_NAME = "plan-reviews.json"  # Library plans review side-store
 
 # Dashboard-store files (project-agnostic, reusable).
-_SETUPS_NAME = "setups.json"      # OD-18 Setups (rosters)
-_TEMPLATES_NAME = "templates.json"  # OD-16 prompt templates
+_SETUPS_NAME = "setups.json"      # saved Setups (rosters)
+_TEMPLATES_NAME = "templates.json"  # reusable prompt templates
 
 
 # ---------------------------------------------------------------------------
@@ -88,12 +88,12 @@ def dashboard_runtime_dir() -> Path:
 
 
 def setups_path() -> Path:
-    """Saved Setups (rosters) — a dashboard-store file (OD-18)."""
+    """Saved Setups (rosters) — a dashboard-store file."""
     return dashboard_runtime_dir() / _SETUPS_NAME
 
 
 def templates_path() -> Path:
-    """Saved prompt templates — a dashboard-store file (OD-16).
+    """Saved prompt templates — a dashboard-store file.
 
     Tool-level reusable data (like Setups). *Project-specific* templates may
     later live in ``<project>/.awl/``; the reusable set lives here.
@@ -137,13 +137,13 @@ def ensure_project_awl_dir(cwd: str | None) -> Path:
 
 
 def scratchpad_path(cwd: str | None) -> Path | None:
-    """The team scratchpad ``<project>/.awl/scratchpad.md`` (OD-17)."""
+    """The team scratchpad ``<project>/.awl/scratchpad.md``."""
     awl = project_awl_dir(cwd)
     return None if awl is None else awl / _SCRATCHPAD_NAME
 
 
 def plan_reviews_path(cwd: str | None) -> Path | None:
-    """The plans review side-store ``<project>/.awl/plan-reviews.json`` (OD-15)."""
+    """The plans review side-store ``<project>/.awl/plan-reviews.json``."""
     awl = project_awl_dir(cwd)
     return None if awl is None else awl / _PLAN_REVIEWS_NAME
 

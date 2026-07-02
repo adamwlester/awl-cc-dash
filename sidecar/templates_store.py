@@ -1,11 +1,11 @@
-"""Prompt templates store (OD-16) — backend persistence only.
+"""Prompt templates store — backend persistence only.
 
 Templates are a single-select, reusable list (None + saved). Picking one inserts
 a ``template`` block whose ``{{placeholder}}`` pills get filled (or left unfilled).
 This module is the backend store for that feature; the Editor UI is design-stream
 and out of scope here.
 
-**Storage (OD-23):** the **dashboard runtime store** — templates are tool-level
+**Storage:** the **dashboard runtime store** — templates are tool-level
 reusable, project-agnostic data (like Setups), so they live in the dashboard home
 (``sidecar/runtime/templates.json`` by default, overridable via
 ``AWL_SIDECAR_RUNTIME``). We resolve the path through ``storage.templates_path()``

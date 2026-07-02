@@ -1,15 +1,15 @@
-"""OD-09 inbox (the "needs you" surface) + OD-10 cap derivation — store + classifiers.
+"""Inbox (the "needs you" surface) + lifecycle-cap derivation — store + classifiers.
 
-Five typed sections raised over two mechanisms (OD-09 Decision):
+Five typed sections raised over two mechanisms:
   * **permission** — screen-anchored (lives on SessionState.pending_permission;
     surfaced into the merged inbox view by `main`).
   * **error** — best-effort: structural (tmux/session gone), a no-output stall
     watchdog, and text **pattern-match** (`classify_error`). **Sticky** (persists
     until Retry/Dismiss).
-  * **warning** — synthesized from OD-10's cap poll-loop (`cap_warnings`):
+  * **warning** — synthesized from the lifecycle-cap poll-loop (`cap_warnings`):
     max-turns + context-% crossings (deterministic, local). The rate/usage-cap
-    subtype is gated on OD-18 usage data and is not derived here.
-  * **plan** / **decision** — screen-blind; raised via the OD-02 PreToolUse hook
+    subtype is gated on settings/account usage data and is not derived here.
+  * **plan** / **decision** — screen-blind; raised via the PreToolUse hook
     channel (the agent's ExitPlanMode / AskUserQuestion tool calls are visible to
     hooks). The detect→answer→resume round-trip lives in `main`; this module holds
     the card + the pending answer slot.
@@ -98,12 +98,12 @@ def all_open() -> dict[str, list[dict[str, Any]]]:
 
 
 def fleet_badge() -> int:
-    """OD-09 fleet badge: the number of agents with >=1 open request (any type)."""
+    """Fleet badge: the number of agents with >=1 open request (any type)."""
     return sum(1 for agent_id in _INBOX if items_for(agent_id))
 
 
 # ---------------------------------------------------------------------------
-# OD-09 error classifier — best-effort text pattern-match (the catalog grows
+# Error classifier — best-effort text pattern-match (the catalog grows
 # iteratively; the architecture is fixed). Returns {subtype, message} or None.
 # ---------------------------------------------------------------------------
 
@@ -125,7 +125,7 @@ def classify_error(text: str | None) -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
-# OD-10 cap crossing -> Warning subtypes (notify-only; the run continues until
+# Lifecycle-cap crossing -> Warning subtypes (notify-only; the run continues until
 # the user chooses Continue / Raise cap / Stop). Deterministic + local.
 # ---------------------------------------------------------------------------
 

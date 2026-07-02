@@ -1,6 +1,6 @@
-"""OD-02 hook channel — the durable per-agent inject inbox + hook-output builders.
+"""Hook channel — the durable per-agent inject inbox + hook-output builders.
 
-The spike-gated path that the OD-02 hook spike proved out **live** on the
+The spike-gated path that the hook spike proved out **live** on the
 installed build (claude 2.1.195): a running agent receives a queued inject
 **mid-turn at the next tool boundary**, without stopping, via a `PostToolUse`
 HTTP hook that returns `hookSpecificOutput.additionalContext`. A `Stop` hook
@@ -9,10 +9,10 @@ turn still catches an active inject at turn-end.
 
 Two inject **kinds**:
 
-* ``inject``  — an *active* message (OD-05 Inject, OD-09 Plan/Decision prompt)
+* ``inject``  — an *active* message (a link Inject trigger, or a Plan/Decision prompt)
   that SHOULD provoke the agent to act. Delivered via PostToolUse, and eligible
   for the Stop backstop so a no-tool turn still catches it.
-* ``context`` — *passive* context (OD-17 scratchpad delta, OD-06 shared context)
+* ``context`` — *passive* context (a scratchpad delta, or link shared context)
   that must NOT trigger a turn. Delivered via PostToolUse ``additionalContext``
   only; never via the Stop backstop (blocking Stop would force a continuation).
 

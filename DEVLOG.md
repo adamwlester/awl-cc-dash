@@ -386,6 +386,30 @@ Files: archive/design/design-v11p7/ (7 files), DEVLOG.md
 
 ---
 
+### 2026-07-02 01:01:03 — Projects-tab concept snippet (Settings step-in) in .scratch
+
+Built a standalone, interactive concept snippet for a future Settings → **Projects** tab: an active-project card (name · path · agents · last-opened · a Close-project action), a Known-projects registry list (reg-row pattern, per-row Open, one-project-at-a-time gating), an "Open other folder…" register action, and a two-choice close confirm ("Close" keeps agents running in tmux / "Close & stop agents"; ghost-×/Esc cancels — deliberately no third Cancel button, per the spec's "exactly two buttons"). Links the real design/tokens.css + styles.css (design/ untouched); behavior is a small inline script by design. Verified end-to-end with a scripted isolated-Chrome click-through (28 assertions, headless + a headed parity pass, narrow/wide extremes) plus an 11-agent adversarial design review — 7 confirmed findings fixed (button tiers per the emphasis ladder: pink Close commit, cream trigger; hbadge not set-kind for the Open state; confirm force-open not toggle; 0-agent running-flag coherence).
+
+Files: .scratch/ui-snippets/projects-tab.html (new), .scratch/pw-verify/ (new — verification harness + screenshots), DEVLOG.md
+
+---
+
+### 2026-07-02 01:12:30 — Projects-tab snippet: Projects moved to first tab
+
+Per user direction, the concept snippet's Settings tab row now leads with **Projects** (Projects · Setups · Usage · MCP · Plugins · Config — was last). Verification harness updated (asserts tab order; inert-tab check retargeted to Setups); full suite re-run green, headless + headed.
+
+Files: .scratch/ui-snippets/projects-tab.html, .scratch/pw-verify/verify.js, DEVLOG.md
+
+---
+
+### 2026-07-02 01:59:40 — ARCHITECTURE.md rewritten as the final-vision reference; OD record dissolved repo-wide
+
+Complete rewrite of `docs/ARCHITECTURE.md` (~1,120 lines) to **final-intended-system** framing: the doc now leads the build (code converges on it), with every OD-01…23 decision woven seamlessly into topical prose (no labels, no index — historical `OD-NN` ids in DEVLOG/archives resolve via the archived tracker), the data-model-map storage model ported wholesale (§8: six homes, `.awl-cc-dash/` taxonomy, persist-vs-derive contract, transcript policy, warm/cold restore), the one-project product model + Projects tab + `projects.json` (§3), the Console mirror+passthrough model (§7.13), TODO #14/15/17 integrated (open Inbox type set + Response, System pseudo-identity, one-relationship links + Piggyback + one-way exchange counting), and an Open-questions research register (§10, four fields per entry); divergences carried as ⚠ Today markers (file+symbol, never line numbers). Verified by a 20-agent workflow: 139-item adversarial traceability check (0 missing), coherence pass (all findings fixed), hermetic unit suite green (395 passed). Ripples: `OD-NN` tokens stripped from all code comments (~197 refs across sidecar/, frontend/src/, tests/, bridge/ — comment-only, zero behavior change) and rewritten to section-name refs in the three `dev/prompts` files; `dev/notes/TODO.md` split into **NEXT UP — DESIGN / — BUILD** (T1–T11 ported with file:line evidence; Projects-tab + design-OD-sweep items appended; per-path instruction sets + shared doc-sync checklist); `dev/notes/data-model-map.md` archived → `archive/notes/data-model-map-2026-07-01.md` with a supersession banner; CLAUDE.md Key-files row reframed + folder-map § refs corrected. **Outstanding:** the five `design/` files still carry ~85 OD tokens — deferred (design churn active) as NEXT UP — DESIGN #20.
+
+Files: docs/ARCHITECTURE.md, dev/notes/TODO.md, dev/notes/data-model-map.md → archive/notes/data-model-map-2026-07-01.md, CLAUDE.md, dev/prompts/backend-decision-integration.md, dev/prompts/design-stream-finisher-p1.md, dev/prompts/design-stream-finisher-p2.md, sidecar/ (20 files), frontend/src/renderer/ (6 files), tests/ (15 files), bridge/bridge.py, bridge/paths.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

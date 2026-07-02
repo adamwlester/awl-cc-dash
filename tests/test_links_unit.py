@@ -27,7 +27,7 @@ def test_add_link_defaults():
     assert lk.direction == "both"
     assert lk.relationship == ["direct"]
     assert lk.trigger == "queue"
-    assert lk.end_after_exchanges == 25   # OD-07 default
+    assert lk.end_after_exchanges == 25   # decided default end-after budget for a link
     assert lk.active is True
 
 

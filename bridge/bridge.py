@@ -1003,7 +1003,7 @@ class TmuxBridge:
 
         In WSL2's default NAT networking the in-WSL ``localhost`` does NOT reach
         the host and ``host.docker.internal`` lands on the LAN IP (firewall-blocked
-        from WSL) — both live-verified in the OD-02 hook spike — so an agent's
+        from WSL) — both live-verified in the idle-detection hook spike — so an agent's
         HTTP hook must POST to this gateway address. Resolved once per WSL boot
         and cached. Returns the dotted-quad, or ``None`` if it can't resolve.
         """

@@ -1,4 +1,4 @@
-"""Library (OD-15, v1 = read + render, project-scoped).
+"""Library (v1 = read + render, project-scoped).
 
 The Library surfaces the agents' own working artifacts to the dashboard:
 

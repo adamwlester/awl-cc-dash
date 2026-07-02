@@ -1,7 +1,7 @@
-"""Hermetic unit tests for ``sidecar/templates_store.py`` (OD-16 Templates).
+"""Hermetic unit tests for ``sidecar/templates_store.py`` (Templates).
 
 The store persists to the templates JSON inside the **dashboard runtime store**
-(OD-23, reusable / project-agnostic). These tests redirect that store to a
+(reusable / project-agnostic). These tests redirect that store to a
 ``tmp_path`` via ``AWL_SIDECAR_RUNTIME`` so they never touch the real dashboard
 store, and exercise the public API end-to-end through a real JSON file on disk.
 """

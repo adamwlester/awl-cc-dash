@@ -100,16 +100,16 @@ class SessionState:
         self.created_at = datetime.now().isoformat()
         self.events: list[dict[str, Any]] = []
         self.subscribers: list[asyncio.Queue[dict[str, Any]]] = []
-        # OD-01 dedup set: deterministic ids already emitted, so a transcript
+        # Event-stream dedup set: deterministic ids already emitted, so a transcript
         # re-poll / reconnect replays without duplicates (no-op on a repeat).
         self._emitted_ids: set[str] = set()
-        # OD-02 per-agent ORDERED prompt queue (not strict FIFO) + a Hold staging
+        # Per-agent ORDERED prompt queue (not strict FIFO) + a Hold staging
         # slot. Sends to a busy agent are queued, not 409-dropped, and flushed on
         # the proven generating->idle transition. `held` items are parked (link-
         # only) and never auto-flushed (released manually into the Editor).
         self.prompt_queue: deque[dict[str, Any]] = deque()
         self.held: list[dict[str, Any]] = []
-        # OD-04 serialized reply-to: the peer (agent id) whose inbound message this
+        # Serialized reply-to: the peer (agent id) whose inbound message this
         # agent is currently answering, and the link it came over. Set when a link
         # inbound is delivered; on the next generating->idle the sidecar routes
         # THIS turn's output back to that peer (recipients:[peer]) and clears it.
@@ -121,13 +121,13 @@ class SessionState:
         # assistant text on idle.
         self._turn_start_idx: int = 0
         self.pending_permission: dict[str, Any] | None = None
-        # OD-10 lifecycle caps (notify-only). Set on Create, editable; the cap
+        # Lifecycle caps (notify-only). Set on Create, editable; the cap
         # poll-loop raises a Warning inbox card on crossing — the run continues.
         self.max_turns: int | None = None
         self.max_context_pct: float | None = None
         self.context_pct: float | None = None   # latest derived context usage %
         # Locally-derived turn count (each generating->idle = one turn), so the
-        # OD-10 cap loop works for the bridge driver too (it emits status_change,
+        # notify-only cap loop works for the bridge driver too (it emits status_change,
         # not the SDK's `result` with num_turns).
         self.turn_count: int = 0
         self._was_running: bool = False
@@ -171,7 +171,7 @@ class SessionState:
         }
 
     def push_event(self, event: dict[str, Any]):
-        # OD-01/OD-22: stamp the envelope (id/agent_id/seq/ts/source/recipients)
+        # Stamp the envelope (id/agent_id/seq/ts/source/recipients)
         # at the single fan-out choke point. A re-polled transcript entry (same
         # deterministic id) dedups to a no-op (stamp returns None).
         event = eventbus.stamp(event, agent_id=self.session_id,
@@ -179,7 +179,7 @@ class SessionState:
         if event is None:
             return
         self.events.append(event)
-        # OD-04: mark where the current turn's output begins so the reply-to
+        # Reply-to relay: mark where the current turn's output begins so the reply-to
         # engine can lift just this turn's assistant text on the next idle.
         if event.get("type") == "status_change" and event.get("status") == "running":
             self._turn_start_idx = len(self.events)
@@ -189,11 +189,11 @@ class SessionState:
                 q.put_nowait(event)
             except asyncio.QueueFull:
                 pass  # subscriber too slow, skip
-        # Mirror into the bounded cross-agent ring + merged subscribers (OD-01).
+        # Mirror into the bounded cross-agent ring + merged subscribers.
         eventbus.publish_global(event)
 
     def enqueue(self, entry: dict[str, Any], disposition: str) -> dict[str, Any]:
-        """Place a prompt per its OD-02 disposition (an ordered queue, not FIFO):
+        """Place a prompt per its send-timing disposition (an ordered queue, not FIFO):
 
         * ``queue`` — append-tail, flush at idle (the polite default).
         * ``next``  — insert-head, flush at idle (jump ahead of the queue).
@@ -230,16 +230,16 @@ class SessionState:
                 self.status = st  # type: ignore[assignment]
             self.push_event(event)
             if st == "running":
-                # OD-17: start-of-run scratchpad catch-up — deliver this agent's
+                # Start-of-run scratchpad catch-up — deliver this agent's
                 # unread delta as a passive `context` inject (lands at its first
                 # tool boundary; idle agents have no boundary so they catch up now).
                 _deliver_scratch_delta(self)
-            # OD-02: the generating->idle transition is the proven flush signal.
+            # The generating->idle transition is the proven flush signal.
             if st == "idle":
-                if self._was_running:        # one completed turn (OD-10 cap loop)
+                if self._was_running:        # one completed turn (feeds the cap loop)
                     self.turn_count += 1
                     self._was_running = False
-                # OD-04: relay this finished turn back to a linked peer FIRST (uses
+                # Reply-to: relay this finished turn back to a linked peer FIRST (uses
                 # this turn's output before a queued prompt starts a new turn), then
                 # flush the next queued prompt.
                 _maybe_relay_reply(self)
@@ -263,7 +263,7 @@ class SessionState:
             return
 
         if etype == "error":
-            # OD-09 Error section: raise a STICKY inbox card (persists until
+            # Inbox Error section: raise a STICKY inbox card (persists until
             # Retry/Dismiss). Best-effort subtype from the message text.
             msg = event.get("error") or event.get("message") or ""
             cls = inbox.classify_error(msg) or {"subtype": "error", "message": str(msg)[:500]}
@@ -288,7 +288,7 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
-            # OD-04 reply-to relay, then OD-02 flush of the next queued prompt.
+            # Reply-to relay, then flush of the next queued prompt.
             _maybe_relay_reply(self)
             _schedule_flush(self)
 
@@ -296,7 +296,7 @@ sessions: dict[str, SessionState] = {}
 
 
 async def _flush_queue(session: "SessionState") -> None:
-    """OD-02: send the next queued prompt iff the agent is idle and one is queued.
+    """Send the next queued prompt iff the agent is idle and one is queued.
 
     Re-entrancy is gated by flipping status to ``running`` *before* the only
     ``await`` (driver.send), so a concurrent flush sees ``running`` and returns —
@@ -359,10 +359,10 @@ def _last_turn_assistant_text(session: "SessionState", start_idx: int) -> str:
 
 def _maybe_relay_reply(session: "SessionState",
                        _start_idx: int | None = None, _attempt: int = 0) -> None:
-    """OD-04 link fire: if this agent just finished answering a linked peer's
+    """Link fire: if this agent just finished answering a linked peer's
     inbound, route THIS turn's output back to that peer over the link (delivered
-    by the link's OD-05 trigger), then set the peer's reply-to back to this agent
-    — strict one-in-flight alternation, bounded by the OD-07 End-After cap.
+    by the link's trigger mode), then set the peer's reply-to back to this agent
+    — strict one-in-flight alternation, bounded by the link's End-After cap.
 
     The bridge emits generating->idle off *screen* state ~1s before the assistant
     entry is polled into `events`, so when the turn text isn't there yet we RETRY
@@ -423,7 +423,7 @@ def _maybe_relay_reply(session: "SessionState",
 
     trigger = lk.trigger or "queue"
     if trigger == "inject":
-        # Mid-run delivery via the OD-02 hook channel.
+        # Mid-run delivery via the hook channel.
         inj = hookbus.enqueue_inject(src, text, kind="inject",
                                      source=session.session_id)
         target.push_event({
@@ -456,7 +456,7 @@ def _scratch_key(session: "SessionState") -> str:
 
 
 def _deliver_scratch_delta(session: "SessionState") -> None:
-    """OD-17: enqueue the agent's unread scratchpad delta as a PASSIVE `context`
+    """Shared scratchpad: enqueue the agent's unread scratchpad delta as a PASSIVE `context`
     inject (delivered at the next tool boundary via the hook channel; never
     triggers a turn). No-op when there's nothing new past its watermark."""
     try:
@@ -625,10 +625,10 @@ CAP_POLL_INTERVAL = 3.0  # seconds
 
 
 async def _cap_poll_loop():
-    """OD-10 notify-only cap loop: compare each agent's live turns / context-% to
+    """Notify-only cap loop: compare each agent's live turns / context-% to
     its stored caps and raise a Warning inbox card on crossing (dedup'd per
     subtype so it fires once). The run is NOT auto-killed — the user chooses
-    Continue / Raise cap / Stop. This is the same loop that feeds OD-09's Warning
+    Continue / Raise cap / Stop. This is the same loop that feeds the inbox's Warning
     section."""
     while True:
         try:
@@ -694,22 +694,22 @@ class CreateSessionRequest(BaseModel):
     enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
     mcp_servers: list[str] | None = None                   # subset; None = global
     identity: IdentityInput | None = None                  # dashboard-owned id fields
-    max_turns: int | None = None                           # OD-10 cap (notify-only)
-    max_context_pct: float | None = None                   # OD-10 cap (notify-only)
+    max_turns: int | None = None                           # lifecycle cap (notify-only)
+    max_context_pct: float | None = None                   # lifecycle cap (notify-only)
 
 class SendPromptRequest(BaseModel):
     prompt: str
-    # OD-22 addressing (built in now so linking / multi-target sends need no later
+    # Message addressing (built in now so linking / multi-target sends need no later
     # migration). source = who the prompt is from (default the operator);
     # recipients = typed addressees (user | <agent-id> | scratch), default the
     # target agent. These drive routing + the From/To filter + Sent/Received — not
-    # visibility. Full agent-to-agent routing lands with OD-02/linking.
+    # visibility. Full agent-to-agent routing lands with the prompt queue/linking.
     source: str = "user"
     recipients: list[str] | None = None
-    # OD-02 send-timing disposition. `queue` (the polite default) waits for the
+    # Send-timing disposition. `queue` (the polite default) waits for the
     # turn AND the existing queue; `next` jumps ahead at the next idle; `now`
     # interrupts the current run and delivers immediately; `hold` stages for
-    # manual release; `inject` = true mid-run delivery via the OD-02 hook channel
+    # manual release; `inject` = true mid-run delivery via the hook channel
     # (spike-proven on the installed build — lands at the next tool boundary
     # without stopping the turn; if the agent is idle it lands on its next run).
     disposition: Literal["now", "next", "queue", "hold", "inject"] = "queue"
@@ -730,10 +730,10 @@ class CreateLinkRequest(BaseModel):
     b: str
     direction: Literal["a2b", "b2a", "both"] = "both"
     relationship: list[str] = ["direct"]          # subset of {direct, shared}
-    shared_content: list[str] = []                # OD-06 content-type filter
+    shared_content: list[str] = []                # shared-content type filter
     shared_backfill: bool = False
-    trigger: Literal["now", "next", "queue", "inject", "hold"] = "queue"  # OD-05
-    end_after_exchanges: int | None = 25          # OD-07 default
+    trigger: Literal["now", "next", "queue", "inject", "hold"] = "queue"  # link trigger mode
+    end_after_exchanges: int | None = 25          # End-After default
     end_after_tokens: int | None = None
 
 class LinkKickoffRequest(BaseModel):
@@ -806,7 +806,7 @@ async def create_session(req: CreateSessionRequest):
         mcp_servers=req.mcp_servers,
         identity=identity,
     )
-    session.max_turns = req.max_turns                  # OD-10 caps
+    session.max_turns = req.max_turns                  # notify-only caps
     session.max_context_pct = req.max_context_pct
     sessions[session_id] = session
     logger.info(f"Created session {session_id}")
@@ -835,7 +835,7 @@ async def get_session(session_id: str):
 
 @app.delete("/sessions/{session_id}")
 async def close_session(session_id: str, hard: bool = False):
-    """Retire (soft, default) or — with ?hard=true — OD-19 permanent **Delete**:
+    """Retire (soft, default) or — with ?hard=true — permanent **Delete**:
     a hard wipe of the agent's private footprint (runtime record, tmux session,
     on-disk transcript) while everything SHARED is tombstoned (links → inactive
     tombstones; feed/scratchpad history is kept and attributed). The agent's
@@ -849,7 +849,7 @@ async def close_session(session_id: str, hard: bool = False):
         session.listen_task.cancel()
 
     if hard:
-        # --- OD-19 hard wipe + tombstone ---
+        # --- hard wipe + tombstone ---
         number = (session.identity or {}).get("number") if session.identity else None
         link_ids = [lk.id for lk in links.all_links()
                     if session_id in (lk.a, lk.b)]
@@ -922,11 +922,11 @@ async def close_session(session_id: str, hard: bool = False):
 
 @app.post("/sessions/{session_id}/send")
 async def send_prompt(session_id: str, req: SendPromptRequest):
-    """OD-02: enqueue a prompt on the per-agent ordered queue (never 409-drop).
+    """Enqueue a prompt on the per-agent ordered queue (never 409-drop).
 
     An idle agent flushes immediately; a busy agent queues per disposition
     (`queue`/`next`), or — for `now` — is interrupted so the resulting idle
-    flushes it at the head. `hold` stages for manual release. OD-22: the entry
+    flushes it at the head. `hold` stages for manual release. The entry
     carries `source` + `recipients` (default the operator -> this agent)."""
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -934,7 +934,7 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     if not session.driver:
         raise HTTPException(status_code=503, detail="Session not connected yet")
 
-    # `inject` rides the OD-02 hook channel, not the prompt queue: it's pushed to
+    # `inject` rides the hook channel, not the prompt queue: it's pushed to
     # the agent mid-turn at its next tool boundary (no stop). Queue it on the
     # durable inbox and surface a synthesized feed event (the inject text is not
     # written to the agent's JSONL transcript, so the sidecar owns its visibility).
@@ -1027,13 +1027,13 @@ def _parse_csv(value: str | None) -> set[str] | None:
 async def stream_all_events(since: int | None = None,
                             source: str | None = None,
                             recipient: str | None = None):
-    """OD-01 merged cross-agent SSE stream — the single feed all panels subscribe
+    """Merged cross-agent SSE stream — the single feed all panels subscribe
     to, replacing the per-session `/history` poll.
 
     Replays the bounded ring (optionally from `?since=<seq>` for scroll-backfill)
     then streams live, with **server-side** From/To filtering: `?source=a,b`
-    (sender) and `?recipient=user,c` (any addressee). Each event carries the OD-01
-    envelope (id/agent_id/seq/ts) + OD-22 source/recipients.
+    (sender) and `?recipient=user,c` (any addressee). Each event carries the stream
+    envelope (id/agent_id/seq/ts) + addressing (source/recipients).
     """
     sources = _parse_csv(source)
     recipients = _parse_csv(recipient)
@@ -1075,7 +1075,7 @@ async def get_merged_history(since: int | None = None,
 
 
 # ============================================================================
-# OD-02 hook channel — inbox-drain endpoints (the bridge points each agent's
+# Hook channel — inbox-drain endpoints (the bridge points each agent's
 # PostToolUse + Stop HTTP hooks here, keyed by ?agent=<sidecar-session-id>).
 # Spike-proven: a PostToolUse `additionalContext` reply lands mid-turn on the
 # installed build. Durable + ack-on-2xx: an inject leaves the inbox only when it
@@ -1133,7 +1133,7 @@ async def hook_stop(agent: str):
     return hookbus.stop_output(injects)
 
 
-# --- OD-09 Plan/Decision detection via the OD-02 PreToolUse hook channel ---
+# --- Plan/Decision detection via the PreToolUse hook channel ---
 # The agent's ExitPlanMode (Plan) and AskUserQuestion (Decision) tool calls are
 # visible to hooks even when the screen isn't. The spike confirmed the hook
 # channel works; these raise the typed Inbox card (detect-and-surface). Returning
@@ -1172,7 +1172,7 @@ async def hook_decision(agent: str, body: dict[str, Any] | None = None):
 
 
 # ============================================================================
-# OD-09 inbox — the merged "needs you" surface across all five typed sections.
+# Inbox — the merged "needs you" surface across all five typed sections.
 # ============================================================================
 
 @app.get("/inbox")
@@ -1202,7 +1202,7 @@ async def resolve_inbox_item(agent: str, item_id: str, body: dict[str, Any] | No
 
 
 # ============================================================================
-# OD-11 run-strip checklist (done÷total, barber-pole floor)
+# Run-strip checklist (done÷total, barber-pole floor)
 # ============================================================================
 
 def _assistant_texts(session: "SessionState") -> list[str]:
@@ -1227,7 +1227,7 @@ def _assistant_texts(session: "SessionState") -> list[str]:
 
 @app.get("/sessions/{session_id}/checklist")
 async def get_checklist(session_id: str):
-    """OD-11: the agent's self-reported checklist parsed from its transcript
+    """The agent's self-reported checklist parsed from its transcript
     (done÷total + current item); barber-pole indeterminate when none published."""
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1235,7 +1235,7 @@ async def get_checklist(session_id: str):
 
 
 # ============================================================================
-# OD-16 Templates store (dashboard runtime store; reusable / project-agnostic)
+# Templates store (dashboard runtime store; reusable / project-agnostic)
 # ============================================================================
 
 @app.get("/templates")
@@ -1256,7 +1256,7 @@ async def delete_template_endpoint(template_id: str):
 
 
 # ============================================================================
-# OD-15 Library — project-scoped read + render + the plan-review side-store
+# Library — project-scoped read + render + the plan-review side-store
 # ============================================================================
 
 @app.get("/library/documents")
@@ -1289,7 +1289,7 @@ async def library_set_review(req: ReviewRequest):
 
 
 # ============================================================================
-# OD-17 shared scratchpad — post + auto-read delta (live mid-run push)
+# Shared scratchpad — post + auto-read delta (live mid-run push)
 # ============================================================================
 
 class ScratchPostRequest(BaseModel):
@@ -1323,7 +1323,7 @@ async def post_scratch(req: ScratchPostRequest):
 
 
 # ============================================================================
-# OD-12 marquee — the per-agent liveness tail (derived from the stream)
+# Marquee — the per-agent liveness tail (derived from the stream)
 # ============================================================================
 
 @app.get("/sessions/{session_id}/marquee")
@@ -1335,7 +1335,7 @@ async def get_marquee(session_id: str):
 
 
 # ============================================================================
-# OD-20 console — slash-command catalog (the live feed/route rides send/keys +
+# Console — slash-command catalog (the live feed/route rides send/keys +
 # capture-pane on the bridge; interactive commands need follow-on handling)
 # ============================================================================
 
@@ -1374,7 +1374,7 @@ async def console_run(session_id: str, req: ConsoleRunRequest):
 
 
 # ============================================================================
-# OD-18 settings — interactive reads/writes (confirm-gated) + account/usage
+# Settings — interactive reads/writes (confirm-gated) + account/usage
 # ============================================================================
 
 class SettingsWriteRequest(BaseModel):
@@ -1410,7 +1410,7 @@ async def settings_write(req: SettingsWriteRequest):
 
 
 # ============================================================================
-# OD-16 utility-LLM passes — Revise / Summarize via the sdk engine (the ONLY two
+# Utility-LLM passes — Revise / Summarize via the sdk engine (the ONLY two
 # non-bridge consumers). Everything else multi-agent stays on the bridge.
 # ============================================================================
 
@@ -1441,13 +1441,13 @@ async def utility_summarize(req: SummarizeRequest):
 
 
 # ============================================================================
-# Tier-2 linking (OD-04..08) — link CRUD + the reply-to conversation kickoff.
+# Tier-2 linking — link CRUD + the reply-to conversation kickoff.
 # The on-idle reply-to relay lives in SessionState.handle_event / _maybe_relay_reply.
 # ============================================================================
 
 @app.post("/links")
 async def create_link(req: CreateLinkRequest):
-    """Create an agent-to-agent link (OD-06 relationship config)."""
+    """Create an agent-to-agent link (relationship config)."""
     lk = links.add_link(
         a=req.a, b=req.b, direction=req.direction,
         relationship=req.relationship, shared_content=req.shared_content,
@@ -1460,7 +1460,7 @@ async def create_link(req: CreateLinkRequest):
 
 @app.get("/links")
 async def list_links():
-    """All links, plus the OD-08 grouped-by-agent view (each link under both
+    """All links, plus the grouped-by-agent view (each link under both
     agents' groups, with the direction arrow relative to that group's agent)."""
     return {
         "links": [lk.to_dict() for lk in links.all_links()],
@@ -1478,8 +1478,8 @@ async def delete_link(link_id: str):
 @app.post("/links/{link_id}/kickoff")
 async def kickoff_link(link_id: str, req: LinkKickoffRequest):
     """Start a reply-to conversation over a link: deliver `prompt` to `to_agent`
-    and record that its reply routes back to `from_agent` (OD-04). The relay then
-    alternates automatically until the OD-07 cap."""
+    and record that its reply routes back to `from_agent`. The relay then
+    alternates automatically until the End-After cap."""
     lk = links.get_link(link_id)
     if not lk:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -1638,7 +1638,7 @@ async def get_subagents(session_id: str):
         return {"count": 0, "subagents": []}
     try:
         result = await session.driver.get_subagents() or {"count": 0, "subagents": []}
-        # OD-13: relabel to the group+member scheme (A2, no `s` prefix). v1 groups
+        # Relabel subagents to the group+member scheme (A2, no `s` prefix). v1 groups
         # the current flat set as one run (A); full per-run segmentation + the
         # subagent-transcript ingest is the follow-on.
         subs = result.get("subagents") or []
@@ -1803,7 +1803,7 @@ async def get_usage():
 
 if __name__ == "__main__":
     import uvicorn
-    # OD-02: bind WSL-reachable by default so in-WSL agents' HTTP hooks reach the
+    # Bind WSL-reachable by default so in-WSL agents' HTTP hooks reach the
     # sidecar over the host gateway IP (127.0.0.1 is NOT reachable from WSL2 — see
     # the hook spike). On a single-user laptop this exposes the dev port on the
     # LAN; override with AWL_SIDECAR_HOST=127.0.0.1 to keep it loopback-only (the

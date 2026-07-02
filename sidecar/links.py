@@ -1,13 +1,13 @@
-"""Tier-2 agent-to-agent linking — the link store, caps, and grouping (OD-04..08).
+"""Tier-2 agent-to-agent linking — the link store, caps, and grouping.
 
-A **link** joins two agents and carries the OD-06 relationship config:
+A **link** joins two agents and carries the relationship config:
 
 * **direction** — ``a2b`` / ``b2a`` / ``both`` (the agent-pair arrow).
-* **relationship** — any of ``direct`` (reply-to conversation, OD-04) and
-  ``shared`` (passive shared-context awareness, OD-06).
-* **trigger** — the OD-05 delivery mode a fire uses (Now/Next/Queue/Inject/Hold;
+* **relationship** — any of ``direct`` (reply-to conversation) and
+  ``shared`` (passive shared-context awareness).
+* **trigger** — the delivery mode a fire uses (Now/Next/Queue/Inject/Hold;
   ``queue`` default).
-* **End-After** (OD-07) — two independent caps, ``end_after_exchanges`` (default
+* **End-After** — two independent caps, ``end_after_exchanges`` (default
   **25**; a round-trip = one message each direction = 2 messages) and
   ``end_after_tokens``; either reached ends the auto-exchange (the runaway
   backstop behind strict one-in-flight alternation).
@@ -27,7 +27,7 @@ _id_counter = itertools.count(1)
 _LINKS: dict[str, "Link"] = {}
 
 VALID_DIRECTIONS = {"a2b", "b2a", "both"}
-DEFAULT_END_AFTER_EXCHANGES = 25  # OD-07
+DEFAULT_END_AFTER_EXCHANGES = 25  # End-After default: 25 exchanges
 
 
 @dataclass
@@ -66,7 +66,7 @@ class Link:
         return None
 
     def arrow_for(self, group_agent: str) -> str:
-        """OD-08 direction arrow relative to the group's agent: → (to) / ← (from)
+        """Direction arrow relative to the group's agent: → (to) / ← (from)
         / ↔ (both)."""
         if self.direction == "both":
             return "↔"
@@ -160,7 +160,7 @@ def find_direct_link(src: str, dst: str) -> Link | None:
 
 
 def grouped_by_agent() -> dict[str, list[dict[str, Any]]]:
-    """OD-08: all links grouped by agent. A link joins two agents, so it appears
+    """All links grouped by agent. A link joins two agents, so it appears
     under BOTH groups (deliberate double-listing). Each entry: the other agent +
     the direction arrow relative to that group's agent."""
     out: dict[str, list[dict[str, Any]]] = {}

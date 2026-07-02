@@ -1,4 +1,4 @@
-"""OD-13 subagent GROUP+MEMBER naming (pure logic).
+"""Subagent GROUP+MEMBER naming (pure logic).
 
 Replaces the flat monotonic ``s1..sN`` scheme with a group+member naming:
 

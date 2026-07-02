@@ -1,9 +1,9 @@
 // ============================================================================
 // Work panel (middle-bottom) — Library · Links · Scratch
 // ----------------------------------------------------------------------------
-// Library (OD-15): read + render the focused project's markdown Plans/Documents
-// (+ any plan-review verdicts). Links (OD-04..08): list / create / delete
-// agent-to-agent links and kick off a reply-to conversation. Scratch (OD-17):
+// Library: read + render the focused project's markdown Plans/Documents
+// (+ any plan-review verdicts). Links: list / create / delete
+// agent-to-agent links and kick off a reply-to conversation. Scratch:
 // read the shared board for the focused project and post to it. All wired to the
 // live sidecar; minimal styling on the shared primitives.
 // ============================================================================

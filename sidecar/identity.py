@@ -5,7 +5,7 @@ identity to render agent cards. Identity is assigned at create time, persisted i
 the runtime record (so it survives a sidecar restart), and surfaced on the
 session's ``to_dict`` so the UI reads it everywhere.
 
-Round-robin assignment (OD-03):
+Round-robin assignment:
   * ``color = n mod len(AG_COLORS)`` — over the ``--ag-*`` "Jewel" palette.
   * ``icon  = n mod len(AG_ICONS_CURATED)`` — over a **curated 50** of the 167
     recolorable game-icons on disk.
@@ -16,7 +16,7 @@ agents and, once the palette is 25, every pair is unique for the first 50 agents
 Past ~16 colors the **icon** is the primary disambiguator and color becomes a
 soft "family" signal.
 
-CROSS-STREAM SEAM (OD-03 colors). ``AG_COLORS`` mirrors the ``--ag-*`` token
+CROSS-STREAM SEAM (agent colors). ``AG_COLORS`` mirrors the ``--ag-*`` token
 **names** in ``design/tokens.css`` — it is NOT a parallel palette. The design
 stream owns the palette and is extending it **16 → 25** (the +9 names + OKLCH
 values are theirs). When those land, add the 9 ``(name, hex)`` pairs here in the
@@ -47,13 +47,13 @@ AG_COLORS: list[tuple[str, str]] = [
 ]
 
 # The number of colors the palette is intended to reach once the design stream
-# lands the +9 (OD-03). The live round-robin keys off len(AG_COLORS), so this is
+# lands the +9. The live round-robin keys off len(AG_COLORS), so this is
 # documentation / a target the curation tests can reference — not a hard modulo.
 COLOR_POOL_TARGET = 25
 
 _DEFAULT_ICON = "android-mask"
 
-# OD-03 icon curation — a **curated 50** of the 167 game-icons in
+# Icon curation — a **curated 50** of the 167 game-icons in
 # assets/icons/agents/ (the manual icon picker still indexes all 167; this is the
 # auto-assignment pool only). Chosen for distinctiveness + recognizability and
 # ordered so adjacent ordinals look clearly different (categories interleaved:

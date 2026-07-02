@@ -1,6 +1,6 @@
-"""Hermetic unit tests for the OD-09/OD-10 inbox store + classifiers
+"""Hermetic unit tests for the inbox store + classifiers
 (`sidecar/inbox.py`). Pure-logic: the typed inbox sections, the error
-pattern-match, and the OD-10 cap-crossing → Warning derivation. No live env.
+pattern-match, and the cap-crossing → Warning derivation. No live env.
 """
 import sys
 from pathlib import Path
@@ -60,7 +60,7 @@ def test_all_open_groups_by_agent():
     assert set(grouped.keys()) == {"a1", "a2"}
 
 
-# --- OD-09 error classifier (best-effort pattern match) ---
+# --- Error classifier (best-effort pattern match) ---
 
 @pytest.mark.parametrize("text,subtype", [
     ("Error: 429 rate limit exceeded", "rate_limit"),
@@ -78,7 +78,7 @@ def test_classify_error_none_on_clean_text():
     assert inbox.classify_error("All good, ran the tests successfully.") is None
 
 
-# --- OD-10 cap crossing -> Warning subtypes ---
+# --- Cap crossing -> Warning subtypes ---
 
 def test_cap_warnings_max_turns():
     w = inbox.cap_warnings(turns=30, max_turns=25, context_pct=10, max_context_pct=80)

@@ -1,9 +1,9 @@
 // ============================================================================
 // Prompt — Compose (send-timing + send-as-agent + templates + revise) + History
 // ----------------------------------------------------------------------------
-// Compose wires the OD-02 send disposition (Now / Next / Queue / Hold), OD-22
-// send-as (From = User or any agent → the focused agent), the OD-16 templates
-// store (insert / save), and the OD-16 utility-LLM passes (Revise scope +
+// Compose wires the send disposition (Now / Next / Queue / Hold), the
+// send-as addressing (From = User or any agent → the focused agent), the
+// templates store (insert / save), and the utility-LLM passes (Revise scope +
 // Summarize). History lists the focused agent's own prompts from its transcript.
 // ============================================================================
 

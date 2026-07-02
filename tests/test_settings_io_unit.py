@@ -1,4 +1,4 @@
-"""Hermetic unit tests for the sidecar's settings file I/O primitives (OD-18).
+"""Hermetic unit tests for the sidecar's settings file I/O primitives.
 
 Pure and path-explicit: every write targets a pytest ``tmp_path`` file, never the
 real ``~/.claude`` or ``<project>/.claude``. The module under test hardcodes no

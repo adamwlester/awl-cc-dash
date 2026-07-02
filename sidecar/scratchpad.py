@@ -1,19 +1,19 @@
-"""OD-17 shared scratchpad — the team's always-current shared comms channel.
+"""Shared scratchpad — the team's always-current shared comms channel.
 
 Every agent **auto-reads** the scratchpad (the corrected 2026-06-30 policy,
 reversing explicit-send-only). Delivered as a **per-agent delta off a read
-watermark** (the same mechanism as OD-06 shared-context) so context stays
+watermark** (the same mechanism as link shared-context) so context stays
 bounded: each agent keeps a last-read pointer and receives only **new posts past
 that pointer**, which then advances. First read (no watermark) = the **full
 board**; deltas thereafter; an agent's **own posts** are included (positioned in
 the shared timeline — reading never emits a post, so no echo loop).
 
 Delivery moments (wired in `main`): **live mid-run push** to running agents via
-the OD-02 hook channel (a `context` inject = passive additionalContext that does
+the hook channel (a `context` inject = passive additionalContext that does
 NOT trigger a turn), and **start-of-run catch-up** for idle agents (they have no
 tool boundary, so they pick up their delta when they next run). Posts carry
-`recipients:[scratch]` (OD-22). **Storage** = `<project>/.awl/scratchpad.md`
-(OD-23), WSL-reachable.
+`recipients:[scratch]` in the addressing envelope. **Storage** =
+`<project>/.awl/scratchpad.md` (per the storage & scoping model), WSL-reachable.
 
 This module owns the log + delta + render; process-local (like `eventbus`),
 keyed by a **project key** (the project root, so co-located agents share one

@@ -1055,7 +1055,7 @@ class TestBuildLaunchConfig:
 
 
 # ---------------------------------------------------------------------------
-# OD-01: transcript events carry a deterministic anchor (the JSONL entry uuid)
+# Transcript events carry a deterministic anchor (the JSONL entry uuid)
 # so the sidecar can build a stable, dedup-able event id.
 # ---------------------------------------------------------------------------
 
@@ -1067,7 +1067,7 @@ class TestEntryToEventAnchor:
             "timestamp": "2026-06-30T00:00:00",
         })
         assert ev["type"] == "assistant"
-        assert ev["anchor"] == "abc-123"   # the deterministic OD-01 id anchor
+        assert ev["anchor"] == "abc-123"   # the deterministic id anchor
         assert ev["source_kind"] == "t"     # transcript-sourced
 
     def test_user_event_carries_uuid_anchor(self):
@@ -1089,7 +1089,7 @@ class TestEntryToEventAnchor:
 
 # -----------------------------------------------------------------------------
 # WSL2 -> Windows-host gateway resolution (the hook URL must be host-reachable;
-# localhost from WSL2 does NOT reach the host — live-verified in the OD-02 spike).
+# localhost from WSL2 does NOT reach the host — live-verified in the hook-channel spike).
 # -----------------------------------------------------------------------------
 
 class TestDefaultGatewayParse:

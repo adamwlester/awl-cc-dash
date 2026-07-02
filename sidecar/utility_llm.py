@@ -1,4 +1,4 @@
-"""OD-16 utility-LLM passes (Revise / Summarize) — the `sdk`-driver carve-out.
+"""Utility-LLM passes (Revise / Summarize) — the `sdk`-driver carve-out.
 
 Exactly **two** consumers use the `sdk` engine: **Revise** (scope chip
 Grammar · Language · Refactor, default Grammar) and **Summarize**. Both run as
@@ -48,7 +48,7 @@ def _text_of(message) -> list[str]:
 
 async def _one_shot(prompt: str, system_prompt: str, model: str | None = None) -> str:
     """Run a single non-interactive SDK pass and return the collected assistant
-    text. Reserved for the two OD-16 consumers only."""
+    text. Reserved for the two utility-LLM consumers (Revise / Summarize) only."""
     from claude_agent_sdk import query, ClaudeAgentOptions  # local import: sdk-only
     opts = ClaudeAgentOptions(
         system_prompt=system_prompt, model=model, max_turns=1,

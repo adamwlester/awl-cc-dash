@@ -1,4 +1,4 @@
-"""Console slash-command runner catalog (OD-20).
+"""Console slash-command runner catalog.
 
 Pure-logic catalog of Claude Code TUI slash-commands for the dashboard's
 **Console** runner tab, plus the classification the runner needs to drive them.
@@ -9,7 +9,7 @@ wiring — actually pushing ``/model`` into a session and handling the follow-on
 picker — lives elsewhere; this module tells that wiring which commands need
 follow-on handling.
 
-Design (from the OD-20 tracker Decision, authoritative):
+Design (from the console decision record, authoritative):
 
 * A COMPLETE catalog grouped into **six clusters**, in a fixed display order:
   ``Session & context``, ``Model & behavior``, ``Info & status``,

@@ -1,5 +1,12 @@
 # The Dashboard Data & Storage Map — where every piece of data lives
 
+> **ARCHIVED 2026-07-02 — fully ported, no longer maintained.** Everything normative here now lives in
+> [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (§§1–10 → its storage & lifecycle sections) and
+> [`dev/notes/TODO.md`](../../dev/notes/TODO.md) (§11's T1–T11 → NEXT UP — BUILD). Kept for the original
+> deliberation and the file:line ⚠ Today evidence; where this file disagrees with ARCHITECTURE.md, the
+> ARCHITECTURE.md is right (e.g. the dashboard store now also holds a `projects.json` index, and the
+> product opens one project at a time).
+
 *Working note. The data/architecture counterpart to [`design/DESIGN.md`](../../design/DESIGN.md)
 (which owns the visuals) and [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (system wiring).
 This answers: for any piece of data in the dashboard — **where is it stored, which part of the UI

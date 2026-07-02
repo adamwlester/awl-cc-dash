@@ -1,4 +1,4 @@
-"""Hermetic unit tests for the storage & scoping homes (OD-23).
+"""Hermetic unit tests for the storage & scoping homes.
 
 Pure path logic — no driver, no WSL2/tmux, no live agent. Proves the three
 storage homes resolve correctly off each agent's ``cwd``:
@@ -69,7 +69,7 @@ class TestProjectHome:
         proj = tmp_path / "p"
         proj.mkdir()
         awl = proj / ".awl"
-        # OD-17 scratchpad + OD-15 plan-review side-store live in the project home.
+        # The scratchpad + the plan-review side-store live in the project home.
         assert storage.scratchpad_path(str(proj)) == awl / "scratchpad.md"
         assert storage.plan_reviews_path(str(proj)) == awl / "plan-reviews.json"
 

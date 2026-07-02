@@ -1,4 +1,4 @@
-"""Hermetic unit tests for OD-19 permanent Delete planning (`sidecar/deletion.py`).
+"""Hermetic unit tests for permanent Delete planning (`sidecar/deletion.py`).
 
 Pure-logic, no live agents, no real filesystem deletion. Delete is a HARD,
 irreversible wipe governed by one rule: WIPE the agent's private footprint

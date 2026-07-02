@@ -1,9 +1,9 @@
-"""OD-12 Marquee — low-fidelity liveness signal for a running agent.
+"""Marquee — low-fidelity liveness signal for a running agent.
 
 The marquee is a scrolling *tail* of an agent's recent transcript output. Its
 only job is to say "this agent is running and moving" — it is NOT an audit
 surface, so fidelity is deliberately low. The source is the agent's own recent
-events (the OD-01 stream): assistant text and tool_use blocks.
+events (the merged cross-agent stream): assistant text and tool_use blocks.
 
 Event shape (matching the sidecar's assistant/tool events)::
 

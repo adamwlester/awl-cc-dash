@@ -246,7 +246,7 @@ function Create({ onCreate, onCancel, busy }: {
   )
 }
 
-// ---- Console (OD-20 slash-command runner) ----------------------------------
+// ---- Console (slash-command runner) ----------------------------------------
 
 function Console({ session }: { session: Session }) {
   const [catalog, setCatalog] = useState<{ clusters: string[]; by_cluster: Record<string, ConsoleCommand[]> } | null>(null)

@@ -1,4 +1,4 @@
-"""OD-11 run-strip completion parser — "agent self-report with barber-pole floor".
+"""Run-strip completion parser — "agent self-report with barber-pole floor".
 
 Pure logic, no I/O. The dashboard sidecar feeds this module the ordered list of
 assistant text strings produced in a run (most recent last); it scans for a

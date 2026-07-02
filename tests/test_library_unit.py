@@ -1,4 +1,4 @@
-"""Hermetic unit tests for the Library module (OD-15, v1 = read + render).
+"""Hermetic unit tests for the Library module (v1 = read + render).
 
 Pure file logic — no driver, no WSL2/tmux, no live agent, no servers. Proves:
 

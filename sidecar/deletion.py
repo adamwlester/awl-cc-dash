@@ -1,4 +1,4 @@
-"""OD-19 permanent Delete planning (pure logic).
+"""Permanent Delete planning (pure logic).
 
 Delete is a HARD, irreversible wipe governed by one rule: **WIPE the agent's
 private footprint; TOMBSTONE everything shared.**
@@ -8,8 +8,8 @@ private footprint; TOMBSTONE everything shared.**
   transcripts (true on-disk erasure). Available from any state — a running agent
   is interrupted+closed first.
 - **TOMBSTONE** (shared, kept + attributed + marked deleted/inactive): the
-  agent's scratchpad posts (OD-17), feed events/messages (OD-01), and its link
-  history (OD-08). Delete must NOT rewrite the shared record or corrupt peers'
+  agent's scratchpad posts, feed events/messages, and its link
+  history. Delete must NOT rewrite the shared record or corrupt peers'
   watermarks/stream. Link edges become INACTIVE tombstones on the surviving
   peer's list (non-functional), not silent removals.
 - **CLEAR** (own transient state): the agent's queued prompts + inbox items are

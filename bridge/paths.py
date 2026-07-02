@@ -68,8 +68,9 @@ def parse_default_gateway(ip_route_output):
     seen from inside WSL — so this is the host-reachable address an in-WSL agent's
     HTTP hook must POST to (``localhost`` from WSL2 does not reach the host, and
     ``host.docker.internal`` resolves to the LAN IP which the host firewall blocks
-    from WSL — both live-verified in the OD-02 spike). The IP changes across WSL
-    restarts, so callers resolve it at launch rather than hardcoding it.
+    from WSL — both live-verified in the idle-detection hook spike). The IP
+    changes across WSL restarts, so callers resolve it at launch rather than
+    hardcoding it.
 
     Returns the dotted-quad string, or ``None`` when there is no default route.
     """

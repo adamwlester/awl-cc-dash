@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // Messages renders the cross-agent merged /events bus (dedup + seq-ordered in
 // App). A [Focused | All] toggle scopes it to the selected agent or the whole
-// fleet, with per-agent grouping headers in All mode. Inbox is the OD-09 "needs
+// fleet, with per-agent grouping headers in All mode. Inbox is the "needs
 // you" surface across all five typed sections (permission / error / warning /
 // plan / decision) — permission cards Approve/Deny, the rest resolve.
 // ============================================================================

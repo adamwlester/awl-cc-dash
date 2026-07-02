@@ -49,20 +49,20 @@ export interface Session {
   launch_config: LaunchConfig
 }
 
-// A merged-bus event. Every event carries the OD-01 envelope
-// (id/agent_id/seq/ts) + the OD-22 addressing (source/recipients) on top of its
+// A merged-bus event. Every event carries the common envelope
+// (id/agent_id/seq/ts) + the addressing fields (source/recipients) on top of its
 // own payload. `sdk_type` + `content` drive the assistant/user block renderers.
 export interface SDKEvent {
   id?: string
-  agent_id?: string          // the sender session id (OD-01 identity stamp)
+  agent_id?: string          // the sender session id (identity stamp)
   seq?: number               // monotonic ordering key — order by this, never the id
   type: string
   subtype?: string
   sdk_type?: string
   ts?: string
   timestamp?: string
-  source?: string            // OD-22 from
-  recipients?: string[]      // OD-22 to (user | <agent-id> | scratch)
+  source?: string            // addressing: from
+  recipients?: string[]      // addressing: to (user | <agent-id> | scratch)
   data?: any
   content?: any
   status?: string
@@ -119,7 +119,7 @@ export interface PermissionDetail {
   raw?: string
 }
 
-// ---- Inbox (OD-09, 5 typed sections) ---------------------------------------
+// ---- Inbox (5 typed sections) ----------------------------------------------
 
 export type InboxType = 'permission' | 'error' | 'warning' | 'plan' | 'decision'
 
@@ -140,7 +140,7 @@ export interface InboxResponse {
   fleet_badge: number
 }
 
-// ---- Linking (OD-04..08) ---------------------------------------------------
+// ---- Linking (agent-to-agent links) ----------------------------------------
 
 export type LinkDirection = 'a2b' | 'b2a' | 'both'
 export type LinkTrigger = 'now' | 'next' | 'queue' | 'inject' | 'hold'
@@ -278,7 +278,7 @@ const qs = (params: Record<string, string | number | undefined | null>): string 
   return parts.length ? `?${parts.join('&')}` : ''
 }
 
-// ---- Merged event stream (OD-01) -------------------------------------------
+// ---- Merged event stream ---------------------------------------------------
 // Opens an EventSource on /events. The sidecar replays the bounded ring then
 // streams live; `?since/source/recipient` filter server-side. EventSource
 // auto-reconnects (and re-replays the ring) — callers must dedup by event.id.
@@ -317,7 +317,7 @@ export const api = {
   eventsHistory: (opts?: { since?: number; source?: string; recipient?: string }) =>
     getJSON<SDKEvent[]>(`/events/history${qs({ since: opts?.since, source: opts?.source, recipient: opts?.recipient })}`),
 
-  // ---- send (OD-02 timing) + run control ----------------------------------
+  // ---- send (queue/timing dispositions) + run control ----------------------
   send: (id: string, prompt: string, opts?: SendOpts) =>
     postJSON<SendResult>(`/sessions/${id}/send`, {
       prompt,
@@ -338,12 +338,12 @@ export const api = {
   marquee: (id: string) => getJSON<Marquee>(`/sessions/${id}/marquee`),
   usage: () => getJSON<Usage>('/usage'),
 
-  // ---- inbox (OD-09) -------------------------------------------------------
+  // ---- inbox ---------------------------------------------------------------
   inbox: () => getJSON<InboxResponse>('/inbox'),
   resolveInbox: (agent: string, itemId: string, answer?: any) =>
     postJSON(`/inbox/${agent}/${encodeURIComponent(itemId)}/resolve`, answer !== undefined ? { answer } : {}),
 
-  // ---- linking (OD-04..08) -------------------------------------------------
+  // ---- linking ---------------------------------------------------------------
   links: () => getJSON<LinksResponse>('/links'),
   createLink: (body: {
     a: string; b: string; direction?: LinkDirection; relationship?: string[]
@@ -354,35 +354,35 @@ export const api = {
   kickoffLink: (id: string, body: { from_agent: string; to_agent: string; prompt: string }) =>
     postJSON<any>(`/links/${id}/kickoff`, body),
 
-  // ---- scratch (OD-17) -----------------------------------------------------
+  // ---- scratch (shared scratchpad) -------------------------------------------
   scratch: (cwd: string) => getJSON<{ posts: ScratchPost[] }>(`/scratch${qs({ cwd })}`),
   postScratch: (body: { cwd: string; author: string; text: string }) =>
     postJSON<{ status: string; post: ScratchPost }>('/scratch', body),
 
-  // ---- library (OD-15, read + render) -------------------------------------
+  // ---- library (read + render) ---------------------------------------------
   libraryDocuments: (cwd: string, subdir?: string) =>
     getJSON<LibraryDoc[]>(`/library/documents${qs({ cwd, subdir })}`),
   libraryDocument: (path: string) => getJSON<LibraryDocument>(`/library/document${qs({ path })}`),
   libraryReviews: (cwd: string) => getJSON<Record<string, Review>>(`/library/reviews${qs({ cwd })}`),
 
-  // ---- console (OD-20) -----------------------------------------------------
+  // ---- console (slash-command runner) ----------------------------------------
   consoleCatalog: (q?: string) => getJSON<ConsoleCatalog & { commands?: ConsoleCommand[] }>(`/console/catalog${qs({ q })}`),
   consoleRun: (id: string, command: string) =>
     postJSON<ConsoleRunResult>(`/sessions/${id}/console/run`, { command }),
 
-  // ---- templates (OD-16) ---------------------------------------------------
+  // ---- templates -------------------------------------------------------------
   templates: () => getJSON<Template[]>('/templates'),
   addTemplate: (body: { name: string; body: string; placeholders?: string[] | null }) =>
     postJSON<Template>('/templates', body),
   deleteTemplate: (id: string) => delJSON<any>(`/templates/${id}`),
 
-  // ---- utility LLM passes (OD-16 sdk carve-out) ---------------------------
+  // ---- utility LLM passes (the sdk-driver carve-out) -----------------------
   revise: (text: string, scope: 'grammar' | 'language' | 'refactor' = 'grammar', model?: string) =>
     postJSON<{ scope: string; result: string }>('/utility/revise', { text, scope, model }),
   summarize: (text: string, model?: string) =>
     postJSON<{ result: string }>('/utility/summarize', { text, model }),
 
-  // ---- settings (OD-18 interactive + the registry reads) ------------------
+  // ---- settings (interactive writes + the registry reads) ------------------
   settingsRead: (path: string) => getJSON<any>(`/settings/read${qs({ path })}`),
   settingsAccount: (creds_path: string) => getJSON<AccountBand>(`/settings/account${qs({ creds_path })}`),
   settingsWrite: (body: { path: string; key?: string | null; value?: any; op?: 'write' | 'set' | 'toggle' | 'remove'; confirm?: boolean }) =>

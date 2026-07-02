@@ -1,7 +1,7 @@
-"""Hermetic unit tests for the OD-11 run-strip completion parser
+"""Hermetic unit tests for the run-strip completion parser
 (`sidecar/checklist.py`). Pure-logic: no live agents, no I/O.
 
-OD-11 decision (authoritative): the agent publishes a short ordered checklist of
+The decided behavior (authoritative): the agent publishes a short ordered checklist of
 major operations up front and marks each done as it goes; the sidecar reads the
 checklist from the agent's transcript text and renders done / total as a
 segmented bar. The CURRENT in-progress item (first not-done) labels the bar.

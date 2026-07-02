@@ -1,4 +1,4 @@
-"""Hermetic unit tests for the cross-agent event bus (OD-01 + OD-22).
+"""Hermetic unit tests for the cross-agent event bus.
 
 Pure logic — no driver, no SSE transport, no live agent. Proves the event
 envelope (id / agent_id / seq / ts / source / recipients), the deterministic-id
@@ -25,7 +25,7 @@ def _clean_bus():
 
 
 # ---------------------------------------------------------------------------
-# Monotonic seq — the ordering key (OD-01: "never parse the id for order")
+# Monotonic seq — the ordering key ("never parse the id for order")
 # ---------------------------------------------------------------------------
 
 class TestSeq:
@@ -40,7 +40,7 @@ class TestSeq:
 
 
 # ---------------------------------------------------------------------------
-# Envelope stamping (OD-01 id/agent_id/seq/ts + OD-22 source/recipients)
+# Envelope stamping (id/agent_id/seq/ts + source/recipients addressing)
 # ---------------------------------------------------------------------------
 
 class TestStamp:
@@ -51,8 +51,8 @@ class TestStamp:
         assert isinstance(ev["seq"], int) and ev["seq"] >= 1
         assert ev["id"]
         assert ev["ts"]
-        assert ev["source"] == "ag1"           # OD-22 default source = the agent
-        assert ev["recipients"] == ["user"]      # OD-22 default recipients
+        assert ev["source"] == "ag1"           # default source = the agent
+        assert ev["recipients"] == ["user"]      # default recipients
 
     def test_deterministic_id_from_transcript_anchor(self):
         seen = set()
@@ -107,7 +107,7 @@ class TestStamp:
 
 
 # ---------------------------------------------------------------------------
-# From/To filter (OD-22 recipients drives delivery, not visibility)
+# From/To filter (recipients drives delivery, not visibility)
 # ---------------------------------------------------------------------------
 
 class TestFilter:
@@ -133,7 +133,7 @@ class TestFilter:
 
 
 # ---------------------------------------------------------------------------
-# Global ring + replay/backfill (OD-01 bounded bus, server-side filtering)
+# Global ring + replay/backfill (bounded bus, server-side filtering)
 # ---------------------------------------------------------------------------
 
 class TestRingReplay:

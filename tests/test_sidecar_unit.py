@@ -149,7 +149,7 @@ class TestIdentityAssignment:
                 == assign_identity(None, 0)["color"])
 
     def test_icon_round_robin_over_curated_50(self):
-        # OD-03: icon = n mod 50 over the CURATED pool (not the full 167 on disk).
+        # Identity decision: icon = n mod 50 over the CURATED pool (not the full 167 on disk).
         assert len(AG_ICONS_CURATED) == 50
         for n in (0, 1, 25, 49, 50, 51, 99, 100):
             assert assign_identity(None, n)["icon"] == AG_ICONS_CURATED[n % 50]
@@ -197,7 +197,7 @@ class TestIdentityAssignment:
 
 
 # ---------------------------------------------------------------------------
-# Cross-agent event envelope + addressing (OD-01 + OD-22) on push_event
+# Cross-agent event envelope + addressing on push_event
 # ---------------------------------------------------------------------------
 
 class TestEventEnvelope:
@@ -205,12 +205,12 @@ class TestEventEnvelope:
         s = _session()
         s.push_event({"type": "assistant", "content": []})
         ev = s.events[-1]
-        assert ev["agent_id"] == "s1"          # OD-01 sender = session id
-        assert isinstance(ev["seq"], int)        # OD-01 monotonic ordering key
-        assert ev["id"]                          # OD-01 stable id
+        assert ev["agent_id"] == "s1"          # sender = session id
+        assert isinstance(ev["seq"], int)        # monotonic ordering key
+        assert ev["id"]                          # stable id
         assert ev["ts"]
-        assert ev["source"] == "s1"             # OD-22 default source
-        assert ev["recipients"] == ["user"]      # OD-22 default recipients
+        assert ev["source"] == "s1"             # default source
+        assert ev["recipients"] == ["user"]      # default recipients
 
     def test_push_dedups_anchored_event_on_repoll(self):
         s = _session()
@@ -252,7 +252,7 @@ class TestEventEnvelope:
 
 
 class TestMergedHistoryEndpoint:
-    """The OD-01 merged /events/history endpoint: ring replay + From/To + ?since."""
+    """The merged /events/history endpoint: ring replay + From/To + ?since."""
 
     def _two_agents(self):
         a = SessionState(session_id="a1", agent_type=None, model=None,
@@ -287,7 +287,7 @@ class TestMergedHistoryEndpoint:
 
 
 # ---------------------------------------------------------------------------
-# OD-02: per-agent ordered prompt queue + idle-flush (no more 409-drop)
+# Per-agent ordered prompt queue + idle-flush (no more 409-drop)
 # ---------------------------------------------------------------------------
 
 class _FakeDriver:
@@ -364,7 +364,7 @@ class TestPromptQueue:
         assert s.driver.sent == ["x"]
 
     def test_send_to_busy_enqueues_not_409(self):
-        # The OD-02 fix: a prompt to a running agent is QUEUED, never dropped.
+        # The queue fix: a prompt to a running agent is QUEUED, never dropped.
         s = _session(); s.driver = _FakeDriver(); s.status = "running"
         main.sessions["s1"] = s
         try:
@@ -400,7 +400,7 @@ def _clean_hookbus():
 
 
 class TestInjectDisposition:
-    """OD-02 `inject` disposition routes to the hook inbox, NOT the prompt queue,
+    """The `inject` disposition routes to the hook inbox, NOT the prompt queue,
     and surfaces a synthesized feed event (the inject isn't in the JSONL)."""
 
     def test_inject_enqueues_to_hookbus_not_queue(self):
@@ -452,7 +452,7 @@ def _finish_turn(s, text):
 
 
 class TestReplyToRelay:
-    """OD-04 serialized reply-to: a finished turn answering a linked peer fires
+    """Serialized reply-to: a finished turn answering a linked peer fires
     that turn's output back to the peer, and sets the peer's reply-to in return."""
 
     def test_relay_enqueues_to_peer_and_sets_replyto(self):
