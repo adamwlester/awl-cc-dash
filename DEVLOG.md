@@ -426,6 +426,14 @@ Files: design/DESIGN.md, design/mockup.html, design/gallery.html, design/behavio
 
 ---
 
+### 2026-07-02 02:35:12 — TODO Next up — Design #1 synced to the built Projects-tab concept
+
+Per user direction, rewrote **NEXT UP — DESIGN #1 (Projects Tab + Close Flow)** so its description matches the built + click-verified concept snippet: registry-row list wording, the active-project card's exact fields, one-project-at-a-time gating (other rows' Open disabled), the exactly-two-button confirm semantics (keep-running vs stop, one-line explanations, Cancel/Esc), sentence-case **Close project**; cleaned a corrupted trailing fragment ("each number meant.") and expanded the snippet reference (`.scratch/ui-snippets/projects-tab.html`, marked concept-only / rebuild-don't-port). The topbar/footbar chip + gallery-empty-state scoping notes kept as-is (settled model, deliberately beyond the snippet — chip now marked "not in the snippet").
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
