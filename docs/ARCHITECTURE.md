@@ -1207,6 +1207,167 @@ deleted.
   which the product should adopt.
 - **Fallback if infeasible:** keep the current custom coordination spine (inbox, links, scratchpad).
 
+### Priority — coverage-audit additions (2026-07-02)
+
+Surfaced by the 2026-07-02 system coverage audit
+([`dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../dev/notes/scratch/2026-07-02-coverage-audit-orphans.md))
+and **appended here as #14 onward** — deliberately *not* interleaved into the High/Medium/Low subsections
+above — so the existing item↔prompt numbering in [`dev/prompts/`](../dev/prompts/) is not disturbed. Per-item
+priority is noted inline. Each carries a spike or research prompt queued under
+`dev/prompts/2026-07-02-s10-*` (cited per item); those are the concrete next step, not evidence of a built
+capability.
+
+**14. Hook-driven run-state / permission-mode push channel ("hook event stream")** *(→ §6.2, §7.4, §7.11)* — 🧪 **needs-spike** *(priority: medium)*
+- **Evidence:** no test. §7.11 records the current default ("detection is screen-state, not hooks") but never
+  weighs the push-stream option. The sidecar already ingests *some* hooks — `PostToolUse`/`Stop` inject
+  delivery (proven live) and `PreToolUse` plan/decision (wired, spike-gated) — over the working WSL→Windows
+  gateway path, so this is an *extension*, not a greenfield build. A design deep-dive research prompt already
+  exists (`dev/prompts/2026-07-02-s10-research-14-hook-event-stream.md`); the mechanism is known, so the next
+  step is a spike, and a spike prompt is queued (`…-build-14-hook-event-stream.md`).
+- **Desired final behavior:** every agent's hooks POST each lifecycle event to the sidecar, which treats
+  pushed run-state / `permission_mode` as authoritative-when-present, with screen-polling as the fallback for
+  hookless sessions.
+- **Current blocker:** it is unproven whether an HTTP-hook payload actually carries `permission_mode` + the
+  current tool on every tool/turn event ("live mode for free"), and whether ordering/dedup hold under many
+  concurrent agents.
+- **Research/POC must establish:** a spike registering the candidate event set and confirming the payload
+  fields, latency, ordering, and dedup under concurrent load; the research prompt settles the design decision
+  (replace-vs-run-alongside, exact event set) first.
+- **Fallback if infeasible:** screen-state polling stays the primary run-state signal (today's floor); hooks
+  remain limited to the proven inject/plan paths.
+
+**15. Rewind / Handoff / Timeline — conversation truncate-and-resume / fork-from-point** *(→ §7.5, §9.2, §9.9, DESIGN "Rewind & Handoff")* — 🔬 **needs-research** *(priority: high — biggest crack; research gates the spike)*
+- **Evidence:** no test; a grep of this document returns **zero** hits for "rewind" / "handoff" / "timeline."
+  §9.9's only resume path (`claude --resume`) reattaches the *whole* session — it cannot truncate-and-resume
+  at message N, nor fork a session from an earlier point. DESIGN presents Rewind + Handoff as v1 controls but
+  marks only "richer handoff artifacts" deferred, treating the core rollback/fork mechanism as shipping.
+  (Handoff's Create-tab-prepopulation half **is** homed at §9.2/§7.5; the unhomed part is the conversation
+  carry / rollback primitive.) A full research prompt is queued
+  (`dev/prompts/2026-07-02-s10-research-15-rewind-handoff.md`); its spike prompt (`…-build-15-…`) is a
+  **conditional scaffold, to be finalized from the research findings.**
+- **Desired final behavior:** from the Agent→Details Timeline, **Rewind** rolls an agent back to a chosen
+  message and resumes from there; **Handoff** branches from a chosen point into a *new* agent carrying that
+  conversation prefix.
+- **Current blocker:** there is no known Claude Code rollback/fork API; whether *any* path exists (transcript
+  surgery + `--resume`, an SDK fork, checkpointing, or nothing) is unmapped — the mechanism itself is unknown,
+  so this is research-before-spike.
+- **Research/POC must establish:** *first* — **research** whether any truncate-and-resume-at-N or
+  fork-from-point mechanism is feasible under the bridge (gating); *then, only if research finds one* — a spike
+  proving it end-to-end.
+- **Fallback if infeasible:** if no fork/rollback path exists, Rewind/Handoff are cut or degraded to
+  whole-session `--resume` + fresh-agent Create-tab prepopulation only; record the omission.
+
+**16. System-wide fault detection — the harvest half behind the "System" Error cards** *(→ §5, §7.2, §7.8)* — 🧪 **needs-spike** *(priority: high)*
+- **Evidence:** no test; the System-sourced fleet-wide Error card is described (§7.2 ⚠Today + §7.8) but its
+  **detector** is not. Account rate/usage-cap detection is explicitly punted (`inbox.py` ~line 10: the
+  rate/usage-cap subtype "is not derived here"; `main.py` `/usage` ~line 1755: "Plan / rate-limit windows are
+  intentionally NOT here"). A screen-text `rate_limit` classifier exists (`inbox.py` ~line 111) but
+  auth-expiry, global-MCP-outage, and fleet-coalescing have no detector at all. Only the *harvest half* is a
+  spike — the deterministic tmux/WSL/sidecar-liveness probes are ordinary build (body §5/§7), not a research
+  question. Spike prompt queued (`…-build-16-system-fault-detection.md`).
+- **Desired final behavior:** the sidecar detects and raises one coalesced fleet-wide System Error card for the
+  non-deterministic faults — account rate/usage cap hit, auth expiry, global MCP outage.
+- **Current blocker:** it is unproven whether these signals can be harvested off the bridge at all — where a
+  rate/usage-cap or auth-expiry signal reliably surfaces (screen text? a CLI error line? a creds/API probe?),
+  and whether an MCP-outage signal is observable.
+- **Research/POC must establish:** a spike that provokes (or simulates) each fault and confirms a reliable,
+  machine-readable signal the sidecar can key on; the deterministic liveness probes are just-build once the
+  harvest signals are proven.
+- **Fallback if infeasible:** the System card fires only for the deterministic probes (tmux/WSL/sidecar down);
+  the non-harvestable faults are surfaced best-effort from screen text or omitted — recorded as a boundary.
+
+**17. Polling-model scale ceiling** *(→ §4.3, §6.2)* — 🧪 **needs-spike** *(priority: medium — load test)*
+- **Evidence:** no test; the per-agent bridge `events()` loop (`sidecar/drivers/bridge.py` ~line 617) polls
+  each agent on a fixed ~1 s cadence (`asyncio.sleep(1.0)` ~line 663) — an O(N) fleet cost that crosses the
+  Windows→WSL boundary each cycle. The product targets "many agents," but no ceiling, budget, or
+  adaptive-cadence/backpressure policy is stated anywhere. Load-test spike queued
+  (`…-build-17-polling-scale-ceiling.md`).
+- **Desired final behavior:** a known, documented agent-count ceiling (and, if needed, an
+  adaptive-cadence/backpressure policy) so the fleet degrades gracefully rather than silently bogging down.
+- **Current blocker:** the real ceiling is unmeasured — how many concurrent agents the ~1 s poll loop sustains
+  before latency / CPU / event-lag degrade past usability is unknown.
+- **Research/POC must establish:** a load test escalating N tab-less sessions and measuring poll-loop latency /
+  CPU / event lag, to establish the practical ceiling and whether an adaptive cadence is warranted.
+- **Fallback if infeasible:** document a conservative soft cap and a "slows past N agents" note; adaptive
+  cadence deferred.
+
+**18. statusLine `context_window` as a live mid-run context source** *(→ §7.9, §9, DESIGN context dropdown)* — 🧪 **needs-spike** *(priority: low; grouped with #21)*
+- **Evidence:** no test; DESIGN asserts context "can't be read mid-run," but the mode-control research
+  (`claude-code-mode-control-research.md`, ~line 150) documents reading `context_window_size` from the
+  **statusLine payload** as a live source. Complements the already-tested *total*-context derivation (§10-9 /
+  `test_bridge_unit`). Probed together with #21 in one data-source spike
+  (`…-build-18-21-usage-context-sources.md`).
+- **Desired final behavior:** the dashboard reads live context-window usage mid-run (feeding §10-9's context
+  readout and the run-strip) from the statusLine, not only from post-hoc JSONL.
+- **Current blocker:** whether a configured statusLine actually emits a machine-readable `context_window`
+  object mid-run under the bridge — and whether the sidecar can capture it — is unproven; DESIGN currently
+  assumes it can't.
+- **Research/POC must establish:** a spike configuring a statusLine and confirming the `context_window` value
+  is observable mid-run and parseable; if so, reconcile DESIGN.
+- **Fallback if infeasible:** context stays derived from JSONL / `/context` (per §10-9); mid-run context
+  remains best-effort and DESIGN's "can't read mid-run" stands.
+
+**19. Console `/clear` (and `/compact`) transcript-path orphaning** *(→ §7.13, §8.6, §8.7)* — 🧪 **needs-spike** *(priority: low)*
+- **Evidence:** no test; running `/clear` or `/compact` from the Console is believed to write a **new** JSONL
+  transcript while the sidecar's transcript resolution pins the *original* `<session-id>.jsonl`
+  (`bridge/bridge.py` `session_id_for`/`register_session_id` ~lines 428/435; `find_transcript` ~line 972),
+  which would orphan the resolved path (§8.7 "spots to watch"). Spike prompt queued
+  (`…-build-19-console-clear-transcript.md`).
+- **Desired final behavior:** after a Console `/clear` or `/compact`, the sidecar still resolves the agent's
+  *current* transcript, with no lost history or stale mapping.
+- **Current blocker:** it is unconfirmed whether `/clear` / `/compact` actually rotate the JSONL path and, if
+  so, whether the pinned-session-id resolution re-finds the new file or silently orphans it.
+- **Research/POC must establish:** a spike that runs `/clear` (and `/compact`) in a live Console session,
+  checks whether the transcript path changes, and confirms whether resolution recovers it — establishing
+  whether a re-resolve step is needed.
+- **Fallback if infeasible:** document the hazard and re-resolve the transcript path on demand after a Console
+  clear/compact.
+
+**20. Bypass & Auto permission-mode launch preconditions** *(→ §6.2, §7.11)* — 🧪 **needs-spike** *(priority: low; relates to #1)*
+- **Evidence:** no test; per-agent permission mode + launch flags are applied **only at launch** (the "only
+  point a TUI reads them," `sidecar/drivers/bridge.py` ~lines 570–573, which also notes the startup-gate
+  clearer handles the `bypassPermissions` warning gate). So the Bypass segment likely needs
+  `--allow-dangerously-skip-permissions` and Auto (accept-edits) may need eligibility/opt-in — either could
+  silently no-op if the agent wasn't launched for it. Distinct from #1 (mid-run cycling) — this is *launch-time*
+  preconditions. Spike prompt queued (`…-build-20-bypass-auto-preconditions.md`).
+- **Desired final behavior:** the UI presents Bypass/Auto as available only when the agent's launch actually
+  supports them, never as controls that silently do nothing.
+- **Current blocker:** the exact launch preconditions and their observable failure mode (does selecting Bypass
+  on a normally-launched agent no-op silently?) are unconfirmed.
+- **Research/POC must establish:** a spike launching agents with and without the flags, confirming which mode
+  segments are reachable and how an unreachable one presents.
+- **Fallback if infeasible:** gate Bypass/Auto in the UI behind a launch-time choice; disable the segment when
+  its precondition is absent.
+
+**21. Usage / limits source-boundary confirmation** *(→ §7.15)* — 🧪 **needs-spike** *(priority: low; grouped with #18)*
+- **Evidence:** no test; §7.15/DESIGN assert account identity comes from local creds (`settings_io.py`
+  `account_band()` ~line 208 reads email/org/plan for display) and usage/limits from an API, but *what local
+  creds vs. an API can actually deliver* is unverified. Probed together with #18 in one data-source spike
+  (`…-build-18-21-usage-context-sources.md`); complements the per-agent-cost harvest spike (§10-11 / build-11).
+- **Desired final behavior:** the Settings Usage band is fed from confirmed sources (account from creds;
+  usage/limits from a real, reachable surface) before the UI is built against them.
+- **Current blocker:** whether the named sources (local credential files; a usage/limits API or CLI surface)
+  actually deliver account + usage + limit data under the bridge is unverified.
+- **Research/POC must establish:** a spike probing the creds files and any `/usage` / limits surface, recording
+  exactly what each yields, so the Usage UI is built on confirmed data boundaries.
+- **Fallback if infeasible:** show only what a source demonstrably provides (e.g. account identity but not live
+  limits); mark the rest an honest boundary.
+
+**22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🔬 **needs-research** *(priority: medium; overlaps #13)*
+- **Evidence:** no code; subagent *observability* is homed (§7.17 — roster derived from the parent transcript)
+  and pending-vs-active is tracked (§10-8), but the *create / steer* affordance — spawning and managing
+  subagents from the dashboard — is unmapped and overlaps the native-primitives research (§10-13). Currently
+  parked only in [`dev/notes/TODO.md`](../dev/notes/TODO.md) (B4). Research prompt queued
+  (`…-research-22-subagent-management.md`).
+- **Desired final behavior:** the operator can create and manage (steer / stop) subagents from the dashboard,
+  not only observe them.
+- **Current blocker:** the native `Task` / team-spawn / `SendMessage` semantics under the bridge are unmapped —
+  what is reachable and *drivable* from outside the TUI is unknown, so nothing can be designed yet.
+- **Research/POC must establish:** which subagent create/manage operations are reachable and drivable over
+  tmux (vs. SDK-only), building on the §10-13 native-primitives research.
+- **Fallback if infeasible:** subagents remain observe-only (§7.17); creation/management stays a backlog item
+  until a drivable path is found.
+
 ### Decided omissions (not open questions)
 
 Settled engine limits — recorded here so they are not re-raised as open questions, and **not** part of the

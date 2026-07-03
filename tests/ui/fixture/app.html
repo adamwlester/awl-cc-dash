@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI slice — sidecar client-contract harness</title>
+  <style>
+    /* Deliberately minimal. This is a CONTRACT HARNESS, not a UI — it exists so a
+       browser that speaks only the frontend/src/renderer/api.ts contract can be
+       driven by Playwright and read back from the DOM. No framework, no build. */
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      margin: 0; padding: 12px; color: #1a1a1a; background: #fafafa;
+    }
+    #bar {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding-bottom: 8px; border-bottom: 1px solid #ddd;
+    }
+    #bar .pill {
+      padding: 2px 8px; border: 1px solid #ccc; border-radius: 10px;
+      background: #fff; font-size: 12px; white-space: nowrap;
+    }
+    #runstate { font-weight: 700; }
+    #runstate[data-state="running"] { color: #b45309; }
+    #runstate[data-state="idle"] { color: #15803d; }
+    #prompt { flex: 1 1 160px; min-width: 120px; padding: 4px 6px; }
+    button { cursor: pointer; padding: 4px 10px; }
+    #permission {
+      display: none; margin-top: 8px; padding: 10px;
+      border: 2px solid #d97706; border-radius: 6px; background: #fffbeb;
+    }
+    #permission.pending { display: block; }
+    #permission.resolved { display: block; border-color: #9ca3af; background: #f3f4f6; opacity: .75; }
+    #permq { font-size: 13px; margin-bottom: 6px; word-break: break-word; }
+    #permstatus { margin-left: 8px; font-size: 12px; color: #555; }
+    #feed {
+      margin-top: 8px; border: 1px solid #ccc; border-radius: 6px; background: #fff;
+      height: 42vh; overflow: auto; padding: 4px;
+    }
+    .event {
+      font: 12px/1.4 ui-monospace, Consolas, monospace;
+      padding: 1px 4px; border-bottom: 1px solid #f0f0f0;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .event[data-type="permission_request"] { color: #b45309; font-weight: 600; }
+    .event[data-type="permission_resolved"] { color: #6d28d9; }
+    .event[data-type="status_change"] { color: #0369a1; }
+    .event[data-type="assistant"], .event[data-type="user"] { color: #111; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span class="pill">agent <b id="sid">–</b></span>
+    <span class="pill">run-state: <span id="runstate" data-state="">–</span></span>
+    <input id="prompt" placeholder="prompt to send…" />
+    <button id="send">Send</button>
+    <span class="pill" id="sendresult">send: –</span>
+  </div>
+
+  <div id="permission">
+    <div id="permq"></div>
+    <button id="approve">Approve</button>
+    <button id="deny">Deny</button>
+    <span id="permstatus"></span>
+  </div>
+
+  <div id="feed" aria-label="event feed"></div>
+
+  <script>
+    // ------------------------------------------------------------------------
+    // Config — mirror api.ts:  API = window.awl?.sidecarUrl || http://127.0.0.1:7690
+    // A `?api=` override stands in for the Electron preload's injected sidecarUrl;
+    // `?sid=` is the session this harness drives (set by the test after create).
+    // ------------------------------------------------------------------------
+    var params = new URLSearchParams(location.search);
+    var API = params.get('api') || 'http://127.0.0.1:7690';
+    var SID = params.get('sid') || '';
+
+    var feedEl = document.getElementById('feed');
+    var runstateEl = document.getElementById('runstate');
+    var permEl = document.getElementById('permission');
+    var permqEl = document.getElementById('permq');
+    var permstatusEl = document.getElementById('permstatus');
+    var sendresultEl = document.getElementById('sendresult');
+    document.getElementById('sid').textContent = SID || '(none)';
+
+    // Dedup set — mirror openEventStream(): EventSource auto-reconnects and
+    // re-replays the ring, so callers MUST dedup by event.id.
+    var seen = new Set();
+    var permPending = false;
+
+    // ---- feed ----
+    function appendEvent(ev) {
+      var id = ev && ev.id;
+      if (id != null) { if (seen.has(id)) return; seen.add(id); }
+      var div = document.createElement('div');
+      div.className = 'event';
+      div.setAttribute('data-type', (ev && ev.type) || '');
+      if (ev && ev.agent_id) div.setAttribute('data-agent', ev.agent_id);
+      var label = ((ev && ev.type) || '?') + (ev && ev.status ? ':' + ev.status : '');
+      var seq = (ev && ev.seq != null) ? '  #' + ev.seq : '';
+      div.textContent = label + seq;
+      feedEl.appendChild(div);
+      feedEl.scrollTop = feedEl.scrollHeight;
+    }
+
+    // ---- run-state ----
+    function setRunstate(status) {
+      if (!status) return;
+      runstateEl.textContent = status;
+      runstateEl.setAttribute('data-state', status);
+    }
+
+    // ---- permission card ----
+    function renderPermission(pending, detail) {
+      permPending = pending;
+      if (pending) {
+        permEl.className = 'pending';
+        var q = detail && (detail.question || detail.raw);
+        permqEl.textContent = q || '(tool-permission requested)';
+        permstatusEl.textContent = '';
+      } else {
+        // Mark RESOLVED (not merely hidden) so the test can read the transition.
+        if (permEl.classList.contains('pending')) {
+          permEl.className = 'resolved';
+          if (!permstatusEl.textContent) permstatusEl.textContent = 'resolved';
+        }
+      }
+    }
+
+    // ---- event handler (mirrors openEventStream's onEvent) ----
+    function onEvent(ev) {
+      appendEvent(ev);
+      // Only OUR agent's events drive run-state + permission (parallel-safe: the
+      // /events bus is cross-agent, so filter by the identity stamp agent_id).
+      if (SID && ev && ev.agent_id && ev.agent_id !== SID) return;
+      if (ev.type === 'status_change') setRunstate(ev.status);
+      else if (ev.type === 'permission_request') renderPermission(true, ev.data || {});
+      else if (ev.type === 'permission_resolved') renderPermission(false, null);
+    }
+
+    // ---- SSE: EventSource on /events, parse each `message` as JSON (openEventStream) ----
+    var es = new EventSource(API + '/events');
+    es.onmessage = function (m) {
+      if (!m.data) return;
+      try { onEvent(JSON.parse(m.data)); } catch (e) { /* ignore malformed */ }
+    };
+    es.onopen = function () { sendresultEl.setAttribute('data-sse', 'open'); };
+
+    // ---- Authoritative poll of GET /sessions/{id} (api.session) ----
+    // Run-state + has_pending_permission are read back from the session record so
+    // the DOM reflects the same truth the frontend would, independent of SSE timing.
+    async function poll() {
+      if (!SID) return;
+      try {
+        var r = await fetch(API + '/sessions/' + SID);
+        if (!r.ok) return;
+        var s = await r.json();
+        setRunstate(s.status);
+        if (s.has_pending_permission && !permPending) renderPermission(true, s.permission_request || {});
+        else if (!s.has_pending_permission && permPending) renderPermission(false, null);
+      } catch (e) { /* transient */ }
+    }
+    setInterval(poll, 1000);
+    poll();
+
+    // ---- send: POST /sessions/{id}/send  {prompt, source, recipients, disposition} ----
+    document.getElementById('send').onclick = async function () {
+      var prompt = document.getElementById('prompt').value;
+      var body = { prompt: prompt, source: 'user', recipients: null, disposition: 'queue' };
+      var j;
+      try {
+        var r = await fetch(API + '/sessions/' + SID + '/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        j = r.ok ? await r.json() : { status: 'http_' + r.status };
+      } catch (e) { j = { status: 'err' }; }
+      window.__lastSend = j;                       // read back by the test
+      sendresultEl.textContent = 'send: ' + (j.status || '?');
+    };
+
+    // ---- permission: POST /sessions/{id}/permission  {approve} ----
+    async function answerPermission(approve) {
+      var j;
+      try {
+        var r = await fetch(API + '/sessions/' + SID + '/permission', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approve: approve })
+        });
+        j = r.ok ? await r.json() : { status: 'http_' + r.status };
+      } catch (e) { j = { status: 'err' }; }
+      window.__lastPermission = j;                 // read back by the test
+      permstatusEl.textContent = (approve ? 'approved' : 'denied') + ' → ' + (j.status || '?');
+      renderPermission(false, null);               // optimistic; poll/SSE confirm
+    }
+    document.getElementById('approve').onclick = function () { answerPermission(true); };
+    document.getElementById('deny').onclick = function () { answerPermission(false); };
+  </script>
+</body>
+</html>
