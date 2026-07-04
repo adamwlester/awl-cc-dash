@@ -1253,9 +1253,9 @@
     .md-blank{ min-height:0.9em; }
     .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-3); }
     .md-task{ color:var(--foreground); } .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
-    /* L2 (b): md-h-row is the level-generic heading row; md-h2-row is kept as an alias so gallery.html's static
-       snapshot still styles (L3 refreshes the gallery to the live component). */
-    .md-h-row, .md-h2-row{ position:relative; }
+    /* L2 (b): md-h-row is the level-generic heading row. (L3 removed the .md-h2-row alias — the gallery now renders
+       the doc editor live via mdEditorHTML, so no static md-h2-row snapshot remains to style.) */
+    .md-h-row{ position:relative; }
     /* the section heading carries a verdict tally on the right */
     .vtally{ display:inline-flex; align-items:center; gap:var(--space-4); margin-left:8px; vertical-align:middle; }
     .vchip{ display:inline-flex; align-items:center; gap:var(--space-3); height:var(--size-17); padding:0 var(--space-5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
@@ -1534,22 +1534,38 @@
     .cph-lab{ font-size:9px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
     .cph-time{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }
     .cmt-pop-body{ padding:var(--space-9) var(--space-10); display:flex; flex-direction:column; gap:var(--space-9); min-height:0; max-height:300px; overflow-y:auto; }   /* NEXT-UP item 13: the body scrolls past its cap (matching .fb-list/.aglist-scroll) instead of the whole popout being crushed/clipped */
-    .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); }
+    .cmt-pop-item{ font-size:11px; line-height:1.45; color:var(--foreground); cursor:pointer; }   /* L3 (5c): rows are click-to-select (toggleBoxSel) so a comment/author entry can be embedded in a prompt */
     .cmt-pop-item + .cmt-pop-item{ border-top:var(--border-width) solid var(--border); padding-top:var(--space-9); }
+    /* L3 (5c): the box-shadow spread paints the teal selection fill (or cream hover) as a padded highlight WITHOUT
+       shifting the row's layout — feeding the shared select-to-act → merged Export pattern used across the editor. */
+    .cmt-pop-item.sel{ background:var(--select); box-shadow:0 0 0 var(--space-5) var(--select); border-radius:var(--radius-xs); }
+    .cmt-pop-item:hover:not(.sel){ background:var(--background); box-shadow:0 0 0 var(--space-5) var(--background); border-radius:var(--radius-xs); }
     .cpi-h{ display:flex; align-items:center; gap:var(--space-7); margin-bottom:5px; }
+    .cph-time--clk{ display:inline-flex; align-items:center; gap:var(--space-3); }   /* the timestamp + clock glyph in the author box row (was an inline style) */
+    /* L3 (5a): the author-box action badge (Drafted / Edited / Revised) reuses the .dbadge shell in a NEUTRAL register
+       (surface-3 + muted, existing tokens) — an authorship action, deliberately not a verdict/lifecycle colour. */
+    .au-act{ background:var(--surface-3); color:var(--muted); }
     .cpi-none{ color:var(--muted-2); font-style:italic; }
 
     /* plan footer holds Edit + Share + Review groups; lets them wrap on a narrow column */
     .plan-foot{ flex-wrap:wrap; row-gap:var(--space-7); }
 
-    /* ============================ v9p12 — line/section commenting · 3-row header · doc editor ============================ */
-    /* 3-row plan header + chevron on the right */
+    /* ============================ v9p12 → L3 — line/section commenting · 2-row header · doc editor ============================ */
+    /* L3 (item 4): 2-row plan header — row 1 [owner badge · title · steps chip · spacer · cnt-strip · lifecycle badge];
+       row 2 [filename · spacer · dates]. Only the title flexes/ellipsizes; the chips + badge hold their size at the right. */
     .plan-head{ align-items:center; }
     .plan-head .plan-chev{ margin-top:0; margin-left:6px; }
     .plan-head-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--space-4); }
     .plan-row{ display:flex; align-items:center; gap:var(--space-8); min-width:0; }
     .plan-row.r1 .badge{ flex:0 0 auto; }
-    .plan-row.r1 .plan-title{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .plan-row.r1 .plan-title{ flex:0 1 auto; min-width:3ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .plan-row.r1 .cnt-chip,.plan-row.r1 .dbadge{ flex:0 0 auto; }   /* item 4: steps chip · review chips · lifecycle badge never shrink — the title ellipsizes first */
+    /* item 4 (narrow extreme): when the right-side chips + lifecycle badge can't share row 1 with the title, row 1
+       WRAPS (the footer's precedent) so nothing clips — the tally strip + lifecycle badge drop to their own line,
+       margin-left:auto keeping them right-aligned there; at wide widths it stays a single clean line. */
+    .plan-row.r1{ flex-wrap:wrap; row-gap:var(--space-3); }
+    .plan-row.r1 .cnt-strip{ flex:0 0 auto; margin-left:auto; }
+    .cnt-chip.c-steps.all{ color:var(--success); }   /* all steps done — the whole steps chip reads green */
     .steps-txt{ font-family:var(--font-mono); font-size:9px; font-weight:800; color:var(--muted); white-space:nowrap; flex:0 0 auto; }
     .steps-txt.all{ color:var(--success); }
     .fb-none{ font-size:9px; font-weight:700; font-style:italic; color:var(--muted-2); }

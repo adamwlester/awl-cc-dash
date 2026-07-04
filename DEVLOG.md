@@ -437,6 +437,14 @@ Files: tests/test_fast_mode_toggle_live.py, docs/ARCHITECTURE.md, dev/notes/scra
 
 ---
 
+### 2026-07-04 00:55:00 — ND L3: 2-row card header · editor-box detail · prose unwrap · gallery refresh (items 4+5+7d — [ND] queue complete)
+
+Finished the [ND] Library queue. Card header 3→2 rows (owner · title · promoted steps chip · review tally · lifecycle / filename · dates; row 1 wraps at narrow so nothing clips — verified at 360px/648px). Author box gains Drafted/Edited/Revised action badges + summary rows (`{action,summary}` seeded on all PLANS/DOCS authors) and keys `sec:null` to "Whole document"; comment-box timestamp right-aligned; both popovers' rows are click-selectable into the merged Export control (a new ephemeral `SELby` `box` kind — Embed/Copy on, Attach whole-only). Plan cards get the same raw-md edit toggle docs use (host-generic `entryEdit`). All PLANS/DOCS prose unwrapped to one line per paragraph + the soft-wrap authoring convention added to DESIGN.md beside the line-number guarantee. Gallery: plan-card / doc-editor / entry-nav / rosters now render LIVE from the shared builders (`gxRenderSpecimens()` — drift-proof); doc-switcher card replaced by entry-nav, static `md-h2-row` snapshots regenerated (+ the CSS alias removed), dead `docPick`/`data-olsec` dropped; comment-popover card shows 4 states incl. the composer's disabled/hint state. DESIGN.md: `outline-roster` registered, both header-row descriptions reconciled, token-check grep line added. Intentional deviations flagged by the builder: the row-1 "No feedback yet" placeholder dropped (empty tally conveys it), narrow-width row-1 wrap. Full batched verification: whole Library surface driven headless at narrow/wide + headed-parity captures, 0 console errors, token grep clean.
+
+Files: design/behavior.js, design/styles.css, design/gallery.html, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

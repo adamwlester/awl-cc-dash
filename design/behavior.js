@@ -137,9 +137,10 @@
   /* L1: which lens (Outline/Feedback/Authors) a card's nav rail currently shows — so an edit-save repaint keeps it */
   function currentLensMode(id){const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav)return 'outline';
     if(nav.querySelector('.nav-tab--fb.on'))return 'feedback';if(nav.querySelector('.nav-tab--au.on'))return 'authors';return 'outline';}
-  /* L1 (ND-3): per-card raw-markdown edit toggle for DOC cards — the Editor-header Edit ghost flips the rendered
-     .doc-ed view ⇄ a raw textarea seeded from entry.md; Save writes back to entry.md and repaints the view in the
-     card's current lens. Doc-only: plan cards' header Edit still toasts (planAct('edit')) — that parity fix is a later phase. */
+  /* L1 (ND-3) → L3 (5d): per-card raw-markdown edit toggle for BOTH plan and doc cards — the Editor-header Edit ghost
+     flips the rendered .doc-ed view ⇄ a raw textarea seeded from entry.md; Save writes back to entry.md and repaints
+     the view in the card's current lens. entryById resolves plans and docs, so this is host-generic (plan cards now
+     get the same working toggle docs use — planAct is reserved for approve/reject/revise). */
   function entryEdit(btn,id){const card=document.getElementById(id);if(!card)return;
     const ed=card.querySelector('.doc-ed');const ta=card.querySelector('.entry-edit');if(!ed||!ta)return;
     const e=entryById(id);const editing=ta.style.display!=='none';
@@ -164,10 +165,9 @@
     if(a==='approve'){p.status='approved';toast(kind+' approved — '+own+' may proceed');rerender();reopenPlan(p.id);
       if(typeof pushApprovalToInbox==='function')pushApprovalToInbox(p);return;}}
 
-  /* v1.2: Documents tab — doc-switcher selects which doc fills the shared editor host */
-  function docPick(btn,name){const pane=document.getElementById('doc-documents');if(!pane)return;
-    pane.querySelectorAll('.docnav-row').forEach(r=>r.classList.toggle('on',r===btn));
-    pane.querySelectorAll('.docdoc').forEach(d=>d.classList.toggle('on',d.dataset.doc===name));LU();}
+  /* L3: the retired v1.2 doc-switcher (docPick + the one-at-a-time .docdoc panes) is fully removed — the Documents
+     tab is the two-column entry-nav (renderEntryNav) + plan-style cards now; its last dead caller left with the
+     gallery's doc-switcher gx-card (replaced by the live entry-nav specimen). */
 
   /* ===== v10p1 #18-21: Assets as a rail + preview (like Documents) + the shared Documents/Assets
      header & footer + Add menu + nav-row rename/delete. Assets is the single source of truth for media. ===== */
@@ -457,7 +457,8 @@
     if(mode==='copy')expCopy(host);else if(mode==='file')expFile(host);else if(mode==='embed')eaEmbed(host);else if(mode==='attach')eaAttach(host);}
   function libSourceLabel(host){const e=entryById(host);if(!e)return 'Library';   /* L1: read the doc path/title off the DOCS/PLANS entry (the .docdoc panes are retired) */
     return host.indexOf('doc-')===0?('Library → Documents · '+e.path.split('/').pop()):('Library → Plans · '+e.title);}
-  function editorSelText(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return '';
+  function editorSelText(host){const s=SELby[host];if(s&&s.kind==='box')return s.boxText||'';   /* L3 (5c): a popover box selection carries its own picked text */
+    const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return '';
     const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
     return rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();}
   /* R-batch item 6: Copy / Export-to-file for the merged control. feed/hist reuse feedExport/histExport (whole
@@ -1454,7 +1455,7 @@
     LU();}
 
   /* line-numbered markdown — the rendered line numbers MATCH the raw .md file, so "see line N" is a real reference */
-  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}   /* null-safe: L2's document-wide {sec:null} author seeds crashed the Authors lens via esc(null) (L2-panel find) */
   function inlineMd(s){s=esc(s);s=s.replace(/`([^`]+)`/g,'<span class="md-code-i">$1</span>');s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');return s;}
   /* DOC EDITOR — an interactive left rail that indexes every line + section (click a cell to select a
      line or a whole section, so a chunk can be commented on / shared), the rendered body, and a docked
@@ -1498,6 +1499,17 @@
   const SELby={};
   function setCmtCtl(host,on){const ctl=document.querySelector('[data-cmthost="'+host+'"]');if(ctl)ctl.classList.toggle('is-off',!on);}
   function clearSel(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));SELby[host]=null;setCmtCtl(host,false);eaUpdate(host);}
+  /* L3 (5c): the comment/author popover rows are click-to-select — toggling .sel gathers the picked rows' text into
+     SELby[host] as a 'box' selection so the SAME per-host merged Export control (eaUpdate/eaEmbed/expCopy) can Embed or
+     Copy them into a prompt for follow-up. Extends the existing SELby store (a new 'box' kind) rather than adding a
+     parallel one; the box selection is ephemeral — cleared when the popover closes (closeCmtPop). */
+  function toggleBoxSel(row,host){row.classList.toggle('sel');const pop=popFor(host);if(!pop)return;
+    const rows=[...pop.querySelectorAll('.cmt-pop-item.sel')];
+    if(rows.length){const text=rows.map(r=>{const t=r.querySelector('.cpi-txt');return t?t.textContent.trim():'';}).filter(Boolean).join('\n\n');
+      const noun=pop.querySelector('.cph-ic')?'edit':'comment';   /* the Authors box carries a users-glyph .cph-ic; the comment box does not */
+      SELby[host]={kind:'box',ref:'box',label:rows.length+' '+noun+(rows.length>1?'s':''),boxText:text};}
+    else SELby[host]=null;
+    eaUpdate(host);}
   /* L2 (c): the ONE section-boundary helper — a level-L heading's section spans from its heading row to the
      next heading row of level ≤ L (exclusive), stopping before the trailing filler row. Anchored by the
      heading's unique data-secid (its line index) so repeated sub-heading names can never collide. Used by
@@ -1566,19 +1578,29 @@
      own verdict badge + thumbs. The header drops the single-verdict badge; the count matches the contents. */
   function openCmtPop(host,sec){const list=getFeedback(host);const pop=popFor(host);if(!pop)return;
     const items=list.filter(f=>f.sec===sec);
+    /* L3 (5b): row-1 order is badge · verdict · thumbs · spacer · timestamp (the time pins right). L3 (5c): each
+       row is click-to-select (toggleBoxSel) → the merged Export control can Embed/Copy the picked comment(s). */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
-        return '<div class="cmt-pop-item"><div class="cpi-h">'+badgeHTML(a,true)+verdictBadgeHTML(f.verdict)+'<span class="cph-time">'+(f.time||'')+'</span><span class="flex-1"></span>'+thumbsHTML()+'</div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
+        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+verdictBadgeHTML(f.verdict)+thumbsHTML()+'<span class="flex-1"></span><span class="cph-time">'+(f.time||'')+'</span></div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
-  function closeCmtPop(host){const pop=popFor(host);if(pop){pop.classList.remove('open');pop.innerHTML='';}deselectNavCards(host);clearFbHL(host);}
+  function closeCmtPop(host){const pop=popFor(host);if(pop){pop.classList.remove('open');pop.innerHTML='';}deselectNavCards(host);clearFbHL(host);
+    /* L3 (5c): the popover box selection lives only while the popover is open — drop it + re-gate Export on close */
+    if(SELby[host]&&SELby[host].kind==='box'){SELby[host]=null;eaUpdate(host);}}
   /* AUTHORS box — the docked popout in the Authors lens: a neutral section-anchor header (users glyph + § section +
      "N edits") and ONE entry per gutter-badge count (agent badge + timestamp, no verdict/comment/thumbs). Routes
      through the SAME three-indicator sync spine as openCmtPop (card fill + section highlight + open box). */
+  /* L3 (5a): each author-box row uses the comment-box layout grammar minus the thumbs — row 1 = agent badge + a
+     Drafted/Edited/Revised action badge (a neutral .dbadge variant, .au-act) + the timestamp right-aligned; row 2 =
+     the edit summary (wraps). L3 (5c): rows are click-to-select (toggleBoxSel) so an edit can be embedded in a prompt. */
+  function authorActionBadge(action){return '<span class="dbadge au-act">'+esc(action||'Edited')+'</span>';}
   function openAuthorPop(host,sec){const list=getAuthors(host);const pop=popFor(host);if(!pop)return;
-    const items=list.filter(f=>f.sec===sec);
-    pop.innerHTML='<div class="cmt-pop-head"><span class="cph-ic"><i data-lucide="users"></i></span><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' edit'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
+    /* L3: key ''/null to the ONE document-wide group (L2's {sec:null} draft seed) — navCardClick passes '' for it;
+       the header then reads "Whole document" (the title-cell register) rather than an empty "§" badge. */
+    const items=list.filter(f=>(f.sec||'')===(sec||''));const secLab=sec?('§ '+esc(sec)):'Whole document';
+    pop.innerHTML='<div class="cmt-pop-head"><span class="cph-ic"><i data-lucide="users"></i></span><span class="sel-badge">'+secLab+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' edit'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
-        return '<div class="cmt-pop-item"><div class="cpi-h">'+badgeHTML(a,true)+'<span class="flex-1"></span><span class="cph-time" style="display:inline-flex;align-items:center;gap:var(--space-3)"><i data-lucide="clock" class="au-clk"></i>'+(f.time||'')+'</span></div></div>';}).join('')+'</div>';
+        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+authorActionBadge(f.action)+'<span class="flex-1"></span><span class="cph-time cph-time--clk"><i data-lucide="clock" class="au-clk"></i>'+(f.time||'')+'</span></div>'+(f.summary?'<div class="cpi-txt">'+esc(f.summary)+'</div>':'')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   /* v9p14c: a small "Mark as" verdict dropdown lives INSIDE the composer (the Comment control is now a
      plain button); pick a verdict here, then Save commits it */
@@ -1589,7 +1611,7 @@
   function pickVdd(opt,v){const dd=opt.closest('.vdd');dd.dataset.verdict=v;dd.querySelector('.vdd-trig').innerHTML=verdictBadgeHTML(v)+'<i data-lucide="chevron-down" class="vdd-cv"></i>';dd.classList.remove('open');LU();
     const ed=opt.closest('.doc-ed');if(ed&&typeof syncCommentSave==='function')syncCommentSave(ed.dataset.edhost);}   /* L2 (f): a verdict switch re-checks the comment-required rule */
   /* user comment composer — opens in the same popout for the current line/section selection */
-  function openComposer(host,verdict){const sel=SELby[host];if(!sel){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;
+  function openComposer(host,verdict){const sel=SELby[host];if(!sel||sel.kind==='box'){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;   /* L3 (5c): a popover box selection isn't a line/section to comment on */
     deselectNavCards(host);clearFbHL(host);   /* composing is a separate flow from viewing existing feedback */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:2px">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
@@ -1624,13 +1646,10 @@
      md:`# Auth token-rotation remediation
 
 ## Context
-The JWT middleware accepts expired tokens: \`validateToken()\` never checks the
-\`exp\` claim, and refresh issues a fresh token indefinitely. Any held refresh
-token keeps a session alive forever.
+The JWT middleware accepts expired tokens: \`validateToken()\` never checks the \`exp\` claim, and refresh issues a fresh token indefinitely. Any held refresh token keeps a session alive forever.
 
 ## Approach
-Enforce \`exp\` in \`validateToken()\`, add sliding-window refresh rotation behind a
-feature flag, and cover the rotation path with a regression test before merge.
+Enforce \`exp\` in \`validateToken()\`, add sliding-window refresh rotation behind a feature flag, and cover the rotation path with a regression test before merge.
 
 ## Steps
 - [x] Reproduce the expiry bypass under token reuse
@@ -1641,12 +1660,10 @@ feature flag, and cover the rotation path with a regression test before merge.
 - [ ] Open a PR & request review from reviewer-01
 
 ## Risks
-Rotation churn under load; mitigate with a short overlap window. Keep the flag
-default-off until staging smoke passes.
+Rotation churn under load; mitigate with a short overlap window. Keep the flag default-off until staging smoke passes.
 
 ## TL;DR
-Close the expiry-bypass path with \`exp\` enforcement plus flagged refresh
-rotation, covered by a regression test, before merging to main.`,
+Close the expiry-bypass path with \`exp\` enforcement plus flagged refresh rotation, covered by a regression test, before merging to main.`,
      feedback:[
        {sec:'Context',ag:'sandy',verdict:'approve',time:'14:38',comment:''},
        {sec:'Approach',ag:'vega',verdict:'revise',time:'14:44',comment:'Prefer one-time rotation over sliding-window for replay safety — sliding-window leaves a valid window open after a token is stolen.'},
@@ -1656,21 +1673,20 @@ rotation, covered by a regression test, before merging to main.`,
        {sec:'Risks',ag:'kai',verdict:'block',time:'14:51',comment:'Need a rollback path if rotation churn spikes auth latency on prod before this can ship.'}
      ],
      authors:[
-       {sec:null,ag:'sandy',time:'Jun 18 09:12'},
-       {sec:'Context',ag:'sandy',time:'Jun 18 09:12'},
-       {sec:'Approach',ag:'sandy',time:'Jun 18 10:40'},
-       {sec:'Approach',ag:'vega',time:'Jun 19 15:22'},
-       {sec:'Steps',ag:'drew',time:'Jun 19 16:05'},
-       {sec:'Steps',ag:'sandy',time:'Jun 20 08:44'},
-       {sec:'Risks',ag:'kai',time:'Jun 20 11:10'},
-       {sec:'TL;DR',ag:'wren',time:'Jun 20 14:07'}
+       {sec:null,ag:'sandy',action:'Drafted',time:'Jun 18 09:12',summary:'Drafted the initial remediation plan — context, approach, steps, and risks.'},
+       {sec:'Context',ag:'sandy',action:'Edited',time:'Jun 18 09:12',summary:'Wrote up the expired-token bypass and its blast radius.'},
+       {sec:'Approach',ag:'sandy',action:'Edited',time:'Jun 18 10:40',summary:'Laid out exp enforcement plus flagged sliding-window rotation.'},
+       {sec:'Approach',ag:'vega',action:'Revised',time:'Jun 19 15:22',summary:'Weighed one-time rotation against sliding-window for replay safety.'},
+       {sec:'Steps',ag:'drew',action:'Edited',time:'Jun 19 16:05',summary:'Added a negative test for an already-expired refresh token.'},
+       {sec:'Steps',ag:'sandy',action:'Edited',time:'Jun 20 08:44',summary:'Reordered the steps and marked the exp-enforcement work done.'},
+       {sec:'Risks',ag:'kai',action:'Revised',time:'Jun 20 11:10',summary:'Called out rotation-churn latency and the need for a rollback path.'},
+       {sec:'TL;DR',ag:'wren',action:'Edited',time:'Jun 20 14:07',summary:'Tightened the summary to a single sentence.'}
      ]},
     {id:'plan-2',file:'session-handoff-export-quiet-harbor.md',status:'approved',title:'Session-handoff transcript export',owner:'wren',open:false,created:'Jun 12 16:40',createdAgo:'9d',edited:'Jun 19 09:21',editedAgo:'2d',
      md:`# Session-handoff transcript export
 
 ## Context
-A finished agent's context should hand cleanly to the next session instead of
-being lost when the run ends.
+A finished agent's context should hand cleanly to the next session instead of being lost when the run ends.
 
 ## Steps
 - [x] Define the transcript schema
@@ -1681,13 +1697,12 @@ being lost when the run ends.
 ## TL;DR
 Structured JSONL transcript export so an agent's context survives a handoff.`,
      feedback:[{sec:'Steps',ag:'sandy',verdict:'approve',time:'09:18',comment:'Verified the export round-trips on a 200-turn session.'}],
-     authors:[{sec:null,ag:'wren',time:'Jun 12 16:40'},{sec:'Context',ag:'wren',time:'Jun 12 16:40'},{sec:'Steps',ag:'wren',time:'Jun 18 11:20'},{sec:'Steps',ag:'sandy',time:'Jun 19 09:05'}]},
+     authors:[{sec:null,ag:'wren',action:'Drafted',time:'Jun 12 16:40',summary:'Drafted the session-handoff export plan.'},{sec:'Context',ag:'wren',action:'Edited',time:'Jun 12 16:40',summary:'Framed the clean-handoff goal.'},{sec:'Steps',ag:'wren',action:'Edited',time:'Jun 18 11:20',summary:'Listed schema → serialize → summary → CLI wiring.'},{sec:'Steps',ag:'sandy',action:'Revised',time:'Jun 19 09:05',summary:'Verified the export round-trips on a 200-turn session and marked the steps done.'}]},
     {id:'plan-3',file:'dashboard-layout-reflow-electric-meadow.md',status:'draft',title:'Dashboard layout reflow',owner:'lex',open:false,created:'Jun 20 10:50',createdAgo:'20h',edited:'Jun 20 11:02',editedAgo:'20h',
      md:`# Dashboard layout reflow
 
 ## Context
-Reflow the three-pane frame and add the Documentation panel without regressing
-the resize behavior across the nested panel groups.
+Reflow the three-pane frame and add the Documentation panel without regressing the resize behavior across the nested panel groups.
 
 ## Steps
 - [x] Audit the current panel structure & handlers
@@ -1697,10 +1712,9 @@ the resize behavior across the nested panel groups.
 - [ ] Verify resize across the nested groups
 
 ## TL;DR
-Reading order becomes Agent · Team Graph · Documentation · Feed · Prompt, with
-resize intact.`,
+Reading order becomes Agent · Team Graph · Documentation · Feed · Prompt, with resize intact.`,
      feedback:[],
-     authors:[{sec:null,ag:'lex',time:'Jun 20 10:50'},{sec:'Context',ag:'lex',time:'Jun 20 10:50'},{sec:'Steps',ag:'lex',time:'Jun 20 11:02'}]}
+     authors:[{sec:null,ag:'lex',action:'Drafted',time:'Jun 20 10:50',summary:'Drafted the dashboard layout-reflow plan.'},{sec:'Context',ag:'lex',action:'Edited',time:'Jun 20 10:50',summary:'Framed the reflow goal without regressing resize.'},{sec:'Steps',ag:'lex',action:'Edited',time:'Jun 20 11:02',summary:'Sketched the audit → reorder → move → insert → verify steps.'}]}
   ];
   /* L1 (ND-1): DOCS — the project docs as reviewable-document entries in the SAME shape as PLANS (id doc-*, file,
      status, title, owner, created/edited, md, feedback[], authors[]) so the whole Plans machinery — the 3-row card,
@@ -1712,9 +1726,7 @@ resize intact.`,
     {id:'doc-readme',file:'README.md',path:'agent-dashboard/README.md',status:'review',title:'Project README',owner:'lex',open:false,created:'Jun 17',createdAgo:'7d',edited:'Jun 20',editedAgo:'17h',
      md:`# AWL Multi-Agent Dashboard
 
-A control surface for running and supervising a team of Claude Code agents
-from one window. Watch the team, steer each agent, and review their work
-without leaving the dashboard.
+A control surface for running and supervising a team of Claude Code agents from one window. Watch the team, steer each agent, and review their work without leaving the dashboard.
 
 ## The five panels
 The window is a title bar over three columns over a status footer.
@@ -1734,8 +1746,7 @@ Plans, Documents, and Assets share one reviewable-document surface.
 - **Prompts** — compose and dispatch prompts.
 
 ## Design system
-Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
-single pink-to-teal emphasis ladder.
+Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a single pink-to-teal emphasis ladder.
 
 ### Tokens
 Every value lives in tokens.css — colours, type, spacing, radius, shadow.
@@ -1743,16 +1754,14 @@ Every value lives in tokens.css — colours, type, spacing, radius, shadow.
 ### Components
 styles.css holds the shared component CSS; behavior.js the interaction logic.`,
      feedback:[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
-     authors:[{sec:null,ag:'lex',time:'Jun 17 09:00'},{sec:'The five panels',ag:'lex',time:'Jun 18 10:00'},{sec:'Design system',ag:'lex',time:'Jun 20 09:30'}]},
+     authors:[{sec:null,ag:'lex',action:'Drafted',time:'Jun 17 09:00',summary:'Drafted the README — panels overview and design-system notes.'},{sec:'The five panels',ag:'lex',action:'Edited',time:'Jun 18 10:00',summary:'Expanded the five-panels section with the Library tabs.'},{sec:'Design system',ag:'lex',action:'Edited',time:'Jun 20 09:30',summary:'Added the tokens / components breakdown.'}]},
     {id:'doc-claude',file:'CLAUDE.md',path:'agent-dashboard/CLAUDE.md',status:'draft',title:'Project instructions',owner:'sandy',open:false,created:'Jun 16',createdAgo:'8d',edited:'Jun 21',editedAgo:'9h',
      md:`# CLAUDE.md
 
-Project instructions loaded into every agent's context. Keep it short — it is
-spent context on every turn.
+Project instructions loaded into every agent's context. Keep it short — it is spent context on every turn.
 
 ## Workspace identity
-A general-purpose VS Code workspace for AI/agentic workflows. Current focus:
-the AWL multi-agent dashboard.
+A general-purpose VS Code workspace for AI/agentic workflows. Current focus: the AWL multi-agent dashboard.
 
 ## Behavioral rules
 - Stay inside the project directory unless told otherwise.
@@ -1760,12 +1769,11 @@ the AWL multi-agent dashboard.
 - Write transient artifacts into .scratch/, never the repo root.
 - Preserve everything you weren't asked to change.`,
      feedback:[],
-     authors:[{sec:null,ag:'sandy',time:'Jun 16 12:00'},{sec:'Workspace identity',ag:'sandy',time:'Jun 16 12:00'},{sec:'Behavioral rules',ag:'sandy',time:'Jun 21 08:45'}]},
+     authors:[{sec:null,ag:'sandy',action:'Drafted',time:'Jun 16 12:00',summary:'Drafted the project CLAUDE.md instructions.'},{sec:'Workspace identity',ag:'sandy',action:'Edited',time:'Jun 16 12:00',summary:'Described the workspace focus.'},{sec:'Behavioral rules',ag:'sandy',action:'Revised',time:'Jun 21 08:45',summary:'Revised the behavioral rules — scope, DEVLOG, scratch, preservation.'}]},
     {id:'doc-claudeuser',file:'CLAUDE.md (user)',path:'~/.claude/CLAUDE.md',status:'approved',title:'User instructions',owner:'wren',open:false,created:'May 28',createdAgo:'27d',edited:'Jun 22',editedAgo:'2d',
      md:`# CLAUDE.md
 
-User-level instructions loaded into every project's context, on top of the
-project CLAUDE.md. Global defaults that travel with you.
+User-level instructions loaded into every project's context, on top of the project CLAUDE.md. Global defaults that travel with you.
 
 ## Working style
 - Be direct, practical, low-ceremony. Lead with action.
@@ -1776,7 +1784,7 @@ project CLAUDE.md. Global defaults that travel with you.
 - Use markdown links for file references, not bare paths.
 - Match the project's existing patterns before introducing new ones.`,
      feedback:[{sec:'Working style',ag:'sandy',verdict:'approve',time:'Jun 22',comment:'Reads clean — good to keep as the standing default.'}],
-     authors:[{sec:null,ag:'wren',time:'May 28 09:00'},{sec:'Working style',ag:'wren',time:'May 28 09:00'},{sec:'Conventions',ag:'wren',time:'Jun 22 11:20'}]},
+     authors:[{sec:null,ag:'wren',action:'Drafted',time:'May 28 09:00',summary:'Drafted the user-level instructions.'},{sec:'Working style',ag:'wren',action:'Edited',time:'May 28 09:00',summary:'Set the direct, low-ceremony working style.'},{sec:'Conventions',ag:'wren',action:'Revised',time:'Jun 22 11:20',summary:'Revised the conventions — markdown links and pattern-matching.'}]},
     {id:'doc-notes',file:'notes.md',path:'agent-dashboard/notes.md',status:'draft',title:'Scratch notes',owner:'lex',open:false,created:'Jun 26',createdAgo:'1d',edited:'Jun 26',editedAgo:'4h',
      md:`# Scratch notes
 
@@ -1786,7 +1794,7 @@ Short-lived notes for the current run — kept brief on purpose.
 - Sidecar API — http://127.0.0.1:7690
 - Renderer dev — http://127.0.0.1:5199`,
      feedback:[],
-     authors:[{sec:null,ag:'lex',time:'Jun 26 10:15'},{sec:'Endpoints',ag:'lex',time:'Jun 26 10:15'}]}
+     authors:[{sec:null,ag:'lex',action:'Drafted',time:'Jun 26 10:15',summary:'Drafted the scratch notes for the current run.'},{sec:'Endpoints',ag:'lex',action:'Edited',time:'Jun 26 10:15',summary:'Noted the sidecar + renderer dev endpoints.'}]}
   ];
   /* L1 (ND-2): the single entry lookup — search PLANS then DOCS (doc-* ids resolve to DOCS). Replaces the scattered
      PLANS.find(x=>x.id===…) lookups so planAct / reopenPlan / planNavMode / saveComment / getFeedback / getAuthors
@@ -1799,7 +1807,7 @@ Short-lived notes for the current run — kept brief on purpose.
        heading's LINE INDEX (data-secid), never its text, so repeated sub-headings can't collide. */
     const heads=[];p.md.split('\n').forEach((l,i)=>{const m=l.match(/^(#{2,4})\s+(.*)/);if(m)heads.push({level:m[1].length,text:m[2],secid:'s'+i});});
     const outline=heads.map(h=>{const c=fb[h.text];const worst=c?(c.block?'d-block':(c.revise?'d-revise':'')):'';const cnt=c?(c.approve+c.revise+c.block):0;   /* L2 (e): approve no longer tints the dot — only revise/block survive */
-      return '<button data-comp="outline-item" class="ol-item" style="--hl:'+h.level+'" data-hlevel="'+h.level+'" data-secid="'+h.secid+'" data-olsec="'+esc(h.text)+'" onclick="planJump(\''+p.id+'\',this)"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+esc(h.text)+'</span>'+(cnt?'<span class="ol-c">'+cnt+'</span>':'')+'</button>';}).join('');
+      return '<button data-comp="outline-item" class="ol-item" style="--hl:'+h.level+'" data-hlevel="'+h.level+'" data-secid="'+h.secid+'" onclick="planJump(\''+p.id+'\',this)"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+esc(h.text)+'</span>'+(cnt?'<span class="ol-c">'+cnt+'</span>':'')+'</button>';}).join('');
     const auN=(p.authors||[]).length;   /* V1 lens tab strip: Outline keeps its label + takes the first half; Feedback + Authors are icon+count tabs splitting the second half */
     const tabs='<div class="nav-tabs">'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--ol '+(mode==='outline'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'outline\')" title="Outline"><span class="nt-ic"><i data-lucide="list"></i></span><span class="nt-lab">Outline</span></button>'
@@ -1815,7 +1823,7 @@ Short-lived notes for the current run — kept brief on purpose.
      encoding the two-level model (reviewer verdicts are distinct from the document's own lifecycle badge / footer Approve). */
   function rosterAgents(list){const seen=[];(list||[]).forEach(f=>{if(f.ag&&seen.indexOf(f.ag)<0)seen.push(f.ag);});return seen;}
   function worstVerdict(list,ag){let w='approve';(list||[]).forEach(f=>{if(f.ag===ag){if(f.verdict==='block')w='block';else if(f.verdict==='revise'&&w!=='block')w='revise';}});return w;}
-  function rosterBlockHTML(cls,label,rows){return '<div class="ol-roster '+cls+'"><div class="ol-rhead"><span class="ol-rlab">'+label+'</span><span class="nav-cnt">'+rows.length+'</span></div>'
+  function rosterBlockHTML(cls,label,rows){return '<div data-comp="outline-roster" class="ol-roster '+cls+'"><div class="ol-rhead"><span class="ol-rlab">'+label+'</span><span class="nav-cnt">'+rows.length+'</span></div>'
     +(rows.length?'<div class="ol-rlist">'+rows.join('')+'</div>':'<div class="ol-rempty">None yet</div>')+'</div>';}
   function outlineRostersHTML(p){
     const au=rosterAgents(p.authors).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k],true)+'</div>');
@@ -1834,8 +1842,11 @@ Short-lived notes for the current run — kept brief on purpose.
      verdict / thumbs / comment). One card per author entry, like Feedback. */
   function authorListHTML(host,list){if(!list.length)return '<div class="fb-empty">No authorship recorded yet.</div>';
     return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
+      /* L3: a document-wide author entry (L2's {sec:null} seed) reads as "Whole document" — the whole-doc register
+         the title cell / rosters use — never an empty "§ null" badge; navCardClick passes '' for it (openAuthorPop
+         keys '' / null to the same document-wide group). */
       return '<div data-comp="author-card" class="fb-card au-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\')" title="Open all edits on this section →">'
-        +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span><span class="sel-badge">§ '+f.sec+'</span></div>'
+        +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span><span class="sel-badge">'+(f.sec?'§ '+esc(f.sec):'Whole document')+'</span></div>'
         +'<div class="au-line"><i data-lucide="clock" class="au-clk"></i><span>'+(f.time||'')+'</span></div></div>';}).join('')+'</div>';}
   /* R-batch item 10: the Plans footer leads with the merged Export control, then the single-agent Review chip (both
      left-aligned); the right action group is just the decision trio (Revise · Reject · Approve). The right group
@@ -1846,22 +1857,25 @@ Short-lived notes for the current run — kept brief on purpose.
     return '<div class="plan-foot">'   /* item 10: [Export][reviewer chip] left · [Revise·Reject·Approve] right */
       +expMenuHTML(p.id)+reviewChipHTML(p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
-  /* 3-row header: [owner badge · title · state] / [feedback badges · steps done] / [filename · created/edited] */
+  /* L3 (item 4): 2-row header — row 1 [owner badge · title · steps chip · spacer · review count-chips · lifecycle badge];
+     row 2 [filename · spacer · created/edited]. The steps chip is promoted inline with the title (glance altitude);
+     the cnt-strip stays for the glance tally while the L2 Reviewers roster carries the per-reviewer detail. */
   function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);const isDoc=p.id.indexOf('doc-')===0;
     const done=p.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
     const stepN=p.md.split('\n').filter(l=>/^\s*-\s*\[( |x|X)\]/.test(l)).length;
     const tot={approve:0,revise:0,block:0};p.feedback.forEach(f=>tot[f.verdict]++);
     let fbadges='';['approve','revise','block'].forEach(v=>{if(tot[v]){const m=VERDICT[v];fbadges+='<span data-comp="count-chip" class="cnt-chip c-'+v+'" title="'+tot[v]+' '+m.lab.toLowerCase()+'"><i data-lucide="'+m.ic+'"></i><span class="cn">'+tot[v]+'</span></span>';}});
-    if(!fbadges)fbadges='<span class="fb-none">No feedback yet</span>';
-    const steps=stepN?'<span class="steps-txt'+(done===stepN?' all':'')+'">'+done+'/'+stepN+' steps done</span>':'';   /* L1: docs have no checklist — the checkbox regex yields 0, so the steps count is hidden */
-    const editClick=isDoc?"entryEdit(this,'"+p.id+"')":"planAct('edit','"+p.id+"')";   /* L1 (ND-3): doc cards keep a working raw-md edit toggle; plan cards still toast (edit parity is a later phase) */
-    const editHead=editHeadHTML("planCopy('"+p.id+"')",editClick,p.id,'',isDoc?p.id+'-ta':'');   /* 5th arg = mic field; docs bind to their raw textarea, plans have none */
-    const rawTa=isDoc?'<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>':'';
+    /* item 4: the steps chip is promoted onto row 1 right after the title (compact "N/N steps"); hidden when
+       stepN===0, which is naturally Plans-only (docs carry no checklist so the checkbox regex yields 0). */
+    const steps=stepN?'<span data-comp="count-chip" class="cnt-chip c-steps'+(done===stepN?' all':'')+'" title="'+done+' of '+stepN+' steps done"><i data-lucide="list-checks"></i><span class="cn">'+done+'/'+stepN+' steps</span></span>':'';
+    /* L3 (5d): plan AND doc cards both get the raw-markdown edit toggle (host-generic entryEdit) + the hidden
+       textarea + a mic bound to it; planAct stays for approve/reject/revise only (its 'edit' branch is now dead). */
+    const editHead=editHeadHTML("planCopy('"+p.id+"')","entryEdit(this,'"+p.id+"')",p.id,'',p.id+'-ta');
+    const rawTa='<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>';
     return '<div data-comp="plan-card" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
-      +'<div class="plan-row r2"><span class="cnt-strip">'+fbadges+'</span><span class="flex-1"></span>'+steps+'</div>'
-      +'<div class="plan-row r3"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
+      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
+      +'<div class="plan-row r2"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
       +'<div class="plan-body">'   /* A4 bullet 1: editHeadHTML moved INSIDE .plan-main (below) so the Editor header sits over the editor box only; the Outline/Feedback/Authors nav rail rises full-height (Documents-style) */
       +'<div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
