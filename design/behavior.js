@@ -147,6 +147,15 @@
     if(editing){if(e)e.md=ta.value;ta.style.display='none';
       const mode=currentLensMode(id);ed.outerHTML=mdEditorHTML(id,e?e.md:ta.value,mode);   /* fresh view (closed popout, no selection) — same repaint planNavMode uses */
       if(typeof clearSel==='function')clearSel(id);if(typeof refreshJumpPills==='function')refreshJumpPills();
+      /* L3-panel fix: a raw-md save can change the checklist — refresh the promoted header steps chip in place
+         (it lives in .plan-row.r1, outside the .doc-ed repaint), incl. appearing/disappearing at the 0 boundary. */
+      if(e){const r1=card.querySelector('.plan-row.r1');
+        if(r1){const dn=e.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
+          const sn=e.md.split('\n').filter(l=>/^\s*-\s*\[( |x|X)\]/.test(l)).length;
+          let chip=r1.querySelector('.cnt-chip.c-steps');
+          if(!sn){if(chip)chip.remove();}
+          else{if(!chip){const t=r1.querySelector('.plan-title');if(t){t.insertAdjacentHTML('afterend','<span data-comp="count-chip" class="cnt-chip c-steps"><i data-lucide="list-checks"></i><span class="cn"></span></span>');chip=r1.querySelector('.cnt-chip.c-steps');}}
+            if(chip){chip.classList.toggle('all',dn===sn);chip.title=dn+' of '+sn+' steps done';const cn=chip.querySelector('.cn');if(cn)cn.textContent=dn+'/'+sn+' steps';}}}}
       btn.innerHTML='<i data-lucide="square-pen"></i>';btn.title='Edit';}
     else{ta.value=e?e.md:ta.value;ed.style.display='none';ta.style.display='block';
       btn.innerHTML='<i data-lucide="check"></i>';btn.title='Save';ta.focus();}
@@ -1505,7 +1514,11 @@
      parallel one; the box selection is ephemeral — cleared when the popover closes (closeCmtPop). */
   function toggleBoxSel(row,host){row.classList.toggle('sel');const pop=popFor(host);if(!pop)return;
     const rows=[...pop.querySelectorAll('.cmt-pop-item.sel')];
-    if(rows.length){const text=rows.map(r=>{const t=r.querySelector('.cpi-txt');return t?t.textContent.trim():'';}).filter(Boolean).join('\n\n');
+    if(rows.length){
+      /* L3-panel fix: a box selection REPLACES any rail line/section selection in the shared SELby slot — clear the
+         rail's visuals + Comment control too, or they'd stay lit against a selection that no longer exists. */
+      if(!SELby[host]||SELby[host].kind!=='box'){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));setCmtCtl(host,false);}
+      const text=rows.map(r=>{const t=r.querySelector('.cpi-txt');return t?t.textContent.trim():'';}).filter(Boolean).join('\n\n');
       const noun=pop.querySelector('.cph-ic')?'edit':'comment';   /* the Authors box carries a users-glyph .cph-ic; the comment box does not */
       SELby[host]={kind:'box',ref:'box',label:rows.length+' '+noun+(rows.length>1?'s':''),boxText:text};}
     else SELby[host]=null;
@@ -1577,6 +1590,7 @@
   /* P4d: section-anchored popout — lists EVERY comment on the section (all verdicts), each row carrying its
      own verdict badge + thumbs. The header drops the single-verdict badge; the count matches the contents. */
   function openCmtPop(host,sec){const list=getFeedback(host);const pop=popFor(host);if(!pop)return;
+    dropBoxSel(host);   /* L3-panel fix: the popover content is being replaced — a box selection from the previous section is stale (Export would act on invisible content) */
     const items=list.filter(f=>f.sec===sec);
     /* L3 (5b): row-1 order is badge · verdict · thumbs · spacer · timestamp (the time pins right). L3 (5c): each
        row is click-to-select (toggleBoxSel) → the merged Export control can Embed/Copy the picked comment(s). */
@@ -1586,7 +1600,9 @@
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   function closeCmtPop(host){const pop=popFor(host);if(pop){pop.classList.remove('open');pop.innerHTML='';}deselectNavCards(host);clearFbHL(host);
     /* L3 (5c): the popover box selection lives only while the popover is open — drop it + re-gate Export on close */
-    if(SELby[host]&&SELby[host].kind==='box'){SELby[host]=null;eaUpdate(host);}}
+    dropBoxSel(host);}
+  /* L3-panel fix: drop a stale 'box' selection + re-gate Export (shared by popover close AND popover switch) */
+  function dropBoxSel(host){if(SELby[host]&&SELby[host].kind==='box'){SELby[host]=null;eaUpdate(host);}}
   /* AUTHORS box — the docked popout in the Authors lens: a neutral section-anchor header (users glyph + § section +
      "N edits") and ONE entry per gutter-badge count (agent badge + timestamp, no verdict/comment/thumbs). Routes
      through the SAME three-indicator sync spine as openCmtPop (card fill + section highlight + open box). */
@@ -1595,6 +1611,7 @@
      the edit summary (wraps). L3 (5c): rows are click-to-select (toggleBoxSel) so an edit can be embedded in a prompt. */
   function authorActionBadge(action){return '<span class="dbadge au-act">'+esc(action||'Edited')+'</span>';}
   function openAuthorPop(host,sec){const list=getAuthors(host);const pop=popFor(host);if(!pop)return;
+    dropBoxSel(host);   /* L3-panel fix: same stale-box drop as openCmtPop */
     /* L3: key ''/null to the ONE document-wide group (L2's {sec:null} draft seed) — navCardClick passes '' for it;
        the header then reads "Whole document" (the title-cell register) rather than an empty "§" badge. */
     const items=list.filter(f=>(f.sec||'')===(sec||''));const secLab=sec?('§ '+esc(sec)):'Whole document';

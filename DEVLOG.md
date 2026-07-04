@@ -453,6 +453,14 @@ Files: tests/README.md, DEVLOG.md
 
 ---
 
+### 2026-07-04 01:20:00 — ND L3 review panel: 3 box-selection/steps-chip fixes — [ND] run closed
+
+Final adversarial panel on L3 (4 verdicts → 3 distinct defects, 0 refuted), all fixed and re-verified live: (1) **stale box on popover switch** (medium) — switching comment/author popovers section-to-section left the previous section's box selection in `SELby`, so Export would Embed/Copy invisible content; both openers now drop a stale box via a shared `dropBoxSel()`. (2) **box clobbered rail selections incoherently** (low) — selecting a popover row over an existing line/section selection left the rail's `.rsel` highlight lit and Comment enabled against a dead selection; `toggleBoxSel` now clears the rail visuals + Comment control when a box takes the slot. (3) **stale steps chip** (low) — a raw-md save that toggled checklist items didn't refresh the promoted header chip; `entryEdit` now updates it in place (incl. the 0↔N boundary). Verified by driving all three flows in the rendered mockup (17/17 assertions: box drop + Export gating, rail↔box coherence through close, chip 2/6→3/6 on save, no double-view), 0 console errors. Housekeeping: `nd-lane-q`/`nd-lane-i` worktrees removed + branches deleted (merged); the pre-existing stale `wf_*` worktrees left untouched. **The [ND] NEXT UP — DESIGN queue (items 1–8) is fully built, propagated across the six design files, reviewed by adversarial panels at every phase, and verified; items left in TODO.md for the human to review and remove per the queue rule.**
+
+Files: design/behavior.js, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
