@@ -25,7 +25,7 @@ project docs before editing.
 
 - Keep changes scoped to the user's request.
 - Prefer existing project patterns over new abstractions.
-- Do not create or switch branches without explicit permission.
+- Never create or switch branches without explicit permission — see the Git rule in `CLAUDE.md` for the canonical policy (work happens on `main`; branch creation is gated and will prompt).
 - Run relevant tests or checks when practical.
 - If you change repository files, update `DEVLOG.md` according to the rules in
   `CLAUDE.md` before finishing.

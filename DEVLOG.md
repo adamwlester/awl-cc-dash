@@ -461,6 +461,22 @@ Files: design/behavior.js, DEVLOG.md
 
 ---
 
+### 2026-07-04 01:25:00 — docs/config: CLAUDE.md thinned to a router + behavioral-rule rewrites; skills unblocked; vibe-guide equipped
+
+Tuned the instruction/config layer to stop CLAUDE.md drifting out of sync — driven by a CLAUDE.md-vs-docs alignment audit whose only genuine contradiction was the tokens.css absolute (everything else was CLAUDE.md staleness). **CLAUDE.md** (156→118 lines): uppercased the six `##` headings + reconciled the in-text section cross-refs; slimmed the `sidecar/`, `tests/`, Key-files `DESIGN.md`, Custom-tooling (bridge + context-extractor), and Testing entries from detail-dumps to description + pointer to the ground-truth docs (drops the stale module counts, panel names, verified-status lists, and the 20-method list so they can't rot); rewrote the behavioral rules — Scope & safety (thoughtful out-of-repo work, never a mid-run prompt), Working style (clarity-first, lead with a plain-language overview, always cite files as links, never hard-wrap editable text), Editing discipline (preserve-intent-not-mistakes + don't-under-edit + fix-what's-clearly-wrong + a new "CLAUDE.md is not exempt from keep-docs-in-sync" rule); and softened the "no value outside `tokens.css`" absolute to name DESIGN.md's documented exceptions (`--term-*`, per-instance `--nc`, runtime widths/pane sizes). The `frontend/` row was left verbatim (it had just been rewritten with frozen-prototype guidance — a preserve-the-guidance slim is pending a go-ahead). **`.claude/settings.json`:** allowed the `Skill` tool wholesale so skills no longer prompt (replaced the two now-redundant `session-brief` entries). **`.claude/agents/vibe-guide.md`** (the project default agent): added `claude-api`, `superpowers:brainstorming`, `superpowers:systematic-debugging`, `verify`, `run` to its skills, and softened the "keep technical complexity hidden" persona (3 lines) toward "explain the backend in plain language." **AGENTS.md:** the branch rule now points to CLAUDE.md's canonical Git policy instead of paraphrasing it.
+
+Files: CLAUDE.md, .claude/settings.json, .claude/agents/vibe-guide.md, AGENTS.md, DEVLOG.md
+
+---
+
+### 2026-07-04 01:28:00 — docs: CLAUDE.md `frontend/` row — preserve-the-guidance slim (closes the pending item)
+
+Per go-ahead, applied the minimal refactor to the `frontend/` Folder-map row deferred in the prior entry: kept all the frozen-prototype guidance verbatim (parked renderer, rebuild-fresh-from-mockups, don't-refactor-now, main-shell-not-frozen, `api.ts` contract) and collapsed only the churny trailing panel-by-name enumeration (`App.tsx` shell + `AgentPanel`/`TeamGraph`/`TeamFeed`/`PromptPanel`/`WorkPanel`/`Settings` + shared `events`/`api`/`tokens`/`ui`) into the existing "Current renderer map + build strategy → ARCHITECTURE §4/§4.4" pointer. Drops the WorkPanel-vs-Library naming detail from CLAUDE.md; nothing load-bearing lost.
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

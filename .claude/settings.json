@@ -26,8 +26,7 @@
       "mcp__excalidraw__batch_create_elements",
       "mcp__excalidraw__get_canvas_screenshot",
       "mcp__excalidraw__update_element",
-      "Skill(session-brief)",
-      "Skill(session-brief:*)"
+      "Skill"
     ],
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)",

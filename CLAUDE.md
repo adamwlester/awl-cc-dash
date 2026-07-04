@@ -1,25 +1,25 @@
 # CLAUDE.md
 
-## Project identity
+## PROJECT IDENTITY
 
 This is **awl-cc-dash** — a dedicated VS Code/Claude Code workspace for the **AWL Multi-Agent Dashboard**: a single-window Electron desktop app for running, monitoring, and coordinating many Claude Code agents at once. Forked out of the old `claude-code-sandbox` general workspace on 2026-06-21 (fresh git history). This runs on a real laptop — not a container or VM. Files outside the project directory are real and permanent.
 
 The repo separates two layers: the **product** (the dashboard itself) lives in flat dirs at the root; the **build workflow** (how this gets built with Claude Code in VS Code) lives under `dev/`.
 
-## Folder map
+## FOLDER MAP
 
 **Product (the dashboard):**
 
 | Folder | Purpose |
 |--------|---------|
-| `frontend/` | The desktop app — Electron + React (electron-vite). **⚠ The React renderer (the visible UI) is a parked prototype** — frozen, to be **rebuilt fresh from the `design/` mockups at the build sprint**, *not* finished in place; don't build or refactor renderer UI now (the design lane owns that surface). The Electron **main-process shell** (sidecar lifecycle, window, packaging) is **not** frozen — it still needs feasibility proof. `api.ts` is the preserve-through-rebuild contract. Current renderer map: a **componentized** `App.tsx` shell (layout, polling, the merged SSE bus) + `AgentPanel` / `TeamGraph` / `TeamFeed` / `PromptPanel` / `WorkPanel` / `Settings` panels + shared `events`/`api`/`tokens`/`ui`. Full map + build strategy: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4/§4.4. |
-| `sidecar/` | FastAPI service the frontend talks to (`main.py`, port 7690) — the **working MVP** backend. Pluggable **driver seam** under `drivers/` (`base`/`sdk`/`bridge`); `serialize.py` (driver→event normalization) sits at the `sidecar/` root, alongside ~15 feature modules (event bus, hooks, inbox, links, scratchpad, library, console, …) — full module + endpoint map in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5. The **`bridge` driver (real Claude Code TUI via tmux/WSL2) is the primary path the dashboard is built around** — **live-verified below the UI** (run-state, permission round-trips, resume, model/effort) **and now proven end-to-end *through the dashboard UI*** — creating an agent with no driver named comes up on `bridge`, spawns a real tmux session (no tab), and runs live turns that render in the feed (the verifying pass also caught & fixed an `EventRenderer` crash on the bridge's string-content user-prompt events). The `sdk` driver (in-process Claude Agent SDK) is a **limited-use engine** reserved for specific non-interactive tasks (e.g. programmatic flows that don't need a real TUI, such as the Revise / Summarize utility-LLM passes) — **not** the default. **`bridge` is the default when no driver is named**; select `sdk` explicitly with `AWL_DRIVER=sdk` or the per-session `driver` field (an explicitly-named *unknown* driver still falls back to `sdk`). |
-| `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **Custom Tooling**. |
+| `frontend/` | The desktop app — Electron + React (electron-vite). **⚠ The React renderer (the visible UI) is a parked prototype** — frozen, to be **rebuilt fresh from the `design/` mockups at the build sprint**, *not* finished in place; don't build or refactor renderer UI now (the design lane owns that surface). The Electron **main-process shell** (sidecar lifecycle, window, packaging) is **not** frozen — it still needs feasibility proof. `api.ts` is the preserve-through-rebuild contract. Current renderer map + build strategy: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4/§4.4. |
+| `sidecar/` | The FastAPI backend the frontend talks to (port 7690) — the **working MVP** service. It owns a pluggable **driver seam** for talking to agents, plus the feature modules behind the dashboard (event bus, hooks, inbox, scratchpad, library, console, and more). `bridge` (real Claude Code TUI via tmux/WSL2) is the **primary path and the default when no driver is named**; `sdk` (in-process Claude Agent SDK) is a limited-use opt-in. Full module + endpoint map and driver details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5–§6. |
+| `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **CUSTOM TOOLING**. |
 | `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `mockup.html` is the current visual authority; `tokens.css` is the single source of truth for every design value (colors, type, spacing, radius, shadow); `behavior.js` is the **shared component behavior** (interaction logic), loaded by **both** `mockup.html` and `gallery.html` so they can't drift; `styles.css` is the **shared component CSS** linked by both; `gallery.html` is the **interactive component catalog**; `mockup-toolkit.js` is the `Ctrl+G` annotation overlay. |
 | `archive/` | Retired-but-referenced material: the design lineage (old mockups/ui-plans under `design/`), rotated DEVLOG archives (`devlog/`), and retired notes/docs (`notes/`, `dev/notes/`, `docs/`). |
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
-| `tests/` | pytest suite — live bridge/sidecar integration (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) + a **per-module hermetic unit suite** (`test_*_unit.py`, ~18 files — one per sidecar module, plus bridge/sidecar). See **Testing** below. |
-| `docs/` | Committed, curated product reference docs — home of [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), the system/structure reference (see **Key files**). |
+| `tests/` | The pytest suite — a hermetic per-module unit tier, plus live integration, feasibility-spike, and browser-driven UI tiers that exercise the real bridge/sidecar. Layout + conventions: [tests/README.md](tests/README.md) and **TESTING** below. |
+| `docs/` | Committed, curated product reference docs — home of [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), the system/structure reference (see **KEY FILES**). |
 
 **Build workflow & config:**
 
@@ -31,70 +31,30 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 
 **Root files:** `CLAUDE.md`, `DEVLOG.md`, `requirements.txt`, `pyproject.toml`, `.gitignore`, `start-dashboard.bat` (launches the sidecar + Electron together).
 
-## Key files
+## KEY FILES
 
 Cross-cutting docs every session should know about — read the relevant one before diving in:
 
 | File | What it is |
 |------|------------|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The **final-vision system reference** — the intended final system, written as settled architecture: the processes (Electron ↔ FastAPI sidecar `:7690` ↔ driver seam ↔ tmux/WSL2 bridge), the one-project product model, the coordination spine, and the storage model, with every product decision woven into the prose and **"⚠ Today"** markers wherever code hasn't caught up. **The doc leads the build**: builds converge on it and clear markers (the build backlog is its own §11 *Build backlog & queue*); its text changes only when a decision changes. The system counterpart to DESIGN.md (UI intent) and DEVLOG.md (history). |
-| `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling) — the **recent window**. **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [Behavioral rules](#behavioral-rules) and the file header for format. Older entries are rotated into `archive/devlog/` and summarized in the file's **Archived history** index; read those archives **on demand** only when a task needs older history, not by default. |
-| `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — purpose, the 3-pane layout, each panel, the interaction/communication model, and the design system. Read it before working on dashboard design or the frontend; the mockups in `design/` (authority: `mockup.html`, with values in `tokens.css`) own the exact visuals. |
+| `DEVLOG.md` | Append-only project log (migration, backend, dashboard, tooling) — the **recent window**. **Read it before making changes**, and **log every repo change before you end the turn** — see the DEVLOG rule under [BEHAVIORAL RULES](#behavioral-rules) and the file header for format. Older entries are rotated into `archive/devlog/` and summarized in the file's **Archived history** index; read those archives **on demand** only when a task needs older history, not by default. |
+| `design/DESIGN.md` | Ground-truth **design reference** for the dashboard's UI/UX intent — read it before any dashboard-design or frontend work. The mockups in `design/` (authority: `mockup.html`, with values in `tokens.css`) own the exact visuals. |
 | `AGENTS.md` | Codex-specific entry point: points Codex sessions back to this guide and explains that Codex agents are support capacity for focused implementation, review, docs, testing, and repo-management work while Claude Max tokens are constrained. Claude agents should treat it as coordination context, not a replacement for this guide. |
 
-## Custom Tooling
+## CUSTOM TOOLING
 
 ### bridge (tmux agent control)
 
-Python package at the repo root: `bridge/`.
-
-Controls Claude Code TUI sessions running in tmux inside WSL2. Sessions run detached and are driven/read without any window (`capture-pane` + JSONL transcript); a Windows Terminal tab is opened only on an explicit attach via `show()`, never automatically on creation (see the bridge-sessions rule under **Behavioral rules**). Sessions persist even if a tab is closed — `show()` reconnects.
-
-**Import:** `bridge` is a top-level package from the repo root:
-```python
-from bridge import TmuxBridge
-```
-If your code isn't run with the repo root on `sys.path`, add it first:
-```python
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # repo root
-from bridge import TmuxBridge
-```
-
-**CLI:** `python -m bridge <command>` (run from the repo root or with `PYTHONPATH=<repo-root>`).
-
-**20 documented methods:** create, send, keys, read, read_log, list, show, close, shutdown, rename, resume, status, batch_create, broadcast, interrupt, scrollback, watch, wait_idle, export, mcp_sync. Plus config setters (set_cwd, set_model) and internal helpers (session_id_for, register_session_id, wsl_host_ip, sidecar_hook_base_url).
-
-**Key capabilities:**
-- Screen state detection (`status`) — idle, generating, permission_prompt, unknown
-- JSONL transcript parsing (`read_log`) — structured access to conversation history
-- MCP config sync (`mcp_sync`) — translates Windows MCP configs for WSL
-- Pattern matching (`watch`) — poll until output matches a regex
-- Idle blocking (`wait_idle`) — block until agent finishes responding
-- Multi-agent (`batch_create`, `broadcast`, `interrupt`) — parallel session control
-
-**Built-in but not yet fully utilized:**
-- `extract_messages()` in `transcript.py` — converts JSONL entries to clean `[{role, content, timestamp}]` dicts. Available but not surfaced in the CLI or test suite.
-- `export(mode="log")` — exports structured JSONL transcript to file. Implemented; only the sibling `scrollback` mode is tested (the `log` branch is untested).
-- `close()` — kills a single session (vs `shutdown()` which kills all). Implemented, not covered in test suite.
-
-**Test suite:** `tests/test_tmux_bridge.py` — pytest integration suite covering all operations.
+Python package at the repo root: `bridge/` — the agent-control backbone. It drives Claude Code TUI sessions as **detached** tmux sessions inside WSL2 and reads them without any window (`capture-pane` for live screen state + the JSONL transcript for messages); a Windows Terminal tab opens only on an explicit attach via `show()`, never automatically on creation (see the bridge-sessions rule under **BEHAVIORAL RULES**), and sessions persist even if a tab is closed. Import it as `from bridge import TmuxBridge` (add the repo root to `sys.path` first if it isn't already), or drive it from the CLI with `python -m bridge <command>`. Full method reference, capabilities, and internals: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §6.4.
 
 ### claude-context-extractor
 
-Python script at `dev/tools/claude-context-extractor/` (a reusable dev utility, kept under `dev/`).
+Python dev utility at `dev/tools/claude-context-extractor/`. Pulls a full **claude.ai** (web/desktop) conversation — tool calls, results, citations, artifacts, and full thinking — into a raw `conversation.json` plus a clean `transcript.md`, extracted `artifacts/`, and a `summary.md`, so external Claude context can be captured and handed to another session. Stdlib-only core; run it from its own folder, where the commands and auth (a gitignored, account-level `session_key.txt`) live.
 
-Pulls a full **claude.ai** (web/desktop) conversation via the internal API — tool calls, results, citations, artifacts, and full thinking — and saves raw `conversation.json` + a clean `transcript.md` + extracted `artifacts/` + a `summary.md`. Purpose: capture external Claude context to hand to another session. Stdlib-only core; run from its own folder.
+## TESTING
 
-- **Auth:** paste your claude.ai `sessionKey` into `session_key.txt` (gitignored, account-level — delete when done).
-- **Commands:** `--list` · `--conversation <url|uuid>` · `--name "<title>"` (resolve by title) · `--summary <dir|json>` (offline (re)summary). Every export also auto-writes `summary.md` (turns, tools, timing, token estimate).
-- **Tokens:** `--tokens {heuristic,tiktoken,api}` — `api` is exact via Anthropic's free `count_tokens` endpoint (needs `ANTHROPIC_API_KEY`); heuristic/tiktoken are offline estimates.
-- **Gotchas:** `out/` + `session_key.txt` are gitignored; large `conversation.json` exports can exceed a connector's ~1MB tool-result cap — feed `transcript.md`/`summary.md` or chunked reads instead.
-
-## Testing
-
-**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. Tests live in `tests/` at the repo root — live bridge/sidecar integration suites (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`) plus a **per-module hermetic unit suite** (`test_*_unit.py`, ~18 files — one per sidecar module, plus `test_bridge_unit.py` / `test_sidecar_unit.py`). Each `tests/` dir owns a `log/` subdir (gitignored) for timestamped per-run debug logs.
+**Use pytest for all tests.** This is the standard — reach for it when adding or changing testable behavior, rather than writing ad-hoc scripts. The suite lives in `tests/` at the repo root and spans a hermetic per-module unit tier plus live integration, feasibility-spike, and browser-driven UI tiers that exercise the real bridge/sidecar. Each `tests/` dir owns a gitignored `log/` subdir for timestamped per-run debug logs. **The suite layout, tiers, markers, and conventions live in [`tests/README.md`](tests/README.md)** — read it before adding tests.
 
 **How to run** (uses a repo-root `.venv`):
 ```powershell
@@ -107,12 +67,7 @@ python -m venv .venv; .\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 No `testpaths` is configured — pass the path you want to run.
 
-**Conventions** (config in `pyproject.toml`, fuller notes in `tests/README.md`):
-- Console output stays concise; full DEBUG detail (commands, payloads, raw screens, tracebacks) goes to the per-run file in `tests/log/`. Log with `logging.getLogger(__name__)` at DEBUG the inputs/outputs you'd want when a failure needs diagnosing.
-- Tag non-hermetic tests `@pytest.mark.integration` and slow ones `@pytest.mark.slow`.
-- Share expensive setup via session-scoped fixtures (see the `bridge` / `live_session` fixtures in `tests/conftest.py`) rather than relying on cross-test side effects.
-
-## Behavioral rules
+## BEHAVIORAL RULES
 
 ### Git — never branch without express permission
 Work happens on **`main`**. Commit normal work directly to `main`; do **not** create or switch to a new branch without my explicit, in-conversation go-ahead.
@@ -121,15 +76,22 @@ Work happens on **`main`**. Commit normal work directly to `main`; do **not** cr
 - **If a task genuinely needs branch isolation,** say so and wait for my explicit approval before creating anything. When approved and the work is merged, merge back to `main` and delete the branch rather than leaving it to accumulate.
 
 ### Scope & safety
-- Stay inside the project directory for all operations unless explicitly told otherwise.
-- When touching global config (`~/.claude/`, etc.), explain the change before making it.
+- **Default to working inside the project directory — but step outside when the task genuinely needs it.** Going outside `awl-cc-dash` is allowed (reading a reference doc, checking global `~/.claude/` config, using a tool that writes to LocalAppData) when it clearly serves what you're doing. Treat it as a deliberate call, not a reflex: before you do it, be sure it's actually necessary and that an in-project option doesn't already cover it. Routine, reversible, out-of-project reads need no permission — just do them thoughtfully.
+- **Confirmation is for the irreversible, and only when I'm here.** For anything destructive or hard to undo outside the project (deleting/overwriting files, changing global config), get my go-ahead first — but only when I'm reachable. Never let an out-of-project step block an unattended or long autonomous run. When you can't ask, take the conservative path and note what you did (and why) in your wrap-up. When you do touch global config (`~/.claude/`, etc.), explain the change either way.
 
 ### Working style
-- Be direct, practical, low-ceremony. Lead with action, follow with a brief explanation.
-- Write all transient artifacts (screenshots, scratch HTML, debug dumps, ad-hoc server logs) into `.scratch/` — never the repo root or other project folders. Prefix any `filename` you pass to screenshot/export tools with `.scratch/`. One-off files may be deleted when done; accumulation in `.scratch/` is acceptable.
+- **Clarity first, then concision.** Be practical and low-ceremony, but never at the cost of being understandable — a concise answer I can't follow is a failed answer. Write so I can actually read it: plain language, real sentences, structure over a wall of text.
+- **Understand before you act.** Don't jump straight to changes on anything non-trivial — make sure you grasp what I'm asking and why first, and when a request is ambiguous or a decision is mine, check before building. Small, obvious, reversible steps don't need this; larger or irreversible ones do.
+- **Lead with a plain-language overview, then the detail.** Especially for big topics, cross-cutting changes, or anything on the backend (the FastAPI sidecar, the bridge, drivers, SSE, async — largely outside my comfort zone): open with a short, high-level, lay-language summary of what's going on / what you did / what you're proposing, framed in outcomes, before the technical specifics. When I ask for "a high-level overview," that's the default I already want — not a special mode.
+- **Always cite files and locations.** When you discuss code or edits, link the exact spot as a clickable Markdown path — `[main.py:42](sidecar/main.py#L42)` — never a bare filename or an unlocated "the handler." That's how I follow what changed.
+- **Never hard-wrap text I'll edit.** In anything I work with directly — content inside code blocks in your replies, and every Markdown/text/code file in the repo (docs, DEVLOG, design notes, ARCHITECTURE) — write each paragraph as one continuous line and let the editor soft-wrap. Do not insert manual newlines to wrap a paragraph to a column width; frozen mid-paragraph line breaks are painful to reflow. (Structural newlines are fine and expected: separate list items, headings, table rows, and code lines still break normally — this is only about not width-wrapping running prose.) Ordinary conversational prose in a reply I'm only reading, not copying, can wrap however it likes.
+- **Write transient artifacts to `.scratch/`** — screenshots, scratch HTML, debug dumps, ad-hoc server logs — never the repo root or other project folders. Prefix any `filename` you pass to screenshot/export tools with `.scratch/`. One-off files may be deleted when done; accumulation in `.scratch/` is acceptable.
 
 ### Editing discipline
-- **Preserve everything you weren't asked to change.** When you edit a file or produce a new version of an existing artifact (for example, a new UI mockup branched from the prior one), reproduce the untouched parts exactly as they were. Carrying them forward in full is real work, and that work is part of the task: don't skip, summarize, simplify, restyle, or drop sections just because faithfully reproducing them is tedious. The usual failure here is cutting corners, not over-editing, so when in doubt, keep the prior version intact. Before finishing, look back over the result and confirm nothing outside the requested change was lost or quietly altered.
+- **Preserve intent, not mistakes — carry untouched parts forward faithfully.** When you edit a file or produce a new version of an existing artifact (for example, a new UI mockup branched from the prior one), reproduce the parts you weren't asked to change exactly as they were. Carrying them forward in full is real work and part of the task: don't skip, summarize, simplify, restyle, or drop sections just because faithfully reproducing them is tedious. The usual failure here is cutting corners, so when in doubt keep the prior version intact, and before finishing confirm nothing outside the requested change was lost or quietly altered.
+- **This is about not *losing* work — it is not a license to under-edit.** It does not mean "touch as little as possible." When a task calls for a real refactor, do the complete job: change every place the change genuinely reaches, and don't leave it half-applied to feel safe. Faithful preservation and thorough, complete refactoring are both required — timid, partial edits are their own failure mode.
+- **Fix what's clearly wrong when you pass it.** If you come across an obvious error, a stale reference, or a detail the rest of the repo contradicts, and you're confident it's wrong, correct it rather than faithfully preserving a known mistake — then note the fix (and DEVLOG it if it's a repo change). Preservation protects the prior author's intent, not its bugs. If you're not sure it's wrong, leave it and flag it instead of silently changing it.
+- **CLAUDE.md is not exempt from "update all related docs."** When a change makes any statement in this file stale — a folder's purpose, a default, a pointer, a rule — update CLAUDE.md in the same pass, just as you would `docs/ARCHITECTURE.md`, `design/DESIGN.md`, or `DEVLOG.md`. A stale CLAUDE.md is the one every future session silently inherits, so it's the highest-priority doc to keep true, not the easiest to forget.
 
 ### DEVLOG — project memory (not optional)
 `DEVLOG.md` is the project's memory; an unlogged change is, to the next session, a change that never happened.
@@ -142,7 +104,7 @@ Work happens on **`main`**. Commit normal work directly to `main`; do **not** cr
 `design/` is one system in six files, each owning one thing: **`tokens.css`** = every value · **`styles.css`** = shared component CSS (linked by both the mockup and the gallery) · **`behavior.js`** = shared component **behavior / interaction logic** (loaded by both the mockup and the gallery — the single source of truth for how controls actually act, so the two can't drift) · **`mockup.html`** = the working app surface + each component's `data-comp` name and `data-status` marker · **`gallery.html`** = the **interactive catalog** (every reusable component shown as the *real, live* component — variants side-by-side, operable controls you can actually drive, driven by the shared `behavior.js`) · **`DESIGN.md`** = the rules and intent. **Read [`design/DESIGN.md`](design/DESIGN.md) before changing any of them.**
 - **Reuse before adding.** Check `tokens.css` for an existing token and `styles.css` for an existing class/pattern *before* introducing a new one. Never hardcode a value that belongs in `tokens.css` (colour, type, spacing, sizing, radius, border-width) — reference it via `var()`. New tokens are additive; never rename an existing one.
 - **Propagate every change to all the files it touches:** a **value** → `tokens.css`; **component CSS** → `styles.css`; a component's **behavior / interaction logic** → `behavior.js` (shared, so the mockup and gallery stay in lockstep — never duplicate behavior into one of them); a **new or changed component** → tag it in `mockup.html` (`data-comp`, plus `data-status` if dormant/undecided) **and** add a `gx-card` to `gallery.html` with the component's *real markup* (behaviour comes free from `behavior.js`; show every variant, and label any data-state — disabled/empty/error — that can't be reached by interacting) **and** register its name in `DESIGN.md`; a **rule or intent** → `DESIGN.md`. A change that lands in only one file when it owes others is unfinished.
-- **No design value lives outside `tokens.css`, and nothing in `design/` references any backlog** (the build backlog lives in `docs/ARCHITECTURE.md` §11; all backlogs stay out of `design/` so the design system stays at its six files). Verify the result per **Verifying UI changes** below.
+- **No design value lives outside `tokens.css`** except where DESIGN.md documents an exception (currently: the Console's self-contained `--term-*` palette, the per-instance `--nc` agent-colour binding, and runtime values like progress-bar widths and resizable pane sizes). **And nothing in `design/` references any backlog** (the build backlog lives in `docs/ARCHITECTURE.md` §11; all backlogs stay out of `design/` so the design system stays at its six files). Verify the result per **Verifying UI changes** below.
 
 ### Verifying UI changes
 - **Drive the rendered UI — never hand back on static checks alone.** For anything that renders (the dashboard mockups above all), `node --check` / grep / reading the diff is necessary but NOT sufficient — it says nothing about layout, wrapping, overflow, or whether a control actually works. Layout, formatting, overflow, and dynamic behavior are part of the deliverable — not the user's job to catch.
