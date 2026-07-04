@@ -517,6 +517,14 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-04 04:50:00 — design: fixed dev-window + pinned columns + vertical pane min/max as Layout tokens
+
+Added a **Layout — frame & pane size constraints** section to `tokens.css` (`--win-w/h`, `--col-left/right-min/max`, `--pane-graph/docs/feed/prompts-min/max-h`) and wired it through the mockup: `.app` pinned to a fixed **2600×1600** dev window (was `height:100vh`); the left (**400**) and right (**1000**) columns pinned via `min==max` while the middle column flexes to fill (**~1196**); the four vertical panes given a real **300→1200** height range (max sits just under the ~1520px column budget so a fully-dragged pane can never leave a gap). Per the confirmed spec, min and max are **separate tokens per dimension** even where equal, so any one relaxes later without restructuring. Default divider positions (each panel's inline `flex:` ratio) stay inline as runtime state — only the min/max *constraints* became tokens; `design/DESIGN.md`'s token-exception note and `CLAUDE.md`'s mirror were updated to record that split. `behavior.js` untouched (CSS min/max dominates its old 150px drag floor). Verified via `ui-verify` (headed-parked): app **2600×1600** and columns **400/1196/1000** pinned in every state, column splitter inert (no width change on a 260px horizontal drag), both vertical dividers travel **~324↔1200** summing to 1526 with no gap/overflow, and rendering holds at both extremes (Team Graph clips cleanly to one card row; Compose keeps its footer anchored). No gallery change — the 3-pane frame isn't cataloged there.
+
+Files: design/tokens.css, design/styles.css, design/mockup.html, design/DESIGN.md, CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
