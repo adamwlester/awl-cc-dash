@@ -525,6 +525,64 @@ Files: design/tokens.css, design/styles.css, design/mockup.html, design/DESIGN.m
 
 ---
 
+### 2026-07-04 06:12:49 — doc-integration: added the operator decision-question set to the tracker (Phase-9 prerequisite)
+
+Appended a new **"Operator decision questions — the Phase-9 prerequisite set"** section to the doc-integration tracker (`dev/notes/scratch/2026-07-03-doc-integration-tracker.md`): **11 numbered, plain-language, big-picture questions**, each with lettered options and a recommendation/best-guess, consolidating every open decision that is the operator's to make before the §10/§11 Phase-9 refactor. It bundles the §F1 register's coverage-audit decisions (backend-robustness posture #29/#30/#31/#33 · security #32 · degraded-mode #28 · voice #27 · response-format #34 · name-pool #35 · turns-by-tool #26 · the elevate-or-park trio #36/#37/#22) **plus four decisions that live only in §10 and never entered §F1** (Console rendering #5 · docs-in-context #23 · AI-touched-file tracking #24 · asset-sourcing #25), and the **Agent-Archive placement (§11.3 #18)** — flagged as the *single* item that structurally gates Phase 9. Framed as the human-readable companion to §F1 (which stays the durable checkbox ledger); scope deliberately held to `docs/ARCHITECTURE.md` §10/§11 only (private TODO backlog and the design lane excluded per the operator's scoping). Documentation-only, no product code; **no ARCHITECTURE.md or §F1 edit** and **no commit** — awaiting the operator's answers before anything ports into the main docs.
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
+### 2026-07-04 07:10:32 — docs: TODO [ND] rewritten to the design-3g scoped batch; inbox triaged, [BD] +2
+
+Replaced the eight **[ND] NEXT UP — DESIGN** items — the 3c round, built and marked "[ND] queue complete" (commits `b9916df`…`367f977`, Jul 3–4) — with **11 new items** capturing the full locked scope from the `claude-2026-07-04-design-3g` handoff (a read-only scoping session that ended holding for go-ahead, so none of it is built yet). Coverage: card-nav-panel surfaces/tabs/TOC (white `--secondary-background` body, pink `--main` active lens tabs + always-teal counts, "Outline"→"TOC", scrolling heading); the **section-grouped Feedback/Authorship nav-card redesign** (one card per section — kills the select-all-in-section bug and the feedback↔rail mapping defect, true single-open accordion); Outline rosters with count-aware overlapping contribution badges + the doc-wide title-cell badge (audit ①); the **two-tier badge system** (dense default + preserved tiny recipient tier); the **full Messages→Transcript rename** + filter-strip changes (Type/Content caps, Text→Message, Subagent toggle, From/To label) + all-card state/Sent-Recv badge move; Compose routing arrow; agent-card restyle + Compact placement; inbox count alignment; Assets thumbnails; and the doc-sync/housekeeping/gallery-light-cleanup item (audit ⑥/⑦/②, IN-2).
+
+Triaged and **cleared all 11 [IN] inbox notes** into those items (they were the raw input the 3g session scoped — verified each is captured, no loss), and added **BD6** (full gallery audit) + **BD7** (Plans/Docs nested-fill clipping, IN-5) to **[BD]** as the two explicitly-deferred pieces. The 3g dependencies have since landed (the `dev/tools/ui-verify` headed-parked launcher and the pane min/max Layout tokens, commits `097dccb`/`32433a1`), so the batch is ready to build on the operator's go-ahead. Queue capture only — no design files touched; SCRATCH and the [BH]/[NB]/intro sections left intact (git-diff-verified surgical).
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 07:31:31 — docs: captured 3 new design features to the TODO inbox (tracked, not queued)
+
+Recorded three operator-dictated features as **[IN] INBOX** notes in `dev/notes/TODO.md`, mapped to real component names and left un-queued per the operator's instruction to fold them into [ND] coherently in a later refactor (not build them now): (1) an **Agent → Create "Presets" menu** (top-of-panel `agent.md` loader grouped System/Project, view-only in Details); (2) an **Agent Details "Save" action** (first in the `#mid-foot-details` strip → Save to project / Save to system, plus dropping "agent" from the Retire/Delete labels); (3) a **Plans card + shared Editor-header re-layout** (steps badge → row 2, filename → inline after the "Editor" label, drop Copy, reorder to Comment→Edit→Mic with Mic right-aligned). Each note carries its open questions inline. Capture only — no design files touched; clarifying questions raised with the operator before the eventual coherent triage.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 08:27:53 — docs: refined 3 tracked inbox features with operator decisions + captured 5 more (still un-queued)
+
+Updated the three [IN] INBOX notes in `dev/notes/TODO.md` with the operator's decisions from the scoping exchange: the "Presets" idea resolves to **reusing the existing Agent → Create Role combobox as the `agent.md` loader** (group entries System / Project / User — build User in; auto-fill on select; Role view-only in Details, since a running agent's `agent.md` is create-only per §7.15); the **Save** action writes the config as a named `agent.md` to a chosen store (Project / System, likely User too) with the shortened Retire/Delete labels; and the **Plans + shared Editor-header re-layout** is fully settled (steps→row 2, filename→after the "Editor" label, drop Copy, order Comment→Edit→Mic, applies to both Plans and Documents). Corrected the project-store path to `<project>/.awl-cc-dash/*` (§8.2). Added **five** more operator ideas as under-discussion inbox notes: view `agent.md` bodies in the Library editor (eye-icon on Role entries); a Library **config browser** with scope top-tabs × type side-tabs; **per-turn settings** in the Rewind/Handoff history (§10 #15); a **concise ~80-char summary line** on Team Feed & History cards (collapsed preview vs. detail); and a **"Snippets"** dropdown above Templates in Compose (markdown-doc-backed, `##`/`###` grouping). Capture/refine only — nothing queued to [ND], no design files touched; my take + follow-up questions raised with the operator.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 09:03:20 — docs: expanded inbox tracking (turn-row spec, timestamp rule, prompt-content home) from the design exchange
+
+Refined and extended the [IN] INBOX in `dev/notes/TODO.md` (now 10 notes) after the operator's clarifications: the **config-collections** note now folds into the existing Library surface (no new tab) and is explicitly scope-aware (shared/System + Project, + User for agents) across agent files / templates / snippets; the **Rewind/Handoff Timeline** note gained the full turn-row spec (button-like whole-row trigger replacing the `.tl-ic` icon, row 1 = count-only "34/50" · ctx% · a settings string of model + agent-card mode/effort/thinking icon-pairs · right-aligned timestamp, row 2 = the shared turn summary — grounded on `renderHist`/`.tl-row`); the **summary line** note now spans Team Feed + Prompt→History cards + Timeline turn rows. Added two new notes: a standing **timestamps-right-aligned** design convention (sweep + DESIGN.md), and a **build/arch "needs a file home"** note for a scope-aware markdown **prompt-content library** (Responses→runtime instructions, snippets, Revise/Summarize, templates), the first entry in a running file-home track. Capture/refine only — nothing queued to [ND], no design/product files touched.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 09:13:10 — doc-integration: began the tentative operator-answer ledger (Q1–Q3)
+
+Started collecting the operator's answers to the Phase-9 prerequisite question set in the tracker, under a new **"Operator answers — TENTATIVE (pending end-of-block coherence review)"** ledger. All answers are held tentative by operator instruction — a single coherence pass over the full set (does it cohere for clean development?) runs at the end, flags anything to reconsider, and gets sign-off before anything ports to `docs/ARCHITECTURE.md` §10/§11 or converts a §F1 box. Recorded so far: **Q1 → A** (pragmatic single-machine backend posture), **Q2 → A** (OS-firewall-as-boundary), **Q3 → A but IN DISCUSSION** — its degraded-mode *display* is unresolved: the `connector-health-badge` is Settings/connector-scoped (4 auth states: Connected / OAuth ✓ / Parked / OAuth-expired), **not** an app-wide backend-health signal, and problem-states are split across three surfaces (Settings connector badges · System Error/Warning Inbox cards §10 #16 · the "Sidecar offline" chip §4.3). Attached a **design-lane follow-up + coherence item**: a consolidated always-visible system-health indicator (adds down + stale/degraded states) reconciled with §10 #16. Documentation-only; **no product or design-file edits, no commit.**
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
+### 2026-07-04 10:23:11 — docs/config: guardrails against bare section-pointer shorthand (vibe-guide + CLAUDE.md)
+
+Three additive edits to stop agents dropping naked pointers (a bare "§7.5") and over-compressing prose into "convoluted terse" statements. **`.claude/agents/vibe-guide.md`** gains a new "Name things; don't just point at them" subsection under Communication Style, with a ❌/✅ worked before-after example (addresses vs. plain English). **`CLAUDE.md`** gets two tightenings: the "Clarity first, then concision" rule now carries a tiebreaker (when brevity and clarity conflict, clarity wins — never compress past first-read comprehension), and the "Always cite files and locations" rule now forbids handing over a bare section/file/symbol without first saying in plain words what it is and why it matters. Diagnosis behind the change: the persona wasn't the cause — the repo's own docs model the terse dialect agents imitate (1,250 `§` pointers across 137 files; 257 in ARCHITECTURE.md alone), so the fix supplies a plain example to copy and closes the "concise" loophole rather than adding more adjectives. Docs/config only; no product code touched.
+
+Files: .claude/agents/vibe-guide.md, CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
