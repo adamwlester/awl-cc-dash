@@ -833,6 +833,14 @@ Files: design/behavior.js, design/styles.css, design/gallery.html, design/DESIGN
 
 ---
 
+### 2026-07-03 16:59:18 — docs: TODO.md refactored — split inboxes, section tags, backend backlog merged
+
+Reorganized `dev/notes/TODO.md` (overwritten **in place** so git history on the path is preserved). Split the single Inbox into **[ID] INBOX — DESIGN** (the 6 existing all-design notes) + **[IB] INBOX — BUILD**, each placed directly under its Next up. Consolidated every per-section helper line into a new **SECTIONS** table + a tightened HOW-block at the top (two-lane Design/Build framing; nothing dropped). Tagged all list headers with bracket IDs (`[BD]`/`[BB]`/`[BH]`/`[ND]`/`[ID]`/`[NB]`/`[IB]`; item IDs now `BB7`/`BD2`-style) and updated cross-refs (`D2`→`BD2`). Cleared the unapproved **NEXT UP — BUILD** and moved all 11 storage/persistence items into **[BB] BACKEND** as BB15–BB25 (brittle `§n`/line-number refs stripped; kept stable file/symbol + one `docs/ARCHITECTURE.md` §8 pointer; deps rewired to `BB16`/`BB1`/`BB15`/`BB17`); merged old B12+B13 → **BB12 Docs in Agent Context**. Relevance-audited both sections first against live code + this log — the whole 2026-07-02 sprint was §10 validation spikes, not storage build (`.awl`/`.awl-agents` still un-renamed, roster/inbox/links still memory-only), so nothing in the backlog was already built and all 11 moved items were kept. Removed the `TODO-temp.md` working draft.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
