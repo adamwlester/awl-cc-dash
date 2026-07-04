@@ -125,12 +125,14 @@ covering the one-time prereqs is still owed.
 
 **Security posture — accepted by decision.** The sidecar binds `0.0.0.0:7690` with no authentication
 because agents inside WSL must be able to POST hook callbacks to the Windows host; this is accepted for a
-single-user personal machine, as a choice. (`AWL_SIDECAR_HOST` overrides the bind host; the frontend always
+single-user personal machine, as a choice. The untrusted-network case — the mutating control API exposed when the laptop travels onto café / office Wi-Fi — is an open question (§10 #32). (`AWL_SIDECAR_HOST` overrides the bind host; the frontend always
 talks to `127.0.0.1:7690`.)
 
 **One sidecar instance.** A single sidecar process on `:7690` serves whichever project is open. Its state
 is partitioned per project folder (§8), so serving a different project is a matter of which project store
 it is reading and writing — never a second process.
+
+**Sidecar operational concerns — open.** Two are not yet decided: crash-supervision in the two-process model (who restarts a crashed sidecar; §10 #30), and the sidecar's own logging destination and retention (§10 #33).
 
 ---
 
@@ -255,6 +257,8 @@ The frontend reads agent state in exactly two modes:
   running agents via the hook/watermark path (§7.7). The **Console** polls on its own demand-driven
   schedule (§7.13).
 
+Failure handling is only partly specified: SSE reconnect and the "Sidecar offline" chip are homed (`api.ts`), but the degraded-UI policy when `/health` fails, and any backoff on these fixed poll cadences, are open questions (§10 #28).
+
 ### 4.4 Frontend build strategy — rebuild the renderer fresh
 
 **The renderer is throwaway.** The current React renderer is an early prototype, not the shippable client:
@@ -363,7 +367,7 @@ Deliberately **not** advertised: `set_mode`, `set_fast`, `set_thinking`. These a
 real TUI, not missing code: the CLI only cycles permission modes via Shift+Tab in the terminal, and exposes
 no programmatic `/fast` or thinking toggle — so the corresponding endpoints return honest `400`s under the
 bridge driver, and the UI never fakes a live control for them. Mid-run mode change is an open question
-(§10); mode is launch-only until it is sorted.
+(§10); mode is launch-only until it is sorted. (The SDK's stream-json control API — `set_permission_mode` / `set_max_thinking_tokens` — *does* expose these programmatically; forgoing it is the deliberate price of keeping the interactive real TUI, and the proven bridge levers are instead the `keys()` Shift+Tab / `Meta+T` / `Meta+O` paths, §10 #1/#2/#3.)
 
 ### 6.3 `sdk` driver (limited-use, opt-in)
 
@@ -502,7 +506,7 @@ kept in sync on edit via `/rename` — so it surfaces in the VS Code extension's
 `--resume` picker, not only inside the dashboard. Pools are **25 colours and 50 curated icons**, assigned
 round-robin (`colour = n mod 25`, `icon = n mod 50`); past 16 agents the icon becomes the primary
 disambiguator. Icons are recolorable SVGs served from `assets/icons/agents/` via
-`GET /assets/agent-icons/{name}?color=`. ⚠ **Today:** the React client ships only 16 colours (design-parity
+`GET /assets/agent-icons/{name}?color=`. A human-name pool for the Create panel's randomize affordance is not yet defined (§10 #35). ⚠ **Today:** the React client ships only 16 colours (design-parity
 lag, §4.4 — not a decision change); identity editing and the `--name`/`/rename` registration are speced but
 not yet wired.
 
@@ -608,7 +612,7 @@ omits the marquee (§4.4).
 ### 7.11 Permissions
 
 Permission answers are a clean **binary Approve/Deny** (plus Reply). **"Always allow" is fully removed** —
-from the UI and from all persistence. The round-trip: the bridge's screen-state detects the tool-permission
+from the UI and from all persistence. (Native permission-automation surfaces — `PreToolUse` / PermissionRequest hooks, `--permission-prompt-tool`, remote permission responses — are a known smoother path, deliberately **not** adopted; the binary screen-driven round-trip stays the model unless it proves insufficient in practice, per candidates-note #5.) The round-trip: the bridge's screen-state detects the tool-permission
 menu → a Permission inbox card is raised → the operator answers in the UI →
 `POST /sessions/{id}/permission` → the bridge answers the TUI menu via `keys()` → the agent continues.
 Detection is screen-state (`capture-pane`), not hooks.
@@ -669,6 +673,7 @@ merged Export control.
 - **Revise/Summarize** run on the in-process SDK path (`POST /utility/{revise,summarize}`), never the
   bridge.
 - **Send-as-agent** rides the addressing model (§7.2) + the prompt queue (§7.3).
+- **Voice mic** and the **response-format preamble** are surfaced but not yet fully specified: the mic's speech-to-text capture→transcribe→insert path (client Web Speech API vs. a sidecar service) is an open question (§10 #27), and the preamble's option-set + apply/persist model is another (§10 #34).
 
 ### 7.15 Settings
 
@@ -934,14 +939,15 @@ transcript; the dashboard persists only thin semantic overlays on top.
    scratch); the default `agent → [user]` routing is re-derivable and never written. Replay = transcript →
    left-join overlay → full feed, addressing intact, zero duplicated text.
 
-### 8.7 Two spots to watch
+### 8.7 Three spots to watch
 
 1. **Transcript-scheme drift.** The dir-name encoding and `--resume` behavior belong to Claude Code, not
    the dashboard; pinned retention + persisted resolved paths reduce the blast radius, and the live-verify
    habit in the bridge test suite is the canary for drift.
 2. **Concurrent writers on one project.** Two agents in the same project share one `state/` directory —
    fine for append-only files (`routing.jsonl`) and keyed writes, but the state-store implementation must
-   do **atomic write-replace per file** to avoid torn JSON.
+   do **atomic write-replace per file** to avoid torn JSON. Cross-branch/machine merge of the committed `state/` JSON is a separate, still-open concern — there is no merge policy for two branches editing the whole-file state (§10 #31).
+3. **Schema evolution of the committed store.** The `state/` JSON carries no `schema_version` stamp or forward-compat policy yet, so a future format change could break older data — an open question (§10 #29).
 
 ---
 
@@ -1241,7 +1247,7 @@ deleted.
 ### Priority — coverage-audit additions (2026-07-02)
 
 Surfaced by the 2026-07-02 system coverage audit
-([`dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../dev/notes/scratch/2026-07-02-coverage-audit-orphans.md))
+([`archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md))
 and **appended here as #14 onward** — deliberately *not* interleaved into the High/Medium/Low subsections
 above — so the existing item↔prompt numbering in [`dev/prompts/`](../dev/prompts/) is not disturbed. Per-item
 priority is noted inline. Each carries a spike or research prompt queued under
@@ -1411,6 +1417,83 @@ half-formed, by design (see the cheap-entry rule).
 - **Research/POC must establish:** an inventory of where each special asset currently comes from, and a
   per-type sourcing rule.
 - **Fallback if infeasible:** current ad-hoc sourcing stands.
+
+### Priority — coverage-audit remainder (2026-07-04)
+
+The Phase-6 homing of the last coverage-audit orphans ([`archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md)): the Tier-2 "moderate" items still unhomed after the Phase-4 harvest, the Tier-3 production-hygiene minors, and the two Tier-4 design-lane items worth elevating. Appended as **#26 onward** (same append-don't-interleave convention as #14/#23, to preserve existing numbering). Each carries a genuine **product/policy decision that is the operator's to make**, so it is homed here **as an open question, deliberately not decided** — the leading candidate (where the audit suggested one) is noted but not adopted. The consolidated call-list lives in the **§F1 decision register** of the workflow tracker ([`dev/notes/scratch/2026-07-03-doc-integration-tracker.md`](../dev/notes/scratch/2026-07-03-doc-integration-tracker.md)) and is presented to the operator as a batch; when the operator rules, each item converts to a body decision or a Decided omission and leaves the queue.
+
+**26. Turns "by-tool" breakdown + the "Coordinating" slice** *(→ §7.9, §7.10, §10 #9)* — 🧪 **needs-spike** *(priority: medium; sibling of #9)*
+- **Evidence:** no derivation defined — the Agent→Details Turns accordion expands to a per-tool split (Read/search · Edit · Bash · MCP · Subagent · Web · **Coordinating** · Remaining), but §7.9 covers turn *counting* for caps only, and the cross-agent "Coordinating" bucket has no source. The sibling *context*-by-category is §10 #9. Tracked: §F1.
+- **Desired final behavior:** the Turns accordion shows a trustworthy per-tool breakdown, including a "Coordinating" slice for cross-agent work.
+- **Decision pending (operator's call):** what to display once the spike bounds what's derivable — the full per-tool breakdown + a "Coordinating" slice, only the derivable tool buckets, or just the total turn count. The spike settles what's *achievable*; the operator picks what to ship from it.
+- **Spike must establish:** whether per-tool turn counts are derivable from the transcript's `tool_use` blocks, and whether a "Coordinating" slice (link / scratch / inbox activity) can be attributed at all — or whether the breakdown is cut to the derivable tools only.
+- **Fallback if infeasible:** show only the derivable tool buckets (or the total turn count alone, §7.9) and drop the "Coordinating" slice.
+
+**27. Voice dictation — speech-to-text pipeline** *(→ §7.14)* — 🔬 **needs-research** *(priority: medium)*
+- **Evidence:** no capture→transcribe→insert path — §7.14 names "a voice mic" on the Compose / Plans / Documents editors, but the STT mechanism is unchosen and unwired. Tracked: §F1.
+- **Desired final behavior:** the per-field mic captures speech and inserts transcribed text into the editor.
+- **Decision pending (operator's call):** client-side **Web Speech API** (free, built-in, no backend) vs. a **sidecar transcription service** (better quality, more work, its own privacy/offline story) — with the browser/Electron speech-API and privacy/offline behavior still to verify (candidates-note #16).
+- **Fallback if infeasible:** the mic stays a visual affordance until the path lands.
+
+**28. Frontend degraded-mode policy + polling backoff** *(→ §4.3)* — 🔬 **needs-research** *(priority: medium)*
+- **Evidence:** §4.3 fixes the poll cadences, and SSE reconnect + the "Sidecar offline" chip are homed, but there is **no defined degraded-UI policy when `/health` fails** and **no backoff** on the fixed poll cadences. Distinct from #17's scale-ceiling adaptive cadence — this is failure-mode UX plus a retry policy. Tracked: §F1.
+- **Desired final behavior:** when the sidecar is unreachable, the poll-driven readouts degrade predictably and polling backs off rather than hammering the fixed cadence.
+- **Decision pending (operator's call):** what the panels show on `/health` failure (stale-marked last-known values / frozen panels / a banner) and the backoff curve.
+- **Fallback if infeasible:** today's single "Sidecar offline" chip with unchanged poll cadences.
+
+**29. Schema versioning / migration of the committed store** *(→ §8.1, §8.2)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** only the one-time `.awl`→`.awl-cc-dash` rename (§11.2 #1) is homed; the committed `state/` JSON carries **no `schema_version` stamp or forward-compat policy**. Tracked: §F1.
+- **Desired final behavior:** a future format change can read (or migrate) data written by an older version without silent breakage.
+- **Decision pending (operator's call):** stamp a `schema_version` now (cheap future-proofing) vs. accept "a future format change may break old data."
+- **Fallback if infeasible:** none needed — the do-nothing path *is* one of the two options.
+
+**30. Sidecar crash-supervision** *(→ §2, §9.9)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** agent recovery is homed (§9.9), but in the **two-process bat-file model** the "who restarts a crashed sidecar" question is only stated conditionally inside the unbuilt one-click-launch item (§10 #10). Tracked: §F1.
+- **Desired final behavior:** a crashed sidecar recovers (or is known to require a manual relaunch) without losing the running agents.
+- **Decision pending (operator's call):** accept **manual relaunch** (agents survive in tmux; state is write-as-it-happens) vs. build **auto-restart** supervision (folds into §10 #10).
+- **Fallback if infeasible:** manual relaunch is the shipped model.
+
+**31. Git-merge policy on the committed `.awl-cc-dash/` state** *(→ §8.7)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** §8.7 covers in-process atomic write-replace only; two branches/machines editing the whole-file JSON state have **no merge policy**. Tracked: §F1.
+- **Desired final behavior:** concurrent edits to the committed project state from two branches/machines have a defined resolution (or a recorded decision that this is out of scope).
+- **Decision pending (operator's call):** accept **single-machine, no merge policy** (the leading candidate — it matches the accepted cross-machine caveat, §9.9) vs. define a merge/reconcile story.
+- **Fallback if infeasible:** the single-machine assumption stands; a conflict is a manual git resolution.
+
+**32. Security on an untrusted network** *(→ §2)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** §2 accepts the no-auth `0.0.0.0:7690` bind for a single-user machine at home, but does **not** address the mutating control API being exposed when the laptop travels onto café / office Wi-Fi. Tracked: §F1.
+- **Desired final behavior:** the exposed control API is safe (or consciously accepted) on an untrusted network.
+- **Decision pending (operator's call):** record **OS-firewall-as-the-boundary** (the audit's leading candidate) as sufficient vs. add a travel bind/auth posture.
+- **Fallback if infeasible:** the OS firewall is the boundary; document it as the accepted posture.
+
+**33. Sidecar logging / observability** *(→ §2, §9)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** the sidecar keeps only ad-hoc stdout — **no decided destination or retention** for its own process logs, so a failure leaves little trail. Tracked: §F1 *(newly surfaced 2026-07-04 during Phase-6 homing)*.
+- **Desired final behavior:** the sidecar writes a proper, bounded log to a decided home so a crash/fault is diagnosable.
+- **Decision pending (operator's call):** the log destination (a file under the gitignored `sidecar/runtime/` vs. stdout-only) plus retention/rotation.
+- **Fallback if infeasible:** ad-hoc stdout stands.
+
+**34. Response-format preamble — option-set + apply/persist model** *(→ §7.14)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** §7.14 ships the response-format preamble control, but its **option set and how the instruction reaches/persists to the agent** are undefined. Tracked: §F1.
+- **Desired final behavior:** the operator picks a response-format from a defined menu, and the choice reaches the agent and persists at the chosen scope.
+- **Decision pending (operator's call):** the option set (e.g., the operator's own TL;DR-table + emoji-status notes) and whether the setting is **per-agent** vs. **per-message**.
+- **Fallback if infeasible:** a single freeform preamble field with no preset menu.
+
+**35. Agent name pool / "randomize" source** *(→ §7.5)* — 🔬 **needs-research** *(priority: low)*
+- **Evidence:** the Create panel's randomize-name affordance (and any auto-name) has **no defined name pool** (deferred in [`sidecar/identity.py`](../sidecar/identity.py)); §7.5 defines the colour/icon pools but not a name pool. Tracked: §F1.
+- **Desired final behavior:** "shuffle a fresh agent name" draws from a defined source.
+- **Decision pending (operator's call):** a curated human-name pool + randomize vs. names are simply user-typed (fine-as-backlog).
+- **Fallback if infeasible:** names are user-typed and the randomize affordance is dropped or disabled.
+
+**36. Rich visual content in Plans/Docs** *(→ DESIGN.md; design-lane)* — 🔬 **needs-research** *(priority: low; pursue-or-park)*
+- **Evidence:** mermaid / charts / diagrams + visual commenting in Plans/Docs live only in [`dev/notes/TODO.md`](../dev/notes/TODO.md) scratch — a recurring ask, genuinely unhomed in DESIGN. Tracked: §F1. **Design-lane item:** the design surface is owned by the live design agent; this workflow does not edit DESIGN.md — this entry is the architecture-side pointer only.
+- **Desired final behavior:** Plans / Documents can render rich visual content (diagrams / charts) with visual commenting.
+- **Decision pending (operator's call):** pursue (→ route to the design lane for a DESIGN.md home) or leave parked in TODO.
+- **Fallback if infeasible:** stays a TODO backlog idea.
+
+**37. Authors / authorship view for Plans & Documents** *(→ §8.5, DESIGN.md; design-lane)* — 🔬 **needs-research** *(priority: low; pursue-or-park)*
+- **Evidence:** provenance *data* is homed (§8.5 sidecar: created-by / when / session), but the *display* — a dedicated nav-rail "Authors" mode — is not; it lives only in TODO scratch. Tracked: §F1. **Design-lane item:** as with #36, the display is the design agent's surface; this workflow does not edit DESIGN.md.
+- **Desired final behavior:** an Authors view surfaces the authorship/provenance already captured in the doc sidecars.
+- **Decision pending (operator's call):** pursue (→ design lane) or leave parked.
+- **Fallback if infeasible:** provenance stays data-only (§8.5), with no dedicated view.
 
 ### Decided omissions (not open questions)
 

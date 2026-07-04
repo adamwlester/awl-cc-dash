@@ -31,10 +31,22 @@
 [✓] 5.  Resolved the 3 doc-vs-doc contradiction orphans WITH the user (§E) — decisions applied to
         docs/ARCHITECTURE.md (§7.5 / §4.4 / §5.2 / §7.16 / §8.5 + the two ⚠-index rows) + CLAUDE.md
         (2026-07-04; see DEVLOG).
-[ ] 6.  Integrate remaining orphans (Tier-3 decided-omissions, Tier-4 trio, +3 Tier-2 moderates — see §F) → §10/§11/body. Decision register: §F1.
-[ ] 7.  Verify unverified-behavior-candidates.md fully integrated → archive both 07-02 scratch docs.
-[ ] 8.  FINAL comprehensive integration-verification sweep (full reachable trail vs major docs;
-        state what could / could not be cross-checked).
+[✓] 6.  Integrated remaining orphans → docs/ARCHITECTURE.md §10 #26–#37 (12 entries: 3 Tier-2 moderates,
+        7 Tier-3 minors incl. newly-surfaced sidecar-logging, 2 Tier-4 design-lane) + inline body pointers
+        to the new entries (§2 → #30/#32/#33 · §4.3 → #28 · §7.5 → #35 · §7.14 → #27/#34 · §8.7 → #29/#31),
+        plus a §6.2 stream-json-control-API trade-off note (→ existing #1/#2/#3, not a new entry) and a §7.11
+        native-permission-hooks deferred-path note (candidates #5); §8.7 heading Two→Three spots. All
+        homed-as-OPEN, none decided; §F1 annotated with homing pointers (2026-07-04). Design-lane items
+        (#36/#37) recorded as §10 pointers, DESIGN.md untouched.
+[✓] 7.  Verified unverified-behavior-candidates.md integrated (22 items homed/parked; voice #16 → §10 #27);
+        archived BOTH 07-02 scratch docs → archive/dev/notes/scratch/ (git mv, 2026-07-04); repointed the
+        ARCHITECTURE §10 + tracker §E citations to the archive path.
+[✓] 8.  FINAL integration-verification sweep DONE (2026-07-04) — 4 parallel Sonnet verifiers vs the full
+        trail. Verdict: PASS. Cross-refs 23/23 resolve; archived-source coverage confirms NOTHING lost by
+        archiving (all Tier-1–4 orphans + all 22 candidate items homed); §F1↔§10 register consistent; zero
+        new ⚠-Today markers. Fixed on the spot: #26 Decision-pending field; §8.7 heading Two→Three; §7.11
+        permission-hooks deferred note; §6.2 ledger wording. Accepted LOW: link-drawer wiring (candidate
+        #13) subsumed by the §4.4 renderer-rebuild scope. Could NOT machine-verify: prose quality/tone.
 [ ] 9.  Feature-refactor §10/§11 (certainty stays the section split; group by feature within) with an
         old→new mapping table; strip ex-BB scaffolding; re-verify zero inbound TODO.md refs repo-wide;
         archive this tracker.
@@ -106,7 +118,7 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 4. Account split-source + no auth-expiry reader (`sidecar/settings_io.py`; `.claude.json` tier fields unmatched)
 5. Real Electron-main sidecar-lifecycle POC (spike modeled it in Python) (`frontend/`)
 
-### E. Contradiction orphans — need USER decisions (Phase 5; detail in `2026-07-02-coverage-audit-orphans.md`)
+### E. Contradiction orphans — need USER decisions (Phase 5; detail in `archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`, archived Phase 7)
 
 1. [✓] **Identity editing** — DECIDED: all 5 fields **editable**; the **name** is also registered as the
        real Claude Code session name (`claude --name` at launch, `/rename` on edit — confirmed in `--help`).
@@ -126,30 +138,31 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 
 > **Handoff rule — do not drop.** This is where product/policy decisions this workflow surfaces live so they survive session boundaries. Every subsequent session MUST (a) add to and edit this list as orphans get homed and new decisions appear, and (b) **check each open decision WITH the user before treating it as settled** — never silently adopt the audit's suggested resolution as "decided." Homing an orphan as an explicit §10 open-question is an agent's job; *deciding* it is the user's. Mark each `[ ]` open / `[✓]` decided (with date + where applied), mirroring §E.
 
-Surfaced 2026-07-04 (Phase-6 prep); none decided yet.
+Surfaced 2026-07-04 (Phase-6 prep). **All homed as open §10 entries on 2026-07-04 (Phase 6)** — homing gives each orphan a doc entry; it does **not** decide it. Each stays `[ ]` open until the operator rules; the `→ homed §10 #N` note is *where* it was homed, not a resolution.
 
 Higher-stakes — leave genuinely open, user decides:
-- [ ] **Security on an untrusted network** — no-auth `0.0.0.0` bind; audit suggests OS-firewall-as-boundary. (Tier-3)
-- [ ] **Frontend degraded-mode UX** — what the poll-driven panels show when `/health` fails. (Tier-2)
-- [ ] **Voice dictation** — client-side Web Speech API vs. a sidecar transcription service. (Tier-2)
-- [ ] **Response-format preamble** — the option set + per-agent-vs-per-turn persistence. (Tier-3)
-- [ ] **Tier-4 "elevate if pursued" trio** — rich visual content in Plans/Docs · Authors/authorship view · subagent create/manage UI: pursue (→ DESIGN / §10) or leave parked. Design-lane items route through the design agent, not edited here.
+- [ ] **Security on an untrusted network** — no-auth `0.0.0.0` bind; audit suggests OS-firewall-as-boundary. (Tier-3) → homed §10 #32.
+- [ ] **Frontend degraded-mode UX** — what the poll-driven panels show when `/health` fails. (Tier-2) → homed §10 #28.
+- [ ] **Voice dictation** — client-side Web Speech API vs. a sidecar transcription service. (Tier-2) → homed §10 #27.
+- [ ] **Response-format preamble** — the option set + per-agent-vs-per-turn persistence. (Tier-3) → homed §10 #34.
+- [ ] **Tier-4 "elevate if pursued" trio** — rich visual content in Plans/Docs · Authors/authorship view · subagent create/manage UI: pursue (→ DESIGN / §10) or leave parked. Design-lane items route through the design agent, not edited here. → homed §10 #36 (rich visual) + #37 (Authors view); subagent create/manage was already §10 #22.
 
 Lower-stakes — pre-fill the audit's recommendation for confirm/override:
-- [ ] **Schema versioning / migration** of the committed store. (Tier-3)
-- [ ] **Sidecar crash-supervision** — manual relaunch (agents survive in tmux) vs. auto-restart. (Tier-3)
-- [ ] **Git-merge policy** on the committed `.awl-cc-dash/` state. (Tier-3)
-- [ ] **Agent name source** — curated pool + randomize vs. user-typed. (Tier-3)
-- [ ] **Turns-by-tool + "Coordinating" derivation** — confirm derivable (spike) vs. cut the feature. (Tier-2)
+- [ ] **Schema versioning / migration** of the committed store. (Tier-3) → homed §10 #29.
+- [ ] **Sidecar crash-supervision** — manual relaunch (agents survive in tmux) vs. auto-restart. (Tier-3) → homed §10 #30.
+- [ ] **Git-merge policy** on the committed `.awl-cc-dash/` state. (Tier-3) → homed §10 #31.
+- [ ] **Agent name source** — curated pool + randomize vs. user-typed. (Tier-3) → homed §10 #35.
+- [ ] **Turns-by-tool + "Coordinating" derivation** — confirm derivable (spike) vs. cut the feature. (Tier-2) → homed §10 #26.
+- [ ] **Sidecar logging / observability** — log destination + retention/rotation (a file under `sidecar/runtime/` vs. stdout-only). (Tier-3; newly surfaced 2026-07-04 during Phase-6 homing) → homed §10 #33.
 
 Blocks the Phase-9 restructure (also under Running todo):
-- [ ] **"Agent Archive"** (§11.3 #18) → demote to §10?
+- [ ] **"Agent Archive"** (§11.3 #18) → demote to §10? *(Not a coverage-audit orphan — a §11 placement call; stays in §11.3 until the operator rules, then handled in the Phase-9 restructure.)*
 
 ### G. Scratch docs to archive when their content is fully homed
 
-- `dev/notes/scratch/2026-07-02-coverage-audit-orphans.md` (after Phases 5–6)
-- `dev/notes/scratch/2026-07-02-unverified-behavior-candidates.md` (verify in Phase 7)
-- this tracker (last — Phase 9)
+- [✓] `2026-07-02-coverage-audit-orphans.md` — **archived 2026-07-04 (Phase 7)** → `archive/dev/notes/scratch/` (content homed Phases 5–6; ARCHITECTURE §10 citations repointed to the archive path).
+- [✓] `2026-07-02-unverified-behavior-candidates.md` — **archived 2026-07-04 (Phase 7)** → `archive/dev/notes/scratch/` (verified integrated: all 22 candidate items homed or correctly parked; the one still-open item — voice dictation, candidate #16 — is now §10 #27).
+- [ ] this tracker (last — Phase 9)
 
 ## Running todo / open decisions
 
