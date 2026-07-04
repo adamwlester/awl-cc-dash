@@ -5,8 +5,9 @@ the backend actually does* — more current than the docs, and unlike them it is
 **executable**. When a doc and a test disagree, trust the test.
 
 Two things this suite does **not** cover — treat them as unproven until they are:
-the **Electron/React frontend** (no tests at all) and the **live bridge behavior**
-unless you deliberately run the integration tier (below).
+the **Electron/React frontend** (no *component* tests — one live contract spike
+aside, see below) and the **live bridge behavior** unless you deliberately run the
+integration tier (below).
 
 ---
 
@@ -65,6 +66,39 @@ it encodes — read that docstring first; it is the spec.
 | `test_tmux_bridge.py` | The `bridge` package control surface end-to-end: create/send/keys/read/list/rename/resume/status/batch/broadcast/interrupt/scrollback/watch/wait_idle/export/show/set_cwd/set_model/mcp_sync/read_log | ~29 |
 | `test_bridge_finisher_live.py` | The bridge **driver** behaviors the product leans on: **permission approve/deny**, **resume-after-restart**, **model + effort take** | ~4 |
 
+### Feasibility spikes (opt-in, live) — engine-capability evidence
+
+One-shot **engine-feasibility probes** (built 2026-07-02, verified against commit
+`af4964d`), each answering an open question in `docs/ARCHITECTURE.md` §10: *can the
+real Claude Code engine, via the bridge, actually do X?* They live in the live tier
+(they need WSL2 + tmux + a real TUI, and carry the `integration`+`slow` markers, so
+the hermetic run deselects them) but differ in **purpose** from the standing suite
+above — they generate **evidence**, not regression protection: run one to *settle a
+question*, not on every change. Each file's module docstring states the decided
+behavior; the `Verdict` here is the one-line summary, and the run records are in
+`tests/log/`. The full findings + their doc consequences are folded into
+`ARCHITECTURE.md` §10 (the open questions these answer).
+
+| File | Probes: can the engine… | Verdict |
+|------|-------------------------|---------|
+| `test_rewind_handoff_live.py` | …rewind a session to an earlier point **and** fork/handoff a new agent from a point? | ✅ FEASIBLE (both) |
+| `test_permission_mode_cycle_live.py` | …change permission mode mid-run (Shift+Tab) and actually suppress prompts? | ✅ FEASIBLE |
+| `test_plan_decision_hooks_live.py` | …surface `ExitPlanMode`/`AskUserQuestion` as inbox cards, then resume the agent? | ✅ FEASIBLE |
+| `test_thinking_toggle_live.py` | …toggle extended-thinking on a running agent and read it back? | ✅ FEASIBLE (via the modal panel) |
+| `test_context_compact_live.py` | …parse `/context` by category and detect `/compact` boundaries? | ✅ FEASIBLE |
+| `test_per_agent_cost_live.py` | …report a real per-agent $ cost (via `/cost`)? | ✅ FEASIBLE (overturns the "honest blank" assumption) |
+| `test_subagent_status_live.py` | …tell a subagent is active vs. quiet from its own transcript? | ✅ FEASIBLE |
+| `test_hook_event_stream_live.py` | …get live run-state (permission_mode + tool) from hook payloads? | ✅ FEASIBLE (caveats: Notification lacks it; concurrent-load untested) |
+| `test_bypass_auto_preconditions_live.py` | …reach the Bypass/Auto permission segments given how the agent was launched? | ✅ FEASIBLE (bypass is silently absent if not pre-armed) |
+| `test_usage_context_sources_live.py` | …read mid-run context + account/usage from local sources? | ✅ FEASIBLE (data-boundaries only; live % is screen-scrape) |
+| `test_console_mirror_live.py` | …passthrough keystrokes and recover ANSI from the console pane? | ✅ FEASIBLE (faithful xterm rendering = a frontend job) |
+| `test_oneclick_launch_live.py` | …have the app own the sidecar lifecycle without killing agents? | ✅ FEASIBLE (modeled in Python; real Electron POC still owed) |
+| `tests/ui/test_ui_slice_live.py` | …drive the whole live loop from a browser speaking only `api.ts`? | ✅ FEASIBLE |
+| `test_system_fault_harvest_live.py` | …read machine signals for System faults (rate/usage cap, auth, MCP)? | ⚠ PARTIAL — MCP + auth OK; **usage-cap wording not matched** |
+| `test_console_clear_transcript_live.py` | …survive a Console `/clear` without orphaning the transcript? | ⚠ HAZARD — `/clear` **orphans** new turns (`/compact` is safe) |
+| `test_polling_scale_ceiling_live.py` | …scale the ~1s per-agent poll to a fleet? | ⚠ FEASIBLE test, bad curve — **degrades from N=1** (needs rework) |
+| `test_fast_mode_toggle_live.py` | …toggle Fast/Opus mode live? | 🚫 OMITTED — account credit-gated (lands `xfail`) |
+
 ### Support files
 
 | Path | Purpose |
@@ -88,8 +122,11 @@ control, permission round-trips, resume, model/effort. Green by default means
 
 **Not established anywhere (known gaps — do not assume these work):**
 
-- 🔴 **Frontend (Electron/React).** No tests exist. This is the "barely functional"
-  layer; it has no automated safety net.
+- 🔴 **Frontend (Electron/React).** No *component* tests exist. This is the "barely
+  functional" layer; it has no automated safety net. *(One live spike,
+  `tests/ui/test_ui_slice_live.py`, now proves a browser speaking the `api.ts`
+  contract can drive the full loop end-to-end — but the React components themselves
+  remain untested.)*
 - 🟡 **`sidecar/serialize.py`** — the driver→event normalization *seam*. No dedicated
   test.
 - 🟡 **`sidecar/runtime_store.py`** — exercised only incidentally via the bridge unit

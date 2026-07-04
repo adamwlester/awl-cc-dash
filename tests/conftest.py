@@ -34,8 +34,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # housekeeping only.
 DEBUG_LOG_KEEP = 20
 
-# The two live/integration files. Used to decide whether to capture WSL/CLI env
-# info in the results summary (only meaningful when the live tier actually ran).
+# The live/integration tier. Detection is CONVENTION-based: any ``*_live.py`` file
+# is live, plus the legacy ``test_tmux_bridge.py`` (which predates the ``_live.py``
+# suffix). Used to decide whether to capture WSL/CLI env info in the results
+# summary and to label the tier correctly (only meaningful when the live tier
+# actually ran). This tuple is the explicit-match set for files that don't carry
+# the suffix; the suffix rule itself lives in ``_is_live_nodeid`` so the list can't
+# rot as new ``*_live.py`` spikes are added.
 LIVE_TEST_FILES = ("test_tmux_bridge.py", "test_bridge_finisher_live.py")
 
 
@@ -102,11 +107,17 @@ def _claude_cli_version():
         return "unknown"
 
 
+def _is_live_nodeid(nodeid):
+    """True if a test nodeid belongs to the live/integration tier — any ``*_live.py``
+    file (the suffix convention) or one of the explicit ``LIVE_TEST_FILES``."""
+    fname = nodeid.split("::", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
+    return fname.endswith("_live.py") or fname in LIVE_TEST_FILES
+
+
 def _live_ran(terminalreporter):
-    for key in ("passed", "failed", "error", "skipped"):
+    for key in ("passed", "failed", "error", "skipped", "xfailed", "xpassed"):
         for rep in terminalreporter.stats.get(key, []):
-            nodeid = getattr(rep, "nodeid", "")
-            if any(f in nodeid for f in LIVE_TEST_FILES):
+            if _is_live_nodeid(getattr(rep, "nodeid", "")):
                 return True
     return False
 

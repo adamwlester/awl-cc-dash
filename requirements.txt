@@ -19,3 +19,13 @@ python-dotenv==1.2.2
 
 # Testing
 pytest==9.1.1
+
+# Live spike deps (opt-in tier; see tests/README.md). Pinned to the known-good set
+# the 2026-07-02 spikes were verified against.
+#   playwright drives the UI-slice spike (tests/ui/test_ui_slice_live.py). The pip
+#   package alone is not enough — also fetch the browser binary once:
+#       .venv\Scripts\playwright install chromium
+playwright==1.61.0
+#   psutil gives the polling-scale spike (tests/test_polling_scale_ceiling_live.py)
+#   real CPU sampling; without it that spike falls back to WSL /proc/stat.
+psutil==5.9.8
