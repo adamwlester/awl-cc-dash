@@ -131,8 +131,9 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 ## Running todo / open decisions
 
 - [✓] 3b: committed 40decbf (Phase 3+3c + tracker + design [ND] triage), pushed to origin/main.
-- [ ] 4b flag: #3 fast-mode held as 🧪 needs-spike (credit-gated xfail = account limit, not a proven
-      dead-end) rather than moved to Decided-omissions per the handoff shorthand — user to confirm/override.
+- [✓] 4b flag: #3 fast-mode RESOLVED — user enabled Fast credits (2026-07-04); re-ran the spike →
+      ✅ proven (`Meta+O` opens the Fast panel, `Space` toggles OFF↔ON, read-backable there-and-back).
+      §10 #3 → ✅ proven; Decided-omissions note updated; test strengthened from panel-appears to full flip.
 - [✓] 4c: both spikes ran INFEASIBLE (2026-07-04); harvested → §10 #4/#7 (⛔ resolved-at-fallback) + Decided-omissions note.
 - [✓] Phase 5 decisions (§E) — user decided all 3 (2026-07-04); applied to ARCHITECTURE.md + CLAUDE.md.
 - [ ] BB8 "Agent Archive" sits in §11.3 #18 with a value-unclear caveat — user may prefer it demoted to §10

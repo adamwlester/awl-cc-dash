@@ -429,6 +429,14 @@ Files: docs/ARCHITECTURE.md, CLAUDE.md, dev/notes/scratch/2026-07-03-doc-integra
 
 ---
 
+### 2026-07-04 00:45:00 — §10 #3 Fast-mode toggle: re-ran the spike with credits → ✅ proven
+
+User enabled Fast/Opus usage credits, unblocking the previously credit-gated §10 #3 spike. Re-ran `test_fast_mode_toggle_live` live (CLI 2.1.201): `credit_gated=False` now, and `Meta+O` opens the "↯ Fast mode (research preview)" panel. Explored the interaction (scratch, since removed) and found the lever: with the panel open, **`Space` toggles** the `Fast mode OFF/ON` line (Enter/Escape only close it). Strengthened the test from its old "panel-appears + honest xfail" shape to the **full there-and-back flip proof** (open → read OFF → Space → read ON → Space → read OFF), mirroring the proven `Meta+T` thinking spike (#2); it leaves Fast OFF before teardown so nothing keeps drawing credits, and keeps a credit-gate `xfail` branch for accounts without Fast. Test passes live (`off → on → off`, read-backable, repeatable; no orphaned tmux sessions). Harvested: §10 #3 🧪 needs-spike → **✅ proven** *(pending relocation — Phase 9)* with the `Meta+O`+`Space` mechanism + wiring guidance; the §10 Decided-omissions note updated (both mode toggles now proven); tracker 4b flag resolved. `set_fast()` remains an in-code no-op (wiring is a build item; the §5.2/§6 capability-gated-400 ⚠Todays stay accurate).
+
+Files: tests/test_fast_mode_toggle_live.py, docs/ARCHITECTURE.md, dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

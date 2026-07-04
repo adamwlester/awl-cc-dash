@@ -1096,18 +1096,18 @@ deleted.
   transcript; wire it into the driver (replacing the `set_thinking()` no-op) with a current-state read first.
 - **Fallback if infeasible:** n/a — proven feasible.
 
-**3. Fast-mode toggle (`Meta+O`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike** *(blocked: account credit-gated)*
-- **Evidence:** the spike (`test_fast_mode_toggle_live`, 2026-07-02) **could not exercise the lever** — this
-  account is credit-gated for Fast/Opus, so the test lands `xfail` (untestable here, **not** proven
-  impossible). `set_fast()` is an in-code no-op; the `Meta+O` keybinding lever is action-confirmed,
-  integration-untested — symmetric with #1/#2, which both passed.
+**3. Fast-mode toggle (`Meta+O`)** *(→ §7.11, DESIGN mode toggles)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_fast_mode_toggle_live`, **live**, 2026-07-04, Fast credits enabled):
+  `Meta+O` opens the "↯ Fast mode (research preview)" panel on a running agent, and **`Space` toggles the
+  state** — the panel's `Fast mode OFF/ON` line is a plain-text scrape, and a there-and-back flip
+  (OFF → ON → OFF) proved it settable + read-backable + repeatable. (`Enter`/`Escape` only close the panel;
+  `Space` is the lever. `set_fast()` is still an in-code no-op — the proven lever is the `Meta+O`+`Space` path.)
+  The earlier `xfail` (2026-07-02) was a **credit-gate** — an account limit, since lifted — not a bridge limit.
 - **Desired final behavior:** the operator toggles Fast (Opus) mode on a running agent from the UI.
-- **Current blocker:** the toggle is un-runnable on a credit-gated account; the only known lever is the
-  `Meta+O` keybinding.
-- **Research/POC must establish:** re-run the `Meta+O` `keys()` toggle on a Fast-enabled (credit-carrying)
-  account and confirm the state is observable/read-backable. (A credit-gate is an account limit, not a bridge
-  limit — this does **not** meet the ⛔/Decided-omission bar of a spike proving no path exists.)
-- **Fallback if infeasible:** Fast is a launch-time choice or an omitted control — never a fake-live toggle.
+- **Spike established:** `Meta+O` via `keys()` opens the Fast panel and `Space` toggles it, read-backable from
+  the panel; wire it into the driver (replacing the `set_fast()` no-op) as open-panel → read → Space-to-target
+  → close, with a current-state read first. Credit-gate detection (the panel reports "requires usage credits")
+  stays the honest degrade for accounts without Fast credits.
 
 **4. True mid-run Inject** *(→ §7.3)* — ⛔ **tail impossible → resolved at fallback** *(pending relocation — Phase 9)*
 - **Evidence:** **tail spike passed — INFEASIBLE** (`test_inject_tail_live`, **live**, 2026-07-04): typeahead
@@ -1424,8 +1424,9 @@ a proof).
   denominator). Both keep their numbered §10 slot for now (marked ⛔ resolved-at-fallback) and move here
   formally in the Phase 9 refactor; their shipped fallbacks are the final models.
 - Fast/Thinking live control was previously parked here on a code-no-op assumption; the mode-control research
-  surfaced untested `Meta+T` / `Meta+O` keybinding levers, so both moved back into the queue — **#2 is now ✅
-  proven** and **#3 is 🧪 needs-spike (credit-gated, not proven impossible)**.
+  surfaced untested `Meta+T` / `Meta+O` keybinding levers, so both moved back into the queue — **both are now
+  ✅ proven** (#2 `Meta+T` modal; #3 `Meta+O` opens the Fast panel + `Space` toggles it, once Fast credits
+  were enabled, 2026-07-04).
 
 ---
 

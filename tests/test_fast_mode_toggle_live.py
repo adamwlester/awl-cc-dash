@@ -1,38 +1,34 @@
-"""Live spike — Fast-mode toggle via `Meta+O` (`chat:fastMode`).
+"""Live spike — Fast-mode toggle via `Meta+O` (`chat:fastMode`) + `Space`.
 
-§10 item #03 ("Fast-mode toggle (Meta+O)", 🧪 needs-spike). Attempts to toggle
-Fast (Opus) mode on a RUNNING bridge agent by sending the `chat:fastMode`
-keybinding (tmux keyname `M-o`) and reading the resulting state back. The
-read-back is the crux: sending `M-o` always "succeeds" at the tmux level, which
-proves nothing — only a read-backable state change would.
+§10 item #03 ("Fast-mode toggle (Meta+O)"). Proves that Fast (Opus) mode can be
+controlled on a RUNNING bridge agent from the keyboard and that the resulting
+state is READ-BACKABLE — the crux that was previously blocked.
 
-HONEST OUTCOME — omission (xfail), after a real send-and-read-back attempt on
-Claude CLI 2.1.198:
+WHAT THE LIVE SPIKE FOUND (Claude CLI 2.1.201, account with Fast credits enabled
+2026-07-04):
 
-  * Default `M-o` (`chat:fastMode`) produces **no observable change** — no panel,
-    no footer indicator, no model switch (before/after screens identical bar
-    transient footer rotation).
-  * The research's sanctioned fallback — rebinding `chat:fastMode` to a clean
-    chord (`ctrl+x ctrl+f`) via a temporary ~/.claude/keybindings.json and
-    sending it — was performed in the spike (exploration round 2, tests/log/
-    `results_20260702T162318Z`) and ALSO produced no observable change.
-  * ROOT CAUSE, read straight off the TUI: `/fast` opens a panel that says
-    **"↯ Fast mode (research preview) … Fast mode requires usage credits ·
-    /usage-credits to turn them on"**, and the `/fast` command reports
-    **"Fast mode OFF"**. Fast mode is **credit-gated and OFF for this account** —
-    there is no Enabled/Disabled toggle to flip, so no keystroke (default or
-    rebound) can turn it on or surface a read-backable state.
-  * This is NOT a key-encoding failure: `meta`-modifier delivery over tmux is
-    proven working — the sibling `Meta+T` spike opened the thinking panel. It is
-    an account/capability gate.
+  * `Meta+O` (tmux `M-o`, `chat:fastMode`) opens the **"↯ Fast mode (research
+    preview)"** panel on the running session::
 
-Therefore §10 #03's Fallback applies and should be recorded: **Fast stays a
-launch-time / credit-gated choice, never a fake-live toggle** → propose moving
-§10 #03 to "Decided omissions" (reported to the human; this test does not edit
-docs/ARCHITECTURE.md). The test keeps the file and records the finding via
-``pytest.xfail(...)`` — it is NOT faked green. The WORKS branch is retained so
-that, should a future account/build make Fast mode available and `M-o`-toggleable,
-the same test passes by asserting the observed change.
+        ↯ Fast mode (research preview)
+        High-speed mode for Opus 4.8. Draws from usage credits at a higher rate.
+          Fast mode  OFF  $10/$50 per Mtok
+        Learn more: https://code.claude.com/docs/en/fast-mode
+
+  * With the panel open, **`Space` toggles** the state — the panel's
+    `Fast mode  OFF/ON  $10/$50 per Mtok` line flips and is a plain-text scrape
+    (`capture-pane -p -J` strips ANSI). `Enter`/`Escape` just CLOSE the panel;
+    `Space` is the state lever. A clean there-and-back flip (OFF → ON → OFF)
+    proves the state is both settable and read-backable, i.e. `set_fast()` can be
+    wired as open-panel → read → Space-to-target → close (mirrors the proven
+    `Meta+T` thinking control, §10 #02).
+
+  * EARLIER (credit-gated account, CLI 2.1.198): the same `M-o` opened the panel
+    but it read `Fast mode OFF` with **"requires usage credits"** and no keystroke
+    could turn it on — an account/capability gate, not a key-encoding failure
+    (meta-delivery was already proven by the sibling `Meta+T` spike). That state
+    is still handled honestly below: if the panel reports credit-gated, the test
+    `xfail`s rather than faking green.
 
 Drives a `BridgeDriver` (per the build prompt) and reads the screen through a
 SELF-OWNED `TmuxBridge` targeting `driver.tmux_name`.
@@ -47,8 +43,7 @@ sessions concurrently):
   * Does NOT use conftest's `bridge` fixture (its setup AND teardown call
     `_kill_all_tmux()` = `tmux kill-server`, which would kill siblings). We
     instantiate our OWN `TmuxBridge()` for WSL shell helpers and screen reads.
-  * The durable test performs NO global-config writes; the rebind fallback was
-    exercised in the spike only (documented above).
+  * Leaves Fast mode OFF before teardown so nothing keeps drawing credits.
   * No shared-file edits (conftest.py / pyproject.toml / tests/README.md).
 
 Run (PowerShell)::
@@ -58,6 +53,7 @@ Run (PowerShell)::
 
 import asyncio
 import logging
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -83,6 +79,8 @@ log = logging.getLogger(__name__)
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
+_PANEL_MARKER = "fast mode (research preview)"
+
 
 @pytest.fixture(autouse=True)
 def _runtime_to_tmp(tmp_path, monkeypatch):
@@ -90,28 +88,68 @@ def _runtime_to_tmp(tmp_path, monkeypatch):
     monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "runtime"))
 
 
-def _screen(bridge, name, label, lines=40):
+def _screen(bridge, name, label, lines=45):
     content = bridge.read(name, lines=lines)["content"]
     log.debug("%s: read(%d):\n%s", label, lines, content)
     return content
 
 
-def _fast_surface_present(content):
-    """True iff the screen shows an ACTIVE Fast-mode surface (its panel, or an
-    'on' indicator). The `/fast` history line 'Fast mode OFF' is deliberately NOT
-    matched — only a live panel / an on-state counts as a read-backable change."""
+def _fast_panel_state(content):
+    """Parse the open "↯ Fast mode (research preview)" panel.
+
+    Returns 'on' / 'off' (from the `Fast mode  ON/OFF  $.../Mtok` line),
+    'credit-gated' when the panel reports it needs usage credits, or None when the
+    panel isn't open / can't be parsed. The `$/Mtok` line only exists in the OPEN
+    panel, so it isn't confused with the closed-state footer 'Fast mode OFF'.
+    """
     low = content.lower()
-    return (
-        "fast mode (research preview)" in low
-        or "↯ fast" in low
-        or "fast mode on" in low
-    )
+    if _PANEL_MARKER not in low:
+        return None
+    if "requires usage credits" in low or "usage-credits" in low:
+        return "credit-gated"
+    for line in content.splitlines():
+        if "mtok" not in line.lower():
+            continue
+        norm = re.sub(r"\s+", " ", line.lower()).strip()
+        if "fast mode on" in norm:
+            return "on"
+        if "fast mode off" in norm:
+            return "off"
+    return None
+
+
+def _open_fast_panel(bridge, name, label, tries=14, interval=0.6):
+    """Send `M-o`, poll until the Fast panel is open and parseable; return (state, screen)."""
+    bridge.keys(name, "M-o")
+    content = ""
+    for _ in range(tries):
+        content = _screen(bridge, name, label)
+        st = _fast_panel_state(content)
+        if st is not None:
+            return st, content
+        import time
+        time.sleep(interval)
+    return None, content
+
+
+def _space_and_read(bridge, name, label, tries=14, interval=0.6):
+    """With the panel OPEN, press `Space` (the toggle) and read the state back."""
+    bridge.keys(name, "Space")
+    content = ""
+    for _ in range(tries):
+        import time
+        time.sleep(interval)
+        content = _screen(bridge, name, label)
+        st = _fast_panel_state(content)
+        if st in ("on", "off", "credit-gated"):
+            return st, content
+    return None, content
 
 
 def test_fast_mode_toggle_meta_o_live():
-    """`M-o` (chat:fastMode) read-back attempt. Passes if a read-backable Fast
-    state change is observed (future-proof WORKS branch); otherwise records the
-    honest omission via xfail with the /fast credit-gate root cause."""
+    """`M-o` opens the Fast-mode panel; `Space` toggles OFF<->ON, read-backable
+    from the panel, with a there-and-back flip proving repeatability. On a
+    credit-gated account the panel reports it and the test xfails honestly."""
     bridge = TmuxBridge()
     diag = f"/home/lester/awl-fastmode-{uuid.uuid4().hex[:8]}"
     bridge._run(f"mkdir -p {diag}")
@@ -130,49 +168,54 @@ def test_fast_mode_toggle_meta_o_live():
             log.debug("driver.tmux_name=%s (unique awl-<uuid8>)", name)
             await asyncio.sleep(3)  # let the TUI paint
 
-            # --- Probe A: default M-o (chat:fastMode) keybinding read-back. ---
-            before = _screen(bridge, name, "BEFORE M-o")
-            bridge.keys(name, "M-o")
-            await asyncio.sleep(3)
-            after = _screen(bridge, name, "AFTER M-o")
-            mo_opened_fast = (
-                _fast_surface_present(after) and not _fast_surface_present(before)
+            # 1) Open the panel and read the CURRENT Fast state.
+            state1, screen1 = _open_fast_panel(bridge, name, "open #1 (baseline)")
+            if state1 == "credit-gated":
+                pytest.xfail(
+                    "Fast mode is credit-gated on this account — the `M-o` panel "
+                    "reports 'requires usage credits'. Meta-delivery is proven "
+                    "(sibling Meta+T opens the thinking panel), so this is an "
+                    "account/capability gate, not a key-encoding failure. Enable "
+                    "Fast credits (/usage-credits) to run the flip proof. See "
+                    "tests/log/ for the panel capture."
+                )
+            assert state1 in ("on", "off"), (
+                "M-o did not open a parseable '↯ Fast mode (research preview)' "
+                f"panel — the mechanism this spike relies on is absent. Screen "
+                f"tail:\n{screen1[-600:]}"
             )
-            log.debug("M-o opened a Fast surface? %s", mo_opened_fast)
+            opposite = "on" if state1 == "off" else "off"
 
-            # --- Probe B: /fast reveals the account's Fast-mode availability. ---
-            bridge.send(name, "/fast")
-            await asyncio.sleep(2.5)
-            panel = _screen(bridge, name, "AFTER /fast (panel)")
+            # 2) Toggle with Space and read back — the crux: the keystroke-driven
+            #    change must be observable in the panel.
+            state2, screen2 = _space_and_read(bridge, name, "after Space #1 (toggle)")
+            if state2 == "credit-gated":
+                pytest.xfail(
+                    "Fast toggle blocked: panel went credit-gated on Space. Enable "
+                    "Fast credits to run the flip proof."
+                )
+            assert state2 == opposite, (
+                f"Space did not toggle Fast to {opposite!r} / was not read-backable: "
+                f"panel shows {state2!r}. Screen:\n{screen2[-600:]}"
+            )
+
+            # 3) Flip BACK — proves repeatability in both directions, not a one-way
+            #    screen artifact.
+            state3, screen3 = _space_and_read(bridge, name, "after Space #2 (flip back)")
+            assert state3 == state1, (
+                f"flipping Fast back to {state1!r} did not read back cleanly: panel "
+                f"shows {state3!r}. Screen:\n{screen3[-600:]}"
+            )
+
+            # 4) Ensure we leave Fast OFF (never leave it drawing credits), then
+            #    close the panel so the session ends clean.
+            if state3 == "on":
+                _space_and_read(bridge, name, "after Space #3 (force OFF)")
             bridge.keys(name, "Escape")
-            await asyncio.sleep(1.5)
-            post = _screen(bridge, name, "AFTER Escape (/fast result)")
-            blob = (panel + "\n" + post).lower()
-            credit_gated = "requires usage credits" in blob or "usage-credits" in blob
-            fast_off = "fast mode off" in blob
-            log.debug("credit_gated=%s fast_off=%s", credit_gated, fast_off)
-
-            if mo_opened_fast:
-                # WORKS (future-proof): M-o surfaced a read-backable Fast state.
-                log.debug("WORKS: M-o surfaced a read-backable Fast-mode state.")
-                assert mo_opened_fast
-                return
-
-            # Honest omission — real send-and-read-back attempt made; no
-            # read-backable Fast state exists because Fast mode is credit-gated/OFF.
-            pytest.xfail(
-                "chat:fastMode (Meta+O / M-o) produced NO read-backable Fast-mode "
-                "state on Claude CLI 2.1.198. Root cause via the /fast panel: Fast "
-                "mode is a credit-gated 'research preview' and is OFF for this "
-                f"account (credit_gated={credit_gated}, fast_off={fast_off}; panel: "
-                "'↯ Fast mode (research preview) … requires usage credits'). A clean-"
-                "key rebind (chat:fastMode -> ctrl+x ctrl+f) was also attempted in "
-                "the spike with the same null result, and meta-delivery is proven "
-                "(sibling Meta+T opens the thinking panel) — so this is an account/"
-                "capability gate, not a key-encoding failure. Propose §10 #03 -> "
-                "Decided omissions: Fast stays a launch-time/credit-gated choice, "
-                "never a fake-live toggle. See tests/log/ for the before/after and "
-                "/fast panel captures."
+            log.debug(
+                "WORKS: M-o opens the Fast panel; Space flips state read-back "
+                "%s -> %s -> %s (settable + read-backable, repeatable).",
+                state1, state2, state3,
             )
         finally:
             try:
