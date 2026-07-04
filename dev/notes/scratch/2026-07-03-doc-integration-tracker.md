@@ -28,7 +28,9 @@
         [✓] 4c. Late spikes ran 2026-07-04 (concurrent agent): #4 inject-tail INFEASIBLE, #7 runstrip
                 INFEASIBLE — both confirm shipped fallbacks. Harvested → §10 #4/#7 (⛔ resolved-at-fallback)
                 + Decided-omissions note; test files committed.
-[ ] 5.  Resolve doc-vs-doc contradiction orphans WITH the user (list §E below).
+[✓] 5.  Resolved the 3 doc-vs-doc contradiction orphans WITH the user (§E) — decisions applied to
+        docs/ARCHITECTURE.md (§7.5 / §4.4 / §5.2 / §7.16 / §8.5 + the two ⚠-index rows) + CLAUDE.md
+        (2026-07-04; see DEVLOG).
 [ ] 6.  Integrate remaining orphans (Tier-3 decided-omissions, Tier-4 trio) → §10/§11/body.
 [ ] 7.  Verify unverified-behavior-candidates.md fully integrated → archive both 07-02 scratch docs.
 [ ] 8.  FINAL comprehensive integration-verification sweep (full reachable trail vs major docs;
@@ -106,9 +108,15 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 
 ### E. Contradiction orphans — need USER decisions (Phase 5; detail in `2026-07-02-coverage-audit-orphans.md`)
 
-1. **Identity editing** — §7.5 "read-only in v1" vs DESIGN's edit affordances
-2. **Frontend §4.4** — officially adopt park-and-rebuild vs finish-in-place (rewrite §4.4 accordingly)
-3. **`createDoc`** — §5.2/§7.16 "dashboard never writes content files" vs createDoc existing/implied
+1. [✓] **Identity editing** — DECIDED: all 5 fields **editable**; the **name** is also registered as the
+       real Claude Code session name (`claude --name` at launch, `/rename` on edit — confirmed in `--help`).
+       §7.5 flipped read-only→editable (+ display-metadata / stable-id rationale) + ⚠-index row.
+2. [✓] **Frontend §4.4** — DECIDED: **park-and-rebuild** the renderer fresh from `design/`; the freeze is
+       scoped to the *visible UI* only, NOT the Electron main-process shell (sidecar lifecycle, window,
+       packaging — stays active feasibility work). §4.4 rewritten; CLAUDE.md `frontend/` row + freeze note.
+3. [✓] **`createDoc`** — DECIDED: dashboard **may create / delete / explicit-edit** docs; the "never writes"
+       rule narrowed to *review-layer annotations only* (those stay in the `.meta.json` sidecar). §5.2 gained
+       `POST`/`DELETE /library/document`; §7.16 + §8.5 reworded + ⚠-index row.
 
 ### F. Remaining orphans (Phase 6; same source doc)
 
@@ -126,6 +134,6 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 - [ ] 4b flag: #3 fast-mode held as 🧪 needs-spike (credit-gated xfail = account limit, not a proven
       dead-end) rather than moved to Decided-omissions per the handoff shorthand — user to confirm/override.
 - [✓] 4c: both spikes ran INFEASIBLE (2026-07-04); harvested → §10 #4/#7 (⛔ resolved-at-fallback) + Decided-omissions note.
-- [ ] Phase 5 decisions (§E) — user's calls, not agents'
+- [✓] Phase 5 decisions (§E) — user decided all 3 (2026-07-04); applied to ARCHITECTURE.md + CLAUDE.md.
 - [ ] BB8 "Agent Archive" sits in §11.3 #18 with a value-unclear caveat — user may prefer it demoted to §10
 - [ ] Phase 9: also re-check the stale `.claude/worktrees/wf_*` clutter noticed 07-03 (unrelated to this workflow; cleanup candidate)

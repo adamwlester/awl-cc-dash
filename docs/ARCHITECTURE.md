@@ -255,16 +255,27 @@ The frontend reads agent state in exactly two modes:
   running agents via the hook/watermark path (§7.7). The **Console** polls on its own demand-driven
   schedule (§7.13).
 
-### 4.4 Design-system parity
+### 4.4 Frontend build strategy — rebuild the renderer fresh
 
-The React renderer implements the finished design system **1:1** — every component, token, and interaction
-in `design/` (authority: `mockup.html`, values in `tokens.css`) has a functional twin in the renderer. The
-mockup owns the pixels; the renderer is the working client of the same design.
+**The renderer is throwaway.** The current React renderer is an early prototype, not the shippable client:
+it is **frozen** and will be **rebuilt fresh from the design system** (`design/` — authority `mockup.html`,
+values in `tokens.css`) at the build sprint, *not* finished or ported in place. The design lane keeps
+evolving the mockup as the single source of truth; the renderer is rebuilt *to* it once, from scratch. The
+one artifact carried through the rebuild is [`api.ts`](../frontend/src/renderer/api.ts) — the
+frontend↔sidecar contract (§4.3, §5.2). A standalone Playwright **`tests/ui/`** slice proves "a client can
+drive the live loop" against that contract, independent of the parked renderer.
 
-⚠ **Today:** the renderer trails the mockup — 16 agent colours vs the design's 25, Console gaps, the
-marquee omitted, and some controls are honest no-ops for engine-blocked features. The port up to the
-finished mockup/tokens is **deliberately deferred until design churn approaches zero**; this is status, not
-identity.
+**Scope of the freeze — renderer only, not the Electron shell.** What is frozen is the **visible UI**:
+layout, styling, components, and their interaction behaviour — the surface the design system owns. The
+Electron **main-process shell** is *not* frozen and is *not* design-owned: sidecar spawn/supervise/shutdown
+(§2; §10 #10; §11.4 #27), window + app lifecycle, detach-on-close, and packaging carry real feasibility
+unknowns that must still be proven. "Don't build the frontend yet" means the renderer UI — never the shell
+plumbing.
+
+⚠ **Today:** the parked renderer trails the mockup — 16 agent colours vs 25, Console gaps, the marquee
+omitted, honest no-op controls for engine-blocked features — and is **not** being finished; it is superseded
+by the fresh rebuild above. The `tests/ui/` slice exists (built in the §10 spike batch); the real renderer
+rebuild is a build-sprint item (§11).
 
 ---
 
@@ -299,7 +310,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Inbox** | `GET /inbox` · `POST /inbox/{agent}/{item}/resolve` |
 | **Linking** | `POST/GET /links` · `DELETE /links/{id}` · `POST /links/{id}/kickoff` |
 | **Scratchpad** | `GET /scratch` · `POST /scratch` (appends + pushes the delta to running co-located agents) |
-| **Library** | `GET /library/documents` · `GET /library/document` · `GET/POST /library/reviews` |
+| **Library** | `GET /library/documents` · `GET /library/document` · `POST /library/document` (create) · `DELETE /library/document` (delete the `.md` + its paired `.meta.json`) · `GET/POST /library/reviews` |
 | **Console** | `GET /console/catalog` · `POST /sessions/{id}/console/run` (+ the live screen mirror, §7.13 — ⚠ **Today:** the mirror feed is not wired) |
 | **Readouts** | `GET /sessions/{id}/{context,subagents,checklist,marquee}` · `GET /usage` |
 | **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — `mode`/`fast`/`thinking` are capability-gated `400`s under the bridge driver (§6.2) |
@@ -483,11 +494,17 @@ the WSL gateway URL, §6.4):
 ### 7.5 Agent identity
 
 Agent identity is **role + number + name + colour + icon**, assigned at create, persisted with the roster
-(§8.2), shown everywhere, and **read-only in v1**. Pools are **25 colours and 50 curated icons**, assigned
+(§8.2), shown everywhere, and **editable after create** — all five fields. Identity is dashboard-owned
+**display metadata**: routing, links, hooks, and the inbox all key on a stable internal session id, never on
+the name or number, so an edit or a mid-run rename cannot break a reference. The **name** is additionally
+registered as the Claude Code session's own display name — set at launch via the `claude --name` flag and
+kept in sync on edit via `/rename` — so it surfaces in the VS Code extension's session list and the
+`--resume` picker, not only inside the dashboard. Pools are **25 colours and 50 curated icons**, assigned
 round-robin (`colour = n mod 25`, `icon = n mod 50`); past 16 agents the icon becomes the primary
 disambiguator. Icons are recolorable SVGs served from `assets/icons/agents/` via
 `GET /assets/agent-icons/{name}?color=`. ⚠ **Today:** the React client ships only 16 colours (design-parity
-lag, §4.4 — not a decision change).
+lag, §4.4 — not a decision change); identity editing and the `--name`/`/rename` registration are speced but
+not yet wired.
 
 ### 7.6 Links — agent-to-agent context
 
@@ -670,11 +687,13 @@ The Setups store lives in the dashboard store (§8.1). The tab set and the Proje
 ### 7.16 Library
 
 The Library reads and renders **Plans, Documents, and Assets** from the open project's
-`.awl-cc-dash/` folder (`plans/`, `docs/`, `assets/` — §8.2), reached via WSL. The dashboard **never writes
-into a content file**: content is the agent's (or user's) markdown, exactly as written; everything the
-dashboard adds — verdicts, comment threads, anchors, provenance — lives in the per-doc `.meta.json` sidecar
-(§8.5). Documents carry the same review treatment as Plans (comments; the footer action strip minus
-Reject/Approve — the design work is queued in the design lane). The Library can also
+`.awl-cc-dash/` folder (`plans/`, `docs/`, `assets/` — §8.2), reached via WSL. The dashboard **can create and
+delete documents** (`POST`/`DELETE /library/document`, §5.2) and may rewrite a document on an explicit,
+user-directed operation (e.g. a reformat or a schema fix). What it **never** does is let the **review layer**
+write into content: verdicts, comment threads, anchors, and provenance never touch the agent's (or user's)
+markdown — they live in the per-doc `.meta.json` sidecar (§8.5), so content stays exactly as written and a
+running agent is never raced. Documents carry the same review treatment as Plans (comments; the footer action
+strip minus Reject/Approve — the design work is queued in the design lane). The Library can also
 browse other repo `.md` files read-only; commenting applies to dashboard-owned files under `.awl-cc-dash/`
 only (§8.5; extendable later if needed).
 
@@ -683,7 +702,7 @@ now **proven** (§10 #6 → ✅, via a `keys()` Enter, not a hook `updatedInput`
 top of `cwd` (or one named subdir — nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)),
 single-doc reads are path-explicit rather than cwd-scoped (the `/library/document` handler in
 [`sidecar/main.py`](../sidecar/main.py)), reviews live in one central `plan-reviews.json` keyed by filename,
-Documents are read-only with no comment store, and no Assets surface exists.
+Documents are read-only with no comment store, no create/delete endpoint exists yet, and no Assets surface exists.
 
 ### 7.17 Subagents
 
@@ -853,11 +872,12 @@ per-agent hooks).
 
 ### 8.5 Documents & plans — content + sidecar metadata
 
-1. **Content and metadata are separate files, paired by name.** `roadmap.md` is pure markdown, exactly as
-   the agent wrote it — the dashboard **never writes into the content file**. Next to it,
+1. **Content and metadata are separate files, paired by name.** `roadmap.md` is pure markdown — the
+   dashboard **never writes review metadata into the content file** (though it may create, delete, or, on an
+   explicit user-directed operation, rewrite the file itself; §7.16). Next to it,
    `roadmap.meta.json` holds everything else: review state/verdict (+ who/when), comment threads
-   (text · author · timestamp · resolved), quote-anchors, and provenance (created-by/when/session). Nothing
-   is embedded in the content file — no frontmatter requirement, no citation markers.
+   (text · author · timestamp · resolved), quote-anchors, and provenance (created-by/when/session). No
+   review data is embedded in the content file — no frontmatter requirement, no citation markers.
 2. **Anchoring without citations.** A comment targeting specific text stores the *quoted snippet* plus the
    nearest heading; the UI matches and highlights it live. If the text is later edited beyond recognition,
    the comment degrades gracefully to a doc-level comment. The content file stays pristine.
@@ -1438,7 +1458,7 @@ an open question); **—** means the debt has no queue item yet.
 | §6.4, §8.1 | Launch-config dir still `~/.awl-agents/` (target `~/.awl-cc-dash-agents/`) | #9 |
 | §7.2 | No reserved System identity; no System-sourced Error cards | §10 #16 |
 | §7.3 | Inject always degrades to hook-boundary; no instant mid-turn delivery | §10 #4 |
-| §7.5 | React client ships 16 of 25 colours (parity lag) | — (§4.4 deferral) |
+| §7.5 | React client ships 16 of 25 colours (parity lag); identity editing + `--name`/`/rename` registration speced, not wired | — (§4.4 deferral) |
 | §7.6 | Link holds a multi-select relationship list (should be one each); no Piggyback trigger value; exchanges counted as pairs (one-way links burn caps at half rate) | — |
 | §7.7 | Scratchpad at `.awl/scratchpad.md`; board + watermarks memory-only, `.md` never loaded back | #1, #3 |
 | §7.8 | No Response card type; inbox in-memory | #3 |
@@ -1446,7 +1466,7 @@ an open question); **—** means the debt has no queue item yet.
 | §7.12 | Delete misses the project `state/` files; retired numbers memory-only | #11, #3 |
 | §7.13 | Live mirror + keystroke passthrough not wired; React Console stubbed in places | §10 #5 |
 | §7.15 | Per-agent cost not surfaced yet — proven feasible via `/cost` (§10 #11 → ✅), honest-blank overturned | §10 #11 |
-| §7.16 | Plan approve→resume proven (§10 #6 → ✅) but unwired; plans listed non-recursively; central `plan-reviews.json`; Documents read-only, no comment store; no Assets surface | #13, #6, §10 #6 |
+| §7.16 | Plan approve→resume proven (§10 #6 → ✅) but unwired; plans listed non-recursively; central `plan-reviews.json`; Documents read-only, no comment store; no create/delete endpoint yet; no Assets surface | #13, #6, §10 #6 |
 | §8.1 | `project_root()` returns raw cwd (no canonicalization); project folder still `.awl/` | #1, #2 |
 | §8.2 | Only `scratchpad.md` + `plan-reviews.json` exist; roster lives app-level in `sessions.json` | #1, #3 |
 | §8.3, §8.4 | Every Persist row still in-memory or app-level (see the tables' ⚠ Today columns) | #3, #4, #11 |

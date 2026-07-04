@@ -411,6 +411,26 @@ Reworked the Library editor rail/review surface (gallery propagation deferred to
 
 Files: design/behavior.js, design/styles.css, design/DESIGN.md, DEVLOG.md
 
+---
+
+### 2026-07-03 23:55:00 — ND L2 review panel: Authors-lens crash hot-fixed (esc null-guard)
+
+The adversarial panel on L2 (3 findings, all the same root bug) caught a **high-severity crash**: L2's document-wide `{sec:null}` author seeds hit `authorListHTML` → `esc(f.sec)` → `null.replace()` TypeError, killing the Authors lens on every plan/doc (the tab even advertised a nonzero count). Hot-fixed by making `esc()` null-safe (`String(s==null?'':s)`); the in-flight L3 agent was messaged mid-run to render `sec:null` rows as proper document-wide entries in its item-5a author-box rework and to drive the Authors lens in its full verification. Also restored the `## Archived history` heading + separator that the 22:52 DEVLOG append had accidentally consumed (orchestrator error, caught by a structure check).
+
+Files: design/behavior.js, DEVLOG.md
+
+---
+
+### 2026-07-04 00:15:00 — Phase 5: applied the 3 doc-vs-doc contradiction reconciliations (docs only)
+
+Doc-integration Phase 5 — reconciled the three contradictions the coverage audit flagged, per the user's decisions. **Docs only, no product code;** all substantive edits in `docs/ARCHITECTURE.md` (+ one `CLAUDE.md` row) — **zero design-file edits** (in all three, DESIGN was already the correct side, so this was ARCHITECTURE catching up). **(1) Identity editable** — §7.5 flipped "read-only in v1" → **editable (all 5 fields)**, with the rationale that identity is dashboard-owned display metadata keyed separately from routing (links/hooks/inbox key on a stable session id, so a rename can't break refs); the **name** is additionally registered as the real Claude Code session name via `claude --name` at launch + `/rename` mid-run (confirmed live in `claude --help`), surfacing in the VS Code extension session list + `--resume` picker. **(2) Frontend park-and-rebuild** — §4.4 retitled + rewritten from "finish/port the renderer" to **rebuild the renderer fresh from `design/`**, freeze **scoped to the visible UI only** — the Electron main-process shell (sidecar lifecycle, window, detach-on-close, packaging; §10 #10 / §11.4 #27) stays active feasibility work; `api.ts` = preserve-through-rebuild contract; `tests/ui/` noted as existing. CLAUDE.md `frontend/` row corrected ("built in place" → parked/rebuild + Electron-shell-not-frozen note). **(3) createDoc/delete** — §5.2 gained `POST`/`DELETE /library/document`; the over-absolute "the dashboard never writes into a content file" (§7.16 + §8.5) narrowed to **the review layer never writes annotations into content** (those stay in the `.meta.json` sidecar), while create/delete/explicit user-directed edit are allowed. Both §11.1 ⚠-index rows (§7.5, §7.16) synced. Tracker §E + Phase-5 checkbox ticked. These two absolutes were also the seed examples for the BH8 audit.
+
+Files: docs/ARCHITECTURE.md, CLAUDE.md, dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
+## Archived history
+
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
 **Digest — [`DEVLOG-archive-01.md`](archive/devlog/DEVLOG-archive-01.md) (2026-03-26 → 2026-06-13, 21 entries):** the sandbox-era origin story. Workspace + MCP-server setup; the tmux **bridge** built from first draft to a stable 20-method package with a 30-test suite; the **HTTP bridge** (VS Code extension, port 7483); dashboard inception and the **TUI → Electron/React pivot**; the wireframe lineage **v1 → v4** with the palette exploration (Vintage Teal → Warm Dark); the architecture pivot where the Agent **SDK + `stream-json`** replaced xterm/ttyd terminal embedding; the **FastAPI sidecar** (port 7690) + React single-file scaffold; the **E2E pipeline proof**; the design-system / event-feed component specs; and the early file reorganizations (`ui/` → `awl-dashboard/testing/` → `agent-dashboard/design/`).
