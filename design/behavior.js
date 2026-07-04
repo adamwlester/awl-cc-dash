@@ -116,29 +116,50 @@
   function autosizeAll(){document.querySelectorAll('textarea.autosize').forEach(autosize);}
   function selectLibRow(el){el.parentElement.querySelectorAll('.lib-row').forEach(r=>r.classList.remove('on'));el.classList.add('on');}
 
-  /* ===== v9p7 (A3): Documentation panel — Plan expand/collapse + doc viewer edit toggle ===== */
-  function togglePlan(head){const c=head.closest('.plan-card');if(c)c.classList.toggle('open');LU();}
-  /* Inbox (Plan card) → review the full plan in Library → Plans, expanded + flagged */
-  function reviewPlan(planId){switchTab('doc','plan');const card=document.getElementById(planId);if(!card)return;
+  /* ===== v9p7 (A3) / L1 (ND 1+2): Library — Plan/Doc expand/collapse + two-column nav↔card sync + tab routing ===== */
+  function togglePlan(head){const c=head.closest('.plan-card');if(c){c.classList.toggle('open');syncNavHighlight(c.id);}LU();}   /* L1: opening/closing a card highlights/unhighlights its entry-nav row */
+  function navRowFor(id){return document.querySelector('.docnav-row[data-navid="'+id+'"]');}
+  /* L1: card→nav half of the bidirectional sync — a card's open state drives its nav row's .on */
+  function syncNavHighlight(id){const card=document.getElementById(id);const row=navRowFor(id);if(row)row.classList.toggle('on',!!(card&&card.classList.contains('open')));}
+  /* L1: generalized open+scroll+flash for BOTH Plans and Documents — picks the tab by id prefix (doc-* → Documents,
+     else Plans), opens/scrolls/flashes the matching card, and highlights its nav row. reviewPlan is a thin call into
+     this (kept minimal — the Inbox Review routing convention is owned by a parallel lane, same doc-/plan- id prefix). */
+  function openEntry(id){switchTab('doc',id.indexOf('doc-')===0?'documents':'plan');const card=document.getElementById(id);if(!card)return;
     card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});
     card.classList.remove('plan-flash');void card.offsetWidth;card.classList.add('plan-flash');
-    setTimeout(()=>card.classList.remove('plan-flash'),1000);LU();}
-  function docEdit(btn,name){const view=document.getElementById('doc-'+name+'-view');const edit=document.getElementById('doc-'+name+'-edit');if(!view||!edit)return;
-    const editing=edit.style.display!=='none';
-    if(editing){edit.style.display='none';view.style.display='';renderDocView(name);btn.innerHTML='<i data-lucide="square-pen"></i>';btn.title='Edit';}   /* P3: icon-only ghost in the Editor header (title carries Edit/Save) */
-    else{view.style.display='none';edit.style.display='block';btn.innerHTML='<i data-lucide="check"></i>';btn.title='Save';edit.focus();}
-    if(typeof syncEditorMics==='function')syncEditorMics();   /* L: entering/leaving a doc's edit mode flips that doc's header mic */
-    LU();}
-  function docAdd(){/* appends a doc-nav row + editor pane — wired below once the doc markup is known (mock) */
-    toast('Add a document — choose a file to add to the Library');}
+    setTimeout(()=>card.classList.remove('plan-flash'),1000);syncNavHighlight(id);LU();}
+  /* Inbox (Plan card) → review the full plan/doc in the Library, expanded + flagged */
+  function reviewPlan(planId){openEntry(planId);}
+  /* L1: nav→card half of the sync — an entry-nav row click opens/scrolls/flashes its card */
+  function navPick(row){openEntry(row.dataset.navid);}
+  /* L1: which lens (Outline/Feedback/Authors) a card's nav rail currently shows — so an edit-save repaint keeps it */
+  function currentLensMode(id){const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav)return 'outline';
+    if(nav.querySelector('.nav-tab--fb.on'))return 'feedback';if(nav.querySelector('.nav-tab--au.on'))return 'authors';return 'outline';}
+  /* L1 (ND-3): per-card raw-markdown edit toggle for DOC cards — the Editor-header Edit ghost flips the rendered
+     .doc-ed view ⇄ a raw textarea seeded from entry.md; Save writes back to entry.md and repaints the view in the
+     card's current lens. Doc-only: plan cards' header Edit still toasts (planAct('edit')) — that parity fix is a later phase. */
+  function entryEdit(btn,id){const card=document.getElementById(id);if(!card)return;
+    const ed=card.querySelector('.doc-ed');const ta=card.querySelector('.entry-edit');if(!ed||!ta)return;
+    const e=entryById(id);const editing=ta.style.display!=='none';
+    if(editing){if(e)e.md=ta.value;ta.style.display='none';
+      const mode=currentLensMode(id);ed.outerHTML=mdEditorHTML(id,e?e.md:ta.value,mode);   /* fresh view (closed popout, no selection) — same repaint planNavMode uses */
+      if(typeof clearSel==='function')clearSel(id);if(typeof refreshJumpPills==='function')refreshJumpPills();
+      btn.innerHTML='<i data-lucide="square-pen"></i>';btn.title='Edit';}
+    else{ta.value=e?e.md:ta.value;ed.style.display='none';ta.style.display='block';
+      btn.innerHTML='<i data-lucide="check"></i>';btn.title='Save';ta.focus();}
+    if(typeof syncEditorMics==='function')syncEditorMics();LU();}
+  function docAdd(){toast('Add a document — choose a file to add to the Library');}
   /* plan decision/edit/copy (scripted demo): mutate PLANS state + re-render so the card, badges + count update */
-  function reopenPlan(id){const c=document.getElementById(id);if(c){c.classList.add('open');c.scrollIntoView({block:'nearest'});}LU();}
-  function planCopy(id){const p=PLANS.find(x=>x.id===id);if(p&&navigator.clipboard)navigator.clipboard.writeText(p.md).catch(()=>{});toast('Plan copied to clipboard');}
-  function planAct(a,id){const p=PLANS.find(x=>x.id===id)||PLANS.find(x=>x.open);if(!p)return;const own=AG[p.owner]?AG[p.owner].name:p.owner;
+  function reopenPlan(id){const c=document.getElementById(id);if(c){c.classList.add('open');c.scrollIntoView({block:'nearest'});syncNavHighlight(id);}LU();}
+  function planCopy(id){const p=entryById(id);if(p&&navigator.clipboard)navigator.clipboard.writeText(p.md).catch(()=>{});toast((id.indexOf('doc-')===0?'Doc':'Plan')+' copied to clipboard');}
+  /* decision/edit/copy for BOTH plans and docs (scripted demo): mutate the entry + re-render the right surface so the
+     card, badges + tab count update. L1 (ND-6): docs now share the full decision trio (Revise · Reject · Approve). */
+  function planAct(a,id){const p=entryById(id)||PLANS.find(x=>x.open)||DOCS.find(x=>x.open);if(!p)return;const own=AG[p.owner]?AG[p.owner].name:p.owner;
+    const isDoc=p.id.indexOf('doc-')===0;const rerender=isDoc?renderDocs:renderPlans;const kind=isDoc?'Doc':'Plan';
     if(a==='edit'){toast('Editing '+p.file+' — line-numbered editor');return;}
     if(a==='revise'){toast('Flagged sections sent back to '+own+' to revise');return;}
-    if(a==='reject'){p.status='draft';toast('Plan rejected — returned to draft');renderPlans();reopenPlan(p.id);return;}
-    if(a==='approve'){p.status='approved';toast('Plan approved — '+own+' may proceed');renderPlans();reopenPlan(p.id);
+    if(a==='reject'){p.status='draft';toast(kind+' rejected — returned to draft');rerender();reopenPlan(p.id);return;}
+    if(a==='approve'){p.status='approved';toast(kind+' approved — '+own+' may proceed');rerender();reopenPlan(p.id);
       if(typeof pushApprovalToInbox==='function')pushApprovalToInbox(p);return;}}
 
   /* v1.2: Documents tab — doc-switcher selects which doc fills the shared editor host */
@@ -189,27 +210,14 @@
     +'<button class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
     +'<button class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
     +'<button class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
-  /* P3 (#119): the footer drops Copy·Edit·Comment (now in the Editor header). R-batch item 10: the merged Export
-     control sits LEFT (the old leading spacer is dropped); Remove stays at the right.
-     NEXT-UP item 12: the DOCUMENTS footer now mirrors the Plans action strip minus the decision pair —
-     the merged Export control + the single-agent Reviewer chip lead (left), then a right-justified teal
-     Revise (send the doc + its comments back to an agent — the Plans meaning) — deliberately NO
-     Reject/Approve (approval is a Plans concept), keeping the danger Remove trash at the far right.
-     Assets keep the plain Export + Remove footer. */
-  function libFootHTML(host,kind){
-    if(kind==='doc')return expMenuHTML(host)+reviewChipHTML(host)
-      +'<div class="plan-foot-right">'   /* the same right-group wrap model as the Plans footer */
-      +'<button class="btn-secondary" onclick="docRevise(\''+host+'\')" title="Send this doc + its comments back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button>'
-      +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button></div>';
-    return expMenuHTML(host)+'<span class="flex-1"></span>'
+  /* L1: libFootHTML now serves ASSETS only — the Documents footer became the FULL planFootHTML (Export · Reviewer chip ·
+     Revise·Reject·Approve, same as Plans). Assets keep the plain Export + Remove footer (an image is whole-file, so only
+     Attach is enabled on it; no Review chip / Revise). The old doc-footer branch + its docRevise are retired. */
+  function libFootHTML(host,kind){return expMenuHTML(host)+'<span class="flex-1"></span>'
       +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
-  /* item 12: doc Revise (scripted demo) — mirrors planAct('revise'): the doc + its comments go back to an agent */
-  function docRevise(host){const name=host.replace('doc-','');toast('Sent '+name+'.md + its comments back to the agent to revise');}
   function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
   function libRemove(host,kind){if(kind==='asset'){const id=host.replace('asset-','');const i=ASSETS.findIndex(x=>x.id===id);if(i<0)return;const nm=ASSETS[i].name;ASSETS.splice(i,1);if(assetSel===id)assetSel=ASSETS.length?ASSETS[0].id:'';renderAssets();toast('Removed '+nm);return;}
-    const name=host.replace('doc-','');const pane=document.getElementById('doc-documents');if(!pane)return;
-    const row=pane.querySelector('.docnav-row[data-doc="'+name+'"]');const dd=pane.querySelector('.docdoc[data-doc="'+name+'"]');
-    if(row)row.remove();if(dd)dd.remove();const first=pane.querySelector('.docnav-row');if(first)docPick(first,first.dataset.doc);toast('Removed '+name+'.md');}
+    const i=DOCS.findIndex(d=>d.id===host);if(i<0)return;const nm=DOCS[i].file;DOCS.splice(i,1);renderDocs();toast('Removed '+nm);}   /* L1: docs live in DOCS now (the Remove button itself is dropped from the doc footer; this stays for nav-delete/programmatic use) */
   /* Add menu (#20) + nav-row rename/delete (#21), shared by Documents + Assets */
   function toggleAddMenu(e,btn){e.stopPropagation();const w=btn.closest('.docnav-addwrap');const m=w.querySelector('.add-menu');const open=m.classList.contains('open');
     document.querySelectorAll('.add-menu.open').forEach(x=>x.classList.remove('open'));if(!open)m.classList.add('open');}
@@ -225,45 +233,29 @@
      "Attach as file" (item 8, which saves the doc then reveals a chip in Compose). */
   let docPasteSeq=0;
   function createDoc(content,suggestedName){
-    const pane=document.getElementById('doc-documents');if(!pane)return {key:'',name:suggestedName||'',path:suggestedName||''};
-    const nav=pane.querySelector('.docnav'),main=pane.querySelector('.docmain'),addwrap=nav?nav.querySelector('.docnav-addwrap'):null;
-    if(!nav||!main||!addwrap)return {key:'',name:suggestedName||'',path:suggestedName||''};
-    const key='pasted-'+(++docPasteSeq),name=suggestedName||('untitled-'+docPasteSeq+'.md'),path='.scratch/'+name;
-    const row=document.createElement('div');row.className='docnav-row';row.setAttribute('role','button');row.tabIndex=0;row.dataset.doc=key;
-    row.setAttribute('onclick',"docPick(this,'"+key+"')");
-    row.innerHTML='<i data-lucide="'+fileTypeIcon(name)+'" class="docnav-ic"></i>'
-      +'<span class="docnav-lab"><span class="docnav-name">'+esc(name)+'</span><span class="docnav-path">.scratch/</span></span>'+navActsHTML();
-    nav.insertBefore(row,addwrap);
-    const dd=document.createElement('div');dd.className='docdoc';dd.dataset.doc=key;
-    dd.innerHTML='<div class="doc-header"><span class="dh-path">'+esc(path)+'</span><span class="dh-dates"><b>Created</b> now&nbsp;&nbsp;<b>Edited</b> now</span></div>'
-      +'<div data-libhead="doc-'+key+'" data-libkind="doc"></div>'
-      +'<div class="doc-view-host" id="doc-'+key+'-view" style="flex:1 1 auto;min-height:0"></div>'
-      +'<textarea class="doc-edit in" id="doc-'+key+'-edit" style="display:none"></textarea>'
-      +'<div class="doc-foot" data-libfoot="doc-'+key+'" data-libkind="doc"></div>';
-    main.appendChild(dd);
-    const ta=document.getElementById('doc-'+key+'-edit');if(ta)ta.value=content||'';
-    const hs=dd.querySelector('[data-libhead]');if(hs)hs.innerHTML=editHeadHTML("libCopy('doc-"+key+"','doc')","docEdit(this,'"+key+"')",'doc-'+key,'doc-edit-btn','doc-'+key+'-edit');
-    const fs=dd.querySelector('[data-libfoot]');if(fs)fs.innerHTML=libFootHTML('doc-'+key,'doc');
-    renderDocView(key);LU();
+    const name=suggestedName||('untitled-'+(docPasteSeq+1)+'.md');const key='doc-pasted-'+(++docPasteSeq);const path='.scratch/'+name;   /* L1: docs are DOCS entries now — push a plan-shaped seed + re-render (no per-doc .docdoc pane) */
+    DOCS.push({id:key,file:name,path:path,status:'draft',title:name,owner:'user',open:false,created:'now',createdAgo:'now',edited:'now',editedAgo:'now',md:content||'',feedback:[],authors:[]});
+    renderDocs();
     return {key:key,name:name,path:path};
   }
-  /* Export → file / Add-menu Paste: create the doc, then SWITCH to Documents, select it, and open inline RENAME. */
+  /* Export → file / Add-menu Paste: create the doc, then SWITCH to Documents, open its card, and open inline RENAME. */
   function addDocPaste(content,suggestedName){
     const d=createDoc(content,suggestedName);if(!d.key)return;
     switchTab('doc','documents');
-    const pane=document.getElementById('doc-documents');const row=pane&&pane.querySelector('.docnav-row[data-doc="'+d.key+'"]');
-    if(row){docPick(row,d.key);const pencil=row.querySelector('.docnav-acts .ghost-ic');if(pencil)navRename({stopPropagation(){}},pencil);}
+    const pane=document.getElementById('doc-documents');const row=pane&&pane.querySelector('.docnav-row[data-navid="'+d.key+'"]');
+    if(row){navPick(row);const pencil=row.querySelector('.docnav-acts .ghost-ic');if(pencil)navRename({stopPropagation(){}},pencil);}
     LU();
   }
   function navRename(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');const lab=row.querySelector('.docnav-name');if(!lab||row.querySelector('.docnav-name-edit'))return;
     const cur=lab.textContent;const inp=document.createElement('input');inp.className='docnav-name-edit';inp.value=cur;
     lab.style.display='none';lab.parentElement.insertBefore(inp,lab);inp.focus();inp.select();inp.onclick=ev=>ev.stopPropagation();
-    const commit=()=>{const v=(inp.value.trim()||cur);lab.textContent=v;lab.style.display='';inp.remove();const a=ASSETS.find(x=>x.id===row.dataset.asset);if(a)a.name=v;
-      if(row.dataset.doc){const pane=document.getElementById('doc-documents');const dd=pane&&pane.querySelector('.docdoc[data-doc="'+row.dataset.doc+'"]');const ph=dd&&dd.querySelector('.dh-path');if(ph){const seg=ph.textContent.split('/');seg[seg.length-1]=v;ph.textContent=seg.join('/');}}   /* R-batch: reflect a doc rename in the pane header path too (not just the nav label) */
+    const commit=()=>{const v=(inp.value.trim()||cur);lab.textContent=v;lab.style.display='';inp.remove();
+      if(row.dataset.asset){const a=ASSETS.find(x=>x.id===row.dataset.asset);if(a)a.name=v;}
+      else if(row.dataset.navid){const en=entryById(row.dataset.navid);if(en){const fn=en.path.split('/').pop();en.path=en.path.slice(0,en.path.length-fn.length)+v;en.file=v;renderDocs();}}   /* L1: a doc rename updates the DOCS entry (path filename + card label) then re-renders */
       toast('Renamed → '+v);};
     inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();inp.blur();}else if(ev.key==='Escape'){inp.value=cur;inp.blur();}};inp.onblur=commit;}
   function navDelete(e,btn){e.stopPropagation();const row=btn.closest('.docnav-row');if(!row)return;
-    if(row.classList.contains('assetnav-row'))libRemove('asset-'+row.dataset.asset,'asset');else libRemove('doc-'+row.dataset.doc,'doc');}
+    if(row.classList.contains('assetnav-row'))libRemove('asset-'+row.dataset.asset,'asset');else libRemove(row.dataset.navid,'doc');}   /* L1: doc rows carry data-navid = the DOCS entry id */
 
   function closeAllPopups(){document.querySelectorAll('.split-menu.open,.fmt-menu.open,.picker-pop.open,.combo-pop.open,.msel-pop.open,.src-pop.open:not(.src-acc),.vpop.open,.att-pop.open,.add-menu.open,.exp.open').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.fcard.att-open').forEach(c=>c.classList.remove('att-open'));document.querySelectorAll('.plan-card.pop-open').forEach(c=>c.classList.remove('pop-open'));}   /* R-batch item 3: the subagent accordion (.subs-acc.open) is a STICKY toggle, not a popup — intentionally NOT closed here. R11 item 5: also drop the .plan-card overflow-release toggled by footer popovers. Next-up item 8: the accordion-selector drawers (.src-pop.src-acc) are sticky toggles too — excluded here, closed only by their trigger or Escape (closeSrcAccordions). */
   /* R-batch item 2: the subagent +N overflow badge opens a popover listing the hidden subs (preserves the
@@ -461,9 +453,8 @@
   function eaSend(btn){const grp=btn.closest('.ea-dd');if(!grp||btn.disabled)return;const host=grp.dataset.eahost;closeAllPopups();
     const mode=btn.dataset.eamode;
     if(mode==='copy')expCopy(host);else if(mode==='file')expFile(host);else if(mode==='embed')eaEmbed(host);else if(mode==='attach')eaAttach(host);}
-  function libSourceLabel(host){
-    if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');return 'Library → Documents · '+(dd?dd.textContent.split('/').pop():host);}
-    const p=PLANS.find(x=>x.id===host);if(p)return 'Library → Plans · '+p.title;return 'Library';}
+  function libSourceLabel(host){const e=entryById(host);if(!e)return 'Library';   /* L1: read the doc path/title off the DOCS/PLANS entry (the .docdoc panes are retired) */
+    return host.indexOf('doc-')===0?('Library → Documents · '+e.path.split('/').pop()):('Library → Plans · '+e.title);}
   function editorSelText(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return '';
     const rows=[...ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec')];
     return rows.map(r=>{const l=r.querySelector('.md-line');return l?l.textContent:'';}).join('\n').trim();}
@@ -511,7 +502,7 @@
       revealAttachment();toast('Attached '+cards.length+' prompt'+(cards.length>1?'s':'')+' → saved to Documents');return;}
     let name,path,type='doc';
     if(host.indexOf('asset-')===0){const a=ASSETS.find(x=>'asset-'+x.id===host);if(!a)return;name=a.name;path=a.path;type='asset';}
-    else if(host.indexOf('doc-')===0){const dd=document.querySelector('#doc-documents .docdoc[data-doc="'+host.replace('doc-','')+'"] .dh-path');path=dd?dd.textContent:host;name=path.split('/').pop();type='doc';}
+    else if(host.indexOf('doc-')===0){const e=entryById(host);if(!e)return;path=e.path;name=e.path.split('/').pop();type='doc';}   /* L1: doc path off the DOCS entry */
     else {const p=PLANS.find(x=>x.id===host);if(!p)return;name=p.file;path='~/.claude/plans/'+p.file;type='doc';}
     addAttachment({id:nextAttId(),name:name,path:path,type:type});revealAttachment();toast('Attached '+name+' — path reference in the prompt');}
   /* A9: active feed list (Messages/Scratch/Log/Inbox) — the visible one drives the shared select-to-act strip */
@@ -1467,7 +1458,7 @@
      line or a whole section, so a chunk can be commented on / shared), the rendered body, and a docked
      comment popout. Shared by Plan bodies AND the README/CLAUDE/TODO tabs. Line numbers MATCH the raw
      file so "see line N" is a real reference. */
-  function getFeedback(host){if(host.indexOf('doc-')===0)return DOC_FB[host]||[];const p=PLANS.find(x=>x.id===host);return p?p.feedback:[];}
+  function getFeedback(host){const e=entryById(host);return e?(e.feedback||[]):[];}   /* L1: unified — docs + plans both carry feedback[] on their entry */
   function fbCountsBySec(list){const m={};list.forEach(f=>{(m[f.sec]=m[f.sec]||{approve:0,revise:0,block:0})[f.verdict]++;});return m;}
   /* P4d: the rail badge is a SECTION anchor — its count is ALL verdicts on the section and a click opens
      every comment for that section (the worst-verdict colour stays as a severity hint). */
@@ -1475,7 +1466,7 @@
     return '<span class="rd v-'+worst+'" title="Open '+n+' comment'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openCmtPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="'+m.ic+'"></i><span class="rd-n">'+n+'</span></span>';}
   /* AUTHORS lens — authorship metadata (agent + timestamp), tracked like comments. getAuthors mirrors getFeedback;
      the neutral users-glyph gutter badge (rd--author) parallels railBadge but opens the author box (openAuthorPop). */
-  function getAuthors(host){const p=PLANS.find(x=>x.id===host);return p?(p.authors||[]):[];}   /* Plans-only lens: doc hosts have no nav rail, so no author gutter */
+  function getAuthors(host){const e=entryById(host);return e?(e.authors||[]):[];}   /* L1: unified — docs now share the same nav rail + Authors lens as plans (the doc-hosts-return-[] special case is gone) */
   function authorsBySec(list){const m={};list.forEach(f=>{(m[f.sec]=m[f.sec]||[]).push(f);});return m;}
   function authorBadge(host,sec,list){const n=list.length;
     return '<span class="rd rd--author" title="Open '+n+' edit'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openAuthorPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="users"></i><span class="rd-n">'+n+'</span></span>';}
@@ -1517,10 +1508,14 @@
     else rows=[row];
     rows.forEach(r=>r.classList.add('hl'));}
   function railHoverOut(el){const ed=el.closest('.doc-ed');if(ed)ed.querySelectorAll('.md-row.hl').forEach(r=>r.classList.remove('hl'));}
-  function renderDocView(name){const ta=document.getElementById('doc-'+name+'-edit'),view=document.getElementById('doc-'+name+'-view');if(ta&&view)view.innerHTML=mdEditorHTML('doc-'+name,ta.value);}
-  function renderDocs(){['readme','claude','claudeuser','notes'].forEach(renderDocView);
-    document.querySelectorAll('#doc-documents [data-libhead]').forEach(s=>{const host=s.dataset.libhead,name=host.replace('doc-','');s.innerHTML=editHeadHTML("libCopy('"+host+"','doc')","docEdit(this,'"+name+"')",host,'doc-edit-btn',host+'-edit');});   /* P3 #119: each doc gets the Editor header (ghost Copy·Edit·Comment) above its content; L: 5th arg binds the header mic to this doc's edit textarea */
-    document.querySelectorAll('#doc-documents [data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});LU();}   /* footer = Export + Reviewer chip + Revise + Remove (item 12) */
+  /* L1 (ND 1-6): renderDocs mirrors renderPlans — DOCS.map(planCardHTML) fills #doc-list, the shared entry-nav fills
+     #doc-nav (+ the Add-document affordance), and the Documents tab carries a draft+review count chip (docs-badge).
+     The per-doc .docdoc panes + one-at-a-time docPick switching are retired; each doc card carries its own working
+     raw-markdown edit toggle (entryEdit) and the FULL plan footer (Export · Reviewer · Revise·Reject·Approve). */
+  function renderDocs(){const el=document.getElementById('doc-list');if(el)el.innerHTML=DOCS.map(planCardHTML).join('');
+    renderEntryNav('doc-nav',DOCS,'doc');
+    const b=document.getElementById('docs-badge');if(b){const n=DOCS.filter(d=>d.status==='review'||d.status==='draft').length;b.textContent=n;b.style.display=n?'':'none';}
+    LU();}
 
   /* 3-state verdicts (stroke icons, verdict-colored): Approve / Revise / Block */
   const VERDICT={approve:{ic:'circle-check',cls:'v-approve',lab:'Approve'},revise:{ic:'triangle-alert',cls:'v-revise',lab:'Revise'},block:{ic:'circle-x',cls:'v-block',lab:'Block'}};
@@ -1528,12 +1523,7 @@
   /* thumbs agree / disagree toggle (default = agree) — reused in the composer, the comment popout, + nav cards */
   function thumbsHTML(){return '<span class="thumbs" onclick="event.stopPropagation()"><button data-comp="agree-toggle" type="button" class="thumb up on" title="Agree" onclick="thumbPick(this)"><i data-lucide="thumbs-up"></i></button><button type="button" class="thumb down" title="Disagree" onclick="thumbPick(this)"><i data-lucide="thumbs-down"></i></button></span>';}
   function thumbPick(b){const w=b.closest('.thumbs');if(!w)return;w.querySelectorAll('.thumb').forEach(t=>t.classList.remove('on'));b.classList.add('on');}
-  /* a little seeded doc-tab feedback so the rail badges + Feedback flow demo on the file tabs too */
-  const DOC_FB={
-    'doc-readme':[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
-    'doc-claude':[],
-    'doc-claudeuser':[]
-  };
+  /* L1: DOC_FB is retired — doc feedback seeds now live on each DOCS entry's feedback[] (folded in below). */
   function popFor(host){const ed=document.querySelector('[data-edhost="'+host+'"]');return ed?ed.querySelector('.plan-cmt-pop'):null;}
   /* v9p14c: the THREE comment indicators move together — the selected feedback card (teal fill), its
      highlighted section text (teal), and the open comment popout. openCmtPop is the single sync point
@@ -1585,12 +1575,11 @@
   function openComposerFromCtl(btn){const ctl=btn.closest('[data-cmthost]');if(!ctl)return;if(ctl.classList.contains('is-off')){toast('Select a line or section first');return;}openComposer(ctl.dataset.cmthost,ctl.dataset.verdict||'approve');}
   function saveComment(host){const pop=popFor(host);const vdd=pop?pop.querySelector('[data-vdd]'):null;const v=vdd?vdd.dataset.verdict:'approve';
     const ta=pop?pop.querySelector('.cmt-ta'):null;const txt=ta?ta.value.trim():'';const sel=SELby[host];
-    /* Q3=B: append to feedback + re-render so tally/outline dot/rail badge/Feedback count update (thumbs stay cosmetic) */
-    const list=host.indexOf('doc-')===0?(DOC_FB[host]=DOC_FB[host]||[]):((PLANS.find(x=>x.id===host)||{}).feedback);
+    /* Q3=B: append to the entry's feedback + re-render so tally/outline dot/rail badge/Feedback count update (thumbs stay cosmetic) */
+    const e=entryById(host);const list=e?e.feedback:null;
     if(list&&sel&&sel.kind==='sec')list.push({sec:sel.ref,ag:'user',verdict:v,time:'now',comment:txt});
     closeCmtPop(host);
-    if(host.indexOf('doc-')===0)renderDocView(host.replace('doc-',''));
-    else{renderPlans();reopenPlan(host);planNavMode(host,'feedback');}
+    (host.indexOf('doc-')===0?renderDocs:renderPlans)();reopenPlan(host);planNavMode(host,'feedback');   /* L1: docs re-render like plans, then reopen + switch to the Feedback lens */
     toast('Comment saved — marked '+VERDICT[v].lab);}
   function openFeedback(host){if(document.getElementById(host))planNavMode(host,'feedback');}
 
@@ -1676,6 +1665,80 @@ resize intact.`,
      feedback:[],
      authors:[{sec:'Context',ag:'lex',time:'Jun 20 10:50'},{sec:'Steps',ag:'lex',time:'Jun 20 11:02'}]}
   ];
+  /* L1 (ND-1): DOCS — the project docs as reviewable-document entries in the SAME shape as PLANS (id doc-*, file,
+     status, title, owner, created/edited, md, feedback[], authors[]) so the whole Plans machinery — the 3-row card,
+     the Outline/Feedback/Authors rail, the decision footer, the two-column entry-nav — serves docs unchanged.
+     Statuses are a deliberate mix (draft · in review · approved) so the lifecycle badge renders meaningfully. `path`
+     is the FULL path (it disambiguates the project vs user CLAUDE.md); the entry-nav derives its name + directory
+     line from it, and `file` is the disambiguated card-row label. md content is moved verbatim from the retired doc textareas. */
+  const DOCS=[
+    {id:'doc-readme',file:'README.md',path:'agent-dashboard/README.md',status:'review',title:'Project README',owner:'lex',open:false,created:'Jun 17',createdAgo:'7d',edited:'Jun 20',editedAgo:'17h',
+     md:`# AWL Multi-Agent Dashboard
+
+A control surface for running and supervising a team of Claude Code agents
+from one window. Watch the team, steer each agent, and review their work
+without leaving the dashboard.
+
+## The five panels
+- **Agent** — inspect & configure the selected agent.
+- **Team Graph** — every agent as a live card.
+- **Library** — plans + project docs (README, CLAUDE) and reference assets.
+- **Feed** — messages, scratchpad, log, inbox.
+- **Prompts** — compose and dispatch prompts.
+
+## Design system
+Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
+single pink-to-teal emphasis ladder.`,
+     feedback:[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
+     authors:[{sec:'The five panels',ag:'lex',time:'Jun 18 10:00'},{sec:'Design system',ag:'lex',time:'Jun 20 09:30'}]},
+    {id:'doc-claude',file:'CLAUDE.md',path:'agent-dashboard/CLAUDE.md',status:'draft',title:'Project instructions',owner:'sandy',open:false,created:'Jun 16',createdAgo:'8d',edited:'Jun 21',editedAgo:'9h',
+     md:`# CLAUDE.md
+
+Project instructions loaded into every agent's context. Keep it short — it is
+spent context on every turn.
+
+## Workspace identity
+A general-purpose VS Code workspace for AI/agentic workflows. Current focus:
+the AWL multi-agent dashboard.
+
+## Behavioral rules
+- Stay inside the project directory unless told otherwise.
+- Keep DEVLOG.md current — an unlogged change never happened.
+- Write transient artifacts into .scratch/, never the repo root.
+- Preserve everything you weren't asked to change.`,
+     feedback:[],
+     authors:[{sec:'Workspace identity',ag:'sandy',time:'Jun 16 12:00'},{sec:'Behavioral rules',ag:'sandy',time:'Jun 21 08:45'}]},
+    {id:'doc-claudeuser',file:'CLAUDE.md (user)',path:'~/.claude/CLAUDE.md',status:'approved',title:'User instructions',owner:'wren',open:false,created:'May 28',createdAgo:'27d',edited:'Jun 22',editedAgo:'2d',
+     md:`# CLAUDE.md
+
+User-level instructions loaded into every project's context, on top of the
+project CLAUDE.md. Global defaults that travel with you.
+
+## Working style
+- Be direct, practical, low-ceremony. Lead with action.
+- Prefer dedicated tools over ad-hoc shell for file search and edits.
+- Write generated artifacts outside any repo, under a scratch path.
+
+## Conventions
+- Use markdown links for file references, not bare paths.
+- Match the project's existing patterns before introducing new ones.`,
+     feedback:[{sec:'Working style',ag:'sandy',verdict:'approve',time:'Jun 22',comment:'Reads clean — good to keep as the standing default.'}],
+     authors:[{sec:'Working style',ag:'wren',time:'May 28 09:00'},{sec:'Conventions',ag:'wren',time:'Jun 22 11:20'}]},
+    {id:'doc-notes',file:'notes.md',path:'agent-dashboard/notes.md',status:'draft',title:'Scratch notes',owner:'lex',open:false,created:'Jun 26',createdAgo:'1d',edited:'Jun 26',editedAgo:'4h',
+     md:`# Scratch notes
+
+Short-lived notes for the current run — kept brief on purpose.
+
+## Endpoints
+- Sidecar API — http://127.0.0.1:7690
+- Renderer dev — http://127.0.0.1:5199`,
+     feedback:[],
+     authors:[{sec:'Endpoints',ag:'lex',time:'Jun 26 10:15'}]}
+  ];
+  /* L1 (ND-2): the single entry lookup — search PLANS then DOCS (doc-* ids resolve to DOCS). Replaces the scattered
+     PLANS.find(x=>x.id===…) lookups so planAct / reopenPlan / planNavMode / saveComment / getFeedback / getAuthors
+     all operate on plans and docs through one path. */
+  function entryById(id){return PLANS.find(x=>x.id===id)||DOCS.find(x=>x.id===id)||null;}
   const PLAN_BADGE={review:['db-review','In review'],approved:['db-approved','Approved'],draft:['db-draft','Draft']};
   function fbBySection(p){const m={};p.feedback.forEach(f=>{(m[f.sec]=m[f.sec]||{approve:0,revise:0,block:0})[f.verdict]++;});return m;}
   function planNavHTML(p,fb,mode){
@@ -1718,27 +1781,49 @@ resize intact.`,
       +expMenuHTML(p.id)+reviewChipHTML(p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
   /* 3-row header: [owner badge · title · state] / [feedback badges · steps done] / [filename · created/edited] */
-  function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);
+  function planCardHTML(p){const a=AG[p.owner];const bb=PLAN_BADGE[p.status];const fb=fbBySection(p);const isDoc=p.id.indexOf('doc-')===0;
     const done=p.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
     const stepN=p.md.split('\n').filter(l=>/^\s*-\s*\[( |x|X)\]/.test(l)).length;
     const tot={approve:0,revise:0,block:0};p.feedback.forEach(f=>tot[f.verdict]++);
     let fbadges='';['approve','revise','block'].forEach(v=>{if(tot[v]){const m=VERDICT[v];fbadges+='<span data-comp="count-chip" class="cnt-chip c-'+v+'" title="'+tot[v]+' '+m.lab.toLowerCase()+'"><i data-lucide="'+m.ic+'"></i><span class="cn">'+tot[v]+'</span></span>';}});
     if(!fbadges)fbadges='<span class="fb-none">No feedback yet</span>';
+    const steps=stepN?'<span class="steps-txt'+(done===stepN?' all':'')+'">'+done+'/'+stepN+' steps done</span>':'';   /* L1: docs have no checklist — the checkbox regex yields 0, so the steps count is hidden */
+    const editClick=isDoc?"entryEdit(this,'"+p.id+"')":"planAct('edit','"+p.id+"')";   /* L1 (ND-3): doc cards keep a working raw-md edit toggle; plan cards still toast (edit parity is a later phase) */
+    const editHead=editHeadHTML("planCopy('"+p.id+"')",editClick,p.id,'',isDoc?p.id+'-ta':'');   /* 5th arg = mic field; docs bind to their raw textarea, plans have none */
+    const rawTa=isDoc?'<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>':'';
     return '<div data-comp="plan-card" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
       +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
-      +'<div class="plan-row r2"><span class="cnt-strip">'+fbadges+'</span><span class="flex-1"></span><span class="steps-txt'+(done===stepN?' all':'')+'">'+done+'/'+stepN+' steps done</span></div>'
+      +'<div class="plan-row r2"><span class="cnt-strip">'+fbadges+'</span><span class="flex-1"></span>'+steps+'</div>'
       +'<div class="plan-row r3"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
       +'<div class="plan-body">'   /* A4 bullet 1: editHeadHTML moved INSIDE .plan-main (below) so the Editor header sits over the editor box only; the Outline/Feedback/Authors nav rail rises full-height (Documents-style) */
       +'<div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
-      +'<div class="plan-main">'+editHeadHTML("planCopy('"+p.id+"')","planAct('edit','"+p.id+"')",p.id,'','')+mdEditorHTML(p.id,p.md,'outline')+'</div></div>'
+      +'<div class="plan-main">'+editHead+mdEditorHTML(p.id,p.md,'outline')+rawTa+'</div></div>'
       +planFootHTML(p)+'</div></div>';}
+  /* L1 (ND 1+2): one entry-nav mini-card for the two-column list, shared by Plans and Documents. Row 1 = icon + name
+     (+ a path line for docs — they need it to disambiguate same-named files); row 2 = the lifecycle .dbadge. A row
+     click opens/scrolls/flashes its card (navPick→openEntry); docs keep the rename ghost, plans list by title. */
+  function entryNavRowHTML(e,kind){const bb=PLAN_BADGE[e.status];const on=e.open?' on':'';
+    let ic,name,path='',acts='';
+    if(kind==='doc'){const fn=e.path.split('/').pop();const dir=e.path.slice(0,e.path.length-fn.length);
+      ic='<i data-lucide="'+fileTypeIcon(fn)+'" class="docnav-ic"></i>';
+      name='<span class="docnav-name">'+esc(fn)+'</span>';path='<span class="docnav-path">'+esc(dir)+'</span>';acts=navActsHTML();}
+    else{ic='<i data-lucide="clipboard-list" class="docnav-ic"></i>';name='<span class="docnav-name">'+esc(e.title)+'</span>';}
+    return '<div class="docnav-row navcard'+on+'" role="button" tabindex="0" data-navid="'+e.id+'" onclick="navPick(this)">'
+      +'<div class="docnav-top">'+ic+'<span class="docnav-lab">'+name+path+'</span>'+acts+'</div>'
+      +'<div class="docnav-life"><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div></div>';}
+  /* L1: fill an entry-nav column from a list; Documents also gets the Add-document affordance at the foot */
+  function renderEntryNav(navId,entries,kind){const nav=document.getElementById(navId);if(!nav)return;
+    nav.innerHTML=entries.map(e=>entryNavRowHTML(e,kind)).join('')+(kind==='doc'?addMenuHTML('documents'):'');LU();}
   function renderPlans(){const el=document.getElementById('plan-list');if(el)el.innerHTML=PLANS.map(planCardHTML).join('');
-    const b=document.getElementById('plans-badge');if(b){const n=PLANS.filter(p=>p.status==='review'||p.status==='draft').length;b.textContent=n;b.style.display=n?'':'none';}}
+    renderEntryNav('plan-nav',PLANS,'plan');   /* L1: the Plans tab gets the same two-column entry-nav as Documents */
+    const b=document.getElementById('plans-badge');if(b){const n=PLANS.filter(p=>p.status==='review'||p.status==='draft').length;b.textContent=n;b.style.display=n?'':'none';}
+    const sc=document.getElementById('plan-subtitle-count');if(sc){const rev=PLANS.filter(p=>p.status==='review').length;sc.textContent=PLANS.length+' plan'+(PLANS.length===1?'':'s')+' · '+rev+' awaiting review';}   /* L1: live counts replace the hardcoded subtitle */
+    LU();}
   /* the tab strip is a LENS SWITCH: selecting a tab repaints the nav card list AND the editor gutter badges AND
      resets the docked box together (Outline→no gutter badges · Feedback→verdict badges · Authors→author badges). */
-  function planNavMode(id,mode){const p=PLANS.find(x=>x.id===id);const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav||!p)return;
+  function planNavMode(id,mode){const p=entryById(id);const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav||!p)return;
     nav.innerHTML=planNavHTML(p,fbBySection(p),mode);
     const ed=document.querySelector('[data-edhost="'+id+'"]');if(ed)ed.outerHTML=mdEditorHTML(id,p.md,mode);   /* repaint the gutter to match the lens (the fresh .doc-ed carries an empty, closed popout) */
     clearSel(id);   /* reset any line/section selection + the Comment control so they match the fresh editor */

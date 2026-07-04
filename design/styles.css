@@ -1080,6 +1080,14 @@
       color:var(--muted); cursor:pointer; border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; }
     .docnav-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--surface-3); }
     .docnav-add svg{ width:var(--size-13); height:var(--size-13); }
+    /* L1 (ND 1+2): entry-nav MINI-CARD — the two-column entry list shared by BOTH the Plans and Documents tabs
+       (generalized from the doc-switcher rail). A .navcard row stacks a top line (icon · name (+ path for docs) · acts)
+       over a lifecycle-badge row. Plain single-line .docnav-row (Assets, legacy) is untouched. */
+    .docnav-row.navcard{ flex-direction:column; align-items:stretch; gap:var(--space-4); }
+    .docnav-top{ display:flex; align-items:center; gap:var(--space-7); width:100%; min-width:0; }
+    .docnav-top .docnav-lab{ flex:1 1 auto; }
+    .docnav-life{ display:flex; align-items:center; }
+    .docnav-life .dbadge{ flex:0 0 auto; }
 
     /* ---- Library: Assets tab — thumbnail grid IS the nav, + selected-asset detail strip ---- */
     .asset-grid{ flex:1 1 auto; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:var(--space-9); align-content:start; padding:var(--space-2); }
@@ -1670,6 +1678,11 @@
        Feedback nav rail rises to the top, full height (Documents-style). The editor body flex-fills. */
     .plan-main{ display:flex; flex-direction:column; min-height:0; }
     .plan-main .doc-ed{ flex:1 1 auto; min-height:0; }
+    /* L1 (ND-3): the per-doc-card raw-markdown edit textarea — shown (display:block from JS) when the Editor-header
+       Edit ghost is toggled on, filling the editor area in place of the rendered .doc-ed view. */
+    .plan-main .entry-edit{ flex:1 1 auto; min-height:180px; width:100%; box-sizing:border-box; resize:none;
+      font-family:var(--font-mono); font-size:11px; line-height:1.55; color:var(--foreground);
+      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-10) var(--space-12); }
     .plan-main .md{ display:flex; flex-direction:column; flex:1 1 auto; }   /* a flex column that fills .plan-main so .md-fill runs the rail to the bottom (keeps its max-height/overflow from below) */
     /* enlarge the title row so its whole-doc select-all rail box matches the Messages title box */
     .md-line.md-h1{ padding-top:var(--space-5); padding-bottom:var(--space-5); }

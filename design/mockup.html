@@ -1211,146 +1211,36 @@
               <h3>Library</h3>
               <div class="tabset">
                 <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plans<span data-comp="count-chip" class="req-badge ml-1" id="plans-badge">2</span></button>
-                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents</button>
+                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents<span data-comp="count-chip" class="req-badge ml-1" id="docs-badge">3</span></button>
                 <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
               </div>
             </div>
             <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
 
-              <!-- PLAN — native plan review/edit/approve (backlog C4) -->
-              <div id="doc-plan" data-group="doc" class="flex-1 min-h-0 overflow-y-auto p-2.5">
-                <div class="text-[9px] text-muted font-mono mb-2 flex items-center">
-                  <span>~/.claude/plans/</span>
-                  <span class="flex-1"></span>
-                  <span>3 plans · 1 awaiting review</span>
+              <!-- PLAN — native plan review/edit/approve (backlog C4). L1 (ND 1+2): two-column — the shared entry-nav
+                   (#plan-nav, rendered from PLANS) beside the right card column; the subtitle count is live. -->
+              <div id="doc-plan" data-group="doc" class="flex-1 min-h-0 flex p-2.5 gap-2.5">
+                <nav data-comp="entry-nav" class="docnav" id="plan-nav"></nav>
+                <div class="docmain flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div class="text-[9px] text-muted font-mono mb-2 flex items-center flex-none">
+                    <span>~/.claude/plans/</span>
+                    <span class="flex-1"></span>
+                    <span id="plan-subtitle-count">3 plans · 1 awaiting review</span>
+                  </div>
+                  <div id="plan-list" class="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0"></div>
                 </div>
-                <div id="plan-list" class="flex flex-col gap-2"></div>
               </div>
 
-              <!-- DOCUMENTS — all project docs in one tab, switched via the left doc-nav.
-                   Reuses the shared doc editor (toolbar + line-numbered view + rail); the nav lists
-                   each doc as icon · name · path (path disambiguates project vs user CLAUDE.md). -->
+              <!-- DOCUMENTS — L1 (ND 1-6): every project doc is a reviewable-document card (same component as Plans),
+                   rendered from DOCS by renderDocs(). Two-column: the shared entry-nav (#doc-nav — icon · name · path,
+                   path disambiguates project vs user CLAUDE.md, + the Add-document affordance) beside the right card
+                   list (#doc-list). Each card carries the 3-row header, the Outline/Feedback/Authors rail, a working
+                   raw-markdown edit toggle, and the full decision footer. The per-doc .docdoc panes are retired. -->
               <div id="doc-documents" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
-
-                <!-- doc-switcher rail — rows are <div role=button> so the ghost rename/delete icons nest legally (#21) -->
-                <nav data-comp="doc-switcher" class="docnav">
-                  <div class="docnav-row on" role="button" tabindex="0" data-doc="readme" onclick="docPick(this,'readme')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">README.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>
-                  </div>
-                  <div class="docnav-row" role="button" tabindex="0" data-doc="claude" onclick="docPick(this,'claude')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>
-                  </div>
-                  <div class="docnav-row" role="button" tabindex="0" data-doc="claudeuser" onclick="docPick(this,'claudeuser')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">CLAUDE.md</span><span class="docnav-path">~/.claude/</span></span>
-                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>
-                  </div>
-                  <!-- R11 item 3: a deliberately SHORT doc so the editor's extended gutter (the .md-fill filler rail) is demonstrable — short content leaves the rail running visibly to the editor bottom -->
-                  <div class="docnav-row" role="button" tabindex="0" data-doc="notes" onclick="docPick(this,'notes')">
-                    <i data-lucide="file-text" class="docnav-ic"></i>
-                    <span class="docnav-lab"><span class="docnav-name">notes.md</span><span class="docnav-path">agent-dashboard/</span></span>
-                    <span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>
-                  </div>
-                  <!-- Add menu (#20): Add file (explorer) / Paste (clipboard, auto-named) -->
-                  <div class="docnav-addwrap">
-                    <button class="docnav-add" onclick="toggleAddMenu(event,this)"><i data-lucide="plus"></i>Add document</button>
-                    <div class="add-menu">
-                      <button class="add-mi" onclick="addDoc(event,'documents','file')"><b><i data-lucide="folder-open"></i>Add file</b><span class="add-sub">Open the explorer</span></button>
-                      <button class="add-mi" onclick="addDoc(event,'documents','paste')"><b><i data-lucide="clipboard"></i>Paste</b><span class="add-sub">New doc — name it inline</span></button>
-                    </div>
-                  </div>
-                </nav>
-
-                <!-- editor host — one doc visible at a time -->
-                <div class="docmain flex-1 min-h-0 flex flex-col">
-
-                  <!-- README.md -->
-                  <div class="docdoc on" data-doc="readme">
-                    <div class="doc-header"><span class="dh-path">agent-dashboard/README.md</span><span class="dh-dates"><b>Created</b> Jun 17 · 7d ago&nbsp;&nbsp;<b>Edited</b> Jun 20 · 17h ago</span></div>
-                    <div data-libhead="doc-readme" data-libkind="doc"></div>
-                    <div class="doc-view-host" id="doc-readme-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-readme-edit" style="display:none"># AWL Multi-Agent Dashboard
-
-A control surface for running and supervising a team of Claude Code agents
-from one window. Watch the team, steer each agent, and review their work
-without leaving the dashboard.
-
-## The five panels
-- **Agent** — inspect & configure the selected agent.
-- **Team Graph** — every agent as a live card.
-- **Library** — plans + project docs (README, CLAUDE) and reference assets.
-- **Feed** — messages, scratchpad, log, inbox.
-- **Prompts** — compose and dispatch prompts.
-
-## Design system
-Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
-single pink-to-teal emphasis ladder.</textarea>
-                    <div class="doc-foot" data-libfoot="doc-readme" data-libkind="doc"></div>
-                  </div>
-
-                  <!-- CLAUDE.md (project) -->
-                  <div class="docdoc" data-doc="claude">
-                    <div class="doc-header"><span class="dh-path">agent-dashboard/CLAUDE.md</span><span class="dh-dates"><b>Created</b> Jun 16 · 8d ago&nbsp;&nbsp;<b>Edited</b> Jun 21 · 9h ago</span></div>
-                    <div data-libhead="doc-claude" data-libkind="doc"></div>
-                    <div class="doc-view-host" id="doc-claude-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claude-edit" style="display:none"># CLAUDE.md
-
-Project instructions loaded into every agent's context. Keep it short — it is
-spent context on every turn.
-
-## Workspace identity
-A general-purpose VS Code workspace for AI/agentic workflows. Current focus:
-the AWL multi-agent dashboard.
-
-## Behavioral rules
-- Stay inside the project directory unless told otherwise.
-- Keep DEVLOG.md current — an unlogged change never happened.
-- Write transient artifacts into .scratch/, never the repo root.
-- Preserve everything you weren't asked to change.</textarea>
-                    <div class="doc-foot" data-libfoot="doc-claude" data-libkind="doc"></div>
-                  </div>
-
-                  <!-- CLAUDE.md (user-level) -->
-                  <div class="docdoc" data-doc="claudeuser">
-                    <div class="doc-header"><span class="dh-path">~/.claude/CLAUDE.md</span><span class="dh-dates"><b>Created</b> May 28 · 27d ago&nbsp;&nbsp;<b>Edited</b> Jun 22 · 2d ago</span></div>
-                    <div data-libhead="doc-claudeuser" data-libkind="doc"></div>
-                    <div class="doc-view-host" id="doc-claudeuser-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-claudeuser-edit" style="display:none"># CLAUDE.md
-
-User-level instructions loaded into every project's context, on top of the
-project CLAUDE.md. Global defaults that travel with you.
-
-## Working style
-- Be direct, practical, low-ceremony. Lead with action.
-- Prefer dedicated tools over ad-hoc shell for file search and edits.
-- Write generated artifacts outside any repo, under a scratch path.
-
-## Conventions
-- Use markdown links for file references, not bare paths.
-- Match the project's existing patterns before introducing new ones.</textarea>
-                    <div class="doc-foot" data-libfoot="doc-claudeuser" data-libkind="doc"></div>
-                  </div>
-
-                  <!-- notes.md (R11 item 3: short doc — short enough that the editor's filler rail runs visibly to the bottom) -->
-                  <div class="docdoc" data-doc="notes">
-                    <div class="doc-header"><span class="dh-path">agent-dashboard/notes.md</span><span class="dh-dates"><b>Created</b> Jun 26 · 1d ago&nbsp;&nbsp;<b>Edited</b> Jun 26 · 4h ago</span></div>
-                    <div data-libhead="doc-notes" data-libkind="doc"></div>
-                    <div class="doc-view-host" id="doc-notes-view" style="flex:1 1 auto;min-height:0"></div>
-                    <textarea class="doc-edit in" id="doc-notes-edit" style="display:none"># Scratch notes
-
-Short-lived notes for the current run — kept brief on purpose.
-
-## Endpoints
-- Sidecar API — http://127.0.0.1:7690
-- Renderer dev — http://127.0.0.1:5199</textarea>
-                    <div class="doc-foot" data-libfoot="doc-notes" data-libkind="doc"></div>
-                  </div>
-
-                </div><!-- /docmain -->
+                <nav data-comp="entry-nav" class="docnav" id="doc-nav"></nav>
+                <div class="docmain flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div id="doc-list" class="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0"></div>
+                </div>
               </div><!-- /doc-documents -->
 
               <!-- ASSETS (#18) — rebuilt as a rail + preview like Documents: a left list of thumbnail + name,
