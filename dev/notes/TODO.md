@@ -2,7 +2,7 @@
 
 > **Backlog is reference-only; the "Next up" sections are the only actionable ones.** For the backlog sections ([BD] · [BB] · [BH]), agents must not implement anything, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. The exception is **Next up**: items there are approved for work, and being directed to that section is itself the signal to build them. This is otherwise a capture-and-triage doc.
 >
-> **Two lanes, three tiers.** Work flows **Inbox → Next up → Backlog** in two lanes: the **Design** lane (`design/` — the mockup, tokens, DESIGN.md) and the **Build** lane (the app — `sidecar/`, `bridge/`, `frontend/`; system reference in `docs/ARCHITECTURE.md`). *Build* is the umbrella; its backlog splits into **Backend** and **Housekeeping & Docs**. So the Design lane is **[ID] → [ND] → [BD]**, and the Build lane is **[IB] → [NB] → [BB]** (+ **[BH]**).
+> **One inbox, two lanes.** Rough notes land in a single **[IN] INBOX**; an agent then syncs each into the right downstream section. Downstream, work splits into two lanes: the **Design** lane (`design/` — the mockup, tokens, DESIGN.md) and the **Build** lane (the app — `sidecar/`, `bridge/`, `frontend/`; system reference in `docs/ARCHITECTURE.md`). *Build* is the umbrella; its backlog splits into **Backend** and **Housekeeping & Docs**. So the Design lane is **[ND] → [BD]** and the Build lane is **[NB] → [BB]** (+ **[BH]**) — both fed from the shared **[IN]** inbox.
 
 ## SECTIONS
 
@@ -14,9 +14,8 @@
 | `[BB]` | BACKLOG — BACKEND | Features needing real backend/runtime work (`sidecar/`, `bridge/`, `frontend/`). |
 | `[BH]` | BACKLOG — HOUSEKEEPING & DOCS | Maintenance, config, and documentation chores. |
 | `[ND]` | NEXT UP — DESIGN | Approved design queue, priority order. Build per the design path; leave finished items for the human to remove. Empty by design when idle. |
-| `[ID]` | INBOX — DESIGN | Rough human design notes to be filed into [BD] later (one per bullet). Empty by design. |
 | `[NB]` | NEXT UP — BUILD | Approved build queue, priority order. Build per the build path; leave finished items for the human to remove. Empty by design when idle. |
-| `[IB]` | INBOX — BUILD | Rough human build notes to be filed into [BB]/[BH] later (one per bullet). Empty by design. |
+| `[IN]` | INBOX | Rough human notes (one per bullet) to be synced into the right Next up or backlog section later. Empty by design. |
 | — | SCRATCH | Rough human ideas **not** to be used or considered by any agent. |
 
 ## HOW AGENTS MAINTAIN THIS LIST
@@ -38,11 +37,11 @@
 > 4. **Doc-sync before finishing.** DEVLOG.md always; `design/DESIGN.md` for design work; `docs/ARCHITECTURE.md` for build work; `CLAUDE.md` only if folder structure moved.
 > 5. **Leave the item in place when done — do not delete it.** Log the work in DEVLOG per the project rule and report what you changed; the human reviews the build and removes the item once satisfied.
 >
-> **Inbox.** The human keeps rough notes as a bullet list (one per line) under the matching Inbox — **[ID]** for design, **[IB]** for build. When asked to incorporate them, handle each note in turn:
-> 1. **File it** into the best-fit section — design → [BD], backend → [BB], chore → [BH] (or whatever section the human names) — with a concise **bold header**, plus an ID for backlog sections; Next up items get no ID.
+> **Inbox.** The human keeps rough notes as a bullet list (one per line) in the single **[IN] INBOX** — they don't sort their own notes, so an agent triages each on request. Handle each note in turn:
+> 1. **Sync it** into the right downstream section — a **backlog** section by default (design → [BD], backend → [BB], chore → [BH]), or a **Next up** queue ([ND] / [NB]) when the human is directing it straight to work — with a concise **bold header**, plus an ID for backlog sections (Next up items get no ID).
 > 2. **Minimal edits for clarity only** — tighten the wording so it reads cleanly and complete any obvious shorthand, but never change the intent or scope, and don't add ideas of your own.
 > 3. **Disambiguate references.** Map any loose label or shorthand to the actual component/feature name as it appears in `design/mockup.html` (or the relevant app module). If you genuinely can't tell what's meant, keep the original wording and flag it rather than guess.
-> 4. **Delete it from the Inbox** once filed, so the bucket stays empty for next time.
+> 4. **Delete it from the [IN] inbox** once filed, so the bucket stays empty for next time.
 
 ## [BD] BACKLOG — DESIGN
 
@@ -92,7 +91,9 @@
 
 ## [ND] NEXT UP — DESIGN
 
-## [ID] INBOX — DESIGN
+## [NB] NEXT UP — BUILD
+
+## [IN] INBOX
 
 - I want to rework both the Plans and Documents tab layout and functionality. I want documents to have the same within card nav bar as projects. This means Documents needs to be card based as well, like Plans. This also means Documents should have commenting allowed and should the same within card action strip options and the Draft vs Approved badge and state tracking. The Documents tab should have a badge indicating how many docs have pending actions, just like the plans tab. The existing tab-based nav bar for Documents should be preserved and I want one of these added to Plans with a list of all Plans docs. For both Plans and Documents, clicking the entry in the tab-level nav bar should open the corresponding entry and, conversely, opening a given card should highlight/select that entry in the nav bar. For both the tab-level nav bars, the little card entries in the bar should have another row with the state badge (Approved/Draft). I want to add another state badge "Revising" or "Editing". With that, we might need to change the label for the "Revise" button to disambiguate it. Maybe something like "Refactor" that is more evocative of an operation that is integrating multiple sources of revision feedback. Might need to breakdown and actually have a multi word label for this button.
 - Every example entry for Plans and Documents should have at least one author badge in the first rail cell (or whatever the term is for those) that indicates the original author. That first cell is the one that indicates document-wide stuff.
@@ -100,10 +101,6 @@
 - Minor thing related to above. We need an example set of rail badges in the first plans tab entry (the one selected by default) where we have one an entry with all 3 types of rail badges/chips to see how that will fit in the layout; that is, how will a single rail block accommodate the max number of badges. On that, in order to account for the limited space, I am wondering if we really need the approve chip/badge, given that no revise or error chip/badge implicitly indicates a given section etc is approved.
 - Modify the the little arrow used in the messages card indicating the sending to receiving agent in the card header. We should use the same right arrow icon as that used in the Link Config panel, though does not need to be the same size and line weight; style in a way that looks good.
 - I want to change the Link Agent drawer button to be named Link Config, like the heading in the drawer. 
-
-## [NB] NEXT UP — BUILD
-
-## [IB] INBOX — BUILD
 
 ## SCRATCH
 

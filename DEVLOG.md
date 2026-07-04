@@ -841,6 +841,14 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-03 17:21:28 — docs: TODO.md reverted to a single [IN] INBOX (per user)
+
+Per the user, collapsed the two-inbox split (`[ID]`/`[IB]`) back to a single **`[IN]` INBOX** — they add unsorted notes and have agents triage them, so per-lane inboxes didn't fit the real workflow. The single inbox now sits after both Next up sections (before Scratch) and holds the 6 existing notes; the SECTIONS table, the intro lane-map ("one inbox, two lanes"), and the HOW-block Inbox guidelines were all updated so agents **sync each note into the appropriate Next up or backlog section** (a backlog section by default; a Next up queue when the human directs it straight to work). No item content changed; only the inbox structure + its guidelines.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
