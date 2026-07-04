@@ -94,9 +94,9 @@
   --font-weight-heading:800;
 
   /* ---- Radius (primitive, by size — used directly, no semantic layer) ----- */
-  --radius-base:5px;   /* the uniform tight radius — cards, inputs, buttons, panels */
-  --radius-sm:3px;     /* small badges & chips (status/lifecycle/verdict/count, menu items) — still a rounded square, no pill */
-  --radius-xs:2px;     /* tiniest accents — colour swatches, the command-group rule, focus-fill chips */
+  --radius-base:0px;   /* the uniform tight radius — cards, inputs, buttons, panels */
+  --radius-sm:0px;     /* small badges & chips (status/lifecycle/verdict/count, menu items) — still a rounded square, no pill */
+  --radius-xs:0px;     /* tiniest accents — colour swatches, the command-group rule, focus-fill chips */
 
   /* ---- Border / divider widths (primitive) ------------------------------- */
   --border-width:2px;    /* the navy border on every bordered element */
