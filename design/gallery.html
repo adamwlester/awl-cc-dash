@@ -49,20 +49,39 @@
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
     body{margin:0;background:var(--background);color:var(--foreground);font-family:'Archivo',sans-serif;font-weight:500}
-    .gx-page{max-width:1440px;margin:0 auto;padding:26px 26px 160px}
+    .gx-page{max-width:1440px;margin:0 auto;padding:26px 26px 160px;display:flex;align-items:flex-start;gap:24px}
+    /* sticky left ToC (gallery chrome only) — built generically from the DOM (see gxBuildToc) */
+    .gx-toc{position:sticky;top:22px;align-self:flex-start;flex:0 0 210px;width:210px;
+      max-height:calc(100vh - 44px);overflow-y:auto;background:var(--secondary-background);
+      border:var(--border-width) solid var(--border);border-radius:var(--radius-base);box-shadow:var(--shadow);
+      padding:12px 10px}
+    .gx-toc-h{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 4px 9px}
+    .gx-toc-group{margin-bottom:5px}
+    .gx-toc-sec{display:block;font-size:12px;font-weight:800;color:var(--foreground);text-decoration:none;
+      padding:5px 7px;border-radius:var(--radius-sm);cursor:pointer;transition:background .1s,color .1s}
+    .gx-toc-sec:hover{background:var(--main);color:var(--main-foreground)}
+    .gx-toc-sec.on{background:var(--select)}
+    .gx-toc-cards{display:flex;flex-direction:column;margin:2px 0 6px 9px;padding-left:7px;
+      border-left:var(--border-width) solid var(--rule)}
+    .gx-toc-card{font-size:10.5px;color:var(--muted);text-decoration:none;padding:3px 6px;border-radius:var(--radius-sm);
+      cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .1s,color .1s}
+    .gx-toc-card:hover{background:var(--surface-3);color:var(--foreground)}
+    .gx-toc-card.on{background:var(--select);color:var(--foreground);font-weight:700}
+    .gx-main{flex:1 1 auto;min-width:0}
     .gx-header{margin-bottom:18px;padding:22px 24px;background:var(--secondary-background);
       border:var(--border-width) solid var(--border);border-radius:var(--radius-base);box-shadow:var(--shadow)}
     .gx-h1{font-size:26px;font-weight:900;letter-spacing:-.01em;margin:0 0 8px;color:var(--foreground)}
     .gx-intro{font-size:12.5px;line-height:1.6;color:var(--muted);max-width:84ch;margin:0 0 6px}
     .gx-intro b{color:var(--foreground)}
     .gx-intro code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--surface-3);
-      padding:1px 5px;border-radius:4px;border:1px solid var(--border)}
-    .gx-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-    .gx-nav a{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:6px 11px;
-      border:var(--border-width) solid var(--border);border-radius:var(--radius-base);background:var(--background);
-      color:var(--foreground);text-decoration:none;box-shadow:var(--shadow-sm)}
-    .gx-nav a:hover{background:var(--main);color:var(--main-foreground);transform:translate(-1px,-1px)}
-    .gx-sec{margin:34px 0 14px;padding-bottom:8px;border-bottom:3px solid var(--border);
+      padding:1px 5px;border-radius:var(--radius-base);border:1px solid var(--border)}
+    /* narrow viewport: the left ToC (which absorbed the old horizontal .gx-nav) collapses to a capped
+       static block above the content so the catalog gets full width */
+    @media(max-width:780px){
+      .gx-page{flex-direction:column}
+      .gx-toc{position:static;flex:0 0 auto;width:100%;max-height:280px;margin-bottom:4px}
+    }
+    .gx-sec{margin:34px 0 14px;padding-bottom:8px;border-bottom:var(--divider-width) solid var(--border);
       display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
     .gx-sec h2{font-size:19px;font-weight:900;margin:0;color:var(--foreground)}
     .gx-sec span{font-size:12px;color:var(--muted)}
@@ -75,14 +94,14 @@
     .gx-card-head{display:flex;align-items:center;gap:9px;margin-bottom:7px;flex-wrap:wrap}
     .gx-name{font-size:14px;font-weight:800;color:var(--foreground)}
     .gx-slug{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);
-      background:var(--surface-3);border:1px solid var(--border);border-radius:4px;padding:1px 6px}
+      background:var(--surface-3);border:1px solid var(--border);border-radius:var(--radius-base);padding:1px 6px}
     .gx-status{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:800;text-transform:uppercase;
-      letter-spacing:.05em;padding:1px 6px;border-radius:4px;border:1px solid var(--border)}
+      letter-spacing:.05em;padding:1px 6px;border-radius:var(--radius-base);border:1px solid var(--border)}
     .gx-status--planned{background:var(--warning);color:#3a2a00}
     .gx-status--undecided{background:var(--surface-3);color:var(--muted)}
     .gx-blurb{font-size:11.5px;line-height:1.55;color:var(--muted);margin:0 0 13px}
     .gx-blurb code{font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--surface-3);
-      padding:0 4px;border-radius:3px}
+      padding:0 4px;border-radius:var(--radius-sm)}
     .gx-stage{position:relative;background:var(--background);border:1px dashed var(--border);
       border-radius:var(--radius-base);padding:16px;display:flex;flex-wrap:wrap;gap:18px 22px;
       align-items:flex-start;min-height:46px;overflow:visible}
@@ -173,11 +192,13 @@
   </svg>
 
   <div class="gx-page">
+    <!-- sticky sectioned ToC — built generically from the .gx-sec / .gx-card DOM by gxBuildToc() (absorbs the old horizontal .gx-nav) -->
+    <aside class="gx-toc" id="gx-toc" aria-label="Component index"></aside>
+    <div class="gx-main">
     <header class="gx-header">
       <h1 class="gx-h1">Component Gallery &mdash; Interactive Catalog</h1>
       <p class="gx-intro">Every reusable component and basic building block in the design system. This page shares <code>tokens.css</code>, <code>styles.css</code> <b>and</b> <code>behavior.js</code> with the mockup, so each operable specimen is the genuine component driven by the genuine interaction code &mdash; never a frozen copy.</p>
       <p class="gx-intro"><b>The operable specimens are live: hover, click, open their menus.</b> Components with several looks (button tiers, badge colours) show every variant side by side; controls with menus or toggles show one live instance you can drive. Only page scaffolding (the <code>gx-*</code> classes) is added here.</p>
-      <nav class="gx-nav"><a href="#sec-primitives">Primitives</a><a href="#sec-fields">Form fields</a><a href="#sec-badges">Badge catalog</a><a href="#sec-inbox">Inbox card types</a><a href="#sec-composites">Composites</a></nav>
     </header>
 
   <section class="gx-sec" id="sec-primitives"><h2>Primitives</h2><span>cross-cutting controls & elements &middot; 40</span></section>
@@ -1222,6 +1243,7 @@
     <div class="gx-stage gx-stage--single"><div class="gx-spec"><div class="gx-spec-host"><div style="font-size:11px;color:var(--muted)">[no specimen for <code>link-edges</code>]</div></div></div></div>
   </article>
   </div>
+  </div><!-- /.gx-main -->
 
   </div>
   <!-- SHARED product behavior: the same file the mockup loads. boot() is inert here (no .app). -->
@@ -1237,7 +1259,50 @@
          through the same shared agSync/updateAgBadges/updateSubCounts paths the app runs. */
       function gxRoster(){ if(typeof fillRosterLists==='function')fillRosterLists();
         document.querySelectorAll('.gx-spec-host [data-agscope]').forEach(s=>{ if(typeof agSync==='function'){agSync(s);updateAgBadges(s);updateSubCounts(s);} }); }
-      if(document.readyState!=='loading'){ gxLU(); gxRoster(); } else document.addEventListener('DOMContentLoaded', function(){ gxLU(); gxRoster(); });
+      /* Sticky left ToC — derived generically from the DOM so future cards appear automatically: one group per
+         .gx-sec, nested per-.gx-card entries (label from .gx-name, falling back to data-card). Clicking a section
+         or card entry smooth-scrolls to it; a scroll-spy marks the section currently in view. All gallery-local. */
+      function gxBuildToc(){
+        var toc=document.getElementById('gx-toc'); if(!toc)return;
+        var secs=[].slice.call(document.querySelectorAll('.gx-sec')); if(!secs.length)return;
+        var gi=0, html='<div class="gx-toc-h">Contents</div><nav class="gx-toc-nav">';
+        secs.forEach(function(sec){
+          var h=sec.querySelector('h2'), name=h?h.textContent.trim():sec.id;
+          html+='<div class="gx-toc-group"><a class="gx-toc-sec" href="#'+sec.id+'">'+name+'</a>';
+          var grid=sec.nextElementSibling;
+          while(grid && !(grid.classList&&grid.classList.contains('gx-grid'))) grid=grid.nextElementSibling;
+          if(grid){
+            var cards=[].slice.call(grid.querySelectorAll('.gx-card'));
+            if(cards.length){
+              html+='<div class="gx-toc-cards">';
+              cards.forEach(function(card){
+                if(!card.id) card.id='gxc-'+(card.dataset.card||'card')+'-'+(gi++);
+                var nm=card.querySelector('.gx-name'), label=nm?nm.textContent.trim():(card.dataset.card||'card');
+                html+='<a class="gx-toc-card" href="#'+card.id+'" title="'+label+'">'+label+'</a>';
+              });
+              html+='</div>';
+            }
+          }
+          html+='</div>';
+        });
+        toc.innerHTML=html+'</nav>';
+        toc.querySelectorAll('a[href^="#"]').forEach(function(a){
+          a.addEventListener('click',function(e){
+            e.preventDefault();
+            var el=document.getElementById(a.getAttribute('href').slice(1));
+            if(el){ el.scrollIntoView({behavior:'smooth',block:'start'}); history.replaceState(null,'', a.getAttribute('href')); }
+          });
+        });
+        var secLinks=[].slice.call(toc.querySelectorAll('.gx-toc-sec'));
+        function gxSpy(){
+          var cur=0;
+          for(var i=0;i<secs.length;i++){ if(secs[i].getBoundingClientRect().top<=140) cur=i; }
+          secLinks.forEach(function(a,i){ a.classList.toggle('on', i===cur); });
+        }
+        window.addEventListener('scroll',gxSpy,{passive:true});
+        window.addEventListener('resize',gxSpy); gxSpy();
+      }
+      if(document.readyState!=='loading'){ gxLU(); gxRoster(); gxBuildToc(); } else document.addEventListener('DOMContentLoaded', function(){ gxLU(); gxRoster(); gxBuildToc(); });
       window.addEventListener('load', gxLU);
     })();
   </script>

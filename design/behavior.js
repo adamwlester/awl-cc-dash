@@ -1767,7 +1767,7 @@ resize intact.`,
   function recipientsHTML(o){const r=(o.recipients&&o.recipients.length)?o.recipients:['user'];const CAP=2;
     const shown=r.slice(0,CAP).map(recipientBadge).join('');
     const more=r.length>CAP?'<span class="rcpt-more" title="'+esc(r.slice(CAP).join(', '))+'">+'+(r.length-CAP)+'</span>':'';
-    return '<span class="rcpt-to" title="addressed to">→</span>'+shown+more;}
+    return '<span class="rcpt-to" title="addressed to"><i data-lucide="arrow-right"></i></span>'+shown+more;}
   /* typed message content blocks — rendered in the expanded card; the Include toggles show/hide them by kind */
   const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
   /* A7: the block TYPE is now shown by the rail tag (3-char, in the rail box), so the block CONTENT carries NO inline

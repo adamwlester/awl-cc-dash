@@ -486,7 +486,7 @@
       <span class="chip" id="clock" style="font-family:'JetBrains Mono',monospace"></span>
       <span class="chip">WSL2</span>
       <span class="chip">tmux</span>
-      <span class="chip" style="gap:6px"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:2px solid var(--border)"></span>Connected</span>
+      <span class="chip" style="gap:6px"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
       <button data-comp="settings-gear" class="topbar-gear" id="settings-gear" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
     </div>
   </header>
@@ -680,7 +680,7 @@
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
               </div>
-              <div id="hist-acc" class="acc flex flex-col" style="display:none;border-top:2px solid var(--border);border-radius:var(--radius-base);margin-top:6px">
+              <div id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:6px">
                 <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
                 <div data-comp="inline-confirm" class="tl-confirm" id="hist-confirm"></div>
                 <div data-comp="timeline" class="tl" id="hist-panel" style="min-height:120px"></div>
@@ -859,7 +859,7 @@
           <section class="rz-panel" id="pGraph" style="flex:1 1 52%; min-height:150px">
             <div class="pcard-head">
               <h3>Team Graph</h3>
-              <button onclick="toggleDrawer()" class="btn btn-sm"><i data-lucide="link-2" class="w-3.5 h-3.5"></i>Link Agents</button>
+              <button onclick="toggleDrawer()" class="btn btn-sm"><i data-lucide="link-2" class="w-3.5 h-3.5"></i>Link Config</button>
             </div>
             <div class="pcard-body overflow-auto" style="background:var(--background)">
               <div class="graph-wrap p-3.5" id="graph-wrap" data-status="planned"><!-- planned: edge-layer host for drawEdges()/LINKS — no #edge-layer element exists yet, so drawEdges() returns early and draws nothing -->
@@ -1495,7 +1495,7 @@ Short-lived notes for the current run — kept brief on purpose.
 
             <!-- MESSAGES -->
             <div id="feed-messages" data-group="feed" class="flex-1 overflow-y-auto px-3 pt-1 pb-3" style="background:var(--background)">
-              <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:2px solid var(--border)">
+              <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:var(--border-width) solid var(--border)">
                 <span class="mini-cap">Type</span>
                 <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Messages you sent to the team"><i data-lucide="arrow-up-right"></i>Sent</button>
                 <button class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
@@ -1720,9 +1720,9 @@ Short-lived notes for the current run — kept brief on purpose.
       <span><b class="text-foreground">17</b> subagents</span><span class="opacity-40">·</span><!-- Next-up item 6: subagent total = the graph-card roster (sandy 6 + max 1 + lex 2 + fen 8) -->
 
       <span><b class="text-foreground">6</b> links</span><span class="opacity-40">·</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:2px solid var(--border)"></span>5 active</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--muted-2);border:2px solid var(--border)"></span>4 idle</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warning);border:2px solid var(--border)"></span>4 pending</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>5 active</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--muted-2);border:var(--border-width) solid var(--border)"></span>4 idle</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warning);border:var(--border-width) solid var(--border)"></span>4 pending</span>
     </div>
     </div><!-- /A13 left group (mic + counts) -->
     <div class="flex items-center gap-2">
