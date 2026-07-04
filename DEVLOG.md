@@ -277,6 +277,38 @@ Files: DEVLOG.md, archive/devlog/DEVLOG-archive-05.md
 
 ---
 
+### 2026-07-03 19:55:00 — ARCHITECTURE §11 "Build backlog & queue" + TODO.md [BB] strip (doc-integration Phase 3)
+
+Phase 3 of the test-findings/doc-integration pass: consolidated all build-related backlog into `docs/ARCHITECTURE.md` so it lives in **one place**. Created a new top-level **§11 "Build backlog & queue"** (Repo map renumbered §11→§12; no internal refs broke): §11.1 = a **⚠ Today index** (one row per body section carrying markers, each tied to its queue item or §10 gate; "—" = unqueued debt), §11.2 = the storage/lifecycle set (ex-BB15–25, pointing into §8/§9), §11.3 = the feature backlog (ex-BB1–3, 5–10), §11.4 = docs/meta chores (ex-BH3, 5–7) — all rows keep their ex-IDs for traceability. The backlog's four **(open)** items routed to §10 instead: BB12/13/14 became new queue entries **#23–25** (a "backlog-port additions (2026-07-03)" block), BB11 was absorbed into #13, and BB4 was recorded as already homed at #22. Stripped every `TODO.md` reference out of §10 and the doc header/§2 (build-queue pointers now → §11; the three design-lane refs remain by design). `dev/notes/TODO.md` correspondingly cut down: **[BB] removed entirely**, [BH] trimmed to the 3 dev-env chores (npm, PowerShell strings, CLAUDE.md trim), top matter/SECTIONS/triage prose rewritten so backend inbox notes now route to §11 and [NB] NEXT UP — BUILD stays as the execution hand-off lane; [BD]/[ND]/[IN]/SCRATCH untouched. `CLAUDE.md` synced (2 lines: the ARCHITECTURE key-files row + the design-rule backlog parenthetical).
+
+Files: docs/ARCHITECTURE.md, dev/notes/TODO.md, CLAUDE.md, DEVLOG.md
+
+---
+
+### 2026-07-03 20:06:28 — docs: TODO.md [ND] NEXT UP — DESIGN queue seeded from inbox (Plans/Docs refactor)
+
+Filed all 6 `[IN]` INBOX notes into `[ND]` NEXT UP — DESIGN as **7 sequenced design items**, after a multi-turn design discussion this session. The batch unifies Library → Plans and Documents onto one shared reviewable-document card: Documents gains a card layout + the Outline/Feedback/Authors rail + commenting + the full Draft→In review→Approved approval workflow + a pending badge (overturns the "approval is Plans-only" rule); both tabs get a left tab-level nav column with bidirectional card↔nav sync; the Outline gains a nested Table of contents + Authors/Reviewers rosters (a two-level approval model); the per-section Approve gutter chip is dropped; plus card-header/box/edit-parity refinements, an Inbox docs-review flow with neutral accordion sections, a gallery section-nav, and a no-hard-wrap example-content cleanup. Decisions locked in-conversation: keep the "Revise" button name (no new "Revising" state — In review covers it), Feedback tab stays (caption "Responses"→"Feedback"), nested headings supported to `####` built level-generically. `[IN]` inbox cleared to empty. No design/code files touched — this is queue/log only.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-03 21:05:00 — Phase 3 correction pass: [BH] un-ported, all inbound TODO.md refs stripped (doc-integration Phase 3c)
+
+Alignment corrections after user review of Phase 3. New standing rule: **nothing outside `dev/notes/TODO.md` references TODO.md — full stop** (it's a private capture doc, used only when the human points an agent at it). Applied: **ARCHITECTURE.md** — removed the §11 "Execution hand-off" note (§11 exit is now just built→row-removed or demoted→§10), de-named TODO in the §11/§11.2/§11.3 intros (bare ex-BB IDs remain as *temporary* scaffolding, stripped in the final refactor), **deleted §11.4 entirely** ([BH] was not meant to port), reverted the §2 README pointer to a plain "still owed," and stripped the three legacy design-lane refs (§3.2, §7.16, §8.5 → "queued in the design lane"). **TODO.md** — [BH] restored verbatim to its 7-item "HOUSEKEEPING & DOCS" form (heading, table row, lane prose, triage prose); the concurrent design session's [ND] queue / emptied [IN] / SCRATCH edits left untouched. **CLAUDE.md** — both TODO.md mentions removed (§11 pointers kept). Verified: `grep TODO` returns zero hits in ARCHITECTURE.md and CLAUDE.md. Also agreed: a new **Phase 9** (after the final sweep) will feature-refactor §10/§11 by feature with an old→new mapping table, strip the ex-ID scaffolding, and re-verify zero inbound TODO.md refs repo-wide.
+
+Files: docs/ARCHITECTURE.md, dev/notes/TODO.md, CLAUDE.md, DEVLOG.md
+
+---
+
+### 2026-07-03 21:35:00 — scratch: doc-integration workflow tracker created (+ 2 un-run spikes caught)
+
+A repo-state audit answering "did any scoped research go un-run?" found: all **5 research reports exist** in `dev/notes/research/` (#12, #13, #14, #15, #22 — none yet reviewed or harvested), but **two authored spike prompts were never dispatched** — `2026-07-02-s10-build-04-inject-tail.md` (§10 #4) and `…-build-07-runstrip-tail.md` (§10 #7); the user is dispatching them now. To guard the rest of the workflow against exactly this kind of silent fall-through, created [`dev/notes/scratch/2026-07-03-doc-integration-tracker.md`](dev/notes/scratch/2026-07-03-doc-integration-tracker.md) — the phase ledger (now 9 phases; Phase 4 split into 4a research-review / 4b harvest / 4c late spikes), the locked standing rules (TODO.md private, §10/§11 split, ex-ID scaffolding, no code fixes), and a full artifact inventory with harvest checkboxes: 17 spike tests, 2 late spikes, 5 research reports, 5 code gaps, the contradiction orphans, and the scratch docs due for archiving. Tracker is disposable — archived at Phase 9.
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

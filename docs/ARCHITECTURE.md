@@ -15,9 +15,9 @@
 > **The ⚠ Today marker.** Wherever today's code differs from the intended behavior described here, an
 > inline marker of the form **"⚠ Today: …"** states current reality at *behavior* level, citing the file and
 > symbol involved (e.g. `storage.project_root()` in [`sidecar/storage.py`](../sidecar/storage.py)) — never
-> line numbers. A section with no marker is a section where code and intent already agree. The build queue
-> that clears these markers lives in [`dev/notes/TODO.md`](../dev/notes/TODO.md) (NEXT UP — BUILD), which
-> carries the task-level detail; this doc carries the decisions.
+> line numbers. A section with no marker is a section where code and intent already agree. The build
+> backlog that clears these markers is **§11 (Build backlog & queue)** — the single home for decided,
+> buildable work; the body carries the decisions, §11 the queue.
 >
 > **Churn note.** The doc is still being tuned as the product is; it always reflects the intended *final*
 > state, never a build snapshot. **Maintenance rule:** build runs clear Today-markers as they land; decision
@@ -121,7 +121,7 @@ Two boundaries matter most:
 personal tool on one machine. Prerequisites are installed manually, once — WSL2 Ubuntu with tmux and the
 `claude` CLI inside WSL, plus a Windows Python venv — and the app is launched by `start-dashboard.bat`.
 There is no installer, no auto-update, no multi-user story, and none is intended. A root README setup guide
-covering the one-time prereqs is tracked in [`dev/notes/TODO.md`](../dev/notes/TODO.md) (H3).
+covering the one-time prereqs is still owed.
 
 **Security posture — accepted by decision.** The sidecar binds `0.0.0.0:7690` with no authentication
 because agents inside WSL must be able to POST hook callbacks to the Windows host; this is accepted for a
@@ -159,7 +159,7 @@ Config**). It renders:
 
 ⚠ **Today:** no Projects surface exists yet — the React Settings tabs are Usage / MCP / Plugins / Config
 (plus a file-editor tab) in [`frontend/src/renderer/Settings.tsx`](../frontend/src/renderer/Settings.tsx);
-the design work is queued in [`dev/notes/TODO.md`](../dev/notes/TODO.md) (NEXT UP — DESIGN).
+the design work is queued in the design lane.
 
 ### 3.3 The active-project chip
 
@@ -673,7 +673,7 @@ The Library reads and renders **Plans, Documents, and Assets** from the open pro
 into a content file**: content is the agent's (or user's) markdown, exactly as written; everything the
 dashboard adds — verdicts, comment threads, anchors, provenance — lives in the per-doc `.meta.json` sidecar
 (§8.5). Documents carry the same review treatment as Plans (comments; the footer action strip minus
-Reject/Approve — design work tracked in [`dev/notes/TODO.md`](../dev/notes/TODO.md)). The Library can also
+Reject/Approve — the design work is queued in the design lane). The Library can also
 browse other repo `.md` files read-only; commenting applies to dashboard-owned files under `.awl-cc-dash/`
 only (§8.5; extendable later if needed).
 
@@ -866,7 +866,7 @@ per-agent hooks).
    ⚠ **Today:** reviews live in one central `plan-reviews.json` keyed by the plan's filename
    ([`sidecar/library.py`](../sidecar/library.py)), so a rename silently orphans the review.
 4. **Documents get comments like Plans** — the editor-header Comment control plus the Plans-style footer
-   action strip minus Reject/Approve (design work tracked in [`dev/notes/TODO.md`](../dev/notes/TODO.md)).
+   action strip minus Reject/Approve (the design work is queued in the design lane).
    ⚠ **Today:** Documents are read-only with no comment store.
 5. **Commenting scope:** dashboard-owned files under `.awl-cc-dash/` only; the Library can still browse
    other repo `.md` files read-only. Extendable later if needed.
@@ -1023,9 +1023,9 @@ specced; parking it here *is* the point.
 **Exit is strict** (unchanged): an item leaves only by being **sorted** (a mechanism is found and woven into
 the settled body) or **explicitly omitted** (a recorded decision → Decided omissions). Nothing is deleted.
 
-**§10 vs [`TODO.md`](../dev/notes/TODO.md) — keep the line sharp:** §10 = *don't-yet-know-if-or-how* (not
-buildable; needs research, a spike, or a decision first). TODO = *know-how, queued to build*. When a spike
-settles a §10 item into "buildable," it graduates to the body + TODO and leaves the queue.
+**§10 vs §11 — keep the line sharp:** §10 = *don't-yet-know-if-or-how* (not buildable; needs research, a
+spike, or a decision first). §11 = *know-how, queued to build*. When a spike settles a §10 item into
+"buildable," it graduates to the body + §11 and leaves the queue.
 
 Each entry carries a **status tag** — the reality of the capability *today*, not whether the question is
 resolved (everything here is unresolved) — plus an **Evidence** line citing the test that backs it, marked
@@ -1198,7 +1198,8 @@ deleted.
 **13. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — 🔬 **needs-research**
 - **Evidence:** research files describe native `Task`/`TodoWrite`/`Workflow`/`SendMessage`/team-spawn
   concepts; the dashboard hasn't decided how much to adopt versus its own wrappers. No code yet — pure
-  research.
+  research. (This item also absorbs the old backend backlog's *Tasks (open)* question — understand tasks
+  and decide whether they belong in the workflow — absorbed from BB11, 2026-07-03.)
 - **Desired final behavior:** the dashboard's coordination (tasks, agent-team messaging) reuses native
   Claude Code primitives where they fit, rather than reinventing them.
 - **Current blocker:** the trade-off (native adoption vs custom wrappers) is undecided, and native surfaces
@@ -1356,9 +1357,9 @@ capability.
 **22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🔬 **needs-research** *(priority: medium; overlaps #13)*
 - **Evidence:** no code; subagent *observability* is homed (§7.17 — roster derived from the parent transcript)
   and pending-vs-active is tracked (§10-8), but the *create / steer* affordance — spawning and managing
-  subagents from the dashboard — is unmapped and overlaps the native-primitives research (§10-13). Currently
-  parked only in [`dev/notes/TODO.md`](../dev/notes/TODO.md) (B4). Research prompt queued
-  (`…-research-22-subagent-management.md`).
+  subagents from the dashboard — is unmapped and overlaps the native-primitives research (§10-13). (Formerly
+  parked in the backend backlog as BB4; this entry is now its sole home — ported 2026-07-03.) Research prompt
+  queued (`…-research-22-subagent-management.md`).
 - **Desired final behavior:** the operator can create and manage (steer / stop) subagents from the dashboard,
   not only observe them.
 - **Current blocker:** the native `Task` / team-spawn / `SendMessage` semantics under the bridge are unmapped —
@@ -1367,6 +1368,43 @@ capability.
   tmux (vs. SDK-only), building on the §10-13 native-primitives research.
 - **Fallback if infeasible:** subagents remain observe-only (§7.17); creation/management stays a backlog item
   until a drivable path is found.
+
+### Priority — backlog-port additions (2026-07-03)
+
+Ported from the old backend backlog ([BB]) when it was consolidated into §11: these three carried the
+backlog's **(open)** marker — still needing research or a decision before they're buildable — so they
+belong in this queue, not §11. Appended as #23 onward per the numbering convention above; they entered
+half-formed, by design (see the cheap-entry rule).
+
+**23. Docs in agent context** *(→ §7.6, §7.7)* — 🔬 **needs-research** *(priority: medium; ex-BB12)*
+- **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
+- **Desired final behavior:** agents dynamically get relevant, up-to-date documentation in context, and
+  agents doing systems-level work always have current docs in context.
+- **Current blocker:** no mechanism chosen — context injection, an MCP docs server, hook-pushed digests, or
+  the existing link/scratchpad channels (§7.6/§7.7) are all candidates; "relevant and current" selection is
+  undefined.
+- **Research/POC must establish:** a delivery mechanism, and how relevant/current docs are selected and
+  refreshed per agent role.
+- **Fallback if infeasible:** manual doc references in prompts (status quo).
+
+**24. AI-touched file tracking** *(→ §7.5 attribution, DEVLOG practice)* — 🔬 **needs-research** *(priority: low; ex-BB13)*
+- **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
+- **Desired final behavior:** what AI has touched is tracked, e.g. a local per-directory index file
+  (`index.md`) or equivalent.
+- **Current blocker:** undecided whether per-directory index files, a central ledger, or git-derived
+  attribution is the right shape; product value unvalidated.
+- **Research/POC must establish:** the cheapest reliable attribution mechanism, and whether it earns its
+  maintenance cost.
+- **Fallback if infeasible:** rely on git history + DEVLOG (status quo).
+
+**25. Special-asset sourcing check** *(→ 🔌 Claude config, §8.1)* — 🔬 **needs-research** *(priority: low; ex-BB14)*
+- **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
+- **Desired final behavior:** skills and other special Claude Code assets are confirmed to be pulled from
+  the ideal source.
+- **Current blocker:** "ideal source" per asset type (skills, agents, hooks, plugins) is unestablished.
+- **Research/POC must establish:** an inventory of where each special asset currently comes from, and a
+  per-type sourcing rule.
+- **Fallback if infeasible:** current ad-hoc sourcing stands.
 
 ### Decided omissions (not open questions)
 
@@ -1380,7 +1418,127 @@ a proof).
 
 ---
 
-## 11. Repo map — where the architecture lives
+## 11. Build backlog & queue
+
+The single home for **decided, buildable** work — the *know-how, queued to build* side of the line whose
+*don't-yet-know* side is §10. Everything actionable lands here, in one place: the body's ⚠ Today markers
+(indexed in §11.1), the ported backend backlog (ex-[BB] ids, 2026-07-03), and build gaps surfaced by
+spikes. A row here is a **queue entry, not a spec** — the body section each item points at owns the
+detail; read it before building.
+
+**Entry:** an item enters only once it is decided and buildable. If it still needs research, a spike, or a
+product decision first, it belongs in §10 — the two sections model the pipeline (§10 question → spike →
+§11 build item → body marker cleared). **Exit:** an item leaves by being **built** (its ⚠ Today markers
+clear and the row is removed — DEVLOG keeps the history) or by being **demoted to §10** (building revealed
+an open question).
+
+### 11.1 ⚠ Today index — build debt by body section
+
+One row per body section carrying ⚠ Today markers, so the doc's whole build debt is scannable in one
+place. The body markers are canonical — this is a pointer table; update the row when a marker is added or
+cleared. **Queue item** ties the debt to the numbered backlog below (or to §10 where the debt is gated on
+an open question); **—** means the debt has no queue item yet.
+
+| Body § | What's owed today | Queue item |
+|--------|-------------------|------------|
+| §3.1–§3.5, §9.1 | The whole Projects surface: picker tab, active-project chip, close dialog, `projects.json` index, open/close flow | — |
+| §4.4 | Renderer trails the finished mockup (16/25 colours, Console gaps, marquee omitted) — deliberately deferred until design churn ≈ 0 | — (deliberate deferral) |
+| §5.2 | Console live-mirror feed not wired; no Projects endpoint surface | §10 #5 / — |
+| §6.4, §8.1 | Launch-config dir still `~/.awl-agents/` (target `~/.awl-cc-dash-agents/`) | #9 |
+| §7.2 | No reserved System identity; no System-sourced Error cards | §10 #16 |
+| §7.3 | Inject always degrades to hook-boundary; no instant mid-turn delivery | §10 #4 |
+| §7.5 | React client ships 16 of 25 colours (parity lag) | — (§4.4 deferral) |
+| §7.6 | Link holds a multi-select relationship list (should be one each); no Piggyback trigger value; exchanges counted as pairs (one-way links burn caps at half rate) | — |
+| §7.7 | Scratchpad at `.awl/scratchpad.md`; board + watermarks memory-only, `.md` never loaded back | #1, #3 |
+| §7.8 | No Response card type; inbox in-memory | #3 |
+| §7.10 | Marquee omitted in the React UI | — (§4.4 deferral) |
+| §7.12 | Delete misses the project `state/` files; retired numbers memory-only | #11, #3 |
+| §7.13 | Live mirror + keystroke passthrough not wired; React Console stubbed in places | §10 #5 |
+| §7.15 | No per-agent cost figure (honest blank) | §10 #11 |
+| §7.16 | Plan approve→resume unproven; plans listed non-recursively; central `plan-reviews.json`; Documents read-only, no comment store; no Assets surface | #13, #6, §10 #6 |
+| §8.1 | `project_root()` returns raw cwd (no canonicalization); project folder still `.awl/` | #1, #2 |
+| §8.2 | Only `scratchpad.md` + `plan-reviews.json` exist; roster lives app-level in `sessions.json` | #1, #3 |
+| §8.3, §8.4 | Every Persist row still in-memory or app-level (see the tables' ⚠ Today columns) | #3, #4, #11 |
+| §8.5 | Central `plan-reviews.json` keyed by filename (rename orphans reviews); Documents have no comment store; no `plansDirectory` in materialized settings | #6, #7 |
+| §8.6 | Transcript path recomputed every read, never persisted; retention unpinned (30-day default applies) | #4, #5 |
+| §9.9 | Dead-tmux records pruned instead of cold-restored; nothing invokes `claude --resume` | #8 |
+
+### 11.2 Storage & lifecycle set
+
+Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the detail; read them first.**
+(Ex-IDs BB15–BB25 are temporary traceability scaffolding, stripped in the final refactor pass.)
+
+1. **Storage rename + subdir taxonomy** *(ex-BB15 → §8.1, §8.2)* — rename `.awl/` → `.awl-cc-dash/`; add
+   path accessors for `plans/`, `docs/`, `assets/`, `state/`; one-time migration of existing `.awl/`
+   contents; scratchpad moves to `docs/scratchpad.md`. Where: `_AWL_DIRNAME` + accessors in
+   [`sidecar/storage.py`](../sidecar/storage.py).
+2. **Canonical project root** *(ex-BB16 → §8.1 "`<project>` defined")* — derive one canonical `<project>`
+   from `cwd` (git top-level; symlink + `/mnt`-alias normalization) and use it everywhere a cwd key scopes,
+   including the scratch project key. Where: `storage.project_root()` ([`sidecar/storage.py`](../sidecar/storage.py)),
+   [`sidecar/main.py`](../sidecar/main.py).
+3. **Per-project state store** *(ex-BB17 → §8.2, §8.3)* — build the `state/` persistence layer (atomic
+   write-replace; append for `.jsonl`); move the roster out of `sessions.json` → `state/agents.json`;
+   persist inbox (open type set), links, routing overlay, bookmarks, and retired numbers; reload the
+   scratchpad board from its `.md` on load. Load lazily on the first session whose canonical root resolves
+   to the project, cache per root, write-through thereafter. Where: `sidecar` modules (`runtime_store` /
+   `inbox` / `links` / `watermark` / `scratchpad`).
+4. **Persist session id + transcript path** *(ex-BB18 → §8.4, §8.6)* — persist `claude_session_id` + the
+   resolved transcript path per agent in `state/agents.json`; refresh on resolve. Where:
+   [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), [`bridge/transcript.py`](../bridge/transcript.py).
+5. **Pin transcript retention** *(ex-BB19 → §8.6)* — pin `cleanupPeriodDays: 3650` in the materialized
+   per-agent settings. Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
+6. **Per-doc metadata sidecars** *(ex-BB20 → §8.5)* — `<doc>.meta.json` read/write (verdict, comments,
+   quote-anchors, provenance), replacing `plan-reviews.json`; Documents comment endpoints;
+   dashboard-mediated rename of the doc + sidecar pair; orphan detection/re-link. Where:
+   [`sidecar/library.py`](../sidecar/library.py), [`sidecar/storage.py`](../sidecar/storage.py).
+7. **Absolute `plansDirectory`** *(ex-BB21 → §8.5; depends on #2)* — set `plansDirectory` to the absolute
+   WSL path `<canonical-root>/.awl-cc-dash/plans` in the materialized per-agent settings (a relative `./`
+   resolves against raw cwd and breaks subfolder launches). Where: `_build_settings()`
+   ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
+8. **Cold-restore on startup** *(ex-BB22 → §9.9; enables #12)* — on startup, dead-tmux records **resume**
+   (`claude --resume <claude_session_id>`, correct cwd) instead of prune. Needs a bridge resume-launch path
+   (today a passed `session_id` only pins `--session-id` — still a NEW conversation — and `resume()`'s
+   dead-session fall-through calls `create()` with no id). Graceful degrade = restore data, manual
+   re-resume. *(Mechanism proven feasible by the one-click-launch + rewind/handoff live spikes.)* Where:
+   [`sidecar/main.py`](../sidecar/main.py), [`bridge/bridge.py`](../bridge/bridge.py).
+9. **WSL home dir rename** *(ex-BB23 → §6.4, §8.1)* — rename `~/.awl-agents/` → `~/.awl-cc-dash-agents/`.
+   Where: `WSL_AWL_DIR` ([`bridge/paths.py`](../bridge/paths.py)).
+10. **Dogfood the committed store** *(ex-BB24 → §8.2 self-dogfooding; depends on #1)* — commit this repo's
+    `.awl-cc-dash/`; add a CLAUDE.md note (runtime data, deliberate commits); confirm tests stay on temp
+    dirs. Where: `.gitignore`, `CLAUDE.md`.
+11. **Delete → project state files** *(ex-BB25 → §9.10, §7.12; depends on #3)* — extend the
+    delete/tombstone flow to the project `state/` files — the roster entry plus
+    inbox/links/routing/bookmarks rows — not just the runtime record + transcripts. Where:
+    [`sidecar/deletion.py`](../sidecar/deletion.py), [`sidecar/main.py`](../sidecar/main.py).
+
+### 11.3 Feature backlog
+
+Decided, buildable features with no storage-set dependency ordering (ex-IDs BB1–BB10; ex-BB4 *Subagent
+Management* is **not** here — it carries an open question and lives at §10 #22; ex-BB11 *Tasks* was
+absorbed into §10 #13).
+
+12. **Load past agents** *(ex-BB1; gated on #8)* — load past agents by name, ID, or via file explorer.
+    Fleet Setups save/load and startup auto-reconnect exist; still no on-demand per-agent resume (endpoint
+    or UI).
+13. **Plans action loop** *(ex-BB2 → §7.16, §9.7)* — the Library → Plans tab (review rail + verdicts) is
+    built; still need plan edit-in-place and wiring the Approve/Revise verdicts into the live flow
+    (approve → resume the agent; the resume half rides the spike-gated Plan hook, §10 #6).
+14. **Queue awareness** *(ex-BB3 → §7.3, §7.6)* — for >2 linked agents, share in message front matter that
+    another agent's message is queued, so an agent can decide whether to wait.
+15. **Git automation** *(ex-BB5)* — handle and semi-automate Git tasks, including commits.
+16. **Change-log watcher** *(ex-BB6)* — an agent that watches codebase changes and auto-updates change
+    logs (or similar).
+17. **System-check agent** *(ex-BB7)* — a system-checking agent that's easy to run.
+18. **Agent archive** *(ex-BB8; value still unclear — confirm with the operator before building)* — a
+    database of past agents with a short summary of each one's work plus timestamps.
+19. **Handoff artifacts** *(ex-BB9 → DESIGN.md's explicit deferral; gated on §10 #15)* — generate a
+    summary/handoff report on Handoff, rather than the plain context-carry-over (which comes first).
+20. **Native agent-teams messaging** *(ex-BB10; gated on §10 #13 research)* — adopt Claude Code's built-in
+    inter-agent messaging in place of the custom sender/trigger wrapping, once the native feature matures.
+
+---
+
+## 12. Repo map — where the architecture lives
 
 | Path | Layer |
 |------|-------|
