@@ -118,8 +118,9 @@
 
   /* ===== v9p7 (A3): Documentation panel — Plan expand/collapse + doc viewer edit toggle ===== */
   function togglePlan(head){const c=head.closest('.plan-card');if(c)c.classList.toggle('open');LU();}
-  /* Inbox (Plan card) → review the full plan in Library → Plans, expanded + flagged */
-  function reviewPlan(planId){switchTab('doc','plan');const card=document.getElementById(planId);if(!card)return;
+  /* Inbox (Plans & Docs card) → review the full plan/doc in Library → Plans or Documents, expanded + flagged.
+     Routes by entry kind: a doc-* id opens the Documents tab, any other id opens the Plans tab. */
+  function reviewPlan(planId){switchTab('doc',planId.indexOf('doc-')===0?'documents':'plan');const card=document.getElementById(planId);if(!card)return;
     card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});
     card.classList.remove('plan-flash');void card.offsetWidth;card.classList.add('plan-flash');
     setTimeout(()=>card.classList.remove('plan-flash'),1000);LU();}
@@ -2096,7 +2097,7 @@ resize intact.`,
     {type:'error',lab:'Error'},
     {type:'warning',lab:'Warning'},
     {type:'permission',lab:'Permission'},
-    {type:'plan',lab:'Plan'},
+    {type:'plan',lab:'Plans & Docs'},   /* one unified card type — plans AND doc-review hand-offs (doc-* ids route to the Documents tab) */
     {type:'decision',lab:'Decision'},
     {type:'response',lab:'Response'}
   ];
@@ -2104,6 +2105,7 @@ resize intact.`,
   const REQS=[
     {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'},
     {ag:'sandy',type:'plan',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
+    {ag:'wren',type:'plan',time:'14:45',title:'Review README.md edits before commit',body:'Docs edit: README.md · +37 −12 · refreshed the Quick-start and the driver-seam overview to match the sidecar rename — ready for a look before it lands.',plan:'doc-readme'},   /* doc-review flow (Lane I): SAME unified plan card, plan id is doc-* so Review routes to Library → Documents (the doc card lands after the Lane-L Plans+Documents merge; graceful no-op until then) */
     {ag:'sandy',type:'permission',time:'14:42',title:'Edit settings.json',cmd:'apply patch → .claude/settings.json (add rotation-hook allow rule)'},
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
@@ -2151,11 +2153,16 @@ resize intact.`,
       +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
       +'</div>'
       +'<div class="fcard-body"><div class="inbox-detail">'+detail+'</div><div class="inbox-acts">'+acts+'</div></div></div>';}
+  /* OQ-2 resolved → folds: each typed section is an ACCORDION, expanded by default (all open for scanning).
+     The band is a neutral --surface-3 fill with a LEADING chevron — deliberately distinct from the .fcard
+     accordion (bordered right-side chevbtn + chevron-right). Clicking the band toggles the section. */
   function renderInbox(){const el=document.getElementById('inbox-list');if(el){
       let html='';INBOX_SECTIONS.forEach(sec=>{const items=REQS.filter(r=>r.type===sec.type);if(!items.length)return;
-        html+='<div data-comp="inbox-section" data-status="undecided" class="inbox-sec inbox-sec--'+sec.type+'"><div class="inbox-sec-head"><span class="inbox-sec-lab">'+sec.lab+'</span><span class="inbox-sec-n">'+items.length+'</span></div>'
+        html+='<div data-comp="inbox-section" class="inbox-sec inbox-sec--'+sec.type+' open">'
+          +'<button class="inbox-sec-head" onclick="toggleInboxSec(this)" title="Collapse / expand this section"><i data-lucide="chevron-down" class="inbox-sec-chev"></i><span class="inbox-sec-lab">'+sec.lab+'</span><span class="inbox-sec-n">'+items.length+'</span></button>'
           +'<div class="inbox-sec-cards">'+items.map(o=>inboxCardHTML(o,REQS.indexOf(o))).join('')+'</div></div>';});
       el.innerHTML=html;LU();}refreshInbox();}
+  function toggleInboxSec(btn){const s=btn.closest('.inbox-sec');if(s)s.classList.toggle('open');LU();}
   function refreshInbox(){const n=document.querySelectorAll('#feed-inbox .fcard').length;
     const b=document.getElementById('inbox-badge');if(b){b.textContent=n;b.style.display=n?'':'none';}
     const aw=document.getElementById('inbox-await');if(aw)aw.textContent=n+' open item'+(n===1?'':'s')+' — blocking requests first, the non-blocking Response section last';}   /* item 14: "one open request each / N agents" no longer holds — Response is non-blocking and coalesces per agent */
