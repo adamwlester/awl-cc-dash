@@ -59,6 +59,7 @@
 5. **Doc Date/ID Tagging:** Better tagging of dates and IDs for document creation and editing.
 6. **System Details Doc:** Document and maintain my system details — OS, Claude install, plugins, etc.
 7. **Config SOPs:** Write SOPs for all major system-config activities (agent, hook, skills setup).
+8. **Over-Scoped Absolute-Language Audit:** Sweep the guiding docs (`docs/ARCHITECTURE.md`, `design/DESIGN.md`) for categorical wording — "never", "always", "only", "read-only", "no X exists", "cannot" — and test each rule against the *actual* intent it protects. Where the wording over-reaches that intent it manufactures false contradictions (with DESIGN, the code, or a sibling section) and gets re-litigated every session; narrow those to their real invariant, but leave genuinely-absolute invariants intact (the goal is right-sizing, not blanket-softening). Two already surfaced in the Phase-5 discussion and slated for that reconciliation: §7.16/§8.5 "the dashboard **never writes into a content file**" (real rule: the *review layer* never embeds annotations in agent content — create/delete/explicit user-directed edits are fine) and §7.5 identity "**read-only in v1**" (identity is editable). Same doc-reconciliation family as the coverage audit.
 
 ## [ND] NEXT UP — DESIGN
 

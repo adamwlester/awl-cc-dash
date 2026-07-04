@@ -389,6 +389,14 @@ Files: design/gallery.html, design/behavior.js
 
 ---
 
+### 2026-07-03 22:30:00 — TODO [BH8]: audit for over-scoped absolute language in the guiding docs
+
+Added a housekeeping/docs backlog item (`BH8`) to `dev/notes/TODO.md`: sweep `docs/ARCHITECTURE.md` + `design/DESIGN.md` for categorical wording ("never / always / only / read-only / no X exists / cannot") and test each rule against the intent it protects, narrowing the ones that over-reach (they manufacture false doc-vs-doc / doc-vs-code contradictions and get re-litigated every session). Prompted by the Phase-5 discussion, which already surfaced two: §7.16/§8.5 "never writes into a content file" and §7.5 identity "read-only in v1". No doc bodies changed yet — this just queues the audit.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
