@@ -975,11 +975,20 @@
        reddish→copper attention ramp). Response is the lone NON-blocking section — neutral --muted heading
        like Plan/Decision (no new tone). */
     #inbox-list{ gap:var(--space-12); }
-    .inbox-sec-head{ display:flex; align-items:center; gap:var(--space-7); padding:0 var(--space-2) var(--space-6); }
+    /* OQ-2 resolved → folds: typed sections are ACCORDIONS (expanded by default, all open for scanning). The
+       band is a neutral --surface-3 fill (one tint-step off the white card fill) with a LEADING chevron —
+       deliberately DISTINCT from the .fcard accordion (bordered right-side chevbtn + chevron-right that rotates
+       from the right edge): here the chevron leads on the left and the whole band is the click target. A --rule
+       hairline leads from the open band into its cards; a collapsed band is a self-contained rounded band. */
+    .inbox-sec-head{ display:flex; align-items:center; gap:var(--space-7); width:100%; padding:var(--space-6) var(--space-8); background:var(--surface-3); border:none; border-radius:var(--radius-base); cursor:pointer; text-align:left; font:inherit; }
+    .inbox-sec.open .inbox-sec-head{ border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom:var(--border-width) solid var(--rule); }
+    .inbox-sec-chev{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; color:var(--muted); transition:transform .15s; }
+    .inbox-sec:not(.open) .inbox-sec-chev{ transform:rotate(-90deg); }
     .inbox-sec-lab{ font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
     /* count badge matches its section label (was a fainter --muted-2/--rule — barely visible) */
     .inbox-sec-n{ font-size:8.5px; font-weight:800; font-family:var(--font-mono); color:var(--muted); border:var(--border-width) solid var(--muted); border-radius:var(--radius-sm); padding:0 var(--space-5); line-height:1.5; }
-    .inbox-sec-cards{ display:flex; flex-direction:column; gap:var(--space-8); }
+    .inbox-sec-cards{ display:flex; flex-direction:column; gap:var(--space-8); padding-top:var(--space-8); }
+    .inbox-sec:not(.open) .inbox-sec-cards{ display:none; }
     /* Section-heading ramp (label + matching badge): Permission → Warning → Error escalate;
        Plan + Decision stay the neutral --muted base above. Card left-edge stays Error-only. */
     .inbox-sec--permission .inbox-sec-lab{ color:var(--inbox-permission); }
