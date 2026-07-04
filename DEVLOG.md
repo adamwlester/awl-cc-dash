@@ -445,6 +445,14 @@ Files: design/behavior.js, design/styles.css, design/gallery.html, design/DESIGN
 
 ---
 
+### 2026-07-04 01:05:00 — tests/README spike index: add the two tail tests + refresh the Fast-mode verdict
+
+Housekeeping noting from the test-build-10 session handoff. The two late tail-spike tests (`test_inject_tail_live.py`, `test_runstrip_tail_live.py`) were already created, committed (`e94935e`), run, and harvested into §10 #4/#7 (⛔ resolved-at-fallback) + DEVLOG — but they were **missing from the `tests/README.md` feasibility-spike index**. Added both as **❌ INFEASIBLE** rows (inject = typeahead held to the turn boundary → Next/Queue; runstrip = engine emits numerators only). Also refreshed the now-stale `test_fast_mode_toggle_live.py` row from "🚫 OMITTED — credit-gated" to **✅ FEASIBLE** (`Meta+O`+`Space`, proven 2026-07-04), and paired it beside the thinking toggle in the ✅ group so the table keeps its severity order. Index-only doc sync; no test or product code changed. (My prior work this session — Phase 5 `b2fd3fe`, Fast-mode proof `36c39e7` — is already committed + pushed.)
+
+Files: tests/README.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

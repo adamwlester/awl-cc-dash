@@ -85,6 +85,7 @@ behavior; the `Verdict` here is the one-line summary, and the run records are in
 | `test_permission_mode_cycle_live.py` | …change permission mode mid-run (Shift+Tab) and actually suppress prompts? | ✅ FEASIBLE |
 | `test_plan_decision_hooks_live.py` | …surface `ExitPlanMode`/`AskUserQuestion` as inbox cards, then resume the agent? | ✅ FEASIBLE |
 | `test_thinking_toggle_live.py` | …toggle extended-thinking on a running agent and read it back? | ✅ FEASIBLE (via the modal panel) |
+| `test_fast_mode_toggle_live.py` | …toggle Fast/Opus mode live? | ✅ FEASIBLE (`Meta+O` opens the panel, `Space` toggles OFF↔ON, read-backable — proven 2026-07-04 once Fast credits were enabled) |
 | `test_context_compact_live.py` | …parse `/context` by category and detect `/compact` boundaries? | ✅ FEASIBLE |
 | `test_per_agent_cost_live.py` | …report a real per-agent $ cost (via `/cost`)? | ✅ FEASIBLE (overturns the "honest blank" assumption) |
 | `test_subagent_status_live.py` | …tell a subagent is active vs. quiet from its own transcript? | ✅ FEASIBLE |
@@ -97,7 +98,8 @@ behavior; the `Verdict` here is the one-line summary, and the run records are in
 | `test_system_fault_harvest_live.py` | …read machine signals for System faults (rate/usage cap, auth, MCP)? | ⚠ PARTIAL — MCP + auth OK; **usage-cap wording not matched** |
 | `test_console_clear_transcript_live.py` | …survive a Console `/clear` without orphaning the transcript? | ⚠ HAZARD — `/clear` **orphans** new turns (`/compact` is safe) |
 | `test_polling_scale_ceiling_live.py` | …scale the ~1s per-agent poll to a fleet? | ⚠ FEASIBLE test, bad curve — **degrades from N=1** (needs rework) |
-| `test_fast_mode_toggle_live.py` | …toggle Fast/Opus mode live? | 🚫 OMITTED — account credit-gated (lands `xfail`) |
+| `test_inject_tail_live.py` | …deliver an Inject *mid-turn*, earlier than the tool/turn boundary? | ❌ INFEASIBLE — typeahead is held to the turn boundary → pure Next/Queue (§10 #4) |
+| `test_runstrip_tail_live.py` | …get a real work-completion % (a denominator) from the engine? | ❌ INFEASIBLE — engine emits numerators only, no denominator (§10 #7) |
 
 ### Support files
 
