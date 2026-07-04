@@ -100,6 +100,9 @@ behavior; the `Verdict` here is the one-line summary, and the run records are in
 | `test_polling_scale_ceiling_live.py` | …scale the ~1s per-agent poll to a fleet? | ⚠ FEASIBLE test, bad curve — **degrades from N=1** (needs rework) |
 | `test_inject_tail_live.py` | …deliver an Inject *mid-turn*, earlier than the tool/turn boundary? | ❌ INFEASIBLE — typeahead is held to the turn boundary → pure Next/Queue (§10 #4) |
 | `test_runstrip_tail_live.py` | …get a real work-completion % (a denominator) from the engine? | ❌ INFEASIBLE — engine emits numerators only, no denominator (§10 #7) |
+| `workflow_probe/test_workflow_orchestration_live.py` † | …run a **workflow** (JS fan-out of `workflow-subagent`s) whose on-disk artifacts an *external* observer (our sidecar) can consume — and is the run manifest live or completion-only? | ✅ FEASIBLE — `journal.jsonl` streams live; the `<runId>.json` manifest is **completion-only**; manifest ↔ journal ↔ per-agent transcripts reconcile; the approval gate is pre-authorizable via `skipWorkflowUsageWarning` |
+
+† **The `workflow_probe/` spike is a different animal from the bridge probes above.** It answers open questions in [`../dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md`](../dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md), not `ARCHITECTURE.md` §10. It probes the **Claude Code workflow engine** (the `Workflow` tool / `/workflows`), *not* the tmux bridge — so it needs **no WSL2/tmux**. Instead it is a pure **observer**: a driver *agent* launches a subject workflow (the engine can only be started from inside a Claude session — there is no out-of-process launch API), and the probe watches the artifacts the run drops on disk, validating the manifest schema, reconciling manifest ↔ journal ↔ per-agent transcripts, and (when it catches a run live) settling the manifest-timing question. It still carries `integration`+`slow` (it needs a real workflow run to exist), so the hermetic run deselects it; it imports only the stdlib, so collection stays clean. Everything an agent needs to run it **cold, with no human in the loop** is in [`workflow_probe/RUNBOOK.md`](workflow_probe/RUNBOOK.md); the package also ships `subject_workflow.js` (the deterministic thing to observe) and writes `tests/log/workflow_probe_findings_latest.txt`.
 
 ### Support files
 
@@ -107,7 +110,7 @@ behavior; the `Verdict` here is the one-line summary, and the run records are in
 |------|---------|
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) + per-run timestamped DEBUG log setup. Adds the repo root to `sys.path`. |
 | `run.ps1` | Convenience runner — resolves the local `.venv` and passes all args through to pytest. |
-| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). |
+| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here — its plain-language answers to the workflow open questions. |
 
 ---
 

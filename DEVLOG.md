@@ -583,6 +583,22 @@ Files: .claude/agents/vibe-guide.md, CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-04 12:35:14 — research: reverse-engineered the Claude Code `/workflows` engine + subagent orchestration
+
+New research note documenting how Claude Code's built-in workflow engine actually works, reconstructed from two real runs (the operator's CLI `approval-demo` test in session `ed34df81`, and this session's `approval-prompt-demo`) rather than docs. Covers the full lifecycle (author → **blocking approval gate** → async launch → run → task-notification → cache-keyed resume), the script API (`meta`/`phase`/`agent`/`parallel`/`pipeline`/`log`), the subagent model (isolated one-shot sidechains tagged `workflow-subagent`, `spawnDepth:1`; **no agent-to-agent channel — the JS script is the message bus**), and the complete on-disk artifact schemas: the `journal.jsonl` live feed (append-only `started`/`result` keyed by a `v2:` content hash) and the `<runId>.json` run manifest whose `workflowProgress[]` array is a 1:1 data model for the `/workflows` TUI. Key finding for us: workflow runs emit clean, structured, file-based telemetry the sidecar can tail — a far cleaner answer to the observe-subagents problem than tmux scraping ([s10-research-22](dev/notes/research/s10-research-22-subagent-management.md)). Closes with awl-cc-dash utilization options (read-only workflow observer being the highest-value/lowest-effort) and 5 open spikes (chiefly: can the approval gate be pre-authorized for unattended runs?). Research note only; no product code touched.
+
+Files: dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md, DEVLOG.md
+
+---
+
+### 2026-07-04 13:58:34 — tests: workflow-engine observer probe (feasibility spike) + empirical answers to the workflow open questions
+
+New agent-drivable test package **`tests/workflow_probe/`** that probes the Claude Code workflow engine from the outside — a pure **observer** (the engine can only be launched from inside a Claude session, so a driver *agent* launches a subject workflow and the probe watches the artifacts it drops). Three files: `test_workflow_orchestration_live.py` (the probe — live-watch + manifest schema validation + manifest↔journal↔transcript reconciliation + structured-output + pipeline-signature checks, writing `tests/log/workflow_probe_findings_*.txt`), `subject_workflow.js` (deterministic subject exercising phase/parallel/pipeline/log/schema, long enough to be caught mid-flight), and `RUNBOOK.md` (the baked-in "deal" so any agent runs it cold, no human). Marked `integration`+`slow`, stdlib-only so the hermetic tier deselects it cleanly (395/468 collected, 73 deselected). **Proven live: 8/8 green** across fresh runs `wf_e03d4702-80f` / `wf_bc9c13b5-66d` / `wf_08c553cf-2f5`. Empirical answers (settling open questions in the workflow research report): the `<runId>.json` manifest is written **COMPLETION-ONLY** — `journal.jsonl` (append-only, `v2:`-keyed) is the live signal to tail; **schema agents store their `result` as a native JSON object** in the journal (manifest keeps a JSON-string preview); and the approval gate is **pre-authorizable** via the global `skipWorkflowUsageWarning: true` setting (not a per-tool permission). Hardened against false-greens via a 3-agent adversarial review workflow (`wf_928e53cf-fe4`) — fixed a torn-read false-LIVE risk, a tautological timing assert, vacuous-on-empty-agents guards, a status-whitelist coupling, and over-broad journal-key/preview assertions. Also updated `tests/README.md` (spike row + Verdict + footnote) and the research report (§4 pipeline signature, §7a structured storage, §11 #1/#2 answered).
+
+Files: tests/workflow_probe/test_workflow_orchestration_live.py, tests/workflow_probe/subject_workflow.js, tests/workflow_probe/RUNBOOK.md, tests/README.md, dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
