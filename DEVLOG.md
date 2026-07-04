@@ -349,6 +349,14 @@ Files: docs/ARCHITECTURE.md, dev/notes/scratch/2026-07-03-doc-integration-tracke
 
 ---
 
+### 2026-07-04 12:15:00 — Commit the concurrent design session's [ND] execution plan (housekeeping)
+
+Session handoff from dev-doc-4g. That agent's Phase-4 harvest was already committed + pushed (`e94935e`); the only thing left in the working tree was the concurrent design session's untracked `[ND] DESIGN queue` parallel-lane execution plan (`.claude/plans/you-will-be-implementing-quiet-gem.md`), which dev-doc-4g deliberately left alone as not-theirs. Committed it now to clean the tree and preserve the plan as reference — no product/design code touched. Whether that design refactor actually runs is a separate call: frontend/design *implementation* is being frozen pending the build sprint (the Phase-5 identity-editing + frontend-freeze decisions are being reconciled into ARCHITECTURE next).
+
+Files: .claude/plans/you-will-be-implementing-quiet-gem.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
