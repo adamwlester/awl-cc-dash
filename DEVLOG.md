@@ -309,6 +309,46 @@ Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
 
 ---
 
+### 2026-07-03 20:47:39 — docs: TODO.md [IN] inbox — token-compliance sweep captured
+
+Added one `[IN]` INBOX note capturing the token-compliance sweep from this session's design discussion: migrate hardcoded design values that duplicate an existing token to `var(--…)` (known leaks — `styles.css` `4px`/`6px` radii, `gallery.html`'s `4px`/`3px` chrome, stray inline `2px` borders), scoped to values matching an existing token only — font-sizes stay inline (no such token, by design) and documented exceptions (circles/pills/squares, `--nc`, `--term-*`, `mockup-toolkit.js`) are preserved; noted that the guidelines already exist and the real gap is enforcement. Left as a capture, not promoted to `[ND]` — the human will fold it in alongside the radius change. No design/code files touched. (Timestamp trails the entry above it — concurrent design/doc-integration sessions logging on a clock ~48 min ahead; appended at the Log foot per the append-only rule.)
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-03 20:52:15 — docs: correction — token-sweep note promoted [IN] → [ND] item 8
+
+Supersedes the 20:47:39 entry's "left as a capture, not promoted" line: at the human's direction, moved the token-compliance sweep out of `[IN]` INBOX into `[ND]` NEXT UP — DESIGN as **item 8** (reformatted to the section's bold-header convention; scope and exclusions unchanged). `[IN]` re-emptied. Intent: the sweep now runs as part of the design refactor so the hardcoded radius/border leaks are tokenized before the human hand-edits the three `--radius-*` values. TODO.md only — no design/code touched.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-03 21:19:13 — §10 #4 tail spike: true mid-run Inject (open tail) — INFEASIBLE, no earlier-than-boundary point
+
+Ran the "earlier-than-hook-boundary Inject" feasibility spike as a new live test `tests/test_inject_tail_live.py` (integration+slow; own `TmuxBridge()`, tab-less, parallel-safe, no `kill-server`). Live result: typeahead into a *generating* pane lands in the composer but is **held there for the whole turn** and submitted only at the turn boundary — pure Next/Queue, never mid-turn. Decisive run: an ultrathink turn was driven to `generating`, the marker typed + Enter pressed mid-turn, then the marker sat **queued ~36 s** (`marker_in_user=False`) during live generation and flipped to a real `user` transcript entry only when the turn ended (t≈41 s), answered as an ordinary next turn (`mid_turn_hit=False`, `earlier_safe_point=False`). 2 consecutive clean passes (`= 1 passed in 51.9s / 53.3s =`, `results_20260704T041754Z`, CLI 2.1.201). Design notes captured live: (a) extended thinking ("ultrathink") is the only reliable way to hold a multi-second generating window — output length streams too fast/variably; (b) `status()`'s 15-line detection false-reads *idle* once the composer holds typed text (spinner/"esc to interrupt" pushed out) — the test confirms `generating` with an empty composer *before* typing, then probes after Enter. **Verdict: INFEASIBLE** — confirms §10 item 4's Fallback (hook-boundary delivery + transparent Next/Queue degrade) is the final model. Doc-change recommendation flagged to the human (not applied): move item 4's open tail to a Decided omission / resolved-as-fallback. No edits to ARCHITECTURE.md or TODO.md.
+
+Files: tests/test_inject_tail_live.py, DEVLOG.md
+
+---
+
+### 2026-07-03 21:23:42 — §10 #7 tail spike: real run-strip completion % (open tail) — INFEASIBLE, no engine progress fraction
+
+Ran the "engine-side progress signal" feasibility spike as a new live test `tests/test_runstrip_tail_live.py` (integration+slow; own `TmuxBridge()`, tab-less `acceptEdits` session, parallel-safe, no `kill-server`). Drove a genuine multi-tool task (three Write calls → a/b/c.txt, then `DONE_TAIL`) that publishes **no checklist**, then read the transcript back via `derive_context_usage(read_log(...))`. Live result: the run is **100% complete** (all 3 files written, DONE_TAIL) yet the engine yields only NUMERATORS — `work_steps=2`, `tool_total=3` (three `edit` tool_uses) — with **no denominator**: the sole percentage is `percent=18.79` = **context tokens** (37583/200000), categorically not work done. No `TodoWrite` fired (`todo_uses=[]`), so not even the self-report todo channel appeared; and `checklist.parse_checklist([...])` on the no-checklist texts returns the honest **barber-pole indeterminate** floor (`total=0, fraction=0.0`). Test pins `derive_context_usage`'s exact 8-key shape so a future engine denominator would flag as the WORKS case. 2 consecutive clean passes (`= 1 passed in 12.9s / 14.2s =`, `results_20260704T042321Z`, CLI 2.1.201, Sonnet 5). Cited: research Q3 item 3 (transcript overlay = busy/idle, not a fraction) + §10 item 7. **Verdict: INFEASIBLE** — no trustworthy engine-side completion fraction exists; confirms §10 item 7's Fallback (checklist self-report + barber-pole floor) as the final model. Doc-change recommendation flagged to the human (not applied): move item 7 from ◐ partially-proven to a Decided omission / resolved-as-fallback. No edits to ARCHITECTURE.md or TODO.md.
+
+Files: tests/test_runstrip_tail_live.py, DEVLOG.md
+
+---
+
+### 2026-07-04 11:30:00 — ARCHITECTURE §10/§11 harvest complete: 17 spikes + 5 reports + 2 late tails (doc-integration Phase 4)
+
+Phase 4 of the doc-integration pass — the full §10/§11 harvest, **docs only** (no product code). **4a** (5 parallel Sonnet subagents): reviewed the 5 never-reviewed research reports — #12 assets / #13 native-coordination / #22 subagent-mgmt settled to 🧪 needs-spike (research done, not yet buildable), #14 → ◐, #15 → ✅ (spike-passed). **4b:** harvested the 17-spike batch + the 5 research findings into §10 — **8 → ✅ proven** (#1 permission-mode, #2 thinking, #6 plan/decision [resume is a `keys()` Enter, **not** a hook `updatedInput`], #8 subagent-status, #9 context/compact, #11 per-agent cost [**overturns the "honest blank"** — `/cost` gives a real figure], #15 rewind/fork, #20 bypass/auto), **9 → ◐ partially-proven** (#5, #10, #14, #16, #17, #18/#21, #19), **#3 fast held 🧪** (credit-gated xfail = account limit, not a proven dead-end — flagged). **4c:** both late tail-spikes came back **INFEASIBLE** (#4 mid-turn Inject held to the turn boundary → pure Next/Queue; #7 engine emits numerators, no denominator) → both marked **⛔ resolved-at-fallback** (shipped model is final) and recorded in the Decided-omissions note; formal relocation deferred to Phase 9. Every ✅/⛔ carries a *(pending relocation — Phase 9)* marker (updated in place; relocates to the settled body at the refactor). Body corrected: §7.15 (honest-blank overturned), §7.16 (plan-resume proven), the two §11.1 ⚠-index rows. **§11 grew:** new **§11.4 "Spike-surfaced code fixes"** #23–28 (the 5 code gaps + a `Task`→`Agent` parser audit) + 2 spike-derived features in §11.3 (#21 Rewind/Fork, #22 hook-lifecycle arbiter). Tracker updated (4a/4b/4c ✓). The two late-spike test files (`test_inject_tail_live.py`, `test_runstrip_tail_live.py`, logged above by the concurrent spike agent) are committed alongside this harvest.
+
+Files: docs/ARCHITECTURE.md, dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

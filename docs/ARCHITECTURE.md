@@ -662,8 +662,9 @@ marked honestly in the UI: mid-run permission-mode change is blocked (§7.11); p
 take effect at launch/restart; tool scoping is deny-based. The **Account band** (email/org/plan from local
 creds) and the **usage-limits band** (session/weekly %, live from the API, graceful degrade) are both in.
 The intended cost surface goes one level deeper: **live per-agent cost/usage figures on each agent card**,
-complementing the account-level band. ⚠ **Today:** the bridge emits no cost data, so no per-agent figure is
-shown — an honest blank, never a fabricated number (open question, §10).
+complementing the account-level band. ⚠ **Today:** no per-agent figure is shown yet — but the 2026-07-02
+spike **overturned the old "honest blank" assumption**: `/cost` yields a real per-session figure (§10 #11 →
+✅ proven), so this is an *unbuilt* surface, not an engine boundary — scrape-and-surface is the build.
 The Setups store lives in the dashboard store (§8.1). The tab set and the Projects tab are §3.2.
 
 ### 7.16 Library
@@ -678,7 +679,7 @@ browse other repo `.md` files read-only; commenting applies to dashboard-owned f
 only (§8.5; extendable later if needed).
 
 Plan-approve from the dashboard resumes the agent out of plan mode. ⚠ **Today:** that resume path is
-unproven (it rides the spike-gated Plan hook, §10); the Library lists plans **non-recursively** from the
+now **proven** (§10 #6 → ✅, via a `keys()` Enter, not a hook `updatedInput`) but not yet wired; the Library lists plans **non-recursively** from the
 top of `cwd` (or one named subdir — nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)),
 single-doc reads are path-explicit rather than cwd-scoped (the `/library/document` handler in
 [`sidecar/main.py`](../sidecar/main.py)), reviews live in one central `plan-reviews.json` keyed by filename,
@@ -1040,6 +1041,13 @@ resolved (everything here is unresolved) — plus an **Evidence** line citing th
 Live citations below reference the **2026-07-02 full-suite pass — 428/428 (395 unit + 33 live) @ commit
 `c73a526`, Claude CLI 2.1.198** (`results_20260702T142448Z`).
 
+**Spike-settled items (2026-07-02 batch).** Where a live feasibility spike (`tests/*_live.py`, verified @
+`af4964d`; index in [`tests/README.md`](../tests/README.md)) or a completed research pass has since settled
+an item, its tag is updated **in place** (✅/◐/🧪/⛔) and its Evidence line cites the spike test or research
+report. Per the port-then-refactor plan, a fully-proven item stays listed here with a ✅ tag and a *(pending
+relocation — Phase 9)* marker until the Phase 9 refactor moves it into the settled body — so a ✅ here means
+"proven, pending relocation," not "still open."
+
 Maintenance note: when adding, removing, or moving entries, renumber them continuously across the priority
 subsections in display order (High → Medium → Low); do not restart numbering inside each subsection. Keep a
 status tag + Evidence line on every entry (a fresh, half-formed item may carry `🧪`/`🔬` with a one-line
@@ -1049,163 +1057,165 @@ deleted.
 
 ### Priority — High
 
-**1. Mid-run permission-mode change** *(→ §6.2, §7.11)* — 🧪 **needs-spike**
-- **Evidence:** no test covers mode-change; the live finisher suite proves permission approve/deny, resume,
-  and model+effort (`test_bridge_finisher_live`, **live**) but **not** mode. `set_mode` is an honest no-op
-  today; the Shift+Tab/`keys()` POC below is plausible but unproven.
+**1. Mid-run permission-mode change** *(→ §6.2, §7.11)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_permission_mode_cycle_live`, **live**, 2026-07-02): Shift+Tab via the
+  bridge's `keys()` at a known-idle screen cycles the permission mode deterministically and actually
+  suppresses prompts, with the resulting mode read back from the status line. (`set_mode` is still an in-code
+  no-op — the proven lever is the `keys()` Shift+Tab path; wiring it into the driver is the build.)
 - **Desired final behavior:** the operator changes an agent's permission mode live, mid-run, from the UI.
-- **Current blocker:** the CLI only cycles modes via Shift+Tab inside the TUI — no flag, no slash command,
-  no API; the bridge driver doesn't advertise `set_mode` and `POST /sessions/{id}/mode` returns an honest
-  `400`.
-- **Research/POC must establish:** whether sending Shift+Tab via the bridge's `keys()` at a known-idle
-  screen state cycles modes deterministically, with the resulting mode read back from the status line.
-- **Fallback if infeasible:** mode stays launch-only; the UI presents it as a launch-time choice, never a
-  fake-live control.
+- **Spike established:** the Shift+Tab `keys()` cycle is deterministic and readable at idle; wire it into the
+  bridge driver (replacing the `set_mode` no-op) and back the `POST /sessions/{id}/mode` route with it.
+- **Fallback if infeasible:** n/a — proven feasible; the launch-only degrade is no longer needed.
 
-**2. Thinking-mode toggle (`Meta+T`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike**
-- **Evidence:** no test; `set_thinking()` is a deliberate no-op today (there is no `/thinking` command). The
-  mode-control research surfaces an untested keybinding lever (`chat:thinkingToggle`, default `Meta+T`) —
-  **action-confirmed, integration-untested**, the same confidence class as #1. (Formerly mis-filed as a
-  decided omission; a code no-op is not a proven dead-end.)
+**2. Thinking-mode toggle (`Meta+T`)** *(→ §7.11, DESIGN mode toggles)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_thinking_toggle_live`, **live**, 2026-07-02): thinking toggles on a
+  running agent via the `Meta+T` modal panel, and the result is read-backable (thinking blocks appear in the
+  transcript). (`set_thinking()` is still an in-code no-op — the proven lever is the `Meta+T` path.)
 - **Desired final behavior:** the operator toggles thinking on/off on a running agent from the UI.
-- **Current blocker:** no slash command and `set_thinking()` is a no-op; the only known lever is the `Meta+T`
-  keybinding — a toggle with no absolute on/off, so current state must be read first.
-- **Research/POC must establish:** whether sending `Meta+T` via the bridge's `keys()` toggles thinking, and
-  whether the result is observable (thinking blocks appearing in the transcript) so state is read-backable.
-- **Fallback if infeasible:** thinking is a launch-time choice or an omitted control — never a fake-live
-  toggle.
+- **Spike established:** `Meta+T` via `keys()` reaches the modal and toggles thinking, read-backable from the
+  transcript; wire it into the driver (replacing the `set_thinking()` no-op) with a current-state read first.
+- **Fallback if infeasible:** n/a — proven feasible.
 
-**3. Fast-mode toggle (`Meta+O`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike**
-- **Evidence:** no test; `set_fast()` is a deliberate no-op today (`/fast` only opens a messy panel). The
-  research surfaces an untested keybinding lever (`Meta+O`) — action-confirmed, integration-untested,
-  symmetric with #1/#2. (Formerly mis-filed as a decided omission.)
+**3. Fast-mode toggle (`Meta+O`)** *(→ §7.11, DESIGN mode toggles)* — 🧪 **needs-spike** *(blocked: account credit-gated)*
+- **Evidence:** the spike (`test_fast_mode_toggle_live`, 2026-07-02) **could not exercise the lever** — this
+  account is credit-gated for Fast/Opus, so the test lands `xfail` (untestable here, **not** proven
+  impossible). `set_fast()` is an in-code no-op; the `Meta+O` keybinding lever is action-confirmed,
+  integration-untested — symmetric with #1/#2, which both passed.
 - **Desired final behavior:** the operator toggles Fast (Opus) mode on a running agent from the UI.
-- **Current blocker:** no clean slash command and `set_fast()` is a no-op; the only known lever is the
-  `Meta+O` keybinding toggle.
-- **Research/POC must establish:** whether `Meta+O` via `keys()` toggles Fast mode and whether the resulting
-  state is observable/read-backable.
+- **Current blocker:** the toggle is un-runnable on a credit-gated account; the only known lever is the
+  `Meta+O` keybinding.
+- **Research/POC must establish:** re-run the `Meta+O` `keys()` toggle on a Fast-enabled (credit-carrying)
+  account and confirm the state is observable/read-backable. (A credit-gate is an account limit, not a bridge
+  limit — this does **not** meet the ⛔/Decided-omission bar of a spike proving no path exists.)
 - **Fallback if infeasible:** Fast is a launch-time choice or an omitted control — never a fake-live toggle.
 
-**4. True mid-run Inject** *(→ §7.3)* — ◐ **partially proven**
-- **Evidence:** hook-boundary delivery is **unit-proven** (`test_hookbus_unit`, `test_sidecar_unit`); only
-  the *immediate, mid-turn* variant is open. (This corrects any framing that treats all Inject as unbuilt —
-  hook-boundary Inject ships.)
+**4. True mid-run Inject** *(→ §7.3)* — ⛔ **tail impossible → resolved at fallback** *(pending relocation — Phase 9)*
+- **Evidence:** **tail spike passed — INFEASIBLE** (`test_inject_tail_live`, **live**, 2026-07-04): typeahead
+  into a *generating* pane lands in the composer but is **held for the whole turn** and submitted only at the
+  turn boundary — pure Next/Queue, never earlier-than-boundary. So the *immediate mid-turn* variant has **no
+  path** on the bridge as-is. The base — hook-boundary delivery — is **unit-proven** (`test_hookbus_unit`,
+  `test_sidecar_unit`) and ships (§7.3).
 - **Desired final behavior:** an Inject-disposition message reaches a running agent immediately, mid-turn.
-- **Current blocker:** no safe arbitrary injection point exists on a live TUI; the hook channel delivers
-  only at tool boundaries (`PostToolUse`) or turn end (`Stop`), so Inject degrades to Next/Queue.
-- **Research/POC must establish:** whether any earlier safe delivery point exists (e.g. typeahead into the
-  composer without corrupting an in-flight turn, or an engine-side input API).
-- **Fallback if infeasible:** hook-boundary delivery plus the transparent Next/Queue degrade is the final
-  model.
+- **Resolved:** the mid-turn variant is a **decided engine limitation** (→ Decided omissions at Phase 9); the
+  shipped model — hook-boundary delivery + the transparent Next/Queue degrade — **is the final model**.
+- **Fallback (now the ceiling):** hook-boundary delivery plus the transparent Next/Queue degrade.
 
-**5. Console rendering fidelity** *(→ §7.13)* — 🧪 **needs-spike**
-- **Evidence:** no test; plain `capture-pane` demonstrably drops ANSI. Track as two gaps: live-mirror +
-  keystroke passthrough *wiring* is separate from ANSI/xterm-level *fidelity* — prove the wiring first, then
-  decide if fidelity is worth it.
+**5. Console rendering fidelity** *(→ §7.13)* — ◐ **partially proven**
+- **Evidence:** **spike passed** (`test_console_mirror_live`, **live**, 2026-07-02) on the *wiring*: keystroke
+  passthrough works and ANSI is recoverable from the pane via `capture-pane -e`. The remaining gap is pure
+  frontend — a faithful xterm-class renderer — which is a build decision, not an engine feasibility question.
 - **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors,
   spinners, and box-drawing.
-- **Current blocker:** plain `capture-pane` output drops ANSI styling; faithful rendering needs `-e`
-  escape capture plus a terminal-renderer component (xterm.js-class) in the frontend.
-- **Research/POC must establish:** the cost/fit of ANSI-preserving capture plus a renderer, vs styled-text
-  approximation.
-- **Fallback if infeasible:** a clean plain-text mirror.
+- **Current blocker (frontend only):** faithful rendering needs the `-e`-captured ANSI fed into a
+  terminal-renderer component (xterm.js-class) in the React Console; the sidecar/bridge half is proven.
+- **Research/POC must establish:** n/a for feasibility (proven); the open call is the frontend cost/fit of a
+  real xterm renderer vs. a styled-text approximation.
+- **Fallback if infeasible:** a clean plain-text mirror (ANSI stripped).
 
-**6. Plan/Decision hook interception (spike-gated)** *(→ §7.4, §7.16)* — 🧪 **needs-spike**
-- **Evidence:** no test exercises `PreToolUse` for `ExitPlanMode`/`AskUserQuestion` under the bridge. Split
-  the question: *detection* (surface a card) may be feasible from transcript/screen; the *answer/resume*
-  loop (hold-for-answer, `updatedInput`, resume-out-of-plan-mode) is the unproven part.
+**6. Plan/Decision hook interception** *(→ §7.4, §7.16)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_plan_decision_hooks_live`, **live**, 2026-07-02): `ExitPlanMode` /
+  `AskUserQuestion` surface as cards, **and** the agent resumes out of plan mode. Key correction: resume is
+  driven by a **`keys()` Enter** on the pane, **not** by a hook `updatedInput` response — the earlier
+  "spike-gated" framing (and §7.16's "resume rides the Plan hook") is superseded.
 - **Desired final behavior:** `ExitPlanMode` / `AskUserQuestion` surface as Plan/Decision inbox cards, and
   plan-approve from the dashboard resumes the agent out of plan mode.
-- **Current blocker:** `PreToolUse` hook behavior for these tools under the bridge is unproven, and no
-  verified resume-out-of-plan-mode path exists.
-- **Research/POC must establish:** a spike proving the hooks fire with usable payloads, and whether the
-  hook response (or a `keys()` sequence) can drive approval/resume.
-- **Fallback if infeasible:** detect-and-surface — notify-only cards from transcript/screen detection, with
-  the operator answering via the Console passthrough.
+- **Spike established:** cards can be raised from the hook/transcript, and approve→resume works via `keys()`
+  Enter (not `updatedInput`); wire the approve action to that keystroke, not a hook response.
+- **Fallback if infeasible:** n/a — proven feasible (detect-and-surface is no longer the ceiling).
 
 ### Priority — Medium
 
-**7. Real run-strip completion %** *(→ §7.10)* — ◐ **partially proven**
-- **Evidence:** the self-reported checklist parser — the honest floor — is **unit-proven**
-  (`test_checklist_unit`, 19 cases); a *genuine* progress signal beyond the checklist is unproven (the
-  engine emits none).
+**7. Real run-strip completion %** *(→ §7.10)* — ⛔ **tail impossible → resolved at fallback** *(pending relocation — Phase 9)*
+- **Evidence:** **tail spike passed — INFEASIBLE** (`test_runstrip_tail_live`, **live**, 2026-07-04): a
+  100%-complete multi-tool run (3 writes + DONE) yields only NUMERATORS from `derive_context_usage`
+  (`work_steps`, `tool_total`) with **no denominator** — the only percentage is *context tokens*, not work
+  done — and no `TodoWrite` fired. So **no trustworthy engine-side completion fraction exists**. The base —
+  the self-reported checklist parser — is **unit-proven** (`test_checklist_unit`, 19 cases) and ships (§7.10).
 - **Desired final behavior:** the run-strip shows a genuine completion percentage for every run.
-- **Current blocker:** the engine emits no progress signal; the only honest source is the self-reported
-  checklist, and without one the strip shows barber-pole indeterminate.
-- **Research/POC must establish:** whether any engine-side signal (transcript structure, todo-tool events)
-  yields a trustworthy progress measure beyond the checklist mandate.
-- **Fallback if infeasible:** checklist self-report with the barber-pole floor is the final model.
+- **Resolved:** an engine-emitted progress fraction is a **decided limitation** (→ Decided omissions at Phase
+  9); the shipped model — checklist self-report + the barber-pole indeterminate floor — **is the final model**.
+- **Fallback (now the ceiling):** checklist self-report with the barber-pole floor.
 
-**8. Subagent pending-vs-active status** *(→ §7.17)* — 🧪 **needs-spike**
-- **Evidence:** subagent identity/naming/ingestion is **unit-proven** (`test_subagents_naming_unit`); the
-  *live pending-vs-active* signal is the unproven part.
+**8. Subagent pending-vs-active status** *(→ §7.17)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_subagent_status_live`, **live**, 2026-07-02): a subagent's
+  active-vs-quiet state is readable from its **own transcript** (recency of the last event). Complements the
+  unit-proven identity/naming/ingestion (`test_subagents_naming_unit`). The `SubagentStart`/`SubagentStop`
+  hooks (research #13/#22) offer an even cleaner authoritative signal — see §11.
 - **Desired final behavior:** each subagent shows live pending vs active state.
-- **Current blocker:** the bridge cannot distinguish a pending subagent from an active one — identity,
-  naming, and transcript ingestion work, but live status cannot be shown honestly.
-- **Research/POC must establish:** whether subagent-transcript activity (file mtime / last-event recency)
-  or hook context inside the subagent gives a reliable active signal.
-- **Fallback if infeasible:** subagents are listed without a pending/active distinction.
+- **Spike established:** subagent-transcript recency yields a reliable active signal; wire it into the roster,
+  and prefer the `SubagentStart`/`SubagentStop` hook fields (`agent_id`, `transcript_path`) once hook
+  ingestion lands (§11).
+- **Fallback if infeasible:** n/a — proven feasible.
 
-**9. Context breakdown & Compact controls** *(→ §7, DESIGN context dropdown)* — 🧪 **needs-spike**
-- **Evidence:** the bridge derives *total* context usage + turn count from JSONL (unit-covered in
-  `test_bridge_unit`'s context-derivation); the per-category breakdown DESIGN shows, and richer compact
-  multi-select/history, are neither built nor tested.
+**9. Context breakdown & Compact controls** *(→ §7, DESIGN context dropdown)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_context_compact_live`, **live**, 2026-07-02): the `/context` output
+  parses into per-category rows, and `/compact` boundaries are detectable from `compact_boundary` transcript
+  metadata. Complements the unit-proven total-context/turn derivation (`test_bridge_unit`).
 - **Desired final behavior:** an on-demand context pull with per-category rows, plus compact controls
   (multi-select options) and a compaction history (count / type / when).
-- **Current blocker:** category breakdown isn't derivable from JSONL alone — it needs `/context` table
-  scraping; compaction events are only inferable from `compact_boundary` transcript metadata.
-- **Research/POC must establish:** whether to parse `/context`, settle for total/turn usage, or move richer
-  compaction controls to an SDK path; and whether `compact_boundary` reliably marks compaction events.
-- **Fallback if infeasible:** show total usage + turn count only (proven today); no per-category rows.
+- **Spike established:** parse `/context` for the category breakdown and key compaction history off
+  `compact_boundary`; wire both into the context dropdown + run-strip.
+- **Fallback if infeasible:** n/a — proven feasible; total usage + turn count remains the floor if the
+  `/context` scrape is ever unavailable.
 
-**10. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)* — 🧪 **needs-spike**
-- **Evidence:** no test; Electron main is deliberately frontend-only today. Test this *together with*
-  project close/reopen semantics (what happens to running tmux agents when the app/project closes), not as
-  a standalone packaging chore.
+**10. One-click launch (Electron main spawns the sidecar)** *(→ §2, §4.1)* — ◐ **partially proven**
+- **Evidence:** **spike passed in model** (`test_oneclick_launch_live`, **live**, 2026-07-02): the
+  spawn/supervise/shutdown lifecycle (including detach-on-close of running tmux agents) is proven **modeled in
+  Python**; the real **Electron-main** POC is still owed (→ §11.4 #27).
 - **Desired final behavior:** one icon starts everything; quitting tears it down cleanly through the same
   close dialog as §3.4.
-- **Current blocker:** Electron main is deliberately frontend-only; owning the sidecar means owning the
-  Python venv path, crash/restart supervision, and shutdown ordering against agents that should keep
-  running.
-- **Research/POC must establish:** a spawn/supervise/shutdown POC from Electron main that preserves the
-  detach-on-close semantics.
+- **Current blocker:** the lifecycle logic is proven, but it has not been ported into Electron main, which
+  must own the Python venv path, crash/restart supervision, and shutdown ordering against agents that should
+  keep running.
+- **Research/POC must establish:** re-home the proven lifecycle model in Electron main and confirm
+  detach-on-close end-to-end (the §11.4 #27 build item).
 - **Fallback if infeasible:** `start-dashboard.bat` two-process launch stays the shipped model (§2).
 
 ### Priority — Low
 
-**11. Per-agent cost** *(→ §7.15)* — 🧪 **needs-spike**
-- **Evidence:** the bridge emits no cost data; any per-agent figure would be fabricated, so none is shown. A
-  harvest path (JSONL usage fields, `/cost` scrape) is plausible but unproven.
+**11. Per-agent cost** *(→ §7.15)* — ✅ **proven** *(pending relocation — Phase 9)*
+- **Evidence:** **spike passed** (`test_per_agent_cost_live`, **live**, 2026-07-02) — this **overturns the
+  "honest blank" assumption**: `/cost` yields a real per-session dollar figure, so a genuine per-agent cost
+  *is* harvestable. §7.15's ⚠Today ("the bridge emits no cost data… an honest blank") is corrected: the
+  figure is unbuilt, not unavailable.
 - **Desired final behavior:** live per-agent cost/usage figures on each card.
-- **Current blocker:** the bridge emits no cost data at all; any displayed number would be fabricated, so
-  none is shown for bridge agents.
-- **Research/POC must establish:** whether per-session token/cost data can be harvested reliably (JSONL
-  usage fields, `/cost` output scraped via the console path, or an engine telemetry surface).
-- **Fallback if infeasible:** no per-agent cost is shown (an honest boundary, not a missing feature); the
-  account-level usage band (§7.15) remains the cost surface.
+- **Spike established:** scrape `/cost` (via the console path) for a per-session figure and surface it on the
+  card; the account-level band (§7.15) stays as the complementary aggregate.
+- **Fallback if infeasible:** n/a — proven feasible; the honest-blank is now a temporary unbuilt gap, not a
+  boundary.
 
-**12. Attachment / citation path materialization** *(→ §7, `library.py`)* — 🔬 **needs-research**
-- **Evidence:** `library.py` defers assets/media and doc write-back; the file/path story — how a *receiver*
-  reliably reads a referenced file across the WSL↔Windows boundary — is an untested investigation item.
+**12. Attachment / citation path materialization** *(→ §7, `library.py`)* — 🧪 **needs-spike**
+- **Evidence:** **research settled** ([`attachment-citation-path-materialization-report.md`](../dev/notes/research/attachment-citation-path-materialization-report.md),
+  2026-07-02): recommends **Option A** — copy bytes into `<project>/.awl-cc-dash/assets/<id>/`; store a
+  project-relative `rel_path` + SHA-256 + MIME + provenance; render per-receiver via a `ProjectPathContext`
+  (Windows-drive path shapes confirmed against Microsoft docs). Design is "plausible" — no prototype built.
 - **Desired final behavior:** attachments and citations route to a real on-disk home a receiving agent can
   open.
-- **Current blocker:** no `.awl-cc-dash/assets/` home exists yet, and WSL↔Windows path rewriting for
-  referenced files is unproven.
-- **Research/POC must establish:** where attachments materialize, and how a path is rewritten so both a
-  Windows renderer and a WSL agent resolve it.
-- **Fallback if infeasible:** attachments stay display-only chips until a storage/path story lands.
+- **Current blocker:** no `ProjectPathContext`, no `.awl-cc-dash/assets/` catalog, no ingestion path;
+  `library.py` still defers assets.
+- **Spike must verify before building:** (a) the WSL-native write path (`wsl.exe … cat > tmp; mv final`) and
+  `wslpath -w` edge cases (spaces, unicode, unusual distro names); (b) Electron/Chromium security policy for
+  loading Windows-absolute and `\\wsl.localhost\…` UNC paths in the renderer, or whether a sidecar-served
+  local HTTP asset endpoint is required instead.
+- **Fallback if infeasible:** attachments stay display-only chips (name/size/MIME) until the path story lands.
 
-**13. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — 🔬 **needs-research**
-- **Evidence:** research files describe native `Task`/`TodoWrite`/`Workflow`/`SendMessage`/team-spawn
-  concepts; the dashboard hasn't decided how much to adopt versus its own wrappers. No code yet — pure
-  research. (This item also absorbs the old backend backlog's *Tasks (open)* question — understand tasks
-  and decide whether they belong in the workflow — absorbed from BB11, 2026-07-03.)
-- **Desired final behavior:** the dashboard's coordination (tasks, agent-team messaging) reuses native
-  Claude Code primitives where they fit, rather than reinventing them.
-- **Current blocker:** the trade-off (native adoption vs custom wrappers) is undecided, and native surfaces
-  under the bridge are unmapped.
-- **Research/POC must establish:** which native primitives are reachable/observable via the bridge, and
-  which the product should adopt.
+**13. Native coordination primitives (Tasks / Workflow / SendMessage)** *(→ research notes)* — 🧪 **needs-spike**
+- **Evidence:** **research settled** ([`native-claude-code-coordination-report-2026-07-02.md`](../dev/notes/research/native-claude-code-coordination-report-2026-07-02.md)):
+  **decision — keep the sidecar custom spine (inbox / links / scratchpad) as canonical; adopt native
+  primitives only narrowly** as observability enrichments or optional run modes. Concrete findings: `Task`
+  was renamed to `Agent` (v2.1.63; `Task(…)` is a legacy alias — the sidecar parser may key on the wrong
+  name, a silent-miss risk → §11.4 #28); `TodoWrite` is disabled-by-default (v2.1.142; not the adoption
+  target); `SendMessage` is scoped to native subagent/team graphs and **cannot** bus across independently
+  spawned tmux processes (confirms LINKS must stay); agent-teams are experimental/disabled-by-default (one
+  team/session, no nesting, no resume) — spike-only. (This item also absorbs the old backend backlog's *Tasks
+  (open)* question — absorbed from BB11, 2026-07-03.)
+- **Desired final behavior:** the dashboard's coordination reuses native Claude Code primitives **where they
+  fit** (observability, optional modes), atop the durable custom spine.
+- **Current blocker (spike-grade):** the report is docs-derived, not run-verified against the deployed CLI —
+  the `SendMessage`/JSONL shapes, `SubagentStart`/`SubagentStop` payloads, and workflow observability under
+  detached tmux need a live spike before adoption.
+- **Research/POC must establish:** a live spike confirming the hook payloads + tool-name state on the
+  installed build; agent-teams stay behind their own spike if ever pursued.
 - **Fallback if infeasible:** keep the current custom coordination spine (inbox, links, scratchpad).
 
 ### Priority — coverage-audit additions (2026-07-02)
@@ -1218,156 +1228,132 @@ priority is noted inline. Each carries a spike or research prompt queued under
 `dev/prompts/2026-07-02-s10-*` (cited per item); those are the concrete next step, not evidence of a built
 capability.
 
-**14. Hook-driven run-state / permission-mode push channel ("hook event stream")** *(→ §6.2, §7.4, §7.11)* — 🧪 **needs-spike** *(priority: medium)*
-- **Evidence:** no test. §7.11 records the current default ("detection is screen-state, not hooks") but never
-  weighs the push-stream option. The sidecar already ingests *some* hooks — `PostToolUse`/`Stop` inject
-  delivery (proven live) and `PreToolUse` plan/decision (wired, spike-gated) — over the working WSL→Windows
-  gateway path, so this is an *extension*, not a greenfield build. A design deep-dive research prompt already
-  exists (`dev/prompts/2026-07-02-s10-research-14-hook-event-stream.md`); the mechanism is known, so the next
-  step is a spike, and a spike prompt is queued (`…-build-14-hook-event-stream.md`).
+**14. Hook-driven run-state / permission-mode push channel ("hook event stream")** *(→ §6.2, §7.4, §7.11)* — ◐ **partially proven** *(priority: medium)*
+- **Evidence:** **spike passed** (`test_hook_event_stream_live`, **live**, 2026-07-02) + **research settled**
+  ([`claude_code_hook_event_stream_report.md`](../dev/notes/research/claude_code_hook_event_stream_report.md)):
+  hook transport + payload fields + the WSL→Windows gateway are confirmed on the installed build; run-state
+  (`permission_mode` + current tool) is readable from hook payloads. Design decision: **Option C hybrid** —
+  hooks authoritative-when-fresh, screen-polling as the watchdog floor (HTTP-hook failures are silent, so a
+  pure-push replacement is unsafe). **Caveats:** `permission_mode` is event-specific (Notification lacks it);
+  ordering/dedup under concurrent load is **untested** — the per-agent merge/arbiter is design, not proven.
 - **Desired final behavior:** every agent's hooks POST each lifecycle event to the sidecar, which treats
   pushed run-state / `permission_mode` as authoritative-when-present, with screen-polling as the fallback for
   hookless sessions.
-- **Current blocker:** it is unproven whether an HTTP-hook payload actually carries `permission_mode` + the
-  current tool on every tool/turn event ("live mode for free"), and whether ordering/dedup hold under many
-  concurrent agents.
-- **Research/POC must establish:** a spike registering the candidate event set and confirming the payload
-  fields, latency, ordering, and dedup under concurrent load; the research prompt settles the design decision
-  (replace-vs-run-alongside, exact event set) first.
+- **Remaining open (resolves during build):** arbiter merge correctness, dedup keys, and late-event ordering
+  under concurrent load; the `prompt_id` version floor (v2.1.196+) should be recorded from the build. The
+  arbiter + `SubagentStart`/`SubagentStop` ingestion is the §11.3 #22 build item.
 - **Fallback if infeasible:** screen-state polling stays the primary run-state signal (today's floor); hooks
   remain limited to the proven inject/plan paths.
 
-**15. Rewind / Handoff / Timeline — conversation truncate-and-resume / fork-from-point** *(→ §7.5, §9.2, §9.9, DESIGN "Rewind & Handoff")* — 🔬 **needs-research** *(priority: high — biggest crack; research gates the spike)*
-- **Evidence:** no test; a grep of this document returns **zero** hits for "rewind" / "handoff" / "timeline."
-  §9.9's only resume path (`claude --resume`) reattaches the *whole* session — it cannot truncate-and-resume
-  at message N, nor fork a session from an earlier point. DESIGN presents Rewind + Handoff as v1 controls but
-  marks only "richer handoff artifacts" deferred, treating the core rollback/fork mechanism as shipping.
-  (Handoff's Create-tab-prepopulation half **is** homed at §9.2/§7.5; the unhomed part is the conversation
-  carry / rollback primitive.) A full research prompt is queued
-  (`dev/prompts/2026-07-02-s10-research-15-rewind-handoff.md`); its spike prompt (`…-build-15-…`) is a
-  **conditional scaffold, to be finalized from the research findings.**
+**15. Rewind / Handoff / Timeline — conversation truncate-and-resume / fork-from-point** *(→ §7.5, §9.2, §9.9, DESIGN "Rewind & Handoff")* — ✅ **proven** *(pending relocation — Phase 9; priority: high — was the biggest crack)*
+- **Evidence:** **research settled** ([`s10-research-15-rewind-handoff.md`](../dev/notes/research/s10-research-15-rewind-handoff.md))
+  **+ spike passed** (`test_rewind_handoff_live`, **live**, 2026-07-02 — **both** rewind and fork-from-point
+  proven end-to-end). Native mechanism confirmed: **`/rewind`** restores conversation state (not just files)
+  to any prior prompt checkpoint; **`--fork-session` + `/rewind`-inside-the-fork** is the proven TUI-native
+  path for branch-from-N. This **overturns the old blocker** ("no known rollback/fork API"). Transcript
+  surgery is ruled out (fragile/unsupported). TypeScript SDK `resumeSessionAt + forkSession` is the best
+  non-interactive path — **but the Python SDK lacks `resume_session_at` parity**, so the sidecar uses the
+  TUI-native path.
 - **Desired final behavior:** from the Agent→Details Timeline, **Rewind** rolls an agent back to a chosen
   message and resumes from there; **Handoff** branches from a chosen point into a *new* agent carrying that
   conversation prefix.
-- **Current blocker:** there is no known Claude Code rollback/fork API; whether *any* path exists (transcript
-  surgery + `--resume`, an SDK fork, checkpointing, or nothing) is unmapped — the mechanism itself is unknown,
-  so this is research-before-spike.
-- **Research/POC must establish:** *first* — **research** whether any truncate-and-resume-at-N or
-  fork-from-point mechanism is feasible under the bridge (gating); *then, only if research finds one* — a spike
-  proving it end-to-end.
-- **Fallback if infeasible:** if no fork/rollback path exists, Rewind/Handoff are cut or degraded to
-  whole-session `--resume` + fresh-agent Create-tab prepopulation only; record the omission.
+- **Spike established (build carries two caveats):** (1) conversation fork does **not** isolate filesystem
+  state — the build needs an explicit per-fork file-state policy (git worktree / code-checkpoint); (2) a
+  version gate ≥ **v2.1.191** is required to rewind past a `/clear`. Build item: §11.3 #21 (the
+  summary/handoff-artifact half stays #19).
+- **Fallback if infeasible:** n/a — proven feasible; whole-session `--resume` + Create-tab prepopulation is
+  no longer the ceiling.
 
-**16. System-wide fault detection — the harvest half behind the "System" Error cards** *(→ §5, §7.2, §7.8)* — 🧪 **needs-spike** *(priority: high)*
-- **Evidence:** no test; the System-sourced fleet-wide Error card is described (§7.2 ⚠Today + §7.8) but its
-  **detector** is not. Account rate/usage-cap detection is explicitly punted (`inbox.py` ~line 10: the
-  rate/usage-cap subtype "is not derived here"; `main.py` `/usage` ~line 1755: "Plan / rate-limit windows are
-  intentionally NOT here"). A screen-text `rate_limit` classifier exists (`inbox.py` ~line 111) but
-  auth-expiry, global-MCP-outage, and fleet-coalescing have no detector at all. Only the *harvest half* is a
-  spike — the deterministic tmux/WSL/sidecar-liveness probes are ordinary build (body §5/§7), not a research
-  question. Spike prompt queued (`…-build-16-system-fault-detection.md`).
+**16. System-wide fault detection — the harvest half behind the "System" Error cards** *(→ §5, §7.2, §7.8)* — ◐ **partially proven** *(priority: high)*
+- **Evidence:** **spike PARTIAL** (`test_system_fault_harvest_live`, **live**, 2026-07-02): **MCP outage +
+  auth expiry are detectable**, but the **usage-cap wording is not matched** (`classify_error` misses the
+  subscription-cap phrasing, e.g. "weekly usage limit" → code gap, §11.4 #24), and the *reactive*
+  auth-expiry **screen signal is unconfirmed**. The deterministic tmux/WSL/sidecar-liveness probes remain
+  ordinary build (body §5/§7).
 - **Desired final behavior:** the sidecar detects and raises one coalesced fleet-wide System Error card for the
   non-deterministic faults — account rate/usage cap hit, auth expiry, global MCP outage.
-- **Current blocker:** it is unproven whether these signals can be harvested off the bridge at all — where a
-  rate/usage-cap or auth-expiry signal reliably surfaces (screen text? a CLI error line? a creds/API probe?),
-  and whether an MCP-outage signal is observable.
-- **Research/POC must establish:** a spike that provokes (or simulates) each fault and confirms a reliable,
-  machine-readable signal the sidecar can key on; the deterministic liveness probes are just-build once the
-  harvest signals are proven.
+- **Remaining open:** widen the usage-cap matcher (§11.4 #24); confirm a reliable reactive auth-expiry signal;
+  then coalesce into one fleet-wide card.
 - **Fallback if infeasible:** the System card fires only for the deterministic probes (tmux/WSL/sidecar down);
   the non-harvestable faults are surfaced best-effort from screen text or omitted — recorded as a boundary.
 
-**17. Polling-model scale ceiling** *(→ §4.3, §6.2)* — 🧪 **needs-spike** *(priority: medium — load test)*
-- **Evidence:** no test; the per-agent bridge `events()` loop (`sidecar/drivers/bridge.py` ~line 617) polls
-  each agent on a fixed ~1 s cadence (`asyncio.sleep(1.0)` ~line 663) — an O(N) fleet cost that crosses the
-  Windows→WSL boundary each cycle. The product targets "many agents," but no ceiling, budget, or
-  adaptive-cadence/backpressure policy is stated anywhere. Load-test spike queued
-  (`…-build-17-polling-scale-ceiling.md`).
+**17. Polling-model scale ceiling** *(→ §4.3, §6.2)* — ◐ **partially proven** *(priority: medium — load test)*
+- **Evidence:** **spike measured** (`test_polling_scale_ceiling_live`, **live**, 2026-07-02): the load test
+  runs, but the curve is **bad — the ~1 s per-agent `events()` loop degrades from N=1** (~1.3 s/cycle at N=1,
+  ~10 s event-lag by N=9), because each cycle makes ~5 WSL spawns × N and crosses the Windows→WSL boundary.
+  The mechanism is proven **not** to scale as-is → rework required (batch the spawns + adaptive cadence, code
+  gap §11.4 #25).
 - **Desired final behavior:** a known, documented agent-count ceiling (and, if needed, an
   adaptive-cadence/backpressure policy) so the fleet degrades gracefully rather than silently bogging down.
-- **Current blocker:** the real ceiling is unmeasured — how many concurrent agents the ~1 s poll loop sustains
-  before latency / CPU / event-lag degrade past usability is unknown.
-- **Research/POC must establish:** a load test escalating N tab-less sessions and measuring poll-loop latency /
-  CPU / event lag, to establish the practical ceiling and whether an adaptive cadence is warranted.
+- **Remaining open:** implement the batching + adaptive-cadence rework (§11.4 #25), then re-measure the
+  practical ceiling.
 - **Fallback if infeasible:** document a conservative soft cap and a "slows past N agents" note; adaptive
   cadence deferred.
 
-**18. statusLine `context_window` as a live mid-run context source** *(→ §7.9, §9, DESIGN context dropdown)* — 🧪 **needs-spike** *(priority: low; grouped with #21)*
-- **Evidence:** no test; DESIGN asserts context "can't be read mid-run," but the mode-control research
-  (`claude-code-mode-control-research.md`, ~line 150) documents reading `context_window_size` from the
-  **statusLine payload** as a live source. Complements the already-tested *total*-context derivation (§10-9 /
-  `test_bridge_unit`). Probed together with #21 in one data-source spike
-  (`…-build-18-21-usage-context-sources.md`).
-- **Desired final behavior:** the dashboard reads live context-window usage mid-run (feeding §10-9's context
-  readout and the run-strip) from the statusLine, not only from post-hoc JSONL.
-- **Current blocker:** whether a configured statusLine actually emits a machine-readable `context_window`
-  object mid-run under the bridge — and whether the sidecar can capture it — is unproven; DESIGN currently
-  assumes it can't.
-- **Research/POC must establish:** a spike configuring a statusLine and confirming the `context_window` value
-  is observable mid-run and parseable; if so, reconcile DESIGN.
-- **Fallback if infeasible:** context stays derived from JSONL / `/context` (per §10-9); mid-run context
-  remains best-effort and DESIGN's "can't read mid-run" stands.
+**18. statusLine `context_window` as a live mid-run context source** *(→ §7.9, §9, DESIGN context dropdown)* — ◐ **partially proven** *(priority: low; grouped with #21)*
+- **Evidence:** **spike passed — boundary found** (`test_usage_context_sources_live`, **live**, 2026-07-02):
+  the statusLine `context_window` is a **per-turn snapshot** (it refreshes once per turn), **not** a continuous
+  mid-run feed. So DESIGN's "can't read *mid-run*" stands for a live gauge, but a per-turn context readout
+  **is** available — a genuine improvement over post-hoc JSONL. Complements the unit-proven total-context
+  derivation (§10-9 / `test_bridge_unit`).
+- **Desired final behavior:** the dashboard reads context-window usage as fresh as the engine exposes it
+  (per-turn from the statusLine), feeding §10-9's readout and the run-strip.
+- **Remaining open:** wire the per-turn statusLine `context_window` capture; reconcile DESIGN to "per-turn
+  snapshot, not a continuous mid-run gauge."
+- **Fallback if infeasible:** context stays derived from JSONL / `/context` (per §10-9).
 
-**19. Console `/clear` (and `/compact`) transcript-path orphaning** *(→ §7.13, §8.6, §8.7)* — 🧪 **needs-spike** *(priority: low)*
-- **Evidence:** no test; running `/clear` or `/compact` from the Console is believed to write a **new** JSONL
-  transcript while the sidecar's transcript resolution pins the *original* `<session-id>.jsonl`
-  (`bridge/bridge.py` `session_id_for`/`register_session_id` ~lines 428/435; `find_transcript` ~line 972),
-  which would orphan the resolved path (§8.7 "spots to watch"). Spike prompt queued
-  (`…-build-19-console-clear-transcript.md`).
+**19. Console `/clear` (and `/compact`) transcript-path orphaning** *(→ §7.13, §8.6, §8.7)* — ◐ **partially proven** *(priority: low)*
+- **Evidence:** **spike confirmed the hazard** (`test_console_clear_transcript_live`, **live**, 2026-07-02):
+  a Console **`/clear` rotates the JSONL and orphans** the sidecar's pinned `<session-id>.jsonl` resolution
+  (`bridge/bridge.py` `session_id_for`/`register_session_id`; `find_transcript`) — new turns are lost to the
+  sidecar until re-resolve. **`/compact` is safe** (same file). Fix = re-resolve + `register_session_id`
+  after a Console `/clear` (code gap §11.4 #23).
 - **Desired final behavior:** after a Console `/clear` or `/compact`, the sidecar still resolves the agent's
   *current* transcript, with no lost history or stale mapping.
-- **Current blocker:** it is unconfirmed whether `/clear` / `/compact` actually rotate the JSONL path and, if
-  so, whether the pinned-session-id resolution re-finds the new file or silently orphans it.
-- **Research/POC must establish:** a spike that runs `/clear` (and `/compact`) in a live Console session,
-  checks whether the transcript path changes, and confirms whether resolution recovers it — establishing
-  whether a re-resolve step is needed.
+- **Remaining open:** implement the post-`/clear` re-resolve (§11.4 #23); `/compact` needs no change.
 - **Fallback if infeasible:** document the hazard and re-resolve the transcript path on demand after a Console
-  clear/compact.
+  clear.
 
-**20. Bypass & Auto permission-mode launch preconditions** *(→ §6.2, §7.11)* — 🧪 **needs-spike** *(priority: low; relates to #1)*
-- **Evidence:** no test; per-agent permission mode + launch flags are applied **only at launch** (the "only
-  point a TUI reads them," `sidecar/drivers/bridge.py` ~lines 570–573, which also notes the startup-gate
-  clearer handles the `bypassPermissions` warning gate). So the Bypass segment likely needs
-  `--allow-dangerously-skip-permissions` and Auto (accept-edits) may need eligibility/opt-in — either could
-  silently no-op if the agent wasn't launched for it. Distinct from #1 (mid-run cycling) — this is *launch-time*
-  preconditions. Spike prompt queued (`…-build-20-bypass-auto-preconditions.md`).
+**20. Bypass & Auto permission-mode launch preconditions** *(→ §6.2, §7.11)* — ✅ **proven** *(pending relocation — Phase 9; priority: low; relates to #1)*
+- **Evidence:** **spike passed** (`test_bypass_auto_preconditions_live`, **live**, 2026-07-02): a 5-case
+  launch matrix confirms the preconditions — a **Bypass segment that was not pre-armed at launch is SILENTLY
+  ABSENT from the mode ring** (it doesn't no-op visibly; it simply isn't reachable). So the UI **must gate**
+  Bypass/Auto on the launch flags. Distinct from #1 (mid-run cycling) — this is *launch-time* preconditions.
 - **Desired final behavior:** the UI presents Bypass/Auto as available only when the agent's launch actually
   supports them, never as controls that silently do nothing.
-- **Current blocker:** the exact launch preconditions and their observable failure mode (does selecting Bypass
-  on a normally-launched agent no-op silently?) are unconfirmed.
-- **Research/POC must establish:** a spike launching agents with and without the flags, confirming which mode
-  segments are reachable and how an unreachable one presents.
-- **Fallback if infeasible:** gate Bypass/Auto in the UI behind a launch-time choice; disable the segment when
-  its precondition is absent.
+- **Spike established:** un-pre-armed Bypass is absent from the ring (not a silent no-op) → the Create panel
+  must set the launch flag, and the mode control must disable/hide the segment when its precondition is absent.
+- **Fallback if infeasible:** n/a — proven; gate Bypass/Auto on the launch-time choice as established.
 
-**21. Usage / limits source-boundary confirmation** *(→ §7.15)* — 🧪 **needs-spike** *(priority: low; grouped with #18)*
-- **Evidence:** no test; §7.15/DESIGN assert account identity comes from local creds (`settings_io.py`
-  `account_band()` ~line 208 reads email/org/plan for display) and usage/limits from an API, but *what local
-  creds vs. an API can actually deliver* is unverified. Probed together with #18 in one data-source spike
-  (`…-build-18-21-usage-context-sources.md`); complements the per-agent-cost harvest spike (§10-11 / build-11).
+**21. Usage / limits source-boundary confirmation** *(→ §7.15)* — ◐ **partially proven** *(priority: low; grouped with #18)*
+- **Evidence:** **spike passed — boundaries mapped** (`test_usage_context_sources_live`, **live**,
+  2026-07-02): account identity is a **split source** (the `.claude.json` tier fields are not matched by the
+  current reader → code gap §11.4 #26), and **live usage % / limits are screen-scrape only** (no clean local
+  API surface). So the Usage band can show account identity + scraped live figures, but "from an API" is not
+  accurate. Complements the per-agent-cost spike (§10-11).
 - **Desired final behavior:** the Settings Usage band is fed from confirmed sources (account from creds;
-  usage/limits from a real, reachable surface) before the UI is built against them.
-- **Current blocker:** whether the named sources (local credential files; a usage/limits API or CLI surface)
-  actually deliver account + usage + limit data under the bridge is unverified.
-- **Research/POC must establish:** a spike probing the creds files and any `/usage` / limits surface, recording
-  exactly what each yields, so the Usage UI is built on confirmed data boundaries.
-- **Fallback if infeasible:** show only what a source demonstrably provides (e.g. account identity but not live
-  limits); mark the rest an honest boundary.
+  usage/limits from the real, reachable surface) before the UI is built against them.
+- **Remaining open:** fix the account split-source reader + add an auth-expiry signal (§11.4 #26); build the
+  Usage band against the confirmed boundaries (identity + screen-scraped live %).
+- **Fallback if infeasible:** show only what a source demonstrably provides (account identity but not a clean
+  live-limits API); mark the rest an honest boundary.
 
-**22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🔬 **needs-research** *(priority: medium; overlaps #13)*
-- **Evidence:** no code; subagent *observability* is homed (§7.17 — roster derived from the parent transcript)
-  and pending-vs-active is tracked (§10-8), but the *create / steer* affordance — spawning and managing
-  subagents from the dashboard — is unmapped and overlaps the native-primitives research (§10-13). (Formerly
-  parked in the backend backlog as BB4; this entry is now its sole home — ported 2026-07-03.) Research prompt
-  queued (`…-research-22-subagent-management.md`).
+**22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🧪 **needs-spike** *(priority: medium; overlaps #13)*
+- **Evidence:** **research settled** ([`s10-research-22-subagent-management.md`](../dev/notes/research/s10-research-22-subagent-management.md)):
+  the surface is mapped. **CREATE** is parent-mediated only — send `@agent-<name> <task>` as literal text to
+  the idle parent pane via tmux `send-keys` (no out-of-process spawn API in the non-SDK path). **Observe** —
+  `SubagentStart`/`SubagentStop` hooks give structured `agent_id` / `agent_type` / `transcript_path` /
+  `last_assistant_message` (closes §10-8 cleanly → §11.3 #22). **STEER** — `SendMessage` resumes a *stopped*
+  subagent; mid-turn steering of a *running* one is unproven. **STOP** — no stable single-subagent API
+  (`Ctrl+X Ctrl+K` kills all background subagents). (Formerly BB4; sole home since 2026-07-03.)
 - **Desired final behavior:** the operator can create and manage (steer / stop) subagents from the dashboard,
   not only observe them.
-- **Current blocker:** the native `Task` / team-spawn / `SendMessage` semantics under the bridge are unmapped —
-  what is reachable and *drivable* from outside the TUI is unknown, so nothing can be designed yet.
-- **Research/POC must establish:** which subagent create/manage operations are reachable and drivable over
-  tmux (vs. SDK-only), building on the §10-13 native-primitives research.
-- **Fallback if infeasible:** subagents remain observe-only (§7.17); creation/management stays a backlog item
-  until a drivable path is found.
+- **Current blocker (spike-grade):** the load-bearing claims are docs-derived — `send-keys -l` delivering
+  `@agent-<name>` as a parsed mention, the subagent transcript-path schema on the local install, and the
+  `Ctrl+X Ctrl+K` timing — each needs a live spike before build.
+- **Research/POC must establish:** a spike confirming the `@agent-<name>` create path, the transcript-path
+  schema, and the stop-key timing on the installed CLI; active mid-turn steer stays observe-only until proven.
+- **Fallback if infeasible:** subagents remain observe-only (§7.17); creation/management stays queued.
 
 ### Priority — backlog-port additions (2026-07-03)
 
@@ -1412,9 +1398,14 @@ Settled engine limits — recorded here so they are not re-raised as open questi
 numbered queue. An item lands here only after a **spike** actually proves no path exists (a code no-op is not
 a proof).
 
-- **None currently.** Nothing has been spike-proven impossible. (Fast/Thinking live control was previously
-  parked here on a code-no-op assumption; the mode-control research surfaced untested `Meta+T` / `Meta+O`
-  keybinding levers, so both moved back into the queue as 🧪 needs-spike — items #2 and #3.)
+- **Two spike-proven tail limits (2026-07-04), pending relocation here at Phase 9:** **#4's** immediate
+  mid-turn Inject (`test_inject_tail_live` — typeahead is held to the turn boundary, pure Next/Queue) and
+  **#7's** engine-side completion fraction (`test_runstrip_tail_live` — the engine emits numerators only, no
+  denominator). Both keep their numbered §10 slot for now (marked ⛔ resolved-at-fallback) and move here
+  formally in the Phase 9 refactor; their shipped fallbacks are the final models.
+- Fast/Thinking live control was previously parked here on a code-no-op assumption; the mode-control research
+  surfaced untested `Meta+T` / `Meta+O` keybinding levers, so both moved back into the queue — **#2 is now ✅
+  proven** and **#3 is 🧪 needs-spike (credit-gated, not proven impossible)**.
 
 ---
 
@@ -1454,8 +1445,8 @@ an open question); **—** means the debt has no queue item yet.
 | §7.10 | Marquee omitted in the React UI | — (§4.4 deferral) |
 | §7.12 | Delete misses the project `state/` files; retired numbers memory-only | #11, #3 |
 | §7.13 | Live mirror + keystroke passthrough not wired; React Console stubbed in places | §10 #5 |
-| §7.15 | No per-agent cost figure (honest blank) | §10 #11 |
-| §7.16 | Plan approve→resume unproven; plans listed non-recursively; central `plan-reviews.json`; Documents read-only, no comment store; no Assets surface | #13, #6, §10 #6 |
+| §7.15 | Per-agent cost not surfaced yet — proven feasible via `/cost` (§10 #11 → ✅), honest-blank overturned | §10 #11 |
+| §7.16 | Plan approve→resume proven (§10 #6 → ✅) but unwired; plans listed non-recursively; central `plan-reviews.json`; Documents read-only, no comment store; no Assets surface | #13, #6, §10 #6 |
 | §8.1 | `project_root()` returns raw cwd (no canonicalization); project folder still `.awl/` | #1, #2 |
 | §8.2 | Only `scratchpad.md` + `plan-reviews.json` exist; roster lives app-level in `sessions.json` | #1, #3 |
 | §8.3, §8.4 | Every Persist row still in-memory or app-level (see the tables' ⚠ Today columns) | #3, #4, #11 |
@@ -1515,7 +1506,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 Decided, buildable features with no storage-set dependency ordering (ex-IDs BB1–BB10; ex-BB4 *Subagent
 Management* is **not** here — it carries an open question and lives at §10 #22; ex-BB11 *Tasks* was
-absorbed into §10 #13).
+absorbed into §10 #13). **#21–#22 are spike-derived additions** (2026-07-02 batch, now buildable), not ex-BB.
 
 12. **Load past agents** *(ex-BB1; gated on #8)* — load past agents by name, ID, or via file explorer.
     Fleet Setups save/load and startup auto-reconnect exist; still no on-demand per-agent resume (endpoint
@@ -1535,6 +1526,41 @@ absorbed into §10 #13).
     summary/handoff report on Handoff, rather than the plain context-carry-over (which comes first).
 20. **Native agent-teams messaging** *(ex-BB10; gated on §10 #13 research)* — adopt Claude Code's built-in
     inter-agent messaging in place of the custom sender/trigger wrapping, once the native feature matures.
+21. **Rewind / Fork (Timeline)** *(→ §7.5, §9.2, §9.9; spike-passed §10 #15)* — implement `/rewind`
+    (tmux-driven, conversation-restore) + `--fork-session` + `/rewind`-inside-the-fork for branch-from-N; add
+    an explicit per-fork **file-state isolation** policy (git worktree / code-checkpoint) and a **≥ v2.1.191**
+    version gate at session create. (The summary/handoff-artifact half is #19; the Create-tab prepopulation
+    half is homed at §9.2/§7.5.)
+22. **Hook lifecycle ingestion & run-state arbiter** *(→ §6.2, §7.4, §7.11, §7.17; spike-proven §10 #14,
+    closes §10 #8)* — register HTTP `SubagentStart`/`SubagentStop` (+ the run-state event set) to the sidecar;
+    a per-agent arbiter merges pushed run-state / `permission_mode` (authoritative-when-fresh) with the
+    screen-poll fallback (Option C hybrid), and the subagent hook fields become the roster's active-vs-quiet
+    signal. Where: [`sidecar/hookbus.py`](../sidecar/hookbus.py), [`sidecar/main.py`](../sidecar/main.py),
+    [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
+
+### 11.4 Spike-surfaced code fixes (2026-07-02)
+
+Concrete code gaps found by the 17-spike batch (and the native-coordination research). **Document-only — no
+product code is changed in this workflow;** these are the queued cleanup, deferred to the consolidated fix
+push. Each cites the §10 item that surfaced it.
+
+23. **Console `/clear` transcript re-resolve** *(→ §7.13, §8.6, §8.7; §10 #19)* — after a Console `/clear`,
+    re-resolve + `register_session_id` so the pinned transcript follows the rotated JSONL (`/compact` is safe,
+    no change). Where: [`bridge/bridge.py`](../bridge/bridge.py), [`sidecar/main.py`](../sidecar/main.py).
+24. **Usage-cap error matcher** *(→ §7.2, §7.8; §10 #16)* — extend `classify_error` to match subscription
+    usage-cap wording ("weekly usage limit", …), which the spike found unmatched. Where:
+    [`sidecar/inbox.py`](../sidecar/inbox.py).
+25. **Polling-scale rework** *(→ §4.3, §6.2; §10 #17)* — batch the ~5 WSL spawns/cycle and add an adaptive
+    cadence so the fleet stops degrading from N=1. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
+26. **Account split-source + auth-expiry reader** *(→ §7.15; §10 #18/#21)* — read account tier from the
+    correct source (`.claude.json` tier fields are currently unmatched) and add an auth-expiry signal. Where:
+    [`sidecar/settings_io.py`](../sidecar/settings_io.py).
+27. **Real Electron-main sidecar-lifecycle POC** *(→ §2, §4.1; §10 #10)* — the spike modeled
+    spawn/supervise/shutdown in Python; build the real Electron-main POC preserving detach-on-close. Where:
+    [`frontend/`](../frontend/).
+28. **Sidecar `Task`→`Agent` parser audit** *(→ §7.17; §10 #13)* — confirm the transcript parser keys on the
+    current `Agent` tool name (renamed from `Task` in v2.1.63) and add dual-name compatibility so subagent
+    events aren't silently missed. Where: `sidecar` transcript/serialize path.
 
 ---
 
