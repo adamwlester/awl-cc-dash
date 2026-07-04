@@ -477,6 +477,14 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-04 12:30:00 — tracker: Phase-6 decision register (§F1) + cross-handoff maintenance rule
+
+Staged the doc-integration workflow for Phase-6 execution by turning the ephemeral decision-surfacing done this session into a durable, handoff-surviving record. In `dev/notes/scratch/2026-07-03-doc-integration-tracker.md`: expanded §F into a new **§F1 "Decisions needing the user's call"** register listing the ~10 product/policy decisions latent in the remaining orphans — grouped higher-stakes (security-on-untrusted-network, frontend degraded-mode UX, voice-dictation STT approach, response-format option-set, the Tier-4 "elevate if pursued" trio) and lower-stakes (schema versioning, sidecar crash-supervision, git-merge policy, agent-name source, turns-by-tool derivation), plus the Agent-Archive call that blocks Phase 9 — each as a `[ ]` open checkbox mirroring §E. Added a prominent **handoff rule** at the top of §F1: every subsequent session MUST keep the register current (add/edit as orphans get homed and new decisions appear) AND check each open decision WITH the user before treating it as settled — homing an orphan as a §10 open-question is the agent's job, deciding it is the user's; never silently adopt the audit's suggested resolution as "decided." Also corrected the under-counting Phase-6 scope: §F and the phase-ledger line now state Phase 6 = Tier-3 minors + Tier-4 trio **+ the 3 Tier-2 moderates verified still-unhomed** (turns-by-tool, voice STT, degraded-mode; polling-ceiling §10 #17 and hook-stream §10 #14 are already homed). **Workflow-tracking only — no product code and no doc *bodies* touched (`docs/ARCHITECTURE.md` untouched); Phase 6 itself is not yet started.**
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

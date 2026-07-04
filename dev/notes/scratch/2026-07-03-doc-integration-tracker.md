@@ -31,7 +31,7 @@
 [✓] 5.  Resolved the 3 doc-vs-doc contradiction orphans WITH the user (§E) — decisions applied to
         docs/ARCHITECTURE.md (§7.5 / §4.4 / §5.2 / §7.16 / §8.5 + the two ⚠-index rows) + CLAUDE.md
         (2026-07-04; see DEVLOG).
-[ ] 6.  Integrate remaining orphans (Tier-3 decided-omissions, Tier-4 trio) → §10/§11/body.
+[ ] 6.  Integrate remaining orphans (Tier-3 decided-omissions, Tier-4 trio, +3 Tier-2 moderates — see §F) → §10/§11/body. Decision register: §F1.
 [ ] 7.  Verify unverified-behavior-candidates.md fully integrated → archive both 07-02 scratch docs.
 [ ] 8.  FINAL comprehensive integration-verification sweep (full reachable trail vs major docs;
         state what could / could not be cross-checked).
@@ -120,7 +120,30 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 
 ### F. Remaining orphans (Phase 6; same source doc)
 
-- Tier-3 "record a decided-omission" minors · Tier-4 "worth elevating" trio
+- **Scope (corrected 2026-07-04):** Tier-3 "record a decided-omission" minors · Tier-4 "worth elevating" trio · **+ 3 Tier-2 moderates verified still-unhomed** — turns-by-tool/"Coordinating" breakdown · voice-dictation STT pipeline · frontend degraded-mode + polling-backoff. The old one-line scope undercounted the phase; polling-ceiling (§10 #17) and hook-event-stream (§10 #14) are already homed, and createDoc was Phase 5.
+
+### F1. Decisions needing the user's call — the durable register (keep current across handoffs)
+
+> **Handoff rule — do not drop.** This is where product/policy decisions this workflow surfaces live so they survive session boundaries. Every subsequent session MUST (a) add to and edit this list as orphans get homed and new decisions appear, and (b) **check each open decision WITH the user before treating it as settled** — never silently adopt the audit's suggested resolution as "decided." Homing an orphan as an explicit §10 open-question is an agent's job; *deciding* it is the user's. Mark each `[ ]` open / `[✓]` decided (with date + where applied), mirroring §E.
+
+Surfaced 2026-07-04 (Phase-6 prep); none decided yet.
+
+Higher-stakes — leave genuinely open, user decides:
+- [ ] **Security on an untrusted network** — no-auth `0.0.0.0` bind; audit suggests OS-firewall-as-boundary. (Tier-3)
+- [ ] **Frontend degraded-mode UX** — what the poll-driven panels show when `/health` fails. (Tier-2)
+- [ ] **Voice dictation** — client-side Web Speech API vs. a sidecar transcription service. (Tier-2)
+- [ ] **Response-format preamble** — the option set + per-agent-vs-per-turn persistence. (Tier-3)
+- [ ] **Tier-4 "elevate if pursued" trio** — rich visual content in Plans/Docs · Authors/authorship view · subagent create/manage UI: pursue (→ DESIGN / §10) or leave parked. Design-lane items route through the design agent, not edited here.
+
+Lower-stakes — pre-fill the audit's recommendation for confirm/override:
+- [ ] **Schema versioning / migration** of the committed store. (Tier-3)
+- [ ] **Sidecar crash-supervision** — manual relaunch (agents survive in tmux) vs. auto-restart. (Tier-3)
+- [ ] **Git-merge policy** on the committed `.awl-cc-dash/` state. (Tier-3)
+- [ ] **Agent name source** — curated pool + randomize vs. user-typed. (Tier-3)
+- [ ] **Turns-by-tool + "Coordinating" derivation** — confirm derivable (spike) vs. cut the feature. (Tier-2)
+
+Blocks the Phase-9 restructure (also under Running todo):
+- [ ] **"Agent Archive"** (§11.3 #18) → demote to §10?
 
 ### G. Scratch docs to archive when their content is fully homed
 
