@@ -357,6 +357,38 @@ Files: .claude/plans/you-will-be-implementing-quiet-gem.md, DEVLOG.md
 
 ---
 
+### 2026-07-03 22:10:00 — ND L1: unify Plans & Documents into one reviewable-document component (items 1+2)
+
+Rebuilt the Library's Documents tab onto the Plans card component: new plan-shaped `DOCS[]` (md moved verbatim from the retired textareas, DOC_FB folded in, mixed lifecycle statuses) + `entryById()` unifying every Library lookup (doc special-cases in getAuthors/saveComment deleted). Both tabs are now two-column — a shared `entry-nav` (mini-card rows: icon · name(·path) · lifecycle badge) beside the card list, with bidirectional nav↔card sync (`openEntry`/`navPick` ↔ `togglePlan`/`syncNavHighlight`). Docs gain the full decision footer (Revise·Reject·Approve; old doc **Remove** button dropped — deliberate), a per-card raw-md edit toggle (`entryEdit`), a `docs-badge` count chip, and a live plans subtitle; `libFootHTML` survives for Assets only. DESIGN.md Library section reconciled — approval is no longer Plans-only. Spot-checked live: zero console errors, both tabs render, doc Approve flows like a plan. Gallery propagation deferred to the batched L3 pass. Commit `b9916df`.
+
+Files: design/behavior.js, design/mockup.html, design/styles.css, design/DESIGN.md
+
+---
+
+### 2026-07-03 22:14:00 — ND Lane Q: quick wins 7a/7b/7c + token-compliance sweep 8 (merge `f2b09af`)
+
+7a: message-card sender→recipient arrow swapped from the Unicode `→` glyph to the `arrow-right` lucide icon (`recipientsHTML`; `.rcpt-to` restyled to a 14px icon holder). 7b: Team Graph "Link Agents" button renamed "Link Config" to match its drawer heading. 7c: `gallery.html` gains a sticky sectioned left ToC (`gx-toc`, gallery-local, built generically off the `.gx-sec`/`.gx-card` DOM — 5 sections, ~126 card entries, scroll-to + scroll-spy, collapses <780px; the old horizontal `.gx-nav` absorbed). 8: token sweep — `4px`/`6px` radii → `var(--radius-base)` on `.ghost-ic`/`.vrow`/`.att-item`/`.exp-mi`/`.con-perm` (intended +1px softening), six inline `2px` borders → `var(--border-width)` (mockup status dot, `#hist-acc`, minibar, legend dots), gallery chrome radii → `var(--radius-base/-sm)` + its `3px` section divider → `var(--divider-width)`; final grep shows no non-exception px radii remain. Verified in-browser at 900/1900px. Built on branch `nd-lane-q` (commit `453ffcb`), merged clean.
+
+Files: design/behavior.js, design/styles.css, design/mockup.html, design/gallery.html
+
+---
+
+### 2026-07-03 22:18:00 — ND Lane I: Inbox docs-review flow + accordion typed sections (item 6; merge `6d4d9bf`)
+
+Renamed the Inbox "Plan" typed section to "Plans & Docs" (one unified card type) with the Review action routing by entry kind — `doc-*` ids → Library → Documents, else Plans (post-merge this rides L1's `openEntry`); seeded a wren README.md doc-review card. Converted every Inbox typed section to a neutral `--surface-3` accordion band (leading chevron, count badge, `--rule` hairline, expanded by default, deliberately distinct from the `.fcard` accordion) via new `toggleInboxSec()`; this resolves OQ-2 (fold vs catalog → **folds**) and drops the `inbox-section` `undecided` marker; gallery card updated with the real accordion markup. Verified in-browser: all six sections toggle, doc Review switches the Library tab, bands hold at 300/900px. Built on branch `nd-lane-i` (commit `69462a8`); merge conflicts in `reviewPlan` (superseded by L1's `openEntry` — same routing convention) and the DESIGN.md registry (kept both lanes' rows) resolved by hand.
+
+Files: design/behavior.js, design/styles.css, design/gallery.html, design/DESIGN.md
+
+---
+
+### 2026-07-03 22:24:00 — ND review-panel fixups: stale gallery arrows + kind-aware Inbox Review tooltip
+
+Two confirmed findings from the adversarial review panels on the lane diffs, fixed on merged main. (1) Lane Q's `.rcpt-to` restyle (font glyph → icon holder) had orphaned the gallery's six static `→` specimens (Recipient Badge ×4, Message Card ×2), leaving them oversized/off-spec — replaced with the real `<i data-lucide="arrow-right">` markup. (2) `inboxCardHTML`'s Review tooltip was hardcoded to "…Library → Plans" even for `doc-*` cards that route to Documents — now kind-aware, matching the gallery specimen's wording and `reviewPlan`'s actual routing.
+
+Files: design/gallery.html, design/behavior.js
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

@@ -2204,8 +2204,9 @@ Short-lived notes for the current run — kept brief on purpose.
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
       acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
-    else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plan: Review (→ Plans) + Reply only — no Approve/Reject */
-      acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="Review the full plan in Library → Plans"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+    else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plans & Docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
+      const isDoc=o.plan&&o.plan.indexOf('doc-')===0;
+      acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
     else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
