@@ -1,0 +1,16 @@
+{
+  "name": "awl-ui-verify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headed-but-parked Playwright launcher for reliable, non-intrusive UI verification of the design/ mockups. Opens a real headed Chromium behind your windows (never steals focus, never throttled) so agents get true headed fidelity + drag/observability without interrupting your work.",
+  "bin": {
+    "ui-verify": "./ui-verify.mjs"
+  },
+  "scripts": {
+    "selftest": "node selftest.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.61.1"
+  }
+}
