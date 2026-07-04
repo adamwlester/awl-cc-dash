@@ -485,6 +485,38 @@ Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
 
 ---
 
+### 2026-07-04 02:27:02 — config: add `Skill(*)` allow-all-skills rule to project settings
+
+Diagnosed why skill invocations kept prompting despite a bare `"Skill"` entry in the project allow-list: bare `"Skill"` does **not** act as an allow-all for skill invocations in this Claude Code build (2.1.195). Confirmed empirically — clicking "allow for this project" on the `claude-api` skill made Claude Code itself write name-specifier rules `Skill(claude-api)` + `Skill(claude-api:*)` even though `"Skill"` was already present, proving the specifier form is the real mechanism and bare `"Skill"` is inert. Added `"Skill(*)"` (wildcard specifier) alongside to cover all skills; kept the auto-written per-name rules as fallback. `Skill(*)` is not yet verified in this build — needs a full VS Code restart (a "Reload Window" does not reliably reload the extension's in-memory permission set) then a test of a skill not individually allow-listed.
+
+Files: .claude/settings.json, DEVLOG.md
+
+---
+
+### 2026-07-04 02:59:40 — tooling: dev/tools/ui-verify — headed-but-parked Playwright launcher (built + verified)
+
+Added `dev/tools/ui-verify/` — a committed Node+Playwright launcher that opens a REAL headed Chromium parked behind the user's windows (bottom of z-order, no-activate, prior foreground restored via `win-window.ps1`) with anti-throttle flags so an occluded window keeps painting. Purpose: one reliable cross-session/cross-agent way to drive the `design/` mockups headed for UI verification without stealing focus — instead of relying on the shared Playwright MCP. `selftest.mjs` drove the real `mockup.html` and passed 7/7: parked is pixel-identical (byte-identical) to a front window at wide+narrow (parking adds 0 px vs the page's own ~790px wide↔narrow edge hysteresis), stays unthrottled while occluded (rAF fires, `visibilityState` 'visible'), repaints live, click + `.rz-handle` splitter drag both work parked, and foreground is never stolen (stayed on the user's window, restored to pre-launch). Pinned `playwright@1.61.1` reuses cached chromium-1228 (no download); `node_modules/` gitignored. The CLAUDE.md "Verifying UI changes" pointer + rewrite is intentionally deferred pending user go-ahead.
+
+Files: dev/tools/ui-verify/package.json, dev/tools/ui-verify/package-lock.json, dev/tools/ui-verify/ui-verify.mjs, dev/tools/ui-verify/win-window.ps1, dev/tools/ui-verify/selftest.mjs, dev/tools/ui-verify/README.md, DEVLOG.md
+
+---
+
+### 2026-07-04 03:11:44 — doc-integration Phases 6–8: homed the last coverage-audit orphans into ARCHITECTURE §10; archived both 07-02 scratch docs
+
+Ran Phases 6–8 of the test-findings → doc-integration workflow (tracker: `dev/notes/scratch/2026-07-03-doc-integration-tracker.md`), documentation-only, no product code. **Phase 6** homed the 12 remaining coverage-audit orphans into `docs/ARCHITECTURE.md` as a new §10 subsection **"coverage-audit remainder (2026-07-04)"** — entries **#26–#37**: 3 Tier-2 moderates (turns-by-tool #26, voice-STT #27, degraded-mode #28), 7 Tier-3 minors (schema-versioning #29, crash-supervision #30, git-merge #31, security-on-untrusted-net #32, newly-surfaced sidecar-logging #33, response-format #34, name-pool #35), and 2 Tier-4 design-lane items (rich-visual #36, Authors-view #37). **Every entry is homed as an OPEN question — none decided**: each carries a "Decision pending (operator's call)" line and a "Tracked: §F1" marker, since the product/policy calls belong to the operator. Added short inline body pointers to the new entries in §2 (→ #30/#32/#33), §4.3 (→ #28), §7.5 (→ #35), §7.14 (→ #27/#34), §8.7 (→ #29/#31), plus a §6.2 stream-json-control-API trade-off note (→ existing #1/#2/#3) and a §7.11 native-permission-hooks deferred-path note. Design-lane items (#36/#37) are architecture-side pointers only — DESIGN.md untouched (owned by the live design agent). Annotated the tracker's §F1 decision register with "→ homed §10 #N" per item (boxes stay OPEN) and added the newly-surfaced sidecar-logging decision. **Phase 7** verified `unverified-behavior-candidates.md` fully integrated (all 22 items homed/parked; the one still-open item — voice, candidate #16 — is now §10 #27) and **archived both 07-02 scratch docs** (`coverage-audit-orphans.md` + `unverified-behavior-candidates.md`) via `git mv` → `archive/dev/notes/scratch/`, repointing the ARCHITECTURE §10 + tracker §E citations to the archive path. **Phase 8** ran a 4-verifier adversarial integration sweep (parallel Sonnet subagents via the Workflow tool): verdict **PASS** — 23/23 cross-refs resolve, archived-source coverage confirms nothing lost by archiving, §F1↔§10 register consistent, zero new ⚠-Today markers. Fixed the sweep's findings in place (#26 Decision-pending field; §8.7 heading Two→Three spots; §7.11 hooks note; §6.2 ledger wording). **Stopped before Phase 9** (the §10/§11 feature-refactor) — it carries a genuine operator decision (Agent Archive §11.3 #18 → demote to §10?). The ~11 open §F1 decisions await the operator's batch ruling. (This DEVLOG entry is written but its commit is deferred: a concurrent session has two uncommitted DEVLOG entries here, and per the no-sweep rule this file is left for the operator/other agent to commit; the Phase 6–8 doc files were committed separately.)
+
+Files: docs/ARCHITECTURE.md, dev/notes/scratch/2026-07-03-doc-integration-tracker.md, archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md (moved), archive/dev/notes/scratch/2026-07-02-unverified-behavior-candidates.md (moved), DEVLOG.md
+
+---
+
+### 2026-07-04 04:27:54 — docs: CLAUDE.md — ui-verify tool entry + "Verifying UI changes" rule → single headed pass
+
+Documented the `ui-verify` tool and moved UI verification to headed-only. **CUSTOM TOOLING** gained a concise `### ui-verify (headed UI verification)` entry (the parked-behind-your-windows Playwright launcher at `dev/tools/ui-verify/`, pointing to its README). The **BEHAVIORAL RULES → "Verifying UI changes"** rule was rewritten to verify through that script in a real headed browser parked behind the user's work as a **single pass**, and the old "iterate headless → final headed parity pass" was **retired** — with every pass headed there is no headless-vs-headed gap left to reconcile, so the second pass is gone. Wording explicitly guards against re-adding it and against misreading "one pass" as checking fewer states/controls; the resize-to-extremes + click-every-control coverage is unchanged and reaffirmed as the real quality gate. Follows the ui-verify script commit `097dccb`; the Playwright MCP was deliberately left out of the verification rule per operator ("script-only for verification").
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
