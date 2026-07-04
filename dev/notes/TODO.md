@@ -76,11 +76,26 @@
 
 ## [IN] INBOX
 
+- In the Agent panel, I want number to default to populate as the next in sequence based on other agents that already have the role but it can still be editable. This likely just needs to be a note in the documentation.
+- Move "Compact" to be left aligned right after the "Context" label.
+- The card-level nav panels in Plans and Documents is the right layout but I do not find the way we have the styling very nice to look at. First I want to change the fill from the f5ecd9 to just white. I want the header tabs to have a full bleed divider below them with a f5ecd9 fill. The "Table of contents" heading label needs to scroll with the viewport not be fixed like its part of the tab controls; this does not work now that we have multiple sections in there, each with their own heading. I think those section heading labels need to be a bit larger and I think the subsections (eg, TOC, Authors) need a divider. I want the Authors badge list in Outline to include the contribution badge (eg, Edited, Revised, etc) similar to how we include the badges for reviewers. The last run did not update the mapping between the Feedback cards and the actual rail badges and lef in Approve nav cards/entries, which we are not including. On that, I want to remove the comment preview from those cards so they are all the same height. For the TOC entries I do not know what the numbers to the right where supposed to be but change them to the line number for each TOC entry.
+- There are a bunch of issues with the resizing stuff with the cards in Plans and Documents including a bunch of clipping. I am worried you guys are not using standard logical fill type nested behavior. This is a recurring issue. 
+- We do not need ".vchip.v-approve" anymore.
+- In the Plans and Documents cards, please remove the divider line above the footer action strip.
+- In the tab-level navigation we can remove the little leading icon for each entry in both Plans and Documents as this just takes up space and provides no real info. For assets I would like the leading image preview to take up the full height of the entry. Also need confirmation that it is documented that those should be preview thumbnails not just the generic image icon and confirm its feasible to have thumbnails that size. 
+- In the badge click pop up panel in the Plans and Documents card, the thumbs up/down control should be right aligned following the timestamp. Both should be right aligned.
+- In the Inbox accordion targets I want the badge count right aligned.
+- In the agent cards I want to move the agent icon and name block to the top, make the model a badge and put it below (left aligned), and then have the creation timestamp inline with the model and right aligned. The badges can all be the same across models. I would like the background to use a 50% opacity white mask, or a good percentage so background color comes through a little but there is good contrast with text and it feels filled.
+- I want to switch to only using the ".badge-sm (small / dense)" size for all identity badges including user and system. You can remove ".badge-sm (small / dense)" and set the default to that size.
+
 ## SCRATCH
 
 > Rough human design ideas and notes not to be used or considered by any agent.
 
 ### General
+
+- Need to integrate workflow support In terms of intercepting /workflows and approving via the inbox. The approval might require some means of displaying the proposed workflow as well, ideally rendered in the inbox card content. Need to consider if this fits in one of the existing inbox sections or it needs its own.
+
 - I want to switch from the cream background (#fef6e4) to something darker, like a charcoal. I want to keep the lighter cream for the main footer and the panel headers but for subheader within the panels I want to move to a darker charcoal (or whatever we use for the new main surface fill/background). 
 - We need to standardize our count chips better. I am partial to just using teal for all these, not including the ones related to editing (approve, revise, etc). 
 - I want to decrease the border radius for all of our components. I want to move to a more sharp neobrutalism style in terms of radiuses.
@@ -111,3 +126,4 @@
 - For our Decisions type entries in inbox, we need to have a way for me to get more detailed info for a given option. Either agents need to embed more detailed summaries of each option, a smaller support agent needs to be able to generate summaries as needed and/or there needs to be some type of small scoped qa feature for these. 
 - Need to consider if we want to track all document/plans (possibly assets tab content) revisions. Ideally we would have a means of doing this by integrating minimal tracking metadata stored locally with git version control.
 - We need to clearly track fork and handoff lineage including original transcript access and it should be visible to all agents so they can reference their ancestors transcripts as needed.
+- We need a way to see and potentially reuse retired agents. I am considering if we should include hidden by default collapsable sections at the end of our agent dropdowns that have them and maybe something like that in our agent cards.

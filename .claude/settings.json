@@ -26,7 +26,10 @@
       "mcp__excalidraw__batch_create_elements",
       "mcp__excalidraw__get_canvas_screenshot",
       "mcp__excalidraw__update_element",
-      "Skill"
+      "Skill",
+      "Skill(*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ],
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)",
@@ -55,8 +58,8 @@
       "C:\\Users\\lester\\.claude\\templates"
     ]
   },
-  "agent": "vibe-guide",
   "enableAllProjectMcpServers": true,
   "fastMode": true,
+  "agent": "vibe-guide",
   "plansDirectory": "./.claude/plans"
 }
