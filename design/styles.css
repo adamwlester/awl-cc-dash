@@ -1247,10 +1247,15 @@
     .md-line{ flex:1 1 auto; min-width:0; padding:0 var(--space-9); white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
     .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
     .md-h2{ font-weight:800; color:var(--ag-azure); }
+    /* L2 (b): H3/H4 body heading styles — visually subordinate to the azure H2 (cooler + quieter with depth) */
+    .md-h3{ font-weight:800; font-size:10px; color:var(--ag-cyan); }
+    .md-h4{ font-weight:700; font-size:9.5px; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); }
     .md-blank{ min-height:0.9em; }
     .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-3); }
     .md-task{ color:var(--foreground); } .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
-    .md-h2-row{ position:relative; }
+    /* L2 (b): md-h-row is the level-generic heading row; md-h2-row is kept as an alias so gallery.html's static
+       snapshot still styles (L3 refreshes the gallery to the live component). */
+    .md-h-row, .md-h2-row{ position:relative; }
     /* the section heading carries a verdict tally on the right */
     .vtally{ display:inline-flex; align-items:center; gap:var(--space-4); margin-left:8px; vertical-align:middle; }
     .vchip{ display:inline-flex; align-items:center; gap:var(--space-3); height:var(--size-17); padding:0 var(--space-5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm);
@@ -1287,12 +1292,18 @@
     .nav-tab--fb .nt-lab, .nav-tab--au .nt-lab{ display:none; }   /* the two annotation tabs go icon-only so all three fit */
     .ol-cap{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted-2); margin:2px 0 5px; }
     .ol-list{ display:flex; flex-direction:column; gap:var(--space-2); }
-    .ol-item{ display:flex; align-items:center; gap:var(--space-6); width:100%; text-align:left; padding:var(--space-5) var(--space-7); border:var(--border-width) solid transparent; border-radius:var(--radius-base);
+    /* L2 (b): TOC indent driven off the heading level (--hl set inline per item) — a future ##### is a threshold bump, not a refactor */
+    .ol-item{ display:flex; align-items:center; gap:var(--space-6); width:100%; text-align:left;
+      padding:var(--space-5) var(--space-7) var(--space-5) calc(var(--space-7) + (var(--hl,2) - 2) * var(--space-8));
+      border:var(--border-width) solid transparent; border-radius:var(--radius-base);
       background:transparent; cursor:pointer; font-size:10px; font-weight:700; color:var(--foreground); }
     .ol-item:hover{ background:var(--surface-3); }
     .ol-item.on{ background:var(--secondary-background); border-color:var(--border); box-shadow:var(--shadow-sm); }
+    .ol-item[data-hlevel="3"] .ol-nm, .ol-item[data-hlevel="4"] .ol-nm{ font-weight:600; color:var(--muted); }   /* sub-headings read subordinate in the TOC too */
+    .ol-item[data-hlevel="4"] .ol-nm{ font-size:9px; }
     .ol-dot{ width:var(--size-9); height:var(--size-9); flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:50%; background:var(--muted-2); }
-    .ol-dot.d-approve{ background:var(--success); } .ol-dot.d-revise{ background:var(--warning); } .ol-dot.d-block{ background:var(--danger); }
+    /* L2 (e): approve no longer tints the outline dot (absence of a revise/block tint reads as approved) — only revise/block survive */
+    .ol-dot.d-revise{ background:var(--warning); } .ol-dot.d-block{ background:var(--danger); }
     .ol-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
     .ol-c{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); flex:0 0 auto; }
     .plan-main{ flex:1 1 auto; min-width:0; }
@@ -1592,6 +1603,8 @@
     .cmt-compose{ display:flex; flex-direction:column; gap:var(--space-8); }
     .cmt-ta{ width:100%; min-height:var(--size-54); resize:vertical; font-size:11px; line-height:1.5; }
     .cmt-foot{ display:flex; align-items:center; gap:var(--space-7); }
+    /* L2 (f): the revise/block "needs a comment" hint sits at the left of the composer footer (Save is also disabled) */
+    .cmt-req{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--warning); }
     .cpi-txt{ font-size:11px; line-height:1.45; color:var(--foreground); }
     .cpi-h .cph-lab{ font-size:8.5px; }
 
@@ -1636,6 +1649,21 @@
        are width:auto (not 100%) so the 7px right inset doesn't push them past the scroll area */
     .fb-list, .ol-list{ flex:1 1 0; min-height:0; max-height:none; overflow-y:auto; overflow-x:hidden; }
     .fb-list > .fb-card, .ol-list > .ol-item{ width:auto; margin-right:7px; }
+    /* L2 (d): Outline lens rosters — Authors then Reviewers, stacked under the TOC inside one scroll region.
+       .ol-scroll is the outline body's flex-fill scroller (TOC + rosters flow together, no mid-column gap);
+       the TOC list reverts to natural height inside it. A reviewer row's worst verdict pins right — encoding the
+       two-level model (reviewer verdicts are distinct from the document's own lifecycle badge / footer Approve). */
+    .ol-scroll{ flex:1 1 0; min-height:0; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:var(--space-10); }
+    .ol-scroll .ol-list{ flex:0 0 auto; min-height:0; overflow:visible; }
+    .ol-scroll .ol-roster{ margin-right:7px; }
+    .ol-rhead{ display:flex; align-items:center; gap:var(--space-5); margin-bottom:5px; }
+    .ol-rlab{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted-2); }
+    .ol-rlist{ display:flex; flex-direction:column; gap:var(--space-5); }
+    .ol-rrow{ display:flex; align-items:center; gap:var(--space-5); min-width:0; }
+    .ol-rrow .badge{ flex:0 1 auto; min-width:0; }
+    .ol-rrow .badge .b-role, .ol-rrow .badge .b-name{ overflow:hidden; text-overflow:ellipsis; }
+    .ol-rrow .vbadge{ flex:0 0 auto; margin-left:auto; }
+    .ol-rempty{ font-size:9px; font-weight:700; font-style:italic; color:var(--muted-2); }
     /* A6: verdict badge + section badge stay on one line; the section chip ellipsizes if tight */
     .plan-nav .fb-mid{ flex-wrap:nowrap; }
     .plan-nav .fb-mid .vbadge{ flex:0 0 auto; }

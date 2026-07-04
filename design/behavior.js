@@ -16,8 +16,10 @@
 
   /* ===== tabs ===== */
   function switchTab(g,t){
-    /* v1.2: remap stale stored doc tabs (the old Readme/Claude/Todo tabs folded into "Documents") */
-    if(g==='doc'&&!document.getElementById('doc-'+t)){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
+    /* v1.2: remap stale stored doc tabs (the old Readme/Claude/Todo tabs folded into "Documents").
+       Gate on the known tab set — NOT getElementById('doc-'+t), which since ND-L1 also matches the
+       doc CARD ids (doc-readme, doc-claude, …) and would leave the remap dead for those stale keys. */
+    if(g==='doc'&&['plan','documents','assets'].indexOf(t)<0){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     /* remap stale internal tab keys to the user-facing names (requests→inbox, library→templates) */
     if(g==='feed'&&t==='requests')t='inbox';
     if(g==='prompt'&&(t==='templates'||t==='library'))t='compose';   /* v10p1 #22: Templates folded into Compose */
@@ -1470,17 +1472,25 @@
   function authorsBySec(list){const m={};list.forEach(f=>{(m[f.sec]=m[f.sec]||[]).push(f);});return m;}
   function authorBadge(host,sec,list){const n=list.length;
     return '<span class="rd rd--author" title="Open '+n+' edit'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openAuthorPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="users"></i><span class="rd-n">'+n+'</span></span>';}
-  function mdEditorHTML(host,text,mode){mode=mode||'feedback';   /* the gutter is lens-aware: feedback→verdict badges · authors→neutral author badges · outline→no badges */
+  function mdEditorHTML(host,text,mode){mode=mode||'feedback';   /* the gutter is lens-aware: feedback→verdict badges (revise/block only) · authors→neutral author badges · outline→no badges */
     const fb=mode==='feedback'?fbCountsBySec(getFeedback(host)):null;const au=mode==='authors'?authorsBySec(getAuthors(host)):null;
-    const rows=text.split('\n').map((ln,i)=>{const n=i+1;const isSec=/^##\s+/.test(ln);const isTitle=/^#\s+/.test(ln);const sec=isSec?ln.replace(/^##\s+/,''):'';const c=isSec?(fb?fb[sec]:(au?au[sec]:null)):null;
-      const rail='<button class="md-rail'+(isSec?' is-sec':'')+(isTitle?' is-title':'')+'" onclick="railClick(event,\''+host+'\','+n+')" onmouseenter="railHover(this)" onmouseleave="railHoverOut(this)" data-line="'+n+'"'+(isSec?' data-sec="'+esc(sec)+'"':'')+(isTitle?' data-title="1"':'')+' title="'+(isTitle?'Select the whole document':(isSec?'Select this section':'Select line '+n))+'">'+(c?(au?authorBadge(host,sec,c):railBadge(host,sec,c)):'')+'<span class="rn">'+n+'</span></button>';
+    const rows=text.split('\n').map((ln,i)=>{const n=i+1;const secid='s'+i;
+      /* L2 (b): level-generic heading parse — ## .. #### → level = hash count; the title (#) stays whole-doc. */
+      const isTitle=/^#\s+/.test(ln);const hm=ln.match(/^(#{2,4})\s+(.*)/);const isHead=!!hm;const level=isHead?hm[1].length:0;const sec=isHead?hm[2]:'';
+      const c=isHead?(fb?fb[sec]:(au?au[sec]:null)):null;
+      /* L2 (e): the feedback gutter chip renders ONLY for revise/block — an approved section shows none (absence = approved). */
+      const gutter=c?(au?authorBadge(host,sec,c):((c.revise||c.block)?railBadge(host,sec,c):'')):'';
+      /* L2 (b/c): every heading row carries data-secid (unique line index) + data-hlevel; data-sec keeps the
+         human name so feedback (keyed by name) still maps to the row. */
+      const hAttrs=isHead?' data-secid="'+secid+'" data-hlevel="'+level+'" data-sec="'+esc(sec)+'"':'';
+      const rail='<button class="md-rail'+(isHead?' is-sec':'')+(isTitle?' is-title':'')+'" onclick="railClick(event,\''+host+'\','+n+')" onmouseenter="railHover(this)" onmouseleave="railHoverOut(this)" data-line="'+n+'"'+hAttrs+(isTitle?' data-title="1"':'')+' title="'+(isTitle?'Select the whole document':(isHead?'Select this section':'Select line '+n))+'">'+gutter+'<span class="rn">'+n+'</span></button>';
       let body;
-      if(/^#\s+/.test(ln))body='<span class="md-line md-h1">'+inlineMd(ln.replace(/^#\s+/,''))+'</span>';
-      else if(isSec)body='<span class="md-line md-h2">'+inlineMd(sec)+'</span>';
+      if(isTitle)body='<span class="md-line md-h1">'+inlineMd(ln.replace(/^#\s+/,''))+'</span>';
+      else if(isHead)body='<span class="md-line md-h'+level+'">'+inlineMd(sec)+'</span>';
       else if(/^\s*-\s*\[( |x|X)\]\s+/.test(ln)){const done=/\[(x|X)\]/.test(ln);const t=ln.replace(/^\s*-\s*\[( |x|X)\]\s+/,'');body='<span class="md-line md-task'+(done?' done':'')+'"><span class="md-box">'+(done?'☑':'☐')+'</span> '+inlineMd(t)+'</span>';}
       else if(ln.trim()==='')body='<span class="md-line md-blank"> </span>';
       else body='<span class="md-line">'+inlineMd(ln)+'</span>';
-      return '<div data-comp="markdown-row" class="md-row'+(isSec?' md-h2-row':'')+'" data-line="'+n+'"'+(isSec?' data-sec="'+esc(sec)+'"':'')+'>'+rail+body+'</div>';
+      return '<div data-comp="markdown-row" class="md-row'+(isHead?' md-h-row':'')+'" data-line="'+n+'"'+hAttrs+'>'+rail+body+'</div>';
     }).join('');
     /* A4 bullet 2 — trailing filler row continues the rail track to the bottom past the last line */
     return '<div data-comp="doc-editor" class="doc-ed" data-edhost="'+host+'"><div class="md">'+rows+'<div class="md-row md-fill" aria-hidden="true"><span class="md-rail md-rail--fill"></span><span class="md-line"></span></div></div><div data-comp="comment-popover" class="plan-cmt-pop"></div></div>';}
@@ -1488,23 +1498,35 @@
   const SELby={};
   function setCmtCtl(host,on){const ctl=document.querySelector('[data-cmthost="'+host+'"]');if(ctl)ctl.classList.toggle('is-off',!on);}
   function clearSel(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));SELby[host]=null;setCmtCtl(host,false);eaUpdate(host);}
+  /* L2 (c): the ONE section-boundary helper — a level-L heading's section spans from its heading row to the
+     next heading row of level ≤ L (exclusive), stopping before the trailing filler row. Anchored by the
+     heading's unique data-secid (its line index) so repeated sub-heading names can never collide. Used by
+     railClick (select), railHover (preview), and highlightFbSection (feedback sync). */
+  function sectionRows(host,secid){const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return [];
+    const head=ed.querySelector('.md-row.md-h-row[data-secid="'+secid+'"]');if(!head)return [];
+    const L=parseInt(head.dataset.hlevel,10);const rows=[head];let nx=head.nextElementSibling;
+    while(nx&&!nx.classList.contains('md-fill')){
+      if(nx.classList.contains('md-h-row')&&parseInt(nx.dataset.hlevel,10)<=L)break;
+      rows.push(nx);nx=nx.nextElementSibling;}
+    return rows;}
   function railClick(e,host,n){e.stopPropagation();const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return;
     const row=ed.querySelector('.md-row[data-line="'+n+'"]');if(!row)return;
-    const isTitle=!!row.querySelector('.md-h1');const isSec=row.classList.contains('md-h2-row');const cur=SELby[host];
-    /* re-clicking the active selection clears it */
-    if(cur&&((cur.kind==='all'&&isTitle)||(cur.kind==='sec'&&isSec&&cur.ref===row.dataset.sec)||(cur.kind==='line'&&cur.ref===n))){clearSel(host);return;}
+    const isTitle=!!row.querySelector('.md-h1');const isHead=row.classList.contains('md-h-row');const secid=row.dataset.secid;const cur=SELby[host];
+    /* re-clicking the active selection clears it (sections compare by data-secid, not by name) */
+    if(cur&&((cur.kind==='all'&&isTitle)||(cur.kind==='sec'&&isHead&&cur.ref===secid)||(cur.kind==='line'&&cur.ref===n))){clearSel(host);return;}
     ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));
     if(isTitle){/* the title selects the whole document */ ed.querySelectorAll('.md-row').forEach(r=>r.classList.add(r.querySelector('.md-h1')?'rsel':'rsel-sec'));
       SELby[host]={kind:'all',ref:'all',label:'Whole document'};}
-    else if(isSec){row.classList.add('rsel');let nx=row.nextElementSibling;while(nx&&!nx.classList.contains('md-h2-row')){nx.classList.add('rsel-sec');nx=nx.nextElementSibling;}
-      SELby[host]={kind:'sec',ref:row.dataset.sec,label:'§ '+row.dataset.sec};}
+    else if(isHead){/* L2 (c): nested boundary via sectionRows — spans sub-headings until the next same-or-higher heading */
+      const rows=sectionRows(host,secid);rows.forEach((r,i)=>r.classList.add(i===0?'rsel':'rsel-sec'));
+      SELby[host]={kind:'sec',ref:secid,sec:row.dataset.sec,label:'§ '+row.dataset.sec};}
     else{row.classList.add('rsel');SELby[host]={kind:'line',ref:n,label:'Line '+n};}
     setCmtCtl(host,true);eaUpdate(host);}
   /* A4 bullet 2 — rail-hover preview: light every row a CLICK would select, in canvas cream (.hl).
      line → that (wrapped) row · section → the whole section · title → the whole document (filler row excluded). */
   function railHover(el){const ed=el.closest('.doc-ed');if(!ed)return;const row=el.closest('.md-row');let rows;
     if(el.dataset.title)rows=[...ed.querySelectorAll('.md-row')].filter(r=>!r.classList.contains('md-fill'));
-    else if(el.classList.contains('is-sec')){rows=[row];let nx=row.nextElementSibling;while(nx&&!nx.classList.contains('md-h2-row')&&!nx.classList.contains('md-fill')){rows.push(nx);nx=nx.nextElementSibling;}}
+    else if(el.dataset.secid)rows=sectionRows(ed.dataset.edhost,el.dataset.secid);   /* L2 (c): preview the whole nested span */
     else rows=[row];
     rows.forEach(r=>r.classList.add('hl'));}
   function railHoverOut(el){const ed=el.closest('.doc-ed');if(ed)ed.querySelectorAll('.md-row.hl').forEach(r=>r.classList.remove('hl'));}
@@ -1531,8 +1553,9 @@
      all three, and opening a different comment switches all three. */
   function clearFbHL(host){const ed=document.querySelector('[data-edhost="'+host+'"]');if(ed)ed.querySelectorAll('.md-row.fbhl,.md-row.fbhl-sec').forEach(r=>r.classList.remove('fbhl','fbhl-sec'));}
   function highlightFbSection(host,sec){const ed=document.querySelector('[data-edhost="'+host+'"]');if(!ed)return;clearFbHL(host);
-    const row=[...ed.querySelectorAll('.md-row.md-h2-row')].find(r=>r.dataset.sec===sec);if(!row)return;
-    row.classList.add('fbhl');let nx=row.nextElementSibling;while(nx&&!nx.classList.contains('md-h2-row')){nx.classList.add('fbhl-sec');nx=nx.nextElementSibling;}}
+    /* L2 (c): feedback is keyed by section NAME; find its heading row, then span the nested section by data-secid */
+    const head=[...ed.querySelectorAll('.md-row.md-h-row')].find(r=>r.dataset.sec===sec);if(!head)return;
+    sectionRows(host,head.dataset.secid).forEach((r,i)=>r.classList.add(i===0?'fbhl':'fbhl-sec'));}
   function deselectNavCards(host){const nav=document.querySelector('[data-plannav="'+host+'"]');if(nav)nav.querySelectorAll('.fb-card.sel').forEach(c=>c.classList.remove('sel'));}
   function selectMatchingCards(host,sec){const nav=document.querySelector('[data-plannav="'+host+'"]');if(!nav)return;   /* P4d: section anchor — select every card in the section */
     nav.querySelectorAll('.fb-card').forEach(c=>c.classList.toggle('sel',c.dataset.fbsec===sec));}
@@ -1563,21 +1586,33 @@
     +'<button type="button" class="vdd-trig" onclick="toggleVdd(this)">'+verdictBadgeHTML(verdict)+'<i data-lucide="chevron-down" class="vdd-cv"></i></button>'
     +'<span class="vdd-menu">'+['approve','revise','block'].map(v=>'<button type="button" class="vdd-opt" onclick="pickVdd(this,\''+v+'\')">'+verdictBadgeHTML(v)+'</button>').join('')+'</span></span>';}
   function toggleVdd(btn){const dd=btn.closest('.vdd');document.querySelectorAll('.vdd.open').forEach(x=>{if(x!==dd)x.classList.remove('open');});dd.classList.toggle('open');}
-  function pickVdd(opt,v){const dd=opt.closest('.vdd');dd.dataset.verdict=v;dd.querySelector('.vdd-trig').innerHTML=verdictBadgeHTML(v)+'<i data-lucide="chevron-down" class="vdd-cv"></i>';dd.classList.remove('open');LU();}
+  function pickVdd(opt,v){const dd=opt.closest('.vdd');dd.dataset.verdict=v;dd.querySelector('.vdd-trig').innerHTML=verdictBadgeHTML(v)+'<i data-lucide="chevron-down" class="vdd-cv"></i>';dd.classList.remove('open');LU();
+    const ed=opt.closest('.doc-ed');if(ed&&typeof syncCommentSave==='function')syncCommentSave(ed.dataset.edhost);}   /* L2 (f): a verdict switch re-checks the comment-required rule */
   /* user comment composer — opens in the same popout for the current line/section selection */
   function openComposer(host,verdict){const sel=SELby[host];if(!sel){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;
     deselectNavCards(host);clearFbHL(host);   /* composing is a separate flow from viewing existing feedback */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:2px">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
-      +'<textarea class="in cmt-ta" placeholder="Add a comment or tags (optional)…"></textarea>'
-      +'<div class="cmt-foot"><span class="flex-1"></span><button class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button class="btn-main btn-sm" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
-    pop.classList.add('open');LU();pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
+      +'<textarea class="in cmt-ta" oninput="syncCommentSave(\''+host+'\')" placeholder="Add a comment or tags…"></textarea>'
+      +'<div class="cmt-foot"><span class="cmt-req"></span><span class="flex-1"></span><button class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button class="btn-main btn-sm cmt-save" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
+    pop.classList.add('open');LU();syncCommentSave(host);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  /* L2 (f): a revise/block verdict REQUIRES a non-empty comment — keep Save disabled (+ a hint) until the note
+     is typed; approve stays comment-optional. Re-run on every keystroke and on a verdict switch. */
+  function syncCommentSave(host){const pop=popFor(host);if(!pop)return;const btn=pop.querySelector('.cmt-save');if(!btn)return;
+    const vdd=pop.querySelector('[data-vdd]');const v=vdd?vdd.dataset.verdict:'approve';
+    const ta=pop.querySelector('.cmt-ta');const txt=ta?ta.value.trim():'';const need=(v==='revise'||v==='block')&&!txt;
+    btn.disabled=need;btn.title=need?VERDICT[v].lab+' needs a comment':'Save';
+    const req=pop.querySelector('.cmt-req');if(req)req.textContent=need?VERDICT[v].lab+' needs a comment':'';}
   function openComposerFromCtl(btn){const ctl=btn.closest('[data-cmthost]');if(!ctl)return;if(ctl.classList.contains('is-off')){toast('Select a line or section first');return;}openComposer(ctl.dataset.cmthost,ctl.dataset.verdict||'approve');}
   function saveComment(host){const pop=popFor(host);const vdd=pop?pop.querySelector('[data-vdd]'):null;const v=vdd?vdd.dataset.verdict:'approve';
     const ta=pop?pop.querySelector('.cmt-ta'):null;const txt=ta?ta.value.trim():'';const sel=SELby[host];
-    /* Q3=B: append to the entry's feedback + re-render so tally/outline dot/rail badge/Feedback count update (thumbs stay cosmetic) */
+    /* L2 (f): a revise/block verdict REQUIRES a note (the Save button is also disabled for this — belt + braces);
+       approve is comment-optional and, comment-less, surfaces only in the reviewer roster. */
+    if((v==='revise'||v==='block')&&!txt){toast(VERDICT[v].lab+' needs a comment');if(ta)ta.focus();return;}
+    /* Q3=B: append to the entry's feedback + re-render so tally/outline dot/rail badge/Feedback count update (thumbs stay cosmetic).
+       L2 (c): the comment keys by section NAME (sel.sec) while DOM selection was anchored on sel.ref (data-secid). */
     const e=entryById(host);const list=e?e.feedback:null;
-    if(list&&sel&&sel.kind==='sec')list.push({sec:sel.ref,ag:'user',verdict:v,time:'now',comment:txt});
+    if(list&&sel&&sel.kind==='sec')list.push({sec:sel.sec,ag:'user',verdict:v,time:'now',comment:txt});
     closeCmtPop(host);
     (host.indexOf('doc-')===0?renderDocs:renderPlans)();reopenPlan(host);planNavMode(host,'feedback');   /* L1: docs re-render like plans, then reopen + switch to the Feedback lens */
     toast('Comment saved — marked '+VERDICT[v].lab);}
@@ -1616,10 +1651,12 @@ rotation, covered by a regression test, before merging to main.`,
        {sec:'Context',ag:'sandy',verdict:'approve',time:'14:38',comment:''},
        {sec:'Approach',ag:'vega',verdict:'revise',time:'14:44',comment:'Prefer one-time rotation over sliding-window for replay safety — sliding-window leaves a valid window open after a token is stolen.'},
        {sec:'Approach',ag:'drew',verdict:'approve',time:'14:46',comment:''},
+       {sec:'Approach',ag:'rowan',verdict:'block',time:'14:49',comment:'Block until the Risks rollback path lands — do not merge rotation without a way to unwind churn on prod.'},
        {sec:'Steps',ag:'drew',verdict:'approve',time:'14:47',comment:'Order is right; add an explicit negative test for an already-expired refresh token.'},
        {sec:'Risks',ag:'kai',verdict:'block',time:'14:51',comment:'Need a rollback path if rotation churn spikes auth latency on prod before this can ship.'}
      ],
      authors:[
+       {sec:null,ag:'sandy',time:'Jun 18 09:12'},
        {sec:'Context',ag:'sandy',time:'Jun 18 09:12'},
        {sec:'Approach',ag:'sandy',time:'Jun 18 10:40'},
        {sec:'Approach',ag:'vega',time:'Jun 19 15:22'},
@@ -1644,7 +1681,7 @@ being lost when the run ends.
 ## TL;DR
 Structured JSONL transcript export so an agent's context survives a handoff.`,
      feedback:[{sec:'Steps',ag:'sandy',verdict:'approve',time:'09:18',comment:'Verified the export round-trips on a 200-turn session.'}],
-     authors:[{sec:'Context',ag:'wren',time:'Jun 12 16:40'},{sec:'Steps',ag:'wren',time:'Jun 18 11:20'},{sec:'Steps',ag:'sandy',time:'Jun 19 09:05'}]},
+     authors:[{sec:null,ag:'wren',time:'Jun 12 16:40'},{sec:'Context',ag:'wren',time:'Jun 12 16:40'},{sec:'Steps',ag:'wren',time:'Jun 18 11:20'},{sec:'Steps',ag:'sandy',time:'Jun 19 09:05'}]},
     {id:'plan-3',file:'dashboard-layout-reflow-electric-meadow.md',status:'draft',title:'Dashboard layout reflow',owner:'lex',open:false,created:'Jun 20 10:50',createdAgo:'20h',edited:'Jun 20 11:02',editedAgo:'20h',
      md:`# Dashboard layout reflow
 
@@ -1663,7 +1700,7 @@ the resize behavior across the nested panel groups.
 Reading order becomes Agent · Team Graph · Documentation · Feed · Prompt, with
 resize intact.`,
      feedback:[],
-     authors:[{sec:'Context',ag:'lex',time:'Jun 20 10:50'},{sec:'Steps',ag:'lex',time:'Jun 20 11:02'}]}
+     authors:[{sec:null,ag:'lex',time:'Jun 20 10:50'},{sec:'Context',ag:'lex',time:'Jun 20 10:50'},{sec:'Steps',ag:'lex',time:'Jun 20 11:02'}]}
   ];
   /* L1 (ND-1): DOCS — the project docs as reviewable-document entries in the SAME shape as PLANS (id doc-*, file,
      status, title, owner, created/edited, md, feedback[], authors[]) so the whole Plans machinery — the 3-row card,
@@ -1680,17 +1717,33 @@ from one window. Watch the team, steer each agent, and review their work
 without leaving the dashboard.
 
 ## The five panels
+The window is a title bar over three columns over a status footer.
+
+### Left column
 - **Agent** — inspect & configure the selected agent.
+
+### Middle column
 - **Team Graph** — every agent as a live card.
 - **Library** — plans + project docs (README, CLAUDE) and reference assets.
+
+#### Library tabs
+Plans, Documents, and Assets share one reviewable-document surface.
+
+### Right column
 - **Feed** — messages, scratchpad, log, inbox.
 - **Prompts** — compose and dispatch prompts.
 
 ## Design system
 Neobrutalism: hard 4px shadows, 2px borders, a warm cream canvas, and a
-single pink-to-teal emphasis ladder.`,
+single pink-to-teal emphasis ladder.
+
+### Tokens
+Every value lives in tokens.css — colours, type, spacing, radius, shadow.
+
+### Components
+styles.css holds the shared component CSS; behavior.js the interaction logic.`,
      feedback:[{sec:'The five panels',ag:'wren',verdict:'revise',time:'Jun 19',comment:'List Library before Feed so the doc order matches the new reading order.'}],
-     authors:[{sec:'The five panels',ag:'lex',time:'Jun 18 10:00'},{sec:'Design system',ag:'lex',time:'Jun 20 09:30'}]},
+     authors:[{sec:null,ag:'lex',time:'Jun 17 09:00'},{sec:'The five panels',ag:'lex',time:'Jun 18 10:00'},{sec:'Design system',ag:'lex',time:'Jun 20 09:30'}]},
     {id:'doc-claude',file:'CLAUDE.md',path:'agent-dashboard/CLAUDE.md',status:'draft',title:'Project instructions',owner:'sandy',open:false,created:'Jun 16',createdAgo:'8d',edited:'Jun 21',editedAgo:'9h',
      md:`# CLAUDE.md
 
@@ -1707,7 +1760,7 @@ the AWL multi-agent dashboard.
 - Write transient artifacts into .scratch/, never the repo root.
 - Preserve everything you weren't asked to change.`,
      feedback:[],
-     authors:[{sec:'Workspace identity',ag:'sandy',time:'Jun 16 12:00'},{sec:'Behavioral rules',ag:'sandy',time:'Jun 21 08:45'}]},
+     authors:[{sec:null,ag:'sandy',time:'Jun 16 12:00'},{sec:'Workspace identity',ag:'sandy',time:'Jun 16 12:00'},{sec:'Behavioral rules',ag:'sandy',time:'Jun 21 08:45'}]},
     {id:'doc-claudeuser',file:'CLAUDE.md (user)',path:'~/.claude/CLAUDE.md',status:'approved',title:'User instructions',owner:'wren',open:false,created:'May 28',createdAgo:'27d',edited:'Jun 22',editedAgo:'2d',
      md:`# CLAUDE.md
 
@@ -1723,7 +1776,7 @@ project CLAUDE.md. Global defaults that travel with you.
 - Use markdown links for file references, not bare paths.
 - Match the project's existing patterns before introducing new ones.`,
      feedback:[{sec:'Working style',ag:'sandy',verdict:'approve',time:'Jun 22',comment:'Reads clean — good to keep as the standing default.'}],
-     authors:[{sec:'Working style',ag:'wren',time:'May 28 09:00'},{sec:'Conventions',ag:'wren',time:'Jun 22 11:20'}]},
+     authors:[{sec:null,ag:'wren',time:'May 28 09:00'},{sec:'Working style',ag:'wren',time:'May 28 09:00'},{sec:'Conventions',ag:'wren',time:'Jun 22 11:20'}]},
     {id:'doc-notes',file:'notes.md',path:'agent-dashboard/notes.md',status:'draft',title:'Scratch notes',owner:'lex',open:false,created:'Jun 26',createdAgo:'1d',edited:'Jun 26',editedAgo:'4h',
      md:`# Scratch notes
 
@@ -1733,7 +1786,7 @@ Short-lived notes for the current run — kept brief on purpose.
 - Sidecar API — http://127.0.0.1:7690
 - Renderer dev — http://127.0.0.1:5199`,
      feedback:[],
-     authors:[{sec:'Endpoints',ag:'lex',time:'Jun 26 10:15'}]}
+     authors:[{sec:null,ag:'lex',time:'Jun 26 10:15'},{sec:'Endpoints',ag:'lex',time:'Jun 26 10:15'}]}
   ];
   /* L1 (ND-2): the single entry lookup — search PLANS then DOCS (doc-* ids resolve to DOCS). Replaces the scattered
      PLANS.find(x=>x.id===…) lookups so planAct / reopenPlan / planNavMode / saveComment / getFeedback / getAuthors
@@ -1742,19 +1795,32 @@ Short-lived notes for the current run — kept brief on purpose.
   const PLAN_BADGE={review:['db-review','In review'],approved:['db-approved','Approved'],draft:['db-draft','Draft']};
   function fbBySection(p){const m={};p.feedback.forEach(f=>{(m[f.sec]=m[f.sec]||{approve:0,revise:0,block:0})[f.verdict]++;});return m;}
   function planNavHTML(p,fb,mode){
-    const secs=p.md.split('\n').filter(l=>/^##\s+/.test(l)).map(l=>l.replace(/^##\s+/,''));
-    const outline=secs.map(sec=>{const c=fb[sec];const worst=c?(c.block?'d-block':(c.revise?'d-revise':'d-approve')):'';const cnt=c?(c.approve+c.revise+c.block):0;
-      return '<button data-comp="outline-item" class="ol-item" onclick="planJump(\''+p.id+'\',this)" data-olsec="'+esc(sec)+'"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+sec+'</span>'+(cnt?'<span class="ol-c">'+cnt+'</span>':'')+'</button>';}).join('');
+    /* L2 (b): a level-generic parse — headings ##..#### carry their level; each outline item is anchored to the
+       heading's LINE INDEX (data-secid), never its text, so repeated sub-headings can't collide. */
+    const heads=[];p.md.split('\n').forEach((l,i)=>{const m=l.match(/^(#{2,4})\s+(.*)/);if(m)heads.push({level:m[1].length,text:m[2],secid:'s'+i});});
+    const outline=heads.map(h=>{const c=fb[h.text];const worst=c?(c.block?'d-block':(c.revise?'d-revise':'')):'';const cnt=c?(c.approve+c.revise+c.block):0;   /* L2 (e): approve no longer tints the dot — only revise/block survive */
+      return '<button data-comp="outline-item" class="ol-item" style="--hl:'+h.level+'" data-hlevel="'+h.level+'" data-secid="'+h.secid+'" data-olsec="'+esc(h.text)+'" onclick="planJump(\''+p.id+'\',this)"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+esc(h.text)+'</span>'+(cnt?'<span class="ol-c">'+cnt+'</span>':'')+'</button>';}).join('');
     const auN=(p.authors||[]).length;   /* V1 lens tab strip: Outline keeps its label + takes the first half; Feedback + Authors are icon+count tabs splitting the second half */
     const tabs='<div class="nav-tabs">'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--ol '+(mode==='outline'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'outline\')" title="Outline"><span class="nt-ic"><i data-lucide="list"></i></span><span class="nt-lab">Outline</span></button>'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--fb '+(mode==='feedback'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'feedback\')" title="Feedback"><span class="nt-ic"><i data-lucide="message-square"></i></span><span class="nt-lab">Feedback</span>'+(p.feedback.length?'<span class="nav-cnt">'+p.feedback.length+'</span>':'')+'</button>'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--au '+(mode==='authors'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'authors\')" title="Authors"><span class="nt-ic"><i data-lucide="users"></i></span><span class="nt-lab">Authors</span>'+(auN?'<span class="nav-cnt">'+auN+'</span>':'')+'</button>'
       +'</div>';
-    const body=mode==='feedback'?('<div class="ol-cap">Responses</div>'+feedbackListHTML(p.id,p.feedback))
+    const body=mode==='feedback'?('<div class="ol-cap">Feedback</div>'+feedbackListHTML(p.id,p.feedback))
       :mode==='authors'?('<div class="ol-cap">Authors</div>'+authorListHTML(p.id,p.authors||[]))
-      :('<div class="ol-cap">Sections</div><div class="ol-list">'+outline+'</div>');
+      :('<div class="ol-cap">Table of contents</div><div class="ol-scroll"><div class="ol-list">'+outline+'</div>'+outlineRostersHTML(p)+'</div>');
     return tabs+body;}
+  /* L2 (d): the two Outline rosters — distinct Authors, then distinct Reviewers, stacked under the TOC. A reviewer
+     row trails its WORST revise/block verdict (block>revise), or a lone Approve for an approve-only reviewer —
+     encoding the two-level model (reviewer verdicts are distinct from the document's own lifecycle badge / footer Approve). */
+  function rosterAgents(list){const seen=[];(list||[]).forEach(f=>{if(f.ag&&seen.indexOf(f.ag)<0)seen.push(f.ag);});return seen;}
+  function worstVerdict(list,ag){let w='approve';(list||[]).forEach(f=>{if(f.ag===ag){if(f.verdict==='block')w='block';else if(f.verdict==='revise'&&w!=='block')w='revise';}});return w;}
+  function rosterBlockHTML(cls,label,rows){return '<div class="ol-roster '+cls+'"><div class="ol-rhead"><span class="ol-rlab">'+label+'</span><span class="nav-cnt">'+rows.length+'</span></div>'
+    +(rows.length?'<div class="ol-rlist">'+rows.join('')+'</div>':'<div class="ol-rempty">None yet</div>')+'</div>';}
+  function outlineRostersHTML(p){
+    const au=rosterAgents(p.authors).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k],true)+'</div>');
+    const rev=rosterAgents(p.feedback).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k],true)+verdictBadgeHTML(worstVerdict(p.feedback,k))+'</div>');
+    return rosterBlockHTML('ol-roster--au','Authors',au)+rosterBlockHTML('ol-roster--rev','Reviewers',rev);}
   /* nav feedback cards (A17): row 1 = agent badge + thumbs · row 2 = verdict badge + section badge · then the comment */
   function feedbackListHTML(host,list){if(!list.length)return '<div class="fb-empty">No feedback yet —<br>send for review below.</div>';
     return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
@@ -1824,17 +1890,23 @@ Short-lived notes for the current run — kept brief on purpose.
   /* the tab strip is a LENS SWITCH: selecting a tab repaints the nav card list AND the editor gutter badges AND
      resets the docked box together (Outline→no gutter badges · Feedback→verdict badges · Authors→author badges). */
   function planNavMode(id,mode){const p=entryById(id);const nav=document.querySelector('[data-plannav="'+id+'"]');if(!nav||!p)return;
+    /* L1-panel fix: switching lens while the card is in raw-edit mode used to repaint a fresh VISIBLE .doc-ed
+       on top of the still-open textarea (Edit ghost stuck on "Save"). Exit edit first as an implicit SAVE —
+       entryEdit re-seeds the textarea from entry.md on entry, so discarding here would lose typed work. */
+    const card=document.getElementById(id);const ta=card?card.querySelector('.entry-edit'):null;
+    if(ta&&ta.style.display!=='none'){p.md=ta.value;ta.style.display='none';
+      const eb=card.querySelector('.lib-edit-head [title="Save"]');if(eb){eb.innerHTML='<i data-lucide="square-pen"></i>';eb.title='Edit';}}
     nav.innerHTML=planNavHTML(p,fbBySection(p),mode);
     const ed=document.querySelector('[data-edhost="'+id+'"]');if(ed)ed.outerHTML=mdEditorHTML(id,p.md,mode);   /* repaint the gutter to match the lens (the fresh .doc-ed carries an empty, closed popout) */
     clearSel(id);   /* reset any line/section selection + the Comment control so they match the fresh editor */
     if(typeof refreshJumpPills==='function')refreshJumpPills();   /* the swapped .md is a fresh scroll region — re-attach its jump-to-end pill (the discarded node took its pill with it) */
     LU();}
-  function planJump(id,btn){const card=document.getElementById(id);if(!card)return;const sec=btn.dataset.olsec;
+  function planJump(id,btn){const card=document.getElementById(id);if(!card)return;const secid=btn.dataset.secid;
     const nav=card.querySelector('[data-plannav]');if(nav)nav.querySelectorAll('.ol-item').forEach(o=>o.classList.toggle('on',o===btn));
-    const rows=[...card.querySelectorAll('.md-row.md-h2-row')];const row=rows.find(r=>r.dataset.sec===sec);
+    /* L2 (c): resolve the outline item to its exact heading row by data-secid (line index), never by text —
+       then select the whole nested span through railClick → sectionRows. */
+    const row=card.querySelector('.md-row.md-h-row[data-secid="'+secid+'"]');
     if(row){row.scrollIntoView({block:'nearest',behavior:'smooth'});
-      /* A4 (CHANGED): clicking an Outline section now selects the whole section exactly like clicking its
-         section rail (railClick), instead of the old brief .md-target flash on the header row only. */
       railClick({stopPropagation(){}}, id, parseInt(row.dataset.line,10));}}
 
   /* FEED + HISTORY — expandable cards (Plan-style) with two-line agent badges; checkbox = multi-select */

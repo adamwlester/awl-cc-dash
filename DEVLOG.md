@@ -397,7 +397,19 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
-## Archived history
+### 2026-07-03 22:52:00 — ND L1 review panel: switchTab stale-key remap regression fixed
+
+The adversarial panel on L1 (5 findings confirmed, 0 refuted) caught that the `awl-v8` stale-doc-tab remap guard (`!getElementById('doc-'+t)`) now matches the new doc CARD ids (`doc-readme`, `doc-claude`), so a returning user with a stale saved sub-tab got a blank Library. The guard now gates on the known tab set (`plan/documents/assets`). The remaining confirmed findings (lens-switch-during-edit double-view; two stale DESIGN.md prose refs to the retired doc-switcher/single-doc-pane shape) are deferred to the L2 checkpoint — L2 is concurrently rewriting that exact region. The fix rides in the L2 checkpoint commit (same file, in-flight tree).
+
+Files: design/behavior.js, DEVLOG.md
+
+---
+
+### 2026-07-03 23:25:00 — ND L2: Library rail, nested TOC & two-level review surface (item 3)
+
+Reworked the Library editor rail/review surface (gallery propagation deferred to L3). Outline caption → "Table of contents", Feedback caption → "Feedback". Level-generic heading parse (`##`–`####`): heading rows carry `data-hlevel` + a line-index `data-secid`; one `sectionRows(host,secid)` boundary helper (a level-L section spans to the next heading ≤ L) now drives `railClick`/`railHover`/`highlightFbSection`/`planJump` — nested selection covers sub-headings, and repeated heading names can't collide. The Outline gains **Authors** + **Reviewers** rosters (distinct agents; reviewer rows trail their worst revise/block badge, or a lone Approve) — encoding the two-level model (reviewer verdicts ≠ document lifecycle). Dropped the per-section approve gutter chip + approve outline dot (absence = approved). Revise/Block verdicts now require a non-empty comment (Save disabled + hint + submit guard); Approve stays comment-optional. Seeds: every plan/doc gained a document-wide author; plan-1 Approach carries revise+approve+block; readme.md re-seeded with real `###`/`####` levels. Verified headless: 0 JS errors, boundaries/rosters/gutters/comment-rule all driven. **Checkpoint fixes folded in** (L1-panel deferrals): lens-switch during raw-edit now implicitly saves and exits edit (was: stacked double-view with Edit stuck on "Save"); DESIGN.md's two stale refs to the retired doc-switcher/single-doc-pane shape corrected.
+
+Files: design/behavior.js, design/styles.css, design/DESIGN.md, DEVLOG.md
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
 
