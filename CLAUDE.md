@@ -28,7 +28,7 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 | `dev/` | Claude-CLI / VS Code build-workflow assets — **not the app**: `notes/` (working notes + `research/`), `prompts/` (dev-loop prompts), `tools/` (`bootstrap-env.ps1`, `claude-context-extractor/`). |
 | `.claude/` | Claude Code config — `settings.json` (permissions, `plansDirectory: ./.claude/plans`), `agents/`, `plans/`. |
 | `.vscode/` | VS Code workspace (`awl-cc-dash.code-workspace`), `settings.json`, `tasks.json`, `claude-prompts.code-snippets`. |
-| `transcripts/` | **Gitignored** personal session exports, one subfolder per surface: `web/` (claude.ai chats via `extract-web.py`), `desktop/` (desktop-app agent-mode sessions via `extract-desktop.py`), `cli/` (Claude Code CLI sessions exported by the claude-history-viewer VS Code extension). See **CUSTOM TOOLING → claude-context-extractor**. |
+| `transcripts/` | **Gitignored** personal session exports — `web/` (claude.ai, `extract-web.py`), `desktop/` (desktop app, `extract-desktop.py`), `cli/` (Claude Code CLI, claude-history-viewer extension). See **CUSTOM TOOLING**. |
 
 **Root files:** `CLAUDE.md`, `DEVLOG.md`, `requirements.txt`, `pyproject.toml`, `.gitignore`, `start-dashboard.bat` (launches the sidecar + Electron together).
 

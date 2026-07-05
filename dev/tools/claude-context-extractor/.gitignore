@@ -1,5 +1,5 @@
-# Never commit the auth cookie or pulled conversations
+# Never commit the auth cookie (extract-web.py). Pulled conversations now go to the
+# gitignored <repo>/transcripts/, not a local out/ — so only the cookie + bytecode are here.
 session_key.txt
-out/
 __pycache__/
 *.pyc

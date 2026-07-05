@@ -647,6 +647,14 @@ Files: dev/tools/claude-context-extractor/extract-web.py, dev/tools/claude-conte
 
 ---
 
+### 2026-07-05 01:21:25 — docs: tightened the transcripts/ folder-map row + dropped the tool's stale `out/` ignore
+
+Follow-up polish on the extractor refactor. Condensed the `transcripts/` row in the CLAUDE.md folder map to match its neighbours' density (was ~2× longer). Dropped the now-vestigial `out/` line from `dev/tools/claude-context-extractor/.gitignore` — the scripts export to the root `transcripts/` (gitignored) now, never a local `out/` — and clarified the comment (only the `session_key.txt` cookie + bytecode remain). Ran a full repo sweep for stale refs to the refactor: live docs/config are all clean; remaining `extract.py`/`cc-exports` hits are only in append-only history (DEVLOG, `archive/**`) — left per the append-only rule — plus two `.claude/plans/` handoff records that point at old `.claude/cc-exports/…` paths (files now in `transcripts/cli/`), left as historical narrative and flagged to the operator rather than silently rewritten.
+
+Files: CLAUDE.md, dev/tools/claude-context-extractor/.gitignore, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
