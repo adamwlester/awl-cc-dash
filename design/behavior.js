@@ -1168,7 +1168,7 @@
      arrow-left-right, next-up item 18) + the OTHER agent + its FULL relationship label (a link now has exactly one).
      The group-header identity badge carries the corner-count overlay badge (teal >0; the muted zero state has no
      live instance here — zero-link groups don't render inside the split sections; its look is preserved in the
-     archived gallery snapshot, a data-variants candidate for the conversion sweep).
+     archived gallery snapshot; declared as the corner-count-badge's `none` data-variants state by the 2026-07-05 sweep).
      LINKS_CFG is keyed by agent name (distinct from the planned on-graph `LINKS` edge data, which is node-id keyed);
      ONE relationship per link — wanting both = two links (see the sandy↔drew pair). */
   const LINKS_CFG=[
