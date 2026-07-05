@@ -687,6 +687,14 @@ Files: CLAUDE.md, design/DESIGN.md, design/behavior.js, design/styles.css, DEVLO
 
 ---
 
+### 2026-07-05 02:52:00 — retirement stage 3: the data-comp label overlay (Ctrl+L) — dev tooling, one script tag
+
+New [design/label-overlay.js](design/label-overlay.js), loaded by `mockup.html` with exactly one script tag after `mockup-toolkit.js` — dev-only view tooling, same class as the toolkit: outside the five-file design system, exempt from propagation, no tokens.css values, and it **never mutates the mockup's DOM** (labels + hover-outlines draw in its own fixed layer appended outside `.app`). Ctrl+L toggles it (verified collision-free: toolkit owns Ctrl+G + Escape-while-active; behavior.js binds only Enter/Escape in inputs; the browser's address-bar Ctrl+L is preventDefault-intercepted, the same override class as the toolkit's Ctrl+G). Density: ~190 tagged instances render as **one label per slug anchored on the first visible instance with an ×N count** (42 labels on the default view), collision-nudged downward, slug-only text; hovering a label outlines every instance of that slug. Stores nothing per component — every draw re-queries `[data-comp]` and recomputes from getBoundingClientRect, clipped against every overflow ancestor + the viewport; redraws on resize, any scroll (capture), mouse-drag movement (splitters), and `.app` mutations (MutationObserver). Verified headed-parked via ui-verify per the CLAUDE.md gate: toggle on/off, hover (5 boxes on `hover-card ×5`), vertical splitter dragged to narrow + wide extremes with labels on (33–34 labels repositioned; visible-count honestly moved 46 ↔ 34 as panels revealed/clipped), inner-panel scroll (42 → 43 as a component scrolled in), Ctrl+G toolkit coexistence both ways, zero page errors; screenshots in `.scratch/glossary-retirement/`. (Note: the mockup's *columns* are pinned by design — the h-orient splitters are no-op clamps; the real resize range is the v-orient panel splits, which is what the extremes test drove.)
+
+Files: design/label-overlay.js (new), design/mockup.html, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
