@@ -663,6 +663,14 @@ Files: dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, dev/prompts/gl
 
 ---
 
+### 2026-07-05 02:09:34 — retirement stage 1: gallery archived as a frozen self-contained snapshot; design/gallery.html deleted
+
+Glossary-retirement run stage 1 (per [dev/prompts/glossary-retirement-run.md](dev/prompts/glossary-retirement-run.md)). Created `archive/design/design-v12p7-gallery-retirement/` — `gallery.html` plus its own copies of `tokens.css` / `styles.css` / `behavior.js`, with all three CDN dependencies **vendored** into `vendor/` (Tailwind Play CDN → `tailwind.js`, lucide v1.23.0 → `lucide.js`, and — beyond the prompt's two — the Google-Fonts Archivo/JetBrains Mono stylesheet → `fonts.css` + 9 woff2 files, URLs rewritten local), so the page renders identically offline forever. Added a prominent in-page FROZEN ARCHIVE banner (inline-styled, top of `<body>`) + a head-comment marker: frozen 2026-07-05, retired in favor of on-element tagging (`data-comp`/`data-variants`) + the label overlay, never edit, living rules in `design/DESIGN.md`. Deleted `design/gallery.html`. Verified headed-parked via ui-verify serving **only** the snapshot folder: zero requests leave localhost, tokens/fonts/lucide all live, 127 gx-cards + 451 icons + 202 agent-tile glyphs render styled, split-button menu opens live (screenshots in `.scratch/glossary-retirement/`); the 9 aborted self-requests reproduce on the untouched v12p6 gallery (pre-existing Chromium `<use>` quirk, not the edits), 404 = the browser's automatic favicon probe.
+
+Files: archive/design/design-v12p7-gallery-retirement/ (new: gallery.html, tokens.css, styles.css, behavior.js, vendor/), design/gallery.html (deleted), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

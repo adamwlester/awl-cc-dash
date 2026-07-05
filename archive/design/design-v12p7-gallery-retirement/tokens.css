@@ -1,0 +1,204 @@
+/* ============================================================================
+   AWL Multi-Agent Dashboard — Design Tokens (single source of truth)
+   ----------------------------------------------------------------------------
+   Every raw design VALUE (colour, type, spacing, radius, shadow) lives here and
+   nowhere else. mockup.html links this file and references the tokens via
+   var(--name); DESIGN.md describes the *rules* and points here for the *values*.
+   If a value needs changing, change it once, here.
+
+   Token names mirror the neobrutalism.dev Tailwind theme (--main,
+   --secondary-background, --border, --shadow, --radius-base, …) so the static
+   mockup ports ~1:1 to a React/shadcn build. DO NOT rename these custom
+   properties — the mockup references them in thousands of places.
+   ============================================================================ */
+
+:root{
+
+  /* ---- Brand / neobrutalism core ----------------------------------------- */
+  --main:#f582ae;              /* PRIMARY accent — pink (main action · active tab · badges · title bar · doc selection highlight) */
+  --main-foreground:#001858;   /* ink on --main */
+  --secondary:#8bd3dd;         /* SECONDARY accent — teal (tonal action · active value in segmented/toggles · selection rings) */
+  --secondary-foreground:#001858;
+  --select:#a9dde7;            /* light teal — selection FILL ("secondary container"): selected rows & cards */
+  --border:#001858;            /* navy — 2px borders everywhere */
+  --foreground:#001858;        /* navy — heading + body ink */
+  --ring:#8bd3dd;              /* focus / selection ring (teal) */
+  --overlay:rgba(0,24,88,0.55);
+
+  /* "dim" = the dropdown CHIP half of each split button — a LIGHTER tint of its
+     action accent (chip recedes, action leads). Send chip = light pink, Revise
+     chip = light teal, each staying in its action's hue family. */
+  --main-dim:#f9b9d2;          /* Send chip — light pink  */
+  --secondary-dim:#bfe6ec;     /* Revise chip — light teal */
+
+  /* ---- Surfaces — deliberately just 3 warm surfaces + button + hairline ---- */
+  --background:#fef6e4;            /* canvas — app background + Team Graph scroll-well */
+  --secondary-background:#ffffff;  /* card — cards, inputs, panel bodies, Feed tab wells */
+  --surface-3:#f5ecd9;             /* chrome — panel headers/footers, toolbars, segmented tracks */
+  --surface-btn:#fbf5e8;           /* warm cream — low-emphasis action buttons (lighter than chrome so buttons pop on --surface-3; form inputs/selector fields stay white) */
+  --rule:#d8cfb8;                  /* hairline — dividers between rows inside a bordered list */
+
+  /* ---- Muted text ramp --------------------------------------------------- */
+  --muted:#5b5f86;
+  --muted-2:#9a93b4;
+
+  /* ---- Semantic / signal ------------------------------------------------- */
+  --success:#2f9e6f;   /* success / active   */
+  --warning:#d98a2b;   /* attention / pending */
+  --danger:#d23b6a;    /* destructive (Retire, Reject, Stop, Bypass) */
+
+  /* Inbox section-heading ramp — the LABEL TEXT (+ its matching count badge) for the
+     three "action-needed" sections, escalating low→high: Permission (blackish-orange) →
+     Warning (--warning) → Error (--danger). Plan + Decision stay neutral (--muted).
+     Only Permission needs a dedicated value — Warning reuses --warning, Error reuses --danger. */
+  --inbox-permission:#a9710f;   /* blackish-orange — the low end of the ramp */
+
+  --ag-user:#7b7fa6;   /* User row / idle tone */
+  --ag-system:#001858; /* reserved System pseudo-identity tile — the app's own ink (the --foreground navy
+                          register, deliberately NOT a jewel --ag-* colour: System is the app, not an agent) */
+
+  /* glyph fill for agent tiles: white so identity reads on every colored tile.
+     Set transparent for a pure knockout. */
+  --icon-fg:#ffffff;
+
+  /* ---- Soft status containers & badge tints ------------------------------ */
+  /* Material-3-style "container" roles: a soft background paired with its
+     on-color text, used by status/lifecycle/health badges, inline confirms,
+     and warning banners. Values preserved from the mockup's prior inline hexes
+     (a few near-identical greens are kept distinct on purpose, not unified, so
+     the rendering is byte-for-byte the same). */
+  --success-soft:#e7f5ee;  --success-text:#1f6f4d;   /* live · connected · confirm */
+  --warning-soft:#f6e6cf;  --warning-text:#9a6710;   /* pending · review · session · warn */
+  --warning-soft-pale:#fff6e9;                       /* global-edit warning banner bg */
+  --danger-soft:#fbe7ee;                             /* danger banner/confirm bg (text uses --danger) */
+
+  /* History / Plan status badges (the .db-* family) */
+  --status-active:#178a55;                           /* in-flight — solid green (text = --icon-fg) */
+  --status-done-soft:#dcf0e6;                        /* sent · complete · approved (text = --success-text) */
+  --status-next-soft:#eef0d8;  --status-next-text:#5f6f1c;
+  --status-held-soft:#f6e0d6;  --status-held-text:#a04b27;
+
+  /* doc rail: section-select indicator (dark teal) */
+  --rail-section:#2f97a6;
+
+  /* link hover (utility text links) */
+  --link-hover:#b06d20;
+
+  /* ---- Type -------------------------------------------------------------- */
+  /* Families — single-sourced here and referenced via var(--font-*). The static
+     mockup also mirrors them in its Tailwind sans/mono theme. Archivo for sans
+     (headings 800 / body 500); JetBrains Mono for metrics, code, ids, commands. */
+  --font-sans:'Archivo',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-weight-base:500;
+  --font-weight-heading:800;
+
+  /* ---- Radius (primitive, by size — used directly, no semantic layer) ----- */
+  --radius-base:0px;   /* the uniform tight radius — cards, inputs, buttons, panels */
+  --radius-sm:0px;     /* small badges & chips (status/lifecycle/verdict/count, menu items) — still a rounded square, no pill */
+  --radius-xs:0px;     /* tiniest accents — colour swatches, the command-group rule, focus-fill chips */
+
+  /* ---- Border / divider widths (primitive) ------------------------------- */
+  --border-width:2px;    /* the navy border on every bordered element */
+  --divider-width:3px;   /* the heavier splitter line between major panels */
+  --ring-width:3px;      /* selection / focus ring outline width */
+
+  /* ---- Shadow (hard offset, no blur) ------------------------------------- */
+  --shadow:4px 4px 0 0 var(--border);
+  --shadow-sm:2px 2px 0 0 var(--border);
+  --spacing-boxShadowX:4px;
+  --spacing-boxShadowY:4px;
+  --spacing-reverseBoxShadowX:-4px;
+  --spacing-reverseBoxShadowY:-4px;
+
+  /* ---- Agent-card icon-fill knobs ---------------------------------------- */
+  /* Global lightness knobs for the Team Graph cards' light agent-colour tint +
+     watermark glyph (the "icon-fill" card treatment). The per-card agent COLOUR
+     itself is the inline --nc binding (per-instance — deliberately NOT a token,
+     since it binds one of the --ag-* palette to a single agent). */
+  --node-tint:22%;            /* base card field tint of the agent colour */
+  --node-tint-selected:33%;   /* stronger field tint for the selected card */
+  --node-icon-pct:5%;         /* watermark glyph tint (near-white over the field) */
+
+  /* ---- Agent identity palette — the "Jewel" family ----------------------- */
+  /* 25 colours assigned per agent (round-robin, color = n mod 25), kept in a
+     different REGISTER from the UI accents above (deeper / more saturated) so
+     identity never reads as a UI signal. The "Jewel" family — one OKLCH recipe
+     (target oklch 0.52 0.15, gamut-clamped per hue), spread around the wheel in
+     spectral ROYGBIV order. 25 = the unique-colour ceiling (typical project);
+     past ~16 the icon is the primary disambiguator and colour a soft "family"
+     signal, so the ring densifies rather than re-spacing (existing 16 unchanged;
+     the +9 fill the widest gaps). These are the single source for the colour
+     picker, the agent tiles, and the agent-identity JS (read from CSS). */
+  --ag-crimson:#aa3a61;
+  --ag-scarlet:#ae3a4f;
+  --ag-vermilion:#af3c3a;
+  --ag-amber:#aa4600;
+  --ag-gold:#9d5400;
+  --ag-topaz:#915c00;
+  --ag-citron:#876300;
+  --ag-chartreuse:#786900;
+  --ag-lime:#687100;
+  --ag-peridot:#557600;
+  --ag-fern:#387b12;
+  --ag-emerald:#008149;
+  --ag-teal:#008370;
+  --ag-turquoise:#007879;
+  --ag-cyan:#007f91;
+  --ag-cerulean:#007494;
+  --ag-azure:#0076ab;
+  --ag-cobalt:#006bbb;
+  --ag-sapphire:#3565be;
+  --ag-indigo:#4d5ebe;
+  --ag-violet:#7152b5;
+  --ag-orchid:#8b48a0;
+  --ag-fuchsia:#954393;
+  --ag-magenta:#9e3f84;
+  --ag-rose:#a53c73;
+
+  /* ---- Sizing scale (primitive, by px — recurring component dimensions) --- */
+  /* Badge/bar/tile/icon/control dimensions used 2+ times across styles.css.
+     Large one-off layout widths stay inline (they're measurements, not reusable
+     design values). Used directly via var(--size-N); no semantic layer. */
+  --size-2:2px;    --size-6:6px;    --size-7:7px;    --size-9:9px;    --size-10:10px;
+  --size-11:11px;  --size-12:12px;  --size-13:13px;  --size-14:14px;  --size-15:15px;
+  --size-16:16px;  --size-17:17px;  --size-18:18px;  --size-20:20px;  --size-21:21px;
+  --size-22:22px;  --size-24:24px;  --size-26:26px;  --size-28:28px;  --size-30:30px;
+  --size-32:32px;  --size-34:34px;  --size-36:36px;  --size-40:40px;  --size-42:42px;
+  --size-44:44px;  --size-54:54px;
+
+  /* ---- Spacing scale (primitive, by px — padding & gaps) ------------------ */
+  /* The padding/gap rhythm (values used 2+ times). Per the locked token scope,
+     any semantic alias tokens are confined to padding/gaps; the mockup uses the
+     primitive scale directly. */
+  --space-1:1px;    --space-2:2px;    --space-3:3px;    --space-4:4px;    --space-5:5px;
+  --space-6:6px;    --space-7:7px;    --space-8:8px;    --space-9:9px;    --space-10:10px;
+  --space-11:11px;  --space-12:12px;  --space-14:14px;  --space-15:15px;  --space-16:16px;
+
+  /* The retired --req-* Inbox request-type ramp (6 tokens) was REMOVED in this
+     token pass — it had been quarantined as unused and is confirmed referenced
+     nowhere in styles.css or mockup.html (the Inbox ranks severity by typed
+     section now; Error owns --danger as the single alarm). */
+
+  /* ---- Layout — frame & pane size constraints --------------------------- */
+  /* The dashboard's canonical geometry, single-sourced. These are stable DESIGN
+     bounds — NOT the same as the DEFAULT divider positions (each panel's inline
+     `flex:` ratio), which stay inline as runtime state. Every dimension carries
+     its own min + max so any one can be relaxed later WITHOUT restructuring the
+     CSS that consumes it: to make a pinned column resizable, widen its --*-max
+     above its --*-min; nothing else changes. In dev the window and the two side
+     columns are PINNED (min==max) to lock the canvas while we build; the middle
+     column has no width token — it FLEXES to fill the remainder (~1196px), so
+     the row always sums to --win-w exactly regardless of splitter width. The two
+     vertical splits keep a REAL range (min≠max); each pane's max sits a touch
+     under the column's ~1520px budget-minus-opposite-min so a fully-dragged pane
+     can never leave a gap. Mirrors the eventual Electron BrowserWindow min/max. */
+  --win-w:2200px;          --win-h:1600px;               /* fixed dev window */
+  --col-left-min:400px;    --col-left-max:400px;         /* Agent column — pinned */
+  --col-right-min:1000px;  --col-right-max:1000px;       /* right column — pinned */
+  /* middle column: flex only (no width token) — fills the remainder (~1196px) */
+  --pane-graph-min-h:300px;    --pane-graph-max-h:1200px;    /* mid col, top — Team Graph */
+  --pane-docs-min-h:300px;     --pane-docs-max-h:1200px;     /* mid col, bottom — Plans/Documents */
+  --pane-feed-min-h:300px;     --pane-feed-max-h:1200px;     /* right col, top — Team Feed/Inbox */
+  --pane-prompts-min-h:300px;  --pane-prompts-max-h:1200px;  /* right col, bottom — Prompt/Compose */
+}
