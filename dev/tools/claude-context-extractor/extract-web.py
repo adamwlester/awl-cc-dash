@@ -13,6 +13,10 @@ the claude-history-viewer extension's convention, `claude-<conversation-date>-<t
     claude-<date>-<slug>.artifacts/     extracted artifact files (only when the chat has any)
     claude-<date>-<slug>.summary.md     stats sidecar — only when --summary is passed
 
+When done, the rendered .md (and the .summary.md, when written) opens as a tab in the running
+VS Code window via the `code` CLI — like the claude-history-viewer extension. The bulky raw
+.source.json and the artifacts folder are left closed. Pass --no-open to skip opening entirely.
+
 Usage (stdlib only — any Python 3.9+, no venv needed). Copy-paste these from the repo root:
     python dev/tools/claude-context-extractor/extract-web.py --list
     python dev/tools/claude-context-extractor/extract-web.py --name "Linting explained simply"
@@ -37,6 +41,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -171,8 +177,31 @@ def disambiguate(out_dir: Path, base: str, owner_marker: str) -> str:
         n += 1
 
 
+def open_in_editor(paths, enabled: bool = True) -> None:
+    """Best-effort: open the exported file(s) as tabs in the running VS Code window — the
+    same convenience the claude-history-viewer extension gives. Uses the `code` CLI (installed
+    globally on PATH, or provided by VS Code's integrated terminal). Quietly no-ops if `code`
+    isn't found or the launch fails: an editor that won't open must never break an export."""
+    paths = [p for p in (paths or []) if p]
+    if not enabled or not paths:
+        return
+    code = shutil.which("code")
+    if not code:
+        print("  (skipped auto-open: VS Code 'code' command not on PATH)", file=sys.stderr)
+        return
+    # On Windows `code` resolves to a .cmd/.bat — route those through cmd.exe so the
+    # launch is reliable across Python versions; run other platforms' `code` directly.
+    launcher = (["cmd", "/c", code] if os.name == "nt" and code.lower().endswith((".cmd", ".bat"))
+                else [code])
+    try:
+        subprocess.run([*launcher, "--reuse-window", *[str(p) for p in paths]], check=False)
+        print(f"  (opened in VS Code: {', '.join(Path(p).name for p in paths)})")
+    except Exception as e:
+        print(f"  (skipped auto-open: {e})", file=sys.stderr)
+
+
 def cmd_fetch(key: str, org: str, arg: str, method: str = "heuristic", model: str | None = None,
-              out_dir: Path = DEFAULT_OUT, want_summary: bool = False) -> None:
+              out_dir: Path = DEFAULT_OUT, want_summary: bool = False, open_editor: bool = True) -> None:
     cid = conv_id(arg)
     data = api_get(
         f"/organizations/{org}/chat_conversations/{cid}"
@@ -219,11 +248,15 @@ def cmd_fetch(key: str, org: str, arg: str, method: str = "heuristic", model: st
 
     print(f"Wrote to {out_dir}:")
     print(f"  {base}.md · {base}.source.json" + (f" · {base}.artifacts/ ({artifacts})" if artifacts else ""))
+    # Open only the human-readable files — never the bulky raw .source.json or the artifacts dir.
+    to_open = [out_dir / f"{base}.md"]
     if want_summary:
         s = write_summary(out_dir / f"{base}.summary.md", data, method, model)
         extra = f" · exact {s['exact_total']:,}" if s.get("exact_total") else ""
         print(f"  {base}.summary.md — {s['messages']} msgs · {sum(s['tools'].values())} tool calls · "
               f"~{s['total']:,} tokens ({s['method']}){extra}")
+        to_open.append(out_dir / f"{base}.summary.md")
+    open_in_editor(to_open, open_editor)
 
 
 def resolve_name(key: str, org: str, name: str) -> str:
@@ -416,7 +449,7 @@ def write_summary(dest_file: Path, data: dict, method: str, model: str | None = 
     return s
 
 
-def cmd_resummarize(path_str: str, method: str, model: str | None) -> None:
+def cmd_resummarize(path_str: str, method: str, model: str | None, open_editor: bool = True) -> None:
     """Offline (re)summary of an existing export — no key, no fetch. Accepts a
     `<base>.source.json` file (new flat layout) or a directory containing
     `conversation.json` (the tool's old per-export-folder layout)."""
@@ -438,6 +471,7 @@ def cmd_resummarize(path_str: str, method: str, model: str | None) -> None:
     s = write_summary(dest, data, method, model)
     print(render_summary(s))
     print(f"\n(summary written to {dest})")
+    open_in_editor([dest], open_editor)
 
 
 def main() -> None:
@@ -461,10 +495,12 @@ def main() -> None:
     ap.add_argument("--org", help="organization UUID (auto-detected if omitted)")
     ap.add_argument("--session-key", help="claude.ai sessionKey (overrides $CLAUDE_SESSION_KEY / session_key.txt)")
     ap.add_argument("--out", help=f"output directory for exports (default: {DEFAULT_OUT})")
+    ap.add_argument("--no-open", action="store_true",
+                    help="don't open the export in VS Code afterward (default: open it)")
     args = ap.parse_args()
 
     if args.resummarize:                   # offline path — no sessionKey needed
-        cmd_resummarize(args.resummarize, args.tokens, args.model)
+        cmd_resummarize(args.resummarize, args.tokens, args.model, not args.no_open)
         return
 
     if (args.tokens != "heuristic" or args.model) and not args.summary:
@@ -478,9 +514,10 @@ def main() -> None:
         cmd_list(key, org)
     elif args.name:
         cmd_fetch(key, org, resolve_name(key, org, args.name), args.tokens, args.model,
-                  out_dir, args.summary)
+                  out_dir, args.summary, not args.no_open)
     elif args.conversation:
-        cmd_fetch(key, org, args.conversation, args.tokens, args.model, out_dir, args.summary)
+        cmd_fetch(key, org, args.conversation, args.tokens, args.model, out_dir, args.summary,
+                  not args.no_open)
     else:
         ap.print_help()
 

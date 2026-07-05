@@ -336,6 +336,11 @@ The enforcement tier and the doc pass that closes the run. **New [dev/tools/vari
 
 Files: dev/tools/variant-lint/variant-lint.mjs (new), CLAUDE.md, design/DESIGN.md, design/behavior.js, DEVLOG.md
 
+### 2026-07-05 06:50:00 — Extractors auto-open their exports in VS Code
+
+Both `extract-desktop.py` and `extract-web.py` now open the rendered transcript `.md` (and the `.summary.md`, when written) as a tab in the running VS Code window after an export — via the `code` CLI, matching the claude-history-viewer extension's convenience so the path is grabbable and the transcript readable immediately. A shared best-effort `open_in_editor()` helper (duplicated per the scripts' standalone-stdlib convention) opens only the human-readable files, leaving the bulky raw `.source.json` and the artifacts folder closed; a new `--no-open` flag skips it for batch/headless runs; a missing `code` on PATH degrades gracefully (the export still completes and prints a "skipped auto-open" note). On Windows the resolved `code.CMD` is routed through `cmd /c` for a reliable launch. Docstrings + README synced. Live-verified: a real desktop export opened both tabs, and `--no-open` cleanly suppressed it.
+Files: dev/tools/claude-context-extractor/extract-desktop.py, dev/tools/claude-context-extractor/extract-web.py, dev/tools/claude-context-extractor/README.md, DEVLOG.md
+
 ---
 
 ## Archived history

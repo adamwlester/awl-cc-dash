@@ -11,6 +11,8 @@ The third transcript surface, `<repo>/transcripts/cli/` (Claude Code CLI session
 
 Both scripts share one convention, matching that extension's filenames: exports are named `claude-<session-date>-<title-slug>` (lowercase slug, max 50 chars). A stats sidecar `<name>.summary.md` (message/tool/thinking counts, timing, token estimate) is written **only** when `--summary` is passed. Override the output folder with `--out <dir>`. The whole `transcripts/` tree is gitignored — personal data never gets committed.
 
+When an export finishes, the readable transcript `.md` (and the `.summary.md`, when written) opens as a tab in your running VS Code window — via the `code` CLI, the same convenience the claude-history-viewer extension gives — so you can grab the path and read it immediately. The bulky raw `.source.json` and any artifacts folder are left closed. Pass `--no-open` to skip it (batch/headless runs); if `code` isn't on PATH the export still completes and just prints a "skipped auto-open" note.
+
 ## extract-desktop.py — desktop app sessions (no setup)
 
 The desktop app runs "local agent mode" as a Claude Code session under the hood and stores each one on disk: a config JSON carrying the human-readable title, plus a standard Claude Code JSONL transcript. On the Microsoft Store (MSIX) build these live under the package container (`AppData\Local\Packages\Claude_...\LocalCache\Roaming\Claude\local-agent-mode-sessions`) — the script auto-detects that, so it just works. Run these from the repo root:
@@ -22,7 +24,7 @@ python dev/tools/claude-context-extractor/extract-desktop.py --name "<title>" --
 python dev/tools/claude-context-extractor/extract-desktop.py --session local_62de1ffd-...              # export by session id
 ```
 
-Escape hatches: `--root <dir>` if sessions live somewhere non-standard; `--transcript <file.jsonl>` (optionally + `--config <file.json>`) renders one transcript directly.
+Escape hatches: `--no-open` skips opening the export in VS Code; `--root <dir>` if sessions live somewhere non-standard; `--transcript <file.jsonl>` (optionally + `--config <file.json>`) renders one transcript directly.
 
 ## extract-web.py — claude.ai conversations (needs your sessionKey)
 
@@ -51,6 +53,7 @@ python dev/tools/claude-context-extractor/extract-web.py --resummarize <path>   
 #   --session-key <key>                 inline auth (else $CLAUDE_SESSION_KEY, else session_key.txt)
 #   --org <org-uuid>                    override org auto-detect
 #   --out <dir>                         output directory (default: <repo>/transcripts/web)
+#   --no-open                           don't open the export in VS Code afterward (default: open it)
 ```
 
 Each web export writes up to three siblings into the output folder:

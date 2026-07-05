@@ -11,6 +11,9 @@ Exports land in `<repo>/transcripts/desktop/` by default (override with --out), 
 the claude-history-viewer extension's convention: `claude-<session-start-date>-<title-slug>.md`.
 A stats sidecar `claude-<date>-<slug>.summary.md` is written only when --summary is passed.
 
+When done, the export opens as a tab in the running VS Code window (via the `code` CLI), the same
+way the claude-history-viewer extension does — pass --no-open to skip that (batch/headless runs).
+
 Usage (stdlib only — any Python 3.9+, no venv needed). Copy-paste these from the repo root:
     python dev/tools/claude-context-extractor/extract-desktop.py --list
     python dev/tools/claude-context-extractor/extract-desktop.py --name "glossary-maintenance-strategy-1"
@@ -21,6 +24,7 @@ Usage (stdlib only — any Python 3.9+, no venv needed). Copy-paste these from t
 (Or `cd dev/tools/claude-context-extractor` first and drop the path prefix: `python extract-desktop.py --list`.)
 
 Escape hatches:
+    --no-open             don't open the export in VS Code afterward (default: open it)
     --root <dir>          sessions root, if the app stores sessions somewhere non-standard
     --transcript <jsonl>  render one transcript file directly (skip discovery);
                           pair with --config <json> to supply title/model metadata
@@ -30,7 +34,10 @@ from __future__ import annotations   # keep `X | None` annotations working on Py
 
 import argparse
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from datetime import datetime
@@ -61,6 +68,29 @@ def default_root() -> Path | None:
         if c.exists():
             return c
     return None
+
+
+def open_in_editor(paths, enabled: bool = True) -> None:
+    """Best-effort: open the exported file(s) as tabs in the running VS Code window — the
+    same convenience the claude-history-viewer extension gives. Uses the `code` CLI (installed
+    globally on PATH, or provided by VS Code's integrated terminal). Quietly no-ops if `code`
+    isn't found or the launch fails: an editor that won't open must never break an export."""
+    paths = [p for p in (paths or []) if p]
+    if not enabled or not paths:
+        return
+    code = shutil.which("code")
+    if not code:
+        print("  (skipped auto-open: VS Code 'code' command not on PATH)", file=sys.stderr)
+        return
+    # On Windows `code` resolves to a .cmd/.bat — route those through cmd.exe so the
+    # launch is reliable across Python versions; run other platforms' `code` directly.
+    launcher = (["cmd", "/c", code] if os.name == "nt" and code.lower().endswith((".cmd", ".bat"))
+                else [code])
+    try:
+        subprocess.run([*launcher, "--reuse-window", *[str(p) for p in paths]], check=False)
+        print(f"  (opened in VS Code: {', '.join(Path(p).name for p in paths)})")
+    except Exception as e:
+        print(f"  (skipped auto-open: {e})", file=sys.stderr)
 
 
 # ----------------------------- discovery (by name) -----------------------------
@@ -218,7 +248,7 @@ def render_block(b: dict) -> str:
                                             ensure_ascii=False), 800)
 
 
-def render(transcript: Path, cfg: dict, out_dir: Path, want_summary: bool):
+def render(transcript: Path, cfg: dict, out_dir: Path, want_summary: bool, open_editor: bool = True):
     recs = load_records(transcript)
     title = cfg.get("title") or transcript.stem
     started = _ms_to_dt(cfg.get("createdAt"))
@@ -304,6 +334,7 @@ def render(transcript: Path, cfg: dict, out_dir: Path, want_summary: bool):
     print(f"\n{title}")
     print(f"{len(convo)} messages ({n_user} user / {n_asst} assistant) · "
           f"{sum(tools.values())} tool calls · {n_think} thinking blocks")
+    open_in_editor(written, open_editor)
 
 
 # ----------------------------- CLI -----------------------------
@@ -321,6 +352,8 @@ def main():
     ap.add_argument("--summary", action="store_true",
                     help="also write a <name>.summary.md stats sidecar (default: transcript only)")
     ap.add_argument("--out", help=f"output directory (default: {DEFAULT_OUT})")
+    ap.add_argument("--no-open", action="store_true",
+                    help="don't open the export in VS Code afterward (default: open it)")
     ap.add_argument("--root", help="sessions root (default: auto-detect the desktop app's store)")
     ap.add_argument("--transcript", help="render one transcript .jsonl directly (skip discovery)")
     ap.add_argument("--config", help="session config .json to pair with --transcript (optional)")
@@ -337,7 +370,7 @@ def main():
             cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
             if not isinstance(cfg, dict):
                 sys.exit(f"--config is not a JSON object: {cfg_path}")
-        render(Path(args.transcript), cfg, out_dir, args.summary)
+        render(Path(args.transcript), cfg, out_dir, args.summary, not args.no_open)
         return
 
     root = Path(args.root) if args.root else default_root()
@@ -373,7 +406,7 @@ def main():
     if not transcript:
         sys.exit(f"Found session '{match['title']}' but no transcript .jsonl under it.")
     cfg = json.loads(match["config"].read_text(encoding="utf-8"))
-    render(transcript, cfg, out_dir, args.summary)
+    render(transcript, cfg, out_dir, args.summary, not args.no_open)
 
 
 if __name__ == "__main__":
