@@ -282,6 +282,36 @@ The retirement run's entries pushed the log past the ~700-line threshold (718). 
 
 Files: DEVLOG.md, archive/devlog/DEVLOG-archive-05.md
 
+### 2026-07-05 04:20:08 — research brief: embedded-terminal feasibility (aligns with Console §7.13 / §10 #5)
+
+Added a research/alignment brief on the side-quest question "embed a live terminal, run Claude in-window, still intercept the output." Finding: not new scope — it's the already-designed per-agent Console (ARCHITECTURE §7.13) and the already-logged open question §10 #5, whose engine half is spike-proven (`test_console_mirror_live`). Surfaced the previously-unreconciled fork: the settled Console *polls* capture-pane, but the in-repo 2026-04-01 architecture research recommended a *streaming* ttyd/node-pty attach — the very approach the project dropped in the sandbox-era SDK/stream-json pivot, reopened now that the default has flipped back to real TUIs (bridge). Flagged the one genuine unknown (a live attach coexisting with the sidecar's continuous capture-pane poll on the same session) as the spike to run, and reaffirmed interception stays on the JSONL transcript, not the terminal stream. Doc-only; no product code touched.
+
+Files: dev/notes/research/embedded-terminal-feasibility-brief-2026-07-05.md
+
+---
+
+### 2026-07-05 04:25:14 — housekeeping: archived pre-07-03 CLI transcripts; gitignore any-depth note
+
+Decluttered the full `transcripts/cli/` folder: moved the 63 older items (every transcript dated 2026-07-02 or earlier by its filename, plus a stale misplaced `claude-desktop-dev-qa.md`) into the existing untracked archive bucket `archive/_ignored/cc-exports/`, leaving only the last three days (July 3–5, 18 items incl. one recent claude.ai app-export dir) in the live folder. All of this is gitignored personal-export data — invisible to git, no tracked content moved. The only tracked change: added a one-line clarifying comment to `.gitignore` documenting that the no-leading-slash `transcripts/` rule already ignores a `transcripts/` folder at any depth (verified with `git check-ignore` on nested paths), directly answering the "make sure it's ignored anywhere" ask. Left uncommitted for the operator to commit when ready.
+
+Files: .gitignore
+
+---
+
+### 2026-07-05 04:55:00 — docs: variant sweep + states page run scoped — brief updated, run prompt written (pre-run capture, nothing executed)
+
+Scoped the follow-on to the glossary retirement (operator-approved): one single session executing the variant conversion sweep + the auto-generated states page + its lint, staged and committed per stage. [dev/notes/scratch/2026-07-05-glossary-retirement-brief.md](dev/notes/scratch/2026-07-05-glossary-retirement-brief.md) updated in place at the operator's direction (this lane's own doc, not the reconciliation lane's): retirement recorded as done, the follow-on run's scope/watch-outs/boundaries added, the TODO rewording map kept (still pending), the Standing doctrine kept with tense fixes plus the sweep-is-now-scheduled note. New [dev/prompts/variant-sweep-states-page-run.md](dev/prompts/variant-sweep-states-page-run.md) (Fable 5 / Opus 4.8, max effort, house style of the retirement prompt): stage 1 the per-slug sweep mining the frozen gallery snapshot + Variant-check + label overlay + code-level states (attribute-only edits; interaction states never declared); stage 2 the states page as dev tooling, fully generated from live tags, honest unrendered placeholders; stage 3 the lint (enforcement tier beside the Variant-check) + doc-sync of every statement the run makes stale, with a completeness grep gate; plus a context escape hatch (stop clean at a stage boundary, never skip verification). Two decisions recorded in both docs: the states page deliberately moved ahead of the second design sprint (operator accepts badge-declaration churn; DESIGN.md's timing line updates in stage 3), and the per-slug operating rule for "states the mockup does not show" (a doctrine clarification the run installs in DESIGN.md). Scope re-verified against the repo this session (274 data-comp instances / zero data-variants confirmed; DESIGN.md ladder + Variant-check blind spots read; DEVLOG/git recency checked). Capture only — no design/product files touched, nothing executed yet.
+
+Files: dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, dev/prompts/variant-sweep-states-page-run.md, DEVLOG.md
+
+---
+
+### 2026-07-05 05:04:00 — docs: run prompt amended — ultracode approved as the execution setting
+
+Amended [dev/prompts/variant-sweep-states-page-run.md](dev/prompts/variant-sweep-states-page-run.md) after the operator raised Claude Code's `ultracode` effort setting (verified via web: shipped 2026-05-28 with Opus 4.8 — xhigh reasoning + auto-orchestrated dynamic workflows with independent verification). Header now names ultracode as the approved setting (plain xhigh the quota-tight fallback) with guardrails: every prompt rule binds every workflow subagent (no branches, no dev/notes/ edits), only the coordinating session writes DEVLOG/commits, and fanned-out sweep judgment must follow the one per-slug rule + ladder with a uniformity review before the stage-1 commit. Two-sentence amendment; scope and stages unchanged.
+
+Files: dev/prompts/variant-sweep-states-page-run.md, DEVLOG.md
+
 ---
 
 ## Archived history
