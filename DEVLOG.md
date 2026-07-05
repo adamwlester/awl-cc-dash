@@ -443,6 +443,22 @@ Files: CLAUDE.md
 
 ---
 
+### 2026-07-05 10:16:00 — assets: agent-names.json — +50 "liminal disco / astral" names (159 → 209)
+
+Extended `assets/names/agent-names.json` with a second thematic wing: 50 liminal-disco-astral-realm names — celestial (`orb`, `nova`, `comet`, `ether`, `muon`, `quark`, `orbit`), disco/glam (`funk`, `glam`, `neon`, `disco`, `prism`, `twirl`, `gleam`, `swoon`), threshold/liminal (`limbo`, `veil`, `drift`, `hush`, `waft`, `fade`), and spectral/vapor (`ghost`, `shade`, `ecto`, `synth`, `vapor`) — bringing the pool to 209. Same hard rails re-validated across the whole file (lowercase `[a-z]`, 3–5 letters, all unique, no human first names). Note: this nudges the pool past the original 100–200 target, kept intentionally per the operator's "keep building it out."
+
+Files: assets/names/agent-names.json
+
+---
+
+### 2026-07-05 10:18:00 — assets: agent-names.json — +35 "speakeasy jazz-noir" names (209 → 244)
+
+Third thematic wing on `assets/names/agent-names.json`: 35 smoky-lounge names — jazz/brass (`jazz`, `sax`, `brass`, `swing`, `croon`, `riff`, `bop`, `scat`, `vamp`, `blues`), smoke/noir (`smoke`, `noir`, `ash`, `ember`, `soot`), booze (`gin`, `rye`, `swig`, `dram`, `fizz`, `hooch`, `lush`), velvet/texture (`sable`, `onyx`, `plush`, `suede`, `silk`, `satin`, `jet`), and cool-cat attitude (`sly`, `coy`, `suave`, `swell`, `jinx`, `minx`) — pool now 244. Whole-file rails re-validated (lowercase `[a-z]`, 3–5 letters, unique, no human first names). Pool is now deliberately in "big multi-domain" territory past the original 200 target.
+
+Files: assets/names/agent-names.json
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
