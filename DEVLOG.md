@@ -655,6 +655,14 @@ Files: CLAUDE.md, dev/tools/claude-context-extractor/.gitignore, DEVLOG.md
 
 ---
 
+### 2026-07-05 01:42:00 — docs: glossary-retirement brief + run prompt (pre-run capture, nothing executed)
+
+Captured the decided glossary retirement as two new docs, ahead of the run that executes it. [dev/notes/scratch/2026-07-05-glossary-retirement-brief.md](dev/notes/scratch/2026-07-05-glossary-retirement-brief.md) briefs the concurrent TODO-reconciliation sessions: what the run will and won't touch, how to reword the five known gallery-referencing TODO items ([ND] #5d/#6a/#11c, BD6, the connector-health [IN] note), and the standing variants/tokens doctrine (`data-variants` required on touched components, emitted from builders; no prose inventories; new values via `tokens.css`; backfill as two named roadmap items; requirements to be written into CLAUDE.md + DESIGN.md with greppable checks). [dev/prompts/glossary-retirement-run.md](dev/prompts/glossary-retirement-run.md) is the single-session init prompt (Fable 5 / Opus 4.8, max effort): stage 1 archive `gallery.html` as a self-contained `archive/design/` snapshot (CDN scripts vendored), stage 2 doc surgery (six-file system → five, gallery obligations out, `data-comp` kept, `data-variants` rule in, gallery-only trio dispositioned, repo-wide grep gate), stage 3 the standalone `data-comp` label overlay (own file + toggle, dev tooling class), committing per stage, no TODO.md edits, no states-page build. Scope re-derived and verified against the repo this session (design/ link topology, reference sweep, DEVLOG/git recency). Capture only — no design/product files touched, nothing executed yet.
+
+Files: dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, dev/prompts/glossary-retirement-run.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
