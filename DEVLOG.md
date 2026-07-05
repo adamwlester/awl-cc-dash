@@ -467,6 +467,14 @@ Files: design/tokens.css, design/styles.css, design/mockup.html, design/behavior
 
 ---
 
+### 2026-07-05 14:10:00 — design: token run stage 2 — badge/chip S/M/L size standard (9 tier tokens, 48 substitutions)
+
+Stage 2 of the token run (checkpoint B1–B7): [design/tokens.css](design/tokens.css) mints the badge tier block — `--badge-{s,m,l}-{h,fs,px}` with S=12px/8px, M=18px/9px, L=22px/10px (L=22 won the headed 20-vs-22 test, B1; the `-fs` tokens are the documented exception to "no font-size tokens"; identity badges `.badge`/`.agtile` stay off-standard, deferred to queued [ND] #5 per B6). 48 line-anchored substitutions in [design/styles.css](design/styles.css) map 29 badge/chip families onto the tiers — height is the hard standard: explicit border-box `height:var(--badge-*-h)` + `inline-flex` centering replaces every line-height-derived height; `-fs`/`-px` adopted only where byte-equal today (except the S numerals' ratified 8px shrink, B2). Mapping (S: ovl-count, req-badge, fmt-badge, sa-count, ag-subcount, inbox-sec-n, inbox-runs, nav-cnt, tl-now, rd, ninb-type · M: rcpt, vbadge, cnt-chip, att-chip, dbadge, dir-tag, inbox-subtype, node-badge, sbadge, sa-status, node-inbox, vchip · L: chip, tok-pill, hbadge, set-kind, lc-badge, pl-chip). Verified headed (ui-verify, frozen clock, stash-based before/after): 28 of 29 families measured live before→after and every one landed exactly on its tier (largest moves: inbox-sec-n/inbox-runs 16.8→12, fmt-badge 16→12, dir-tag 15→18, set-kind/lc-badge 19.3→22, tok-pill 24→22); the 29th, `.vchip`, has CSS but no emission anywhere — converted for consistency and queued as a stage-3 dead-selector candidate. Dense-surface screenshots (node card, inbox, plans, settings, 440px-narrow feed, link drawer, node-inbox drawer, rewind timeline, feedback gutter) in `.scratch/token-upkeep/shots/s2-*`/`s2h-*`; the 440px overflow probe found nothing before or after. The standard + role-based mapping rule recorded in [design/DESIGN.md](design/DESIGN.md) (Design system section). variant-lint green (17 pre-existing gaps unchanged), Token-check clean, `node --check` clean.
+
+Files: design/tokens.css, design/styles.css, design/DESIGN.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
