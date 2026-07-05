@@ -1,11 +1,13 @@
 /* ============================================================================
    AWL Multi-Agent Dashboard — Component & layout styles (shared stylesheet)
    ----------------------------------------------------------------------------
-   Extracted verbatim from mockup.html's two former inline <style> blocks so the
-   mockup and the gallery share one styling source and never diverge. Every raw
-   design VALUE lives in tokens.css (linked alongside this file) and is referenced
-   here via var(--name); DESIGN.md describes the rules. Linked by both
-   mockup.html and gallery.html.
+   Extracted verbatim from mockup.html's two former inline <style> blocks into
+   one shared component stylesheet. Every raw design VALUE lives in tokens.css
+   (linked alongside this file) and is referenced here via var(--name);
+   DESIGN.md describes the rules. Linked by mockup.html. (Until 2026-07-05 it
+   was also linked by the interactive catalog gallery.html — retired; its
+   frozen snapshot under archive/design/design-v12p7-gallery-retirement/
+   carries its own copy.)
    ============================================================================ */
 
     /* ============================ design tokens ============================ */
@@ -1253,8 +1255,8 @@
     .md-blank{ min-height:0.9em; }
     .md-code-i{ background:var(--surface-3); border:1.5px solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-3); }
     .md-task{ color:var(--foreground); } .md-task .md-box{ color:var(--muted-2); } .md-task.done .md-box{ color:var(--success); }
-    /* L2 (b): md-h-row is the level-generic heading row. (L3 removed the .md-h2-row alias — the gallery now renders
-       the doc editor live via mdEditorHTML, so no static md-h2-row snapshot remains to style.) */
+    /* L2 (b): md-h-row is the level-generic heading row. (L3 removed the .md-h2-row alias — the doc editor is
+       rendered live via mdEditorHTML everywhere, so no static md-h2-row snapshot remains to style.) */
     .md-h-row{ position:relative; }
     /* the section heading carries a verdict tally on the right */
     .vtally{ display:inline-flex; align-items:center; gap:var(--space-4); margin-left:8px; vertical-align:middle; }

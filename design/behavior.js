@@ -1,14 +1,16 @@
 /* ============================================================================
  * behavior.js - shared component behavior for the AWL Multi-Agent Dashboard.
  *
- * SINGLE SOURCE OF TRUTH for interaction logic, loaded by BOTH mockup.html and
- * gallery.html (same design/ directory). Extracted verbatim from mockup.html's
- * inline behavior block so the gallery drives the REAL components, never copies.
+ * SINGLE SOURCE OF TRUTH for interaction logic, loaded by mockup.html (same
+ * design/ directory). Extracted verbatim from mockup.html's inline behavior
+ * block. (Until 2026-07-05 it was also loaded by the interactive catalog
+ * gallery.html — retired; its frozen snapshot under
+ * archive/design/design-v12p7-gallery-retirement/ carries its own copy.)
  *
  * The ONLY semantic change vs the original inline block: boot() early-returns
- * when there is no .app root, so it is inert on non-mockup pages (the gallery
- * runs its own small init for the specimens it shows). The shared dismiss/
- * Escape/hover-card listeners auto-install on both pages by design.
+ * when there is no .app root, so it is inert on any page that isn't the
+ * mockup. The shared dismiss/Escape/hover-card listeners auto-install
+ * unconditionally by design.
  * ========================================================================== */
 
   /* ===== Lucide render helper (UI icons) ===== */
@@ -176,7 +178,7 @@
 
   /* L3: the retired v1.2 doc-switcher (docPick + the one-at-a-time .docdoc panes) is fully removed — the Documents
      tab is the two-column entry-nav (renderEntryNav) + plan-style cards now; its last dead caller left with the
-     gallery's doc-switcher gx-card (replaced by the live entry-nav specimen). */
+     doc-switcher card of the gallery (the catalog was retired 2026-07-05 → archive/design/). */
 
   /* ===== v10p1 #18-21: Assets as a rail + preview (like Documents) + the shared Documents/Assets
      header & footer + Add menu + nav-row rename/delete. Assets is the single source of truth for media. ===== */
@@ -1136,7 +1138,7 @@
      while SC keeps the FULL trigger menu (no gating; an actively-delivered share just costs the target a turn to
      ingest, which is why Piggyback stays the SC default). The same handler still drives the nested content-type
      row's plain multi-toggles (no data-rel → plain toggle); the disclosure re-syncs on every call, scoped to the
-     button's own drawer, so the mockup and the gallery specimen stay independent. */
+     button's own drawer, so multiple instances stay independent (originally the mockup + the retired gallery's specimen). */
   function linkRel(btn){const wrap=btn.closest('.drawer');
     if(btn.dataset.rel){
       if(!btn.classList.contains('active')){
@@ -1164,8 +1166,9 @@
      DOUBLE-LISTED under both endpoints, entries sorted PEER-ADJACENT (same peer together, roster order); each entry
      shows a directional arrow relative to THIS group's agent (to · from · both — Lucide arrow-right / arrow-left /
      arrow-left-right, next-up item 18) + the OTHER agent + its FULL relationship label (a link now has exactly one).
-     The group-header identity badge carries the corner-count overlay badge (teal >0; the muted zero state lives in
-     the gallery — zero-link groups don't render inside the split sections).
+     The group-header identity badge carries the corner-count overlay badge (teal >0; the muted zero state has no
+     live instance here — zero-link groups don't render inside the split sections; its look is preserved in the
+     archived gallery snapshot, a data-variants candidate for the conversion sweep).
      LINKS_CFG is keyed by agent name (distinct from the planned on-graph `LINKS` edge data, which is node-id keyed);
      ONE relationship per link — wanting both = two links (see the sandy↔drew pair). */
   const LINKS_CFG=[
@@ -1250,7 +1253,7 @@
     const go=document.createElement('button');go.className='btn-danger-solid btn-sm';go.innerHTML='<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete';
     go.onclick=e=>{e.stopPropagation();const i=parseInt(card.dataset.hidx,10);
       if(!isNaN(i)&&HIST[i]){HIST.splice(i,1);const h=document.getElementById('hist-list');if(h){h.innerHTML=HIST.map(histCardHTML).join('');if(typeof applyHistFilters==='function')applyHistFilters();}}
-      else card.remove();   /* gallery specimen carries no HIST index — just drop the card */
+      else card.remove();   /* a card with no HIST index (originally the retired gallery's specimen) — just drop it */
       toast('Deleted the '+(lab||'queued')+' prompt');eaUpdate('hist');LU();};
     c.appendChild(cancel);c.appendChild(go);
     const head=card.querySelector('.fcard-head');if(head)head.insertAdjacentElement('afterend',c);else card.appendChild(c);LU();}
@@ -1313,7 +1316,7 @@
 
   /* ===== Projects (Settings → Projects tab) — open/close/register + the one-at-a-time rule =====
      The tab itself switches through the shared settingsTab() mechanism (data-set-tab="projects" → #set-projects);
-     this block wires the pane's own behavior. Guarded on #proj-list so it no-ops on the gallery. */
+     this block wires the pane's own behavior. Guarded on #proj-list so it no-ops on any page without the Projects pane. */
   const PROJ = [
     { name:'awl-cc-dash',         path:'~/MeDocuments/AppData/Anthropic/awl-cc-dash',         agents:13, running:true,  last:'2026-07-01 18:42' },
     { name:'claude-code-sandbox', path:'~/MeDocuments/AppData/Anthropic/claude-code-sandbox', agents:6,  running:false, last:'2026-06-21 11:05' },
@@ -1339,7 +1342,7 @@
       +`<div class="reg-rt">${badge}${action}</div></div>`;
   }
   function projRender(){
-    const list=document.getElementById('proj-list');if(!list)return;   /* not the mockup (e.g. gallery) → no-op */
+    const list=document.getElementById('proj-list');if(!list)return;   /* not the mockup (no Projects pane) → no-op */
     const act=document.getElementById('proj-active'),empty=document.getElementById('proj-empty');
     if(projOpenIdx===null){ if(act)act.hidden=true; if(empty)empty.hidden=false; }
     else{
@@ -2556,7 +2559,7 @@ Short-lived notes for the current run — kept brief on purpose.
 
   /* ===== boot ===== */
   function boot(){
-    if(!document.querySelector('.app'))return;   /* inert on non-mockup pages (e.g. the gallery); see file header */
+    if(!document.querySelector('.app'))return;   /* inert on non-mockup pages (historically the gallery, retired 2026-07-05); see file header */
     buildIconGrids();
     document.querySelectorAll('[data-rolecombo]').forEach(buildCombo);
     document.querySelectorAll('[data-msel]').forEach(buildMsel);
