@@ -357,6 +357,54 @@ Files: .gitignore, dev/notes/TODO.md, dev/notes/scratch/2026-07-03-doc-integrati
 
 ---
 
+### 2026-07-05 07:42:00 — docs: lane brief flipped to post-run state (variant sweep recorded as landed)
+
+Updated [dev/notes/scratch/2026-07-05-glossary-retirement-brief.md](dev/notes/scratch/2026-07-05-glossary-retirement-brief.md) at the operator's direction (this lane's own doc, per the 04:55 precedent): the "Where this lane stands" section now records the variant sweep + states page run as executed and committed (commits d6d2b5c / 9bed8d0 / 75671ac / 103f4d5; DEVLOG 05:58, 06:35, 07:05), the run-scope and boundary sections are retitled as historical records, the in-flight watch-outs section is collapsed to a resolved note, and the Standing doctrine's backfill paragraph now names the token-hygiene audit as the sole remaining scheduled item (mirroring DESIGN.md's stage-3 wording). The TODO rewording map stays marked pending (the reconciliation lane's work, untouched). Capture only; no design or product files touched.
+
+Files: dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, DEVLOG.md
+
+---
+
+### 2026-07-05 07:55:00 — docs: token curation + upkeep run scoped — prompt written, brief updated (pre-run capture, nothing executed)
+
+Scoped the next run in the design-maintenance lane (operator-approved): a pull-ahead of the token-hygiene audit's non-minting portion. New [dev/prompts/token-curation-upkeep-run.md](dev/prompts/token-curation-upkeep-run.md) (Fable 5 / Opus 4.8, ultracode approved, house style of the prior two runs): stage 1 converts hardcoded design values to EXISTING tokens under the operator's smart-match rule (close value + fitting documented role; deliberate divergences kept and flagged; zero color minting), seeded from the variant run's ~25-item flag list; stage 2 mints and applies the operator's badge/chip S/M/L size-standard tokens (S≈12 / M≈18 / L=20 or up to 22, run's call headed); stage 3 tags the state-bearing untagged twins, trims now-redundant data-variants declarations, removes provably dead markup, and doc-syncs with a completeness gate. Deferred to sprint 2 by decision, recorded in the prompt so they are not lost: new color tokens, semantic alias layer, palette rework (operator strongly dislikes the cream base and the weak chrome-vs-panel differentiation), and the spacing breathing-room pass. Operator also authorized more initiative than prior runs (documented calls over punted flags). [dev/notes/scratch/2026-07-05-glossary-retirement-brief.md](dev/notes/scratch/2026-07-05-glossary-retirement-brief.md) updated in the same pass (this lane's own doc): new "Next in this lane" section for this run and the Standing doctrine's backfill paragraph reworded to the audit split. Capture only; no design/product files touched, nothing executed yet.
+
+Files: dev/prompts/token-curation-upkeep-run.md (new), dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, DEVLOG.md
+
+---
+
+### 2026-07-05 08:05:00 — docs: token run prompt tightened — zero rendered-color change, exact-match conversions only (run on hold)
+
+Amended [dev/prompts/token-curation-upkeep-run.md](dev/prompts/token-curation-upkeep-run.md) after operator clarification: stage-1 color conversions are now exact-value-match only (near-match and no-match colors stay hardcoded and get flagged, never converted or minted), the prompt states outright that the run changes no rendered color anywhere, and the recorded sprint-2 palette-intent paragraph was replaced by a pointer to a separate, light, operator-led palette revisit that will consume the flag list. The brief's "Next in this lane" section reworded to match. The run is NOT yet approved to launch; the operator is coordinating scope with concurrent design agents first.
+
+Files: dev/prompts/token-curation-upkeep-run.md, dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, DEVLOG.md
+
+---
+
+### 2026-07-05 08:40:00 — docs: token run reshaped — audit-first stage 0 + operator checkpoint, near-match color snapping approved (still not launched)
+
+Amended [dev/prompts/token-curation-upkeep-run.md](dev/prompts/token-curation-upkeep-run.md) on two operator decisions from this session: **(1)** the color rule loosened one notch from exact-match-only: a hardcode that plainly reads as drift from an existing token may be snapped back to that token, gated on checkpoint approval plus a before/after screenshot pair; no-match colors and deliberate divergences still only get flagged, minting stays deferred, and everything off the approved snap/shift list must stay pixel-identical. **(2)** New stage 0 restructure: the run now audits all three workstreams first with zero edits (subagent fan-out expected), writes proposals to `.scratch/token-upkeep/checkpoint.md`, and stops for a rapid-fire operator sign-off (skim format, one line per call with a recommendation and a pointer) covering the snaps, notable spacing shifts, dead-markup removals, the sizing L call, and the optional timestamps-right-aligned inbox item; plus a non-blocking progress-check-in duty (drive-by status lines with a rough estimate of when the operator is next needed, never pausing except at the checkpoint). The brief's "Next in this lane" section synced to the new shape. The run remains NOT launched; the operator is briefing his concurrent design agents first.
+
+Files: dev/prompts/token-curation-upkeep-run.md, dev/notes/scratch/2026-07-05-glossary-retirement-brief.md, DEVLOG.md
+
+---
+
+### 2026-07-05 08:55:00 — docs: Phase-9 operator answers Q4–Q8 + Q11 recorded tentative (Q11 gate cleared pending coherence pass)
+
+Recorded the operator's in-conversation answers in the tracker's tentative-answers section ([dev/notes/scratch/2026-07-03-doc-integration-tracker.md](dev/notes/scratch/2026-07-03-doc-integration-tracker.md)), same format as Q1–Q3: Q4 voice dictation = quality-first spike (built-in vs Whisper-class library; quality beats convenience), Q5 = A basic per-agent presets, Q6 = A curated name pool (stored as `assets/names/agent-names.json`, flat JSON array; operator's own agent will generate it), Q7 turns-by-tool = deprioritized/parked with an operator drift note (bucket vocabulary must be re-framed against the planned feed block/filter trim), Q8 console fidelity = A full xterm-class renderer wanted ASAP (operator saw the 06:53 ttyd/xterm spike output), Q11 Agent Archive = B reshaped (archive-every-agent deep-freeze, distinct IDs, lineage-ready schema, Delete stays a true delete) — clearing the Phase-9 hard gate pending the coherence pass. Q9–Q10 marked pending (operator asked for fuller context; unpacked in-conversation), with one staleness flag recorded: Q10's #37 Authors-view display already landed in the design system via the [ND] run, leaving only system-side provenance wiring. Also recorded the operator's process note: decision write-ups must stand alone. This desktop session edited the reconciliation lane's tracker at the operator's direction, answers-section only.
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
+### 2026-07-05 09:10:00 — docs: Phase-9 answers Q9–Q10 recorded tentative; operator priority signals captured (hooks/lineage HIGH, transcript retention URGENT)
+
+Second recording pass in the tracker's tentative-answers section ([dev/notes/scratch/2026-07-03-doc-integration-tracker.md](dev/notes/scratch/2026-07-03-doc-integration-tracker.md)) after unpacking Q9/Q10 for the operator in plain language: Q9 = modified A (#23 docs-in-agent-context scoped light: Library home + per-agent doc attachment at launch, auto-retrieval future; **#24 elevated, not parked** — attribution re-scoped to per-agent git identity, agent-authored commits under per-agent name/email, pursued as a priority with commit tracking; #25 still pending the operator's call, candidate to fold into hooks setup). Q10 = mixed (#36 rich visuals wanted but scheduled for when the design lane is ready; #22 subagent create/manage parked, parent-decides model accepted; #37 rescoped as already-designed, wiring only). Also captured as an operator-priorities note: lifecycle-hook ingestion + lineage/archive substrate are HIGH priority, and transcript retention is URGENT (the `cleanupPeriodDays` 30-day default is live today per ARCHITECTURE §8.6's ⚠ Today marker — flagged to the operator in chat with the user-level + per-agent two-part fix). Answers-section-only edit to the reconciliation lane's tracker at the operator's direction, per the 08:55 precedent.
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
