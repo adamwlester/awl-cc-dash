@@ -1,46 +1,63 @@
 # claude-context-extractor
 
-Pull a full **claude.ai** conversation (web or desktop) — including the parts ordinary
-exporters drop (tool calls, tool results, citations, artifacts, branch tree) — and save it as
-raw JSON + a clean Markdown transcript + extracted artifact files. Purpose: capture external
-Claude context so it can be handed to another Claude session.
+Two stdlib-only Python exporters that capture full Claude conversations — including the parts ordinary exporters drop (tool calls, tool results, thinking, citations, artifacts) — as clean Markdown, so external Claude context can be handed to another session.
 
-## Your steps (this is all you do)
-1. **Paste your claude.ai `sessionKey`** into [`session_key.txt`](session_key.txt) (replace the
-   placeholder line).
-   - Get it: open **claude.ai** (logged in) → press **F12** → **Application** tab →
-     **Storage → Cookies → `https://claude.ai`** → click **`sessionKey`** → copy the **Value**
-     (starts with `sk-ant-sid01-`). `document.cookie` won't show it — use the Cookies panel.
-2. **Give Claude the conversation link** (`https://claude.ai/chat/…`), or just say "list them."
+| Script | Source | Access | Default output |
+|--------|--------|--------|----------------|
+| [`extract-web.py`](extract-web.py) | **claude.ai** (web) conversations | network + `sessionKey` cookie | `<repo>/transcripts/web/` |
+| [`extract-desktop.py`](extract-desktop.py) | **Claude desktop app** local-agent-mode sessions | local disk only — no network, no auth | `<repo>/transcripts/desktop/` |
+
+The third transcript surface, `<repo>/transcripts/cli/` (Claude Code CLI sessions), is not covered here — the **claude-history-viewer** VS Code extension exports those directly (its export dir is set in `.vscode/awl-cc-dash.code-workspace`).
+
+Both scripts share one convention, matching that extension's filenames: exports are named `claude-<session-date>-<title-slug>` (lowercase slug, max 50 chars). A stats sidecar `<name>.summary.md` (message/tool/thinking counts, timing, token estimate) is written **only** when `--summary` is passed. Override the output folder with `--out <dir>`. The whole `transcripts/` tree is gitignored — personal data never gets committed.
+
+## extract-desktop.py — desktop app sessions (no setup)
+
+The desktop app runs "local agent mode" as a Claude Code session under the hood and stores each one on disk: a config JSON carrying the human-readable title, plus a standard Claude Code JSONL transcript. On the Microsoft Store (MSIX) build these live under the package container (`AppData\Local\Packages\Claude_...\LocalCache\Roaming\Claude\local-agent-mode-sessions`) — the script auto-detects that, so it just works:
+
+```
+python extract-desktop.py --list                                    # all sessions by title/date
+python extract-desktop.py --name "glossary-maintenance-strategy-1"  # export by title
+python extract-desktop.py --name "<title>" --summary                # + stats sidecar
+python extract-desktop.py --session local_62de1ffd-...              # export by session id
+```
+
+Escape hatches: `--root <dir>` if sessions live somewhere non-standard; `--transcript <file.jsonl>` (optionally + `--config <file.json>`) renders one transcript directly.
+
+## extract-web.py — claude.ai conversations (needs your sessionKey)
+
+### Your steps (this is all you do)
+1. **Paste your claude.ai `sessionKey`** into [`session_key.txt`](session_key.txt) (replace the placeholder line).
+   - Get it: open **claude.ai** (logged in) → press **F12** → **Application** tab → **Storage → Cookies → `https://claude.ai`** → click **`sessionKey`** → copy the **Value** (starts with `sk-ant-sid01-`). `document.cookie` won't show it — use the Cookies panel.
+2. **Give Claude the conversation link** (`https://claude.ai/chat/…`) or its title, or just say "list them."
 3. **Tell Claude to run it.** Done.
 
-> The `sessionKey` is account-level access. `session_key.txt` is gitignored; delete it / log out
-> of claude.ai when you're finished.
+> The `sessionKey` is account-level access. `session_key.txt` is gitignored; delete it / log out of claude.ai when you're finished.
 
-## For Claude (the rest)
-Stdlib only — no install. Run from this folder (`tools/claude-context-extractor/`):
+### Commands
 
 ```
-python extract.py --list                           # list recent conversations
-python extract.py --conversation <url-or-uuid>     # export by URL / UUID
-python extract.py --name "<title>"                 # export by conversation title (substring, case-insensitive)
-python extract.py --summary <dir-or-json>          # (offline) re-summarize an existing export — no fetch
-python extract.py --conversation <uuid> --org <org-uuid>     # if org auto-detect is wrong
+python extract-web.py --list                                  # list recent conversations
+python extract-web.py --name "Linting explained simply"       # export by title (substring, case-insensitive)
+python extract-web.py --name "<title>" --summary              # + stats sidecar
+python extract-web.py --conversation <url-or-uuid>            # export by URL / UUID
+python extract-web.py --resummarize <path>                    # offline: (re)write a summary for an existing
+                                                              #   export (.source.json or old-format dir) — no fetch
 
 # options:
-#   --tokens {heuristic,tiktoken,api}   token estimate (api = exact, free, needs ANTHROPIC_API_KEY)
+#   --tokens {heuristic,tiktoken,api}   summary token estimate (api = exact, free, needs ANTHROPIC_API_KEY)
 #   --session-key <key>                 inline auth (else $CLAUDE_SESSION_KEY, else session_key.txt)
-#   --out <dir>                         output directory (default: ./out)
+#   --org <org-uuid>                    override org auto-detect
+#   --out <dir>                         output directory (default: <repo>/transcripts/web)
 ```
 
-Output lands in `out/<date>-<name>/` (or `--out`):
-- `conversation.json` — raw `chat_conversations` API response (source of truth, full fidelity).
-- `transcript.md` — rendered: text + thinking + tool_use + tool_result + citations.
-- `summary.md` — turns, tools, thinking, models, timing, and a token estimate (auto-written).
-- `artifacts/` — extracted documents / code / canvases.
+Each web export writes up to three siblings into the output folder:
+- `claude-<date>-<slug>.md` — rendered transcript: text + thinking + tool_use + tool_result + citations.
+- `claude-<date>-<slug>.source.json` — raw `chat_conversations` API response (source of truth, full fidelity).
+- `claude-<date>-<slug>.artifacts/` — extracted documents / code / canvases (only when the chat has any).
+- `claude-<date>-<slug>.summary.md` — only with `--summary`.
 
 Notes for implementers:
 - Auth: `Cookie: sessionKey=…`. Org UUID auto-resolves via `/api/organizations`; override with `--org`.
 - Single-conversation fetch uses `?tree=True&rendering_mode=messages&render_all_tools=true`.
-- The exact API field names (`chat_messages`/`content`/`sender`) and artifact block shape should
-  be **validated on the first live run** and the renderer adjusted if claude.ai differs.
+- Live-verified 2026-07-05 (`--list` + a full export ran clean against claude.ai); the desktop script is live-verified against the MSIX session store the same day.

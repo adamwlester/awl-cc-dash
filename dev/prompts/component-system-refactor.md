@@ -15,7 +15,7 @@ Execute the full design-system refactor defined in `dev/notes/component-system-s
 
 ## Guardrails (the spec carries the detail; these are the ones not to miss)
 
-- **The spec's decisions are final.** If you encounter the earlier tractability review in `.claude/cc-exports/`, treat it as superseded history. Do not relitigate the gallery, the naming, or the token scope.
+- **The spec's decisions are final.** If you encounter the earlier tractability review in `transcripts/cli/` (formerly `.claude/cc-exports/`), treat it as superseded history. Do not relitigate the gallery, the naming, or the token scope.
 - **Render must not change** through the stylesheet extraction and the tokenization. The value layer aims for byte-for-byte stability. Prove it by driving the UI (per CLAUDE.md), not by reading diffs.
 - **Single-source every value in `tokens.css`, and never rename an existing custom property** (the mockup references them in thousands of places). New tokens are additive.
 - **Naming and status markers are exactly as the spec fixes them:** `data-comp` is a kebab-case slug; `data-status` is `planned` or `undecided`. No parallel name registry.

@@ -1,22 +1,36 @@
 #!/usr/bin/env python3
+"""extract-web.py — export a full claude.ai (web) conversation to Markdown.
+
+Pulls a conversation from claude.ai's internal API — including the parts ordinary exporters
+drop (tool calls, tool results, thinking, citations, artifacts) — using your logged-in
+`sessionKey` cookie (see README for how to grab it). Network + auth required; this is the
+cloud-side sibling of extract-desktop.py (which reads the desktop app's local sessions).
+
+Exports land in `<repo>/transcripts/web/` by default (override with --out), named to match
+the claude-history-viewer extension's convention, `claude-<conversation-date>-<title-slug>`:
+    claude-<date>-<slug>.md             rendered transcript (text + thinking + tools + citations)
+    claude-<date>-<slug>.source.json    raw API response (full fidelity, source of truth)
+    claude-<date>-<slug>.artifacts/     extracted artifact files (only when the chat has any)
+    claude-<date>-<slug>.summary.md     stats sidecar — only when --summary is passed
+
+Usage (stdlib only — any Python 3.9+, no venv needed; run from this folder or anywhere):
+    python extract-web.py --list
+    python extract-web.py --name "Linting explained simply"
+    python extract-web.py --name "Linting explained simply" --summary
+    python extract-web.py --conversation https://claude.ai/chat/<uuid>
+    python extract-web.py --name "..." --out C:\\somewhere\\else
+
+Extras:
+    --tokens {heuristic,tiktoken,api}   summary token-estimate method (api = exact, free,
+                                        needs ANTHROPIC_API_KEY); only used with --summary
+    --resummarize <path>                offline: (re)write the .summary.md for an existing
+                                        export (.source.json file, or an old-format export
+                                        dir containing conversation.json) — no fetch, no key
+    --org <uuid>                        override the auto-detected organization
+    --session-key <key>                 inline auth (else $CLAUDE_SESSION_KEY, else session_key.txt)
 """
-claude-context-extractor — pull a full claude.ai conversation (web/desktop) via the internal
-API and save it as raw JSON + clean Markdown + extracted artifacts, for handing context to
-another Claude session.
 
-Usage:
-    python extract.py --list
-    python extract.py --conversation <conversation-url-or-uuid>
-    python extract.py --name "<conversation title>"                 # resolve & export by name
-    python extract.py --summary <export-dir-or-conversation.json>   # offline (re)summary, no fetch
-    python extract.py --name "<title>" --tokens api                 # exact token count (needs ANTHROPIC_API_KEY)
-
-Every export also writes summary.md (turns, tools, timing, token estimate).
-
-Auth (any of): --session-key <key>, $CLAUDE_SESSION_KEY, or session_key.txt.
-Core is stdlib-only. Optional token methods: --tokens tiktoken (pip install tiktoken);
---tokens api (Anthropic's free count_tokens endpoint, exact for Claude; needs ANTHROPIC_API_KEY).
-"""
+from __future__ import annotations   # keep `X | None` annotations working on Python 3.9
 
 import argparse
 import json
@@ -32,7 +46,15 @@ from pathlib import Path
 BASE = "https://claude.ai/api"
 HERE = Path(__file__).resolve().parent
 KEY_FILE = HERE / "session_key.txt"
-OUT = HERE / "out"
+
+# This file lives at <repo>/dev/tools/claude-context-extractor/, so the repo root is 3 up.
+# If the script is copied somewhere shallower, fall back to CWD instead of crashing at import.
+try:
+    REPO_ROOT = Path(__file__).resolve().parents[3]
+except IndexError:
+    REPO_ROOT = Path.cwd()
+DEFAULT_OUT = REPO_ROOT / "transcripts" / "web"
+
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -94,10 +116,24 @@ def cmd_list(key: str, org: str) -> None:
         print(f"{c.get('updated_at','')[:19]}  {c['uuid']}  {c.get('name','(untitled)')}")
 
 
+def _fmt_citation(c) -> str:
+    if isinstance(c, dict):
+        title = c.get("title") or ""
+        url = c.get("url") or c.get("uri") or ""
+        detail = (f"{title} — {url}" if title and url and title != url
+                  else (url or title or json.dumps(c, ensure_ascii=False)[:200]))
+    else:
+        detail = str(c)[:200]
+    return f"\n> **[citation]** {detail}"
+
+
 def render_block(b: dict) -> str:
     t = b.get("type")
     if t == "text":
-        return b.get("text", "")
+        txt = b.get("text", "")
+        for c in (b.get("citations") or []):
+            txt += _fmt_citation(c)
+        return txt
     if t == "thinking":
         body = (b.get("thinking") or b.get("text") or "").replace("\n", "\n> ")
         return f"\n> **[thinking]**\n> {body}"
@@ -109,22 +145,45 @@ def render_block(b: dict) -> str:
     return f"\n**[{t}]** " + json.dumps({k: v for k, v in b.items() if k != "type"}, ensure_ascii=False)[:2000]
 
 
-def slugify(s: str, n: int = 60) -> str:
-    return re.sub(r"[^a-zA-Z0-9._-]+", "-", s or "").strip("-")[:n]
+def slugify(title: str) -> str:
+    """Mirror the claude-history-viewer extension's filename slug:
+    lowercase, non-alphanumeric runs -> '-', trim '-', max 50 chars."""
+    return re.sub(r"[^a-z0-9]+", "-", (title or "session").lower()).strip("-")[:50] or "session"
+
+
+def disambiguate(out_dir: Path, base: str, owner_marker: str) -> str:
+    """Keep the extension's naming, but never clobber a DIFFERENT conversation's export.
+    Re-exporting the same conversation reuses its filename (refresh); a different conversation
+    that happens to share the title+date gets `-2`, `-3`, ... appended."""
+    candidate, n = base, 2
+    while True:
+        existing = out_dir / f"{candidate}.md"
+        if not existing.exists():
+            return candidate
+        try:
+            head = existing.read_text(encoding="utf-8", errors="replace")[:2000]
+        except Exception:
+            head = ""
+        if owner_marker in head:         # same conversation — safe to overwrite
+            return candidate
+        candidate = f"{base}-{n}"
+        n += 1
 
 
 def cmd_fetch(key: str, org: str, arg: str, method: str = "heuristic", model: str | None = None,
-              out_dir: Path = OUT) -> None:
+              out_dir: Path = DEFAULT_OUT, want_summary: bool = False) -> None:
     cid = conv_id(arg)
     data = api_get(
         f"/organizations/{org}/chat_conversations/{cid}"
         "?tree=True&rendering_mode=messages&render_all_tools=true", key)
 
     name = data.get("name") or cid
-    dest = out_dir / f"{datetime.now():%Y-%m-%d}-{slugify(name) or cid}"
-    (dest / "artifacts").mkdir(parents=True, exist_ok=True)
-    (dest / "conversation.json").write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    started = parse_ts(data.get("created_at")) or datetime.now()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    base = disambiguate(out_dir, f"claude-{started:%Y-%m-%d}-{slugify(name)}",
+                        f"- conversation: {cid}")
+    (out_dir / f"{base}.source.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8", errors="replace")
 
     msgs = data.get("chat_messages") or data.get("messages") or []
     lines = [f"# {name}", "",
@@ -132,6 +191,8 @@ def cmd_fetch(key: str, org: str, arg: str, method: str = "heuristic", model: st
              f"- messages: {len(msgs)}",
              f"- exported: {datetime.now():%Y-%m-%d %H:%M}", "", "---", ""]
     artifacts = 0
+    art_dir = out_dir / f"{base}.artifacts"
+    art_used: set[str] = set()           # uniquify within the export — same-titled artifacts
     ext_map = {"text/html": "html", "text/markdown": "md", "application/vnd.ant.code": "txt"}
     for m in msgs:
         lines.append(f"## {m.get('sender') or m.get('role') or '?'}")
@@ -142,16 +203,26 @@ def cmd_fetch(key: str, org: str, arg: str, method: str = "heuristic", model: st
                 content = inp.get("content")
                 if content:
                     artifacts += 1
-                    fn = slugify(inp.get("title") or inp.get("id") or f"artifact-{artifacts}", 50)
+                    art_dir.mkdir(parents=True, exist_ok=True)
+                    fn = slugify(inp.get("title") or inp.get("id") or f"artifact-{artifacts}")
                     ext = ext_map.get(inp.get("type", ""), "txt")
-                    (dest / "artifacts" / f"{fn}.{ext}").write_text(content, encoding="utf-8")
+                    stem, n = fn, 2
+                    while f"{stem}.{ext}" in art_used:
+                        stem = f"{fn}-{n}"
+                        n += 1
+                    art_used.add(f"{stem}.{ext}")
+                    (art_dir / f"{stem}.{ext}").write_text(content, encoding="utf-8",
+                                                           errors="replace")
         lines.append("")
-    (dest / "transcript.md").write_text("\n".join(lines), encoding="utf-8")
-    s = write_summary(dest, data, method, model)
-    print(f"Saved: {dest}")
-    print(f"  conversation.json · transcript.md · summary.md · artifacts/ ({artifacts} extracted)")
-    extra = f" · exact {s['exact_total']:,}" if s.get("exact_total") else ""
-    print(f"  {s['messages']} msgs · {sum(s['tools'].values())} tool calls · ~{s['total']:,} tokens ({s['method']}){extra}")
+    (out_dir / f"{base}.md").write_text("\n".join(lines), encoding="utf-8", errors="replace")
+
+    print(f"Wrote to {out_dir}:")
+    print(f"  {base}.md · {base}.source.json" + (f" · {base}.artifacts/ ({artifacts})" if artifacts else ""))
+    if want_summary:
+        s = write_summary(out_dir / f"{base}.summary.md", data, method, model)
+        extra = f" · exact {s['exact_total']:,}" if s.get("exact_total") else ""
+        print(f"  {base}.summary.md — {s['messages']} msgs · {sum(s['tools'].values())} tool calls · "
+              f"~{s['total']:,} tokens ({s['method']}){extra}")
 
 
 def resolve_name(key: str, org: str, name: str) -> str:
@@ -338,57 +409,77 @@ def render_summary(s: dict) -> str:
     return "\n".join(L)
 
 
-def write_summary(dest: Path, data: dict, method: str, model: str | None = None) -> dict:
+def write_summary(dest_file: Path, data: dict, method: str, model: str | None = None) -> dict:
     s = summarize(data, method, model)
-    (dest / "summary.md").write_text(render_summary(s), encoding="utf-8")
+    dest_file.write_text(render_summary(s), encoding="utf-8")
     return s
 
 
-def cmd_summary(path_str: str, method: str, model: str | None) -> None:
-    """Offline (re)summary of an existing export dir or conversation.json — no key, no fetch."""
+def cmd_resummarize(path_str: str, method: str, model: str | None) -> None:
+    """Offline (re)summary of an existing export — no key, no fetch. Accepts a
+    `<base>.source.json` file (new flat layout) or a directory containing
+    `conversation.json` (the tool's old per-export-folder layout)."""
     p = Path(path_str)
     if p.is_dir():
-        p = p / "conversation.json"
-    if not p.exists():
-        sys.exit(f"No conversation.json at {p}")
-    data = json.loads(p.read_text(encoding="utf-8"))
-    s = write_summary(p.parent, data, method, model)
+        src = p / "conversation.json"
+        dest = p / "summary.md"
+    else:
+        src = p
+        base = p.name
+        for suffix in (".source.json", ".json"):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+                break
+        dest = p.parent / f"{base}.summary.md"
+    if not src.exists():
+        sys.exit(f"No source JSON at {src}")
+    data = json.loads(src.read_text(encoding="utf-8"))
+    s = write_summary(dest, data, method, model)
     print(render_summary(s))
-    print(f"\n(summary.md written to {p.parent})")
+    print(f"\n(summary written to {dest})")
 
 
 def main() -> None:
     try:                                   # Windows consoles default to cp1252; our output is UTF-8
-        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
     except Exception:
         pass
     ap = argparse.ArgumentParser(description="Export a claude.ai conversation for context handoff.")
     ap.add_argument("--list", action="store_true", help="list recent conversations")
     ap.add_argument("--conversation", help="conversation URL or UUID to export")
     ap.add_argument("--name", help="resolve & export by conversation title (substring, case-insensitive)")
-    ap.add_argument("--summary", metavar="PATH",
-                    help="offline: (re)summarize an existing export dir or conversation.json")
+    ap.add_argument("--summary", action="store_true",
+                    help="also write a <name>.summary.md stats sidecar (default: no summary)")
+    ap.add_argument("--resummarize", metavar="PATH",
+                    help="offline: (re)write the summary for an existing export "
+                         "(.source.json file or old-format export dir) — no fetch, no key")
     ap.add_argument("--tokens", choices=["heuristic", "tiktoken", "api"], default="heuristic",
-                    help="token estimate method (default: heuristic; 'api' = exact via Anthropic count_tokens)")
+                    help="summary token-estimate method (default: heuristic; 'api' = exact via "
+                         "Anthropic count_tokens, needs ANTHROPIC_API_KEY)")
     ap.add_argument("--model", default=None, help=f"model id for --tokens api (default: {DEFAULT_API_MODEL})")
     ap.add_argument("--org", help="organization UUID (auto-detected if omitted)")
     ap.add_argument("--session-key", help="claude.ai sessionKey (overrides $CLAUDE_SESSION_KEY / session_key.txt)")
-    ap.add_argument("--out", help=f"output directory for exports (default: {OUT})")
+    ap.add_argument("--out", help=f"output directory for exports (default: {DEFAULT_OUT})")
     args = ap.parse_args()
 
-    if args.summary:                       # offline path — no sessionKey needed
-        cmd_summary(args.summary, args.tokens, args.model)
+    if args.resummarize:                   # offline path — no sessionKey needed
+        cmd_resummarize(args.resummarize, args.tokens, args.model)
         return
+
+    if (args.tokens != "heuristic" or args.model) and not args.summary:
+        print("note: --tokens/--model only affect the summary — pass --summary to use them.",
+              file=sys.stderr)
 
     key = load_key(args.session_key)
     org = resolve_org(key, args.org)
-    out_dir = Path(args.out) if args.out else OUT
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
     if args.list:
         cmd_list(key, org)
     elif args.name:
-        cmd_fetch(key, org, resolve_name(key, org, args.name), args.tokens, args.model, out_dir)
+        cmd_fetch(key, org, resolve_name(key, org, args.name), args.tokens, args.model,
+                  out_dir, args.summary)
     elif args.conversation:
-        cmd_fetch(key, org, args.conversation, args.tokens, args.model, out_dir)
+        cmd_fetch(key, org, args.conversation, args.tokens, args.model, out_dir, args.summary)
     else:
         ap.print_help()
 

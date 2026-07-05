@@ -607,6 +607,38 @@ Files: tests/workflow_approval_probe/test_workflow_approval_intercept_live.py, t
 
 ---
 
+### 2026-07-04 18:39:57 — docs: captured the design-3h handoff batch (17 new [IN] notes, incl. 4 answered questions) — un-queued
+
+Appended **17 new [IN] INBOX notes** to `dev/notes/TODO.md` capturing the full design-3h→3i operator handoff (answers to the 4 held questions + ~13 new design asks), left un-queued per the standing "reconcile all together at the end" method — the pending 10 [IN] notes and the 11-item [ND] queue were **not** edited, so their versions stay intact for the operator to pick between. New notes: **scope model → Project + System only** (⚠ reverses the 3h "build User in" decision; System now spans the repo store + user-level `~/.claude`; flags §8.4 tracking); **Role field** (remove the pencil, lock after session start — resolves the pending role-loader Q); **UI-injected text → one markdown library, one location** (resolves the prompt-content-library Q, expanded surface list); **turn history** (confirmed, both modes); **Documents nav** (top tabs Projects/Settings + changeable side tabs Templates/Snippets/Agents/Skills); **workflow approval via the Inbox** (rename the Plans-&-Docs subsection "Review", same action strip — feasibility proven by the 2026-07-04 workflow research §10 E); **Transcript filters + rail icons** (new Messages/Thinking/Files/Shell/Search/Workflow set, drop Diff/Meta — ⚠ reconcile with [ND] #6); **subagents nested in the parent card** (⚠ reshapes [ND] #6c); **global radius 0** (tokens already 0 — residual round elements the open part); **drop Sent/Received badges** (⚠ contradicts [ND] #6c, which moves them); **agent-panel Lifecycle label + "Context %"→"Max Context %"**; **window chrome** (footer fill → --surface-3, chrome dividers → --main, surface L/R bounds — carries the operator's open header-divider question); **new lighter pink for panel dividers**; **agent-panel dividers** (Details/Create); **larger footer status dots**; **badge/chip S·M·L size standard** (⚠ overlaps [ND] #5); **Connected chip → shared connector-health-badge with 4 status variants**. Capture only — no design/product files touched; collisions flagged to the operator for the reconciliation pass.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 19:24:15 — docs: refined 7 of the design-3h [IN] notes with operator clarifications/decisions
+
+Updated seven of the just-captured [IN] INBOX notes in `dev/notes/TODO.md` after the operator's reply (still capture, not queue-refactor): **scope note** reframed from "reversal" to a **relabel** — "System" is the old User scope renamed to "persistent, cross-project" (points at `~/.claude`), nothing dropped; **radius note** closed as **RESOLVED/no-action** (tokens already 0, leave round elements round); **window-chrome note** rewritten to the exact current state + decisions (footer fill pink→cream, footer divider navy→--main, header navy divider **deleted**, L/R --main bounds; outer frame = --main exception); **lighter-pink note** tension resolved (window frame is the --main exception, panel-internal strips only go lighter pink); **workflow note** resolved its link target (a planned **Subagents tab in the Agent panel**, back-burnered; reuse the Library editor infra if edit/feedback needed); **agent-panel-divider note** marked operator-confirmed + cross-linked to [ND] #8; **badge-size note** reframed as *related-but-distinct* from [ND] #5 ([ND] #5 tiers the identity badge; the S/M/L standard sizes all badges — fold, don't merge). No design/product files touched.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-04 20:24:43 — docs: corrected the Documents-nav [IN] note (structure misread + Project/System labels + unverified side-tab flag)
+
+Rewrote the Documents-nav inbox note in `dev/notes/TODO.md` after the operator caught a structural misread: the Project/System nav lives **inside the Library's Documents tab** and does **not** replace the Library's Plans · Documents · Assets top tabs (those stay as-is). Fixed the top-tab labels **"Projects / Settings" → "Project / System"** (the "Settings" label was drift from a prior agent's refactor of the handoff prompt; System is the scope name). Flagged the four side-tab candidates (Templates/Snippets/Agents/Skills) as **thin and UNVERIFIED** — the same prompt-refactor likely compressed the operator's original side-tab notes, so the true set must be re-derived from the operator. Recorded the remaining open decisions (UI-text tab grouping, current-doc-content coexistence, what else belongs). Capture-fidelity fix only; no design/product files touched.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
+### 2026-07-05 00:46:45 — tooling: transcripts/ home + claude-context-extractor two-script refactor, extension re-pointed
+
+Created the gitignored root `transcripts/` (`web/` · `desktop/` · `cli/`) as the single home for personal session exports. `dev/tools/claude-context-extractor/` now holds two stdlib-only exporters: `extract.py` → **`extract-web.py`** (claude.ai chats via sessionKey; first live-verified run — `--list` + full export clean) and new **`extract-desktop.py`** (desktop-app local-agent-mode sessions read straight from the MSIX-virtualized store; no auth). Both list/export by human-readable title, default their output to the matching `transcripts/` subfolder (`--out` overrides), name exports by the claude-history-viewer convention `claude-<date>-<title-slug>`, and write a `.summary.md` sidecar only with `--summary`. The extension's export dir moved `.claude/cc-exports` → `transcripts/cli` (`.vscode/awl-cc-dash.code-workspace`); all 79 existing exports migrated and the old dir + tracked `.gitkeep` removed. Retired the pre-fork `tests/claude-desktop/` smoke test to `archive/tests/`. A 20-agent adversarial verify pass confirmed 15 defects (same-title+date exports silently clobbering each other, citations promised but unrendered, PEP-604 unions breaking the stated py3.9 floor, lone-surrogate crash on write, non-dict config crash, ambiguous `--session` guessing, `--config` silently ignored, epoch-0 dates, shallow-copy IndexError, `--tokens` no-op) — all fixed, then proven by 14 repro tests plus live re-runs showing re-export reuses the same filename (idempotent refresh) on both the real desktop store and claude.ai. Docs synced: tool README rewritten for both scripts, CLAUDE.md folder map + CUSTOM TOOLING, stale `cc-exports` pointer in `dev/prompts/component-system-refactor.md`.
+
+Files: transcripts/ (new, gitignored), dev/tools/claude-context-extractor/extract-web.py, dev/tools/claude-context-extractor/extract-desktop.py, dev/tools/claude-context-extractor/README.md, .gitignore, .vscode/awl-cc-dash.code-workspace, CLAUDE.md, dev/prompts/component-system-refactor.md, archive/tests/claude-desktop/, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

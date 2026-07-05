@@ -16,7 +16,7 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 | `sidecar/` | The FastAPI backend the frontend talks to (port 7690) — the **working MVP** service. It owns a pluggable **driver seam** for talking to agents, plus the feature modules behind the dashboard (event bus, hooks, inbox, scratchpad, library, console, and more). `bridge` (real Claude Code TUI via tmux/WSL2) is the **primary path and the default when no driver is named**; `sdk` (in-process Claude Agent SDK) is a limited-use opt-in. Full module + endpoint map and driver details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5–§6. |
 | `bridge/` | The agent-control backbone — tmux/WSL2 control of Claude Code sessions. Importable package (`from bridge import TmuxBridge`). See **CUSTOM TOOLING**. |
 | `design/` | UI mockups, palettes, and the **design reference** (`DESIGN.md`). `mockup.html` is the current visual authority; `tokens.css` is the single source of truth for every design value (colors, type, spacing, radius, shadow); `behavior.js` is the **shared component behavior** (interaction logic), loaded by **both** `mockup.html` and `gallery.html` so they can't drift; `styles.css` is the **shared component CSS** linked by both; `gallery.html` is the **interactive component catalog**; `mockup-toolkit.js` is the `Ctrl+G` annotation overlay. |
-| `archive/` | Retired-but-referenced material: the design lineage (old mockups/ui-plans under `design/`), rotated DEVLOG archives (`devlog/`), and retired notes/docs (`notes/`, `dev/notes/`, `docs/`). |
+| `archive/` | Retired-but-referenced material: the design lineage (old mockups/ui-plans under `design/`), rotated DEVLOG archives (`devlog/`), retired notes/docs (`notes/`, `dev/notes/`, `docs/`), and retired test artifacts (`tests/`). |
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
 | `tests/` | The pytest suite — a hermetic per-module unit tier, plus live integration, feasibility-spike, and browser-driven UI tiers that exercise the real bridge/sidecar. Layout + conventions: [tests/README.md](tests/README.md) and **TESTING** below. |
 | `docs/` | Committed, curated product reference docs — home of [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), the system/structure reference (see **KEY FILES**). |
@@ -26,8 +26,9 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 | Folder | Purpose |
 |--------|---------|
 | `dev/` | Claude-CLI / VS Code build-workflow assets — **not the app**: `notes/` (working notes + `research/`), `prompts/` (dev-loop prompts), `tools/` (`bootstrap-env.ps1`, `claude-context-extractor/`). |
-| `.claude/` | Claude Code config — `settings.json` (permissions, `plansDirectory: ./.claude/plans`), `agents/`, `plans/`, `cc-exports/`. |
+| `.claude/` | Claude Code config — `settings.json` (permissions, `plansDirectory: ./.claude/plans`), `agents/`, `plans/`. |
 | `.vscode/` | VS Code workspace (`awl-cc-dash.code-workspace`), `settings.json`, `tasks.json`, `claude-prompts.code-snippets`. |
+| `transcripts/` | **Gitignored** personal session exports, one subfolder per surface: `web/` (claude.ai chats via `extract-web.py`), `desktop/` (desktop-app agent-mode sessions via `extract-desktop.py`), `cli/` (Claude Code CLI sessions exported by the claude-history-viewer VS Code extension). See **CUSTOM TOOLING → claude-context-extractor**. |
 
 **Root files:** `CLAUDE.md`, `DEVLOG.md`, `requirements.txt`, `pyproject.toml`, `.gitignore`, `start-dashboard.bat` (launches the sidecar + Electron together).
 
@@ -50,7 +51,7 @@ Python package at the repo root: `bridge/` — the agent-control backbone. It dr
 
 ### claude-context-extractor
 
-Python dev utility at `dev/tools/claude-context-extractor/`. Pulls a full **claude.ai** (web/desktop) conversation — tool calls, results, citations, artifacts, and full thinking — into a raw `conversation.json` plus a clean `transcript.md`, extracted `artifacts/`, and a `summary.md`, so external Claude context can be captured and handed to another session. Stdlib-only core; run it from its own folder, where the commands and auth (a gitignored, account-level `session_key.txt`) live.
+Two stdlib-only Python exporters at `dev/tools/claude-context-extractor/` that capture full Claude conversations — tool calls, results, citations, artifacts, and full thinking — as clean Markdown for handing context to another session. `extract-web.py` pulls **claude.ai** (web) chats over the internal API (auth: a gitignored, account-level `session_key.txt` in the tool folder); `extract-desktop.py` reads the **Claude desktop app's** local-agent-mode sessions straight off disk (it knows the MSIX-virtualized store — no network or auth needed). Both list sessions and export by human-readable title (`--list` / `--name "<title>"`), write to `transcripts/web/` and `transcripts/desktop/` respectively by default (`--out` overrides), name files by the claude-history-viewer extension's convention (`claude-<date>-<title-slug>.md`), and write a `.summary.md` stats sidecar only when `--summary` is passed. The third transcript surface, `transcripts/cli/`, is written by that extension directly (export dir set in `.vscode/awl-cc-dash.code-workspace`). Details: [`dev/tools/claude-context-extractor/README.md`](dev/tools/claude-context-extractor/README.md).
 
 ### ui-verify (headed UI verification)
 

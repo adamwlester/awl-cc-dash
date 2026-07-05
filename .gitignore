@@ -58,10 +58,10 @@ __pycache__/
 # Agent memory — local/private agent memory should not be tracked
 .claude/agent-memory-local/
 
-# Claude/Codex session exports (personal transcripts + .source.jsonl sidecars) —
-# written by the claude-history-viewer extension. Keep the dir, ignore its contents.
-.claude/cc-exports/*
-!.claude/cc-exports/.gitkeep
+# Session transcripts (personal exports) — root transcripts/ holds web/ (claude.ai via
+# extract-web.py), desktop/ (desktop-app agent sessions via extract-desktop.py), and cli/
+# (Claude Code CLI sessions via the claude-history-viewer extension). Never tracked.
+transcripts/
 
 # Archive bucket for things kept on disk but intentionally NOT tracked in git
 # (e.g. old personal session transcripts). The _ignored/ name signals "untracked".

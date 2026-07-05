@@ -8,6 +8,6 @@
 		}
 	],
 	"settings": {
-		"claude-history.export.directory": ".claude/cc-exports"
+		"claude-history.export.directory": "transcripts/cli"
 	}
 }
