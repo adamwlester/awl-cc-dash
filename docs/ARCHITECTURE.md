@@ -1126,16 +1126,13 @@ deleted.
   shipped model — hook-boundary delivery + the transparent Next/Queue degrade — **is the final model**.
 - **Fallback (now the ceiling):** hook-boundary delivery plus the transparent Next/Queue degrade.
 
-**5. Console rendering fidelity** *(→ §7.13)* — ◐ **partially proven**
-- **Evidence:** **spike passed** (`test_console_mirror_live`, **live**, 2026-07-02) on the *wiring*: keystroke
-  passthrough works and ANSI is recoverable from the pane via `capture-pane -e`. The remaining gap is pure
-  frontend — a faithful xterm-class renderer — which is a build decision, not an engine feasibility question.
-- **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors,
-  spinners, and box-drawing.
-- **Current blocker (frontend only):** faithful rendering needs the `-e`-captured ANSI fed into a
-  terminal-renderer component (xterm.js-class) in the React Console; the sidecar/bridge half is proven.
-- **Research/POC must establish:** n/a for feasibility (proven); the open call is the frontend cost/fit of a
-  real xterm renderer vs. a styled-text approximation.
+**5. Console rendering fidelity + live-streaming transport** *(→ §7.13)* — ◐ **fidelity: partially proven (renderer is a frontend build) · streaming transport: ✅ proven**
+- **Evidence (wiring/fidelity):** **spike passed** (`test_console_mirror_live`, **live**, 2026-07-02) on the *wiring*: keystroke passthrough works and ANSI is recoverable from the pane via `capture-pane -e`. The remaining fidelity gap is pure frontend — a faithful xterm-class renderer — which is a build decision, not an engine feasibility question.
+- **Evidence (streaming transport):** **spike passed** (`test_console_stream_attach_live`, **live**, 2026-07-05, ttyd 1.7.7) — a real *live-streaming* terminal (`ttyd` attached to the agent's tmux session, consumed over a WebSocket) is: **(a)** reachable from Windows over `localhost` with **no hand-rolled port-forwarding** (WSL2's default relay suffices); **(b)** safely coexistent with the sidecar's capture-pane poller — the scraper keeps classifying state correctly under a live viewer, and **`tmux window-size manual`** pins the pane so a viewer cannot perturb the geometry the poller reads (the one real hazard: naive `window-size latest` lets a viewer resize the pane, and the resize **persists** after it detaches); **(c)** far lower latency — a keystroke round-trip of **~11 ms streaming vs ~778 ms polled** (N=1 best case; the polled mirror also degrades ~O(N) with fleet size, per `test_polling_scale_ceiling_live`). A throwaway harness rendered the live stream faithfully in an xterm.js embed (screenshots in the DEVLOG entry). Interception stays on the JSONL transcript regardless — an interactive TUI only ever emits a painted screen.
+- **The now-informed fork (product/architecture decision, not yet made):** the settled Console (§7.13) renders by *polling* `capture-pane` snapshots; the streaming attach above is the alternative the user's "a real terminal" instinct points at (and the 2026-04-01 in-repo research recommended). Both are feasible — streaming is the "watch Claude live" feel, polling is the simpler snapshot mirror. This entry now carries the data to choose; the choice, and any resulting change to §7.13, is deliberately left to the build sprint. Full context: the embedded-terminal feasibility brief, `dev/notes/research/embedded-terminal-feasibility-brief-2026-07-05.md`.
+- **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors, spinners, and box-drawing.
+- **Current blocker (frontend only):** faithful rendering needs terminal bytes fed into a terminal-renderer component (xterm.js-class) in the React Console — proven to render faithfully in a throwaway spike harness (2026-07-05); the sidecar/bridge/transport half is proven for both the polling and the streaming transports.
+- **Research/POC must establish:** n/a for feasibility (proven for both transports); the open calls are the polling-vs-streaming product choice and the frontend cost/fit of a real xterm renderer vs. a styled-text approximation.
 - **Fallback if infeasible:** a clean plain-text mirror (ANSI stripped).
 
 **6. Plan/Decision hook interception** *(→ §7.4, §7.16)* — ✅ **proven** *(pending relocation — Phase 9)*
