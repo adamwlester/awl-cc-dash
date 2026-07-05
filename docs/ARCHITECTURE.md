@@ -254,8 +254,8 @@ The frontend reads agent state in exactly two modes:
   `/health` (5 s) · `/sessions` + `/usage` + `/inbox` + `/links` (2 s) · `/sessions/{id}/checklist` +
   `/marquee` (3 s) · `/subagents` (4.5 s) · the focused agent's `/context` (~1.2 s loop). The
   **scratchpad** is deliberately **not** on a poll — it is read on demand, and its deltas are pushed to
-  running agents via the hook/watermark path (§7.7). The **Console** polls on its own demand-driven
-  schedule (§7.13).
+  running agents via the hook/watermark path (§7.7). The **Console** is **not** on this poll — the focused
+  agent's terminal is a **live streaming attach** (`ttyd`/WebSocket), decided 2026-07-05 (§7.13, §10 #5).
 
 Failure handling is only partly specified: SSE reconnect and the "Sidecar offline" chip are homed (`api.ts`), but the degraded-UI policy when `/health` fails, and any backoff on these fixed poll cadences, are open questions (§10 #28).
 
@@ -315,7 +315,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Linking** | `POST/GET /links` · `DELETE /links/{id}` · `POST /links/{id}/kickoff` |
 | **Scratchpad** | `GET /scratch` · `POST /scratch` (appends + pushes the delta to running co-located agents) |
 | **Library** | `GET /library/documents` · `GET /library/document` · `POST /library/document` (create) · `DELETE /library/document` (delete the `.md` + its paired `.meta.json`) · `GET/POST /library/reviews` |
-| **Console** | `GET /console/catalog` · `POST /sessions/{id}/console/run` (+ the live screen mirror, §7.13 — ⚠ **Today:** the mirror feed is not wired) |
+| **Console** | `GET /console/catalog` · `POST /sessions/{id}/console/run` (+ the live streaming terminal — `ttyd`/WebSocket attach, §7.13 — ⚠ **Today:** not wired into the renderer) |
 | **Readouts** | `GET /sessions/{id}/{context,subagents,checklist,marquee}` · `GET /usage` |
 | **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — `mode`/`fast`/`thinking` are capability-gated `400`s under the bridge driver (§6.2) |
 | **Settings** | `GET /settings/{read,account,config,mcp,plugins}` · `POST /settings/write` (confirm-gated) |
@@ -640,23 +640,16 @@ files don't exist yet (§8.3), and retired numbers live only in memory (`deletio
 ### 7.13 Console
 
 The Console is a **per-agent Console tab** scoped to the focused agent, with an **Expand** control doing a
-partial step-into over the left + middle columns. Its model is a **live mirror of the agent's real terminal
-screen plus keystroke passthrough**:
+partial step-into over the left + middle columns. Its model is a **real live-streaming terminal** — a live client (`ttyd`, attached to the agent's tmux session and consumed over a WebSocket) rendered into an xterm.js-class component, so the focused agent's terminal is watched and typed into exactly as if sitting at it. **Decided 2026-07-05 (streaming, not polled snapshots — feasibility proven, §10 #5):** the Console is the **focused-agent** surface and uses the live stream; the fleet-wide coordination reads and the many-agent grid overview stay on the capture-pane/transcript path (§4.3, §6.2) — you never run N live terminals at once.
 
-- **Mirror:** `capture-pane` mirrors everything — output, menus, dialogs, the input/status bar — exactly as
-  a human at the terminal would see it.
-- **Passthrough:** the Console input passes keystrokes through to the TUI, so interactive slash-command
-  follow-ups are answered exactly as if sitting at the terminal — the same `keys()` mechanism as the
-  permission round-trip.
-- **Slash-command runner:** a full grouped catalog with filter, staged into a run bar
-  (`GET /console/catalog`, `POST /sessions/{id}/console/run`), routed via the bridge's `send`/`keys`.
-- **Demand-driven polling:** none while the tab is closed; **one bounded scrollback pull on open** (catch-up
-  is a single fetch); **fast polling a few times per second while visible**. Each poll crosses the
-  Windows→WSL boundary (~50–150 ms), which is why the cadence is gated on visibility.
+- **Live stream:** the terminal streams continuously over the WebSocket (~10 ms keystroke round-trip on localhost, no poll cadence), rendering everything faithfully — output, menus, dialogs, the input/status bar, colors, spinners, box-drawing — exactly as a human at the terminal would see it.
+- **Attach-on-open, detach-on-close:** the live client attaches only while the Console tab is open on that agent (never a live terminal per agent across the fleet); one bounded scrollback catch-up on open.
+- **Geometry pinning (required):** the agent's tmux pane is pinned via `window-size manual` so an attached viewer cannot resize it and perturb the sidecar's capture-pane coordination reads — the one coexistence hazard, and its fix (§10 #5).
+- **Passthrough:** the Console input passes keystrokes through to the TUI over the stream, so interactive slash-command follow-ups are answered exactly as if sitting at the terminal.
+- **Slash-command runner:** a full grouped catalog with filter, staged into a run bar (`GET /console/catalog`, `POST /sessions/{id}/console/run`), routed via the bridge's `send`/`keys`.
+- **Interception stays on the transcript:** an interactive TUI only ever emits a *painted screen*, so machine-readable data (messages, tool calls, permission events) is read from the JSONL transcript / event bus (§7.1, §8.6) — never parsed off the terminal stream. The stream is the human's surface; the transcript is the machine's.
 
-⚠ **Today:** the live mirror feed and keystroke passthrough are not wired, and the React Console is
-stubbed in places; the catalog + run endpoints exist. Rendering fidelity (plain text vs ANSI colors needing
-a terminal-renderer component) is the one open sliver (§10).
+⚠ **Today:** neither the streaming attach nor a polled mirror is wired into the React Console (a parked-renderer gap), and the React Console is stubbed in places; the catalog + run endpoints exist. The streaming transport is proven feasible end-to-end (`test_console_stream_attach_live`, §10 #5); what remains is the frontend build — the xterm.js-class renderer plus the `ttyd`/WebSocket wiring — deferred to the build sprint.
 
 ### 7.14 Prompt composition
 
@@ -1126,13 +1119,13 @@ deleted.
   shipped model — hook-boundary delivery + the transparent Next/Queue degrade — **is the final model**.
 - **Fallback (now the ceiling):** hook-boundary delivery plus the transparent Next/Queue degrade.
 
-**5. Console rendering fidelity + live-streaming transport** *(→ §7.13)* — ◐ **fidelity: partially proven (renderer is a frontend build) · streaming transport: ✅ proven**
+**5. Console rendering fidelity + live-streaming transport** *(→ §7.13)* — ✅ **transport decided: streaming for the focused Console (feasibility proven)** · ◐ fidelity renderer is a frontend build
 - **Evidence (wiring/fidelity):** **spike passed** (`test_console_mirror_live`, **live**, 2026-07-02) on the *wiring*: keystroke passthrough works and ANSI is recoverable from the pane via `capture-pane -e`. The remaining fidelity gap is pure frontend — a faithful xterm-class renderer — which is a build decision, not an engine feasibility question.
 - **Evidence (streaming transport):** **spike passed** (`test_console_stream_attach_live`, **live**, 2026-07-05, ttyd 1.7.7) — a real *live-streaming* terminal (`ttyd` attached to the agent's tmux session, consumed over a WebSocket) is: **(a)** reachable from Windows over `localhost` with **no hand-rolled port-forwarding** (WSL2's default relay suffices); **(b)** safely coexistent with the sidecar's capture-pane poller — the scraper keeps classifying state correctly under a live viewer, and **`tmux window-size manual`** pins the pane so a viewer cannot perturb the geometry the poller reads (the one real hazard: naive `window-size latest` lets a viewer resize the pane, and the resize **persists** after it detaches); **(c)** far lower latency — a keystroke round-trip of **~11 ms streaming vs ~778 ms polled** (N=1 best case; the polled mirror also degrades ~O(N) with fleet size, per `test_polling_scale_ceiling_live`). A throwaway harness rendered the live stream faithfully in an xterm.js embed (screenshots in the DEVLOG entry). Interception stays on the JSONL transcript regardless — an interactive TUI only ever emits a painted screen.
-- **The now-informed fork (product/architecture decision, not yet made):** the settled Console (§7.13) renders by *polling* `capture-pane` snapshots; the streaming attach above is the alternative the user's "a real terminal" instinct points at (and the 2026-04-01 in-repo research recommended). Both are feasible — streaming is the "watch Claude live" feel, polling is the simpler snapshot mirror. This entry now carries the data to choose; the choice, and any resulting change to §7.13, is deliberately left to the build sprint. Full context: the embedded-terminal feasibility brief, `dev/notes/research/embedded-terminal-feasibility-brief-2026-07-05.md`.
+- **Decided (2026-07-05) — streaming for the focused Console:** the Console (§7.13, updated) renders the focused agent via the **live streaming attach** (`ttyd`/WebSocket), not polled `capture-pane` snapshots — the "watch Claude live" experience, chosen once coexistence + reachability + latency all came back green. **Polling and the transcript stay** where they belong: the capture-pane/transcript path keeps serving the fleet-wide coordination reads and the many-agent grid overview (§4.3, §6.2) — you never run N live terminals at once. The two are complementary, not competitors. Full context: the embedded-terminal feasibility brief, `dev/notes/research/embedded-terminal-feasibility-brief-2026-07-05.md`.
 - **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors, spinners, and box-drawing.
-- **Current blocker (frontend only):** faithful rendering needs terminal bytes fed into a terminal-renderer component (xterm.js-class) in the React Console — proven to render faithfully in a throwaway spike harness (2026-07-05); the sidecar/bridge/transport half is proven for both the polling and the streaming transports.
-- **Research/POC must establish:** n/a for feasibility (proven for both transports); the open calls are the polling-vs-streaming product choice and the frontend cost/fit of a real xterm renderer vs. a styled-text approximation.
+- **Current blocker (frontend only):** faithful rendering needs the streamed terminal bytes fed into a terminal-renderer component (xterm.js-class) in the React Console — proven to render faithfully in a throwaway spike harness (2026-07-05); the sidecar/bridge/transport half (the decided streaming attach) is proven.
+- **Research/POC must establish:** n/a — feasibility is proven and the transport choice is **decided** (streaming); the one remaining open call is the frontend build itself — the xterm.js-class renderer + `ttyd`/WebSocket wiring in the (frozen, to-be-rebuilt) React Console.
 - **Fallback if infeasible:** a clean plain-text mirror (ANSI stripped).
 
 **6. Plan/Decision hook interception** *(→ §7.4, §7.16)* — ✅ **proven** *(pending relocation — Phase 9)*
