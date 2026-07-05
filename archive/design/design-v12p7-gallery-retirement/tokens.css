@@ -193,7 +193,7 @@
      vertical splits keep a REAL range (min≠max); each pane's max sits a touch
      under the column's ~1520px budget-minus-opposite-min so a fully-dragged pane
      can never leave a gap. Mirrors the eventual Electron BrowserWindow min/max. */
-  --win-w:2200px;          --win-h:1600px;               /* fixed dev window */
+  --win-w:2600px;          --win-h:1600px;               /* fixed dev window */
   --col-left-min:400px;    --col-left-max:400px;         /* Agent column — pinned */
   --col-right-min:1000px;  --col-right-max:1000px;       /* right column — pinned */
   /* middle column: flex only (no width token) — fills the remainder (~1196px) */

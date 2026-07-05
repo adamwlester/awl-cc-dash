@@ -671,6 +671,14 @@ Files: archive/design/design-v12p7-gallery-retirement/ (new: gallery.html, token
 
 ---
 
+### 2026-07-05 02:35:07 — fix(archive): retirement snapshot tokens.css restored to the committed value
+
+The stage-1 snapshot copied `tokens.css` from the working tree, which silently carried an uncommitted, unlogged `--win-w: 2600px → 2200px` edit (a concurrent live tweak; the change is inert in the gallery — no `.app` element consumes `--win-*` there — but a frozen archive shouldn't enshrine an unreviewed diff). Caught by the stage-2 adversarial review panel; restored the snapshot's line to the committed 2600px, and the snapshot's `tokens.css` now matches `git show HEAD:design/tokens.css` byte-for-byte. The working-tree edit to the live [design/tokens.css](design/tokens.css) itself is untouched and left uncommitted — it belongs to whoever made it. One-line correction by the snapshot's authoring run; the never-edit freeze binds from here on.
+
+Files: archive/design/design-v12p7-gallery-retirement/tokens.css, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
