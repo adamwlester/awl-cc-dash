@@ -405,6 +405,44 @@ Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
 
 ---
 
+### 2026-07-05 09:25:00 — docs: Phase-9 answer refinements round 3 (Library-hub sketch, index files elevated, #25 yes-deferred, fan-out button sketch)
+
+Third recording pass in the tracker's tentative-answers section ([dev/notes/scratch/2026-07-03-doc-integration-tracker.md](dev/notes/scratch/2026-07-03-doc-integration-tracker.md)) from continued operator conversation: Q7 amended (operator values the per-turn tool-parsing capability over the display; recorded that the raw data already exists in transcripts + sidecar parsing, so parking loses nothing while retention is pinned); Q9 #23 gained the operator's interface sketch (the Library as the hub, reusing the review-panel nav-rail lens pattern organized by task/project/subproject, kept deliberately broad); Q9 #24 amended (per-folder index files ALSO wanted alongside the git-identity backbone, drift risk flagged and accepted); Q9 #25 resolved (yes but deferred to the hooks setup pass; operator confirms current asset setup is suboptimal); Q10 #22 gained the operator's Compose "add agents" fan-out-block sketch. Answers-section-only edit, per the 08:55 precedent.
+
+Files: dev/notes/scratch/2026-07-03-doc-integration-tracker.md, DEVLOG.md
+
+### 2026-07-05 09:38:48 — Decision locked in: streaming for the focused Console (ARCHITECTURE §7.13 + §10 #5)
+
+Recorded the product decision that the 2026-07-05 live-streaming spike (commit `06c3afe`) had deliberately left as an open fork: the **focused-agent Console uses the live streaming attach** (`ttyd`/WebSocket into an xterm.js-class renderer), **not** polled `capture-pane` snapshots — chosen once the spike proved reachability, poller coexistence (via `window-size manual` pinning), and the ~11 ms vs ~778 ms latency win. The complementary split is now explicit in the doc: **polling + the JSONL transcript stay** as the fleet-wide coordination reads and the many-agent grid overview (you never run N live terminals at once), and interception stays on the transcript, never parsed off the terminal stream. Propagated across ARCHITECTURE.md: **§7.13** rewritten from the polled-mirror model to the streaming model (live-stream · attach-on-open/detach-on-close · required geometry pinning · passthrough · slash-runner · transcript-interception · updated ⚠ Today); **§10 #5** flipped from "fork, not yet made" to "transport decided" (status marker + decision bullet + blocker/research lines); **§4.3** "the Console polls on its own demand-driven schedule" corrected to the streaming attach; **§5.2** endpoint table "live screen mirror" → "live streaming terminal". Doc-only, no product code. NOTE: left uncommitted in the working tree — an operator/other agent may also be recording this, so coordinate the commit to avoid a double-apply.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
+### 2026-07-05 09:55:00 — scratch: renamed .scratch/ui-snippets → ui-spikes; fixed broken tokens.css links (no corruption)
+
+Renamed the gitignored scratch UI proof-of-concept folder `.scratch/ui-snippets` → `.scratch/ui-spikes` (per user — "snippet" was the wrong word; these are 11 standalone POC pages, not fragments). Diagnosed the "all-black background" the user reported as **broken stylesheet links, not corruption**: 6 files linked `../tokens.css`, which resolved to the nonexistent `.scratch/tokens.css` after an earlier move out of `design/` — repointed all 6 to `../../design/tokens.css` (resolves, confirmed). Nothing tossed; all 11 files intact. Stale "ui-snippets" mentions remain in tracked `design/styles.css` (a historical port comment) and `dev/prompts/nextup-parallel-execution.md` (already pointing at the old `design/ui-snippets/` path) — left untouched; archived DEVLOGs keep the old name by rule.
+
+Files: .scratch/ui-spikes/ (renamed from ui-snippets; agent-card, context-dropdown, messages-card, plans-editor-rail, response-popover, turns-dropdown repointed)
+
+---
+
+### 2026-07-05 10:14:25 — assets: agent-names.json — 159 curated randomize-name pool for the Create panel
+
+Added `assets/names/agent-names.json` (`{"names": [...]}`, flat array) feeding the Create panel's randomize-name shuffle. 159 names, all validated against the hard rails that matter because these double as git commit-author names: one word, lowercase `[a-z]` only, 3–5 letters, each visually distinct, all unique, and none a real person's first name (so an agent can never be mistaken for a human in `git blame`). Vibe is deliberately cursed-cute — goop / critter / snack / noise / tiny-machine / mythical-nonsense — punchy and fun to say aloud. Validated with a JSON + regex + uniqueness pass.
+
+Files: assets/names/agent-names.json
+
+---
+
+### 2026-07-05 10:15:00 — CLAUDE.md: added "Match the moment, then name things" response-style rule
+
+Added a lead bullet to the **Working style** section of the project [CLAUDE.md](CLAUDE.md) capturing the response-formatting preference settled this session: match the register I'm in (three tight lines vs. the full breakdown), stay concrete (name the actual items/files/directories/sections/actions, never gesture — folded into the existing *cite-files* rule rather than duplicated), terse ≠ vague / detailed ≠ padded, and emoji-as-seasoning (occasional ⚠️/✅, never per-line, no numbered-emoji headers unless asked). Placed first so "match the moment" leads, per operator.
+
+Files: CLAUDE.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
