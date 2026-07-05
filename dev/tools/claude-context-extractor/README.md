@@ -13,13 +13,13 @@ Both scripts share one convention, matching that extension's filenames: exports 
 
 ## extract-desktop.py — desktop app sessions (no setup)
 
-The desktop app runs "local agent mode" as a Claude Code session under the hood and stores each one on disk: a config JSON carrying the human-readable title, plus a standard Claude Code JSONL transcript. On the Microsoft Store (MSIX) build these live under the package container (`AppData\Local\Packages\Claude_...\LocalCache\Roaming\Claude\local-agent-mode-sessions`) — the script auto-detects that, so it just works:
+The desktop app runs "local agent mode" as a Claude Code session under the hood and stores each one on disk: a config JSON carrying the human-readable title, plus a standard Claude Code JSONL transcript. On the Microsoft Store (MSIX) build these live under the package container (`AppData\Local\Packages\Claude_...\LocalCache\Roaming\Claude\local-agent-mode-sessions`) — the script auto-detects that, so it just works. Run these from the repo root:
 
 ```
-python extract-desktop.py --list                                    # all sessions by title/date
-python extract-desktop.py --name "glossary-maintenance-strategy-1"  # export by title
-python extract-desktop.py --name "<title>" --summary                # + stats sidecar
-python extract-desktop.py --session local_62de1ffd-...              # export by session id
+python dev/tools/claude-context-extractor/extract-desktop.py --list                                    # all sessions by title/date
+python dev/tools/claude-context-extractor/extract-desktop.py --name "glossary-maintenance-strategy-1"  # export by title
+python dev/tools/claude-context-extractor/extract-desktop.py --name "<title>" --summary                # + stats sidecar
+python dev/tools/claude-context-extractor/extract-desktop.py --session local_62de1ffd-...              # export by session id
 ```
 
 Escape hatches: `--root <dir>` if sessions live somewhere non-standard; `--transcript <file.jsonl>` (optionally + `--config <file.json>`) renders one transcript directly.
@@ -36,13 +36,15 @@ Escape hatches: `--root <dir>` if sessions live somewhere non-standard; `--trans
 
 ### Commands
 
+Run these from the repo root (or `cd dev/tools/claude-context-extractor` first and drop the path prefix):
+
 ```
-python extract-web.py --list                                  # list recent conversations
-python extract-web.py --name "Linting explained simply"       # export by title (substring, case-insensitive)
-python extract-web.py --name "<title>" --summary              # + stats sidecar
-python extract-web.py --conversation <url-or-uuid>            # export by URL / UUID
-python extract-web.py --resummarize <path>                    # offline: (re)write a summary for an existing
-                                                              #   export (.source.json or old-format dir) — no fetch
+python dev/tools/claude-context-extractor/extract-web.py --list                             # list recent conversations
+python dev/tools/claude-context-extractor/extract-web.py --name "Linting explained simply"  # export by title (substring, case-insensitive)
+python dev/tools/claude-context-extractor/extract-web.py --name "<title>" --summary         # + stats sidecar
+python dev/tools/claude-context-extractor/extract-web.py --conversation <url-or-uuid>       # export by URL / UUID
+python dev/tools/claude-context-extractor/extract-web.py --resummarize <path>               # offline: (re)write a summary for an
+                                                                                            #   existing export (.source.json or old dir) — no fetch
 
 # options:
 #   --tokens {heuristic,tiktoken,api}   summary token estimate (api = exact, free, needs ANTHROPIC_API_KEY)

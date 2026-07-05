@@ -13,12 +13,13 @@ the claude-history-viewer extension's convention, `claude-<conversation-date>-<t
     claude-<date>-<slug>.artifacts/     extracted artifact files (only when the chat has any)
     claude-<date>-<slug>.summary.md     stats sidecar — only when --summary is passed
 
-Usage (stdlib only — any Python 3.9+, no venv needed; run from this folder or anywhere):
-    python extract-web.py --list
-    python extract-web.py --name "Linting explained simply"
-    python extract-web.py --name "Linting explained simply" --summary
-    python extract-web.py --conversation https://claude.ai/chat/<uuid>
-    python extract-web.py --name "..." --out C:\\somewhere\\else
+Usage (stdlib only — any Python 3.9+, no venv needed). Copy-paste these from the repo root:
+    python dev/tools/claude-context-extractor/extract-web.py --list
+    python dev/tools/claude-context-extractor/extract-web.py --name "Linting explained simply"
+    python dev/tools/claude-context-extractor/extract-web.py --name "Linting explained simply" --summary
+    python dev/tools/claude-context-extractor/extract-web.py --conversation https://claude.ai/chat/<uuid>
+    python dev/tools/claude-context-extractor/extract-web.py --name "..." --out C:\\somewhere\\else
+(Or `cd dev/tools/claude-context-extractor` first and drop the path prefix: `python extract-web.py --list`.)
 
 Extras:
     --tokens {heuristic,tiktoken,api}   summary token-estimate method (api = exact, free,

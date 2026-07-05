@@ -11,13 +11,14 @@ Exports land in `<repo>/transcripts/desktop/` by default (override with --out), 
 the claude-history-viewer extension's convention: `claude-<session-start-date>-<title-slug>.md`.
 A stats sidecar `claude-<date>-<slug>.summary.md` is written only when --summary is passed.
 
-Usage (stdlib only — any Python 3.9+, no venv needed):
-    python extract-desktop.py --list
-    python extract-desktop.py --name "glossary-maintenance-strategy-1"
-    python extract-desktop.py --name "glossary-maintenance-strategy-1" --summary
-    python extract-desktop.py --session local_62de1ffd-c4d1-4ad1-b3d9-93aacc347982
-    python extract-desktop.py --name glossary          # substring match; errors if ambiguous
-    python extract-desktop.py --name "..." --out C:\\somewhere\\else
+Usage (stdlib only — any Python 3.9+, no venv needed). Copy-paste these from the repo root:
+    python dev/tools/claude-context-extractor/extract-desktop.py --list
+    python dev/tools/claude-context-extractor/extract-desktop.py --name "glossary-maintenance-strategy-1"
+    python dev/tools/claude-context-extractor/extract-desktop.py --name "glossary-maintenance-strategy-1" --summary
+    python dev/tools/claude-context-extractor/extract-desktop.py --session local_62de1ffd-c4d1-4ad1-b3d9-93aacc347982
+    python dev/tools/claude-context-extractor/extract-desktop.py --name glossary   # substring; errors if ambiguous
+    python dev/tools/claude-context-extractor/extract-desktop.py --name "..." --out C:\\somewhere\\else
+(Or `cd dev/tools/claude-context-extractor` first and drop the path prefix: `python extract-desktop.py --list`.)
 
 Escape hatches:
     --root <dir>          sessions root, if the app stores sessions somewhere non-standard

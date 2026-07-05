@@ -639,6 +639,14 @@ Files: transcripts/ (new, gitignored), dev/tools/claude-context-extractor/extrac
 
 ---
 
+### 2026-07-05 00:58:10 — fix: extractor header/README examples now copy-paste from the repo root
+
+The extractor usage examples showed a bare `python extract-web.py …`, which only resolves when the shell is inside the tool folder — run from the repo root (where I actually work) they fail with "No such file or directory." (The web header even wrongly claimed "run from this folder or anywhere.") Rewrote every example in both script headers and the README to the repo-root-relative path `python dev/tools/claude-context-extractor/extract-{web,desktop}.py …`, with a note about the `cd`-first shortcut. Verified by running the exact new examples verbatim from the repo root against two live named sessions (desktop "glossary-maintenance-strategy-2", web "Enabling fast mode in settings.json") — both exit 0 and export. Comment/doc-only; no behavior change.
+
+Files: dev/tools/claude-context-extractor/extract-web.py, dev/tools/claude-context-extractor/extract-desktop.py, dev/tools/claude-context-extractor/README.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
