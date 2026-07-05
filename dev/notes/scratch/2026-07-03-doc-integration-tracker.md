@@ -174,3 +174,129 @@ Blocks the Phase-9 restructure (also under Running todo):
 - [✓] Phase 5 decisions (§E) — user decided all 3 (2026-07-04); applied to ARCHITECTURE.md + CLAUDE.md.
 - [ ] BB8 "Agent Archive" sits in §11.3 #18 with a value-unclear caveat — user may prefer it demoted to §10
 - [ ] Phase 9: also re-check the stale `.claude/worktrees/wf_*` clutter noticed 07-03 (unrelated to this workflow; cleanup candidate)
+
+## Operator decision questions — the Phase-9 prerequisite set (2026-07-04)
+
+**What this is.** The plain-language, big-picture version of every open decision that is *yours* to make so that §10/§11 of `docs/ARCHITECTURE.md` can be refactored into a complete, buildable account of the system (Phase 9). Each numbered question bundles one or more §10/§11 items into a single high-level call; the granular sub-items are named inline so nothing is hidden. This is the **human-readable companion to the §F1 register above** — §F1 stays the durable checkbox ledger and the audit trail of where each item is homed in §10; this section is where the decisions are actually framed to be read and answered. Answering by letter is enough, and **"go with your recommendation" is a complete answer.** A 🔧 marker means the item *also* needs a technical spike — but your *direction* is what's asked here; the spike settles feasibility, you settle intent.
+
+**Scope.** These are the system/architecture decisions in `docs/ARCHITECTURE.md` §10/§11 **only** — not the design lane (`design/DESIGN.md` owns UI/UX calls) and not the private `dev/notes/TODO.md` backlog. Q10 touches two design-lane *features*, but only as a pursue-or-park call, not as design work.
+
+**The one hard gate.** Only **Q11 (Agent Archive placement)** structurally blocks the Phase-9 refactor. The others don't block the mechanical reshuffle — but each question left unruled is a part of the system still unaccounted for, so answering them is what turns the refactored §10/§11 into a genuinely complete build map. You don't have to answer them all at once; the register survives handoffs.
+
+### 1. Backend robustness & operations posture — how hardened is the sidecar for v1? *(bundles §10 #29, #30, #31, #33)*
+
+**The call.** How production-hardened should the behind-the-scenes service (the "sidecar") and the project data it saves be for the first real version? Today it's built for one person on one machine. Four small production-hygiene decisions all flow from one posture choice: **schema stamp (#29)** — write a version number into saved project data now, so a future format change can still read old data? · **crash recovery (#30)** — if the sidecar process dies, is it a manual relaunch (your agents keep running in tmux regardless) or does the app auto-restart it? · **two-machine conflicts (#31)** — if the committed project state is edited from two branches/machines, is there a merge rule, or is single-machine simply assumed? · **backend logging (#33)** — does the sidecar write its own diagnostic log to a file so a crash leaves a trail, or just print to a console nobody's attached to?
+
+- **A — Pragmatic single-machine v1.** Take the cheap protections, defer the expensive machinery: stamp `schema_version` now (near-free insurance), keep manual sidecar relaunch, assume single-machine with no merge policy (matches the cross-machine caveat you already accepted, §9.9), and write a small size-bounded log file under the backend's runtime folder.
+- **B — Hardened now.** Add auto-restart supervision, a real cross-machine merge/reconcile story, and rotating logs up front. Meaningfully more work; worth it only if multi-machine or unattended operation is coming soon.
+- **C — Minimal / do nothing.** Accept that a format change may break old data, a crash needs a manual restart with no log trail, and so on.
+
+**My recommendation: A** — and you can override any single item (e.g. "A but skip the schema stamp"). It locks in the two things that are annoying to retrofit later (the version stamp and a log file) and defers the two that are real engineering you don't need yet (auto-restart, merge policy).
+
+### 2. Security on an untrusted network *(§10 #32)*
+
+**The call.** The dashboard's control API listens on the network with no login. At home on your own machine that's a deliberate, accepted choice. The open question is the *travelling laptop*: on café or office Wi-Fi, that same API — which can start, stop, and steer agents — is reachable by anyone else on the network.
+
+- **A — OS firewall is the boundary; document and accept.** Rely on Windows Firewall to block inbound connections and record it as the deliberate posture. Zero new code; genuinely correct for a personal laptop that's firewalled by default.
+- **B — Add a "travel mode."** A toggle that binds the API to localhost-only (or requires a token) when you're on untrusted networks. Modest work; a real safety net if you'll actually work from public Wi-Fi.
+- **C — Always require auth.** A token or login on every request, everywhere. Most secure, most friction for a single-user tool.
+
+**My recommendation: A now, with B noted as a cheap future add** if you find yourself working on public networks. The firewall really is the effective boundary on a default Windows laptop, so A is honest rather than lazy.
+
+### 3. What the UI does when the backend drops — degraded mode *(§10 #28)*
+
+**The call.** The dashboard polls the sidecar for its live readouts. Today, if the backend becomes unreachable, you get a single "Sidecar offline" chip and the app keeps polling at full speed. The open question is how the panels should *behave* when the backend is down — and whether polling should back off instead of hammering a dead endpoint.
+
+- **A — Freeze + mark stale, and back off.** Panels keep showing their last-known values, visibly marked as stale, while polling slows to a gentle retry until the backend returns. Calm, informative, no pointless load.
+- **B — Banner + hide live data.** Replace the live readouts with a prominent "disconnected" banner so nothing potentially-stale is shown at all.
+- **C — Minimal.** Keep today's single offline chip and the unchanged poll rate.
+
+**My recommendation: A.** Last-known-but-marked-stale is the least jarring, and the backoff avoids beating on a dead endpoint — it's the standard, well-understood pattern for this.
+
+### 4. Voice dictation — how speech becomes text *(§10 #27)* 🔧
+
+**The call.** The Compose / Plans / Documents editors show a mic icon for dictation, but nothing is wired behind it. The decision is *how* speech gets turned into text.
+
+- **A — The browser's built-in speech recognition.** Free, no backend, works immediately, decent quality for short dictation. Privacy/offline behavior depends on the browser engine (worth a quick check).
+- **B — A backend transcription service.** Higher quality and full control, but real work to build and run, with its own privacy/offline story.
+- **C — Defer.** Leave the mic as a visual placeholder until later.
+
+**My recommendation: A for v1**, revisiting B only if the built-in quality proves insufficient. (🔧 a small spike should confirm the browser speech API behaves inside the Electron shell before we commit.)
+
+### 5. Response-format presets *(§10 #34)*
+
+**The call.** You want a control that tells an agent how to shape its replies (for example your preferred TL;DR-table-with-emoji-status format). The open call is the *menu of options* and the *scope* — does the choice stick to an agent, or is it set per message?
+
+- **A — A small preset menu, set per-agent.** A short list of formats (including your TL;DR-table + emoji style) chosen once per agent and applied to all its replies.
+- **B — Set per message.** The format is picked each time you send — finer control, more repetition.
+- **C — Single freeform field, no presets.** Just a text box where you type formatting instructions.
+
+**My recommendation: A, per-agent**, with a per-message override as a later nicety. Per-agent matches how you'd actually want a given agent to behave consistently.
+
+### 6. Where "randomize agent name" draws from *(§10 #35)*
+
+**The call.** The Create panel has a shuffle-a-name affordance, but there's no defined pool for it to draw from. Low stakes.
+
+- **A — A curated human-name pool + randomize.** A built-in list of friendly names to shuffle through; you can still type your own.
+- **B — User-typed only.** Drop the randomize affordance; names are always typed.
+
+**My recommendation: A** — a small curated pool is cheap and makes spinning up throwaway agents pleasant, and typing your own stays available.
+
+### 7. How detailed the "turns by tool" breakdown should be *(§10 #26)* 🔧
+
+**The call.** The Agent → Details view is meant to break an agent's activity into a per-tool split (reading, editing, running commands, web, subagents, plus a "Coordinating" slice for cross-agent chatter). It's not yet known how much of that is actually derivable from the transcript data. The decision is how ambitious to aim.
+
+- **A — Spike first, then show whatever's reliably derivable, including "Coordinating" if possible.** Let a quick technical test bound what's real, then display exactly that.
+- **B — Commit to the full breakdown now.** Design for every bucket up front, at the risk that some (especially "Coordinating") can't be sourced.
+- **C — Cut it to the total.** Just show total turn count and drop the per-tool split.
+
+**My recommendation: A** — decide the *ambition* (a rich, honest breakdown) and let the spike settle what's achievable; ship only the buckets that prove trustworthy.
+
+### 8. Console rendering fidelity *(§10 #5)*
+
+**The call.** The engine side of mirroring a live terminal into the dashboard is already proven. What's left is a pure frontend build choice: how faithfully to render it — real terminal colours, spinners, and box-drawing, or a simpler approximation. This one depends most on how central the Console is to how you'll actually work.
+
+- **A — Full terminal renderer (xterm-class).** Faithful colours, spinners, box-drawing — looks exactly like the real terminal. More frontend weight and work.
+- **B — Styled-text approximation.** Clean, readable, captures most of the value without embedding a full terminal engine; upgradeable to A later.
+- **C — Plain-text mirror.** ANSI stripped entirely; simplest, least faithful.
+
+**My best guess: B for v1**, with A as a later upgrade — *unless* you expect to live in the Console a lot, in which case go straight to A. Tell me how central the Console is and I'll firm this up.
+
+### 9. Three "is it worth building?" items *(§10 #23, #24, #25)*
+
+**The call.** Three capabilities were carried over from an old backlog with their *value* never validated. Each is a keep-or-park decision: **Docs in agent context (#23)** — automatically feed agents the *relevant, current* documentation for what they're working on, instead of you pasting doc references into prompts · **AI-touched file tracking (#24)** — keep an index of what the AI has changed (a per-folder `index.md`, a central ledger, or derived from git) · **Special-asset sourcing check (#25)** — confirm skills / agents / hooks / plugins are pulled from the ideal source per type.
+
+- **A — Lightly scope #23, park #24 and #25.** "Relevant docs in context" has obvious leverage and is worth a small research pass; the other two have unclear payoff for their maintenance cost — park them as backlog.
+- **B — Research all three.** Treat all as worth a proper look now.
+- **C — Park all three.** None are core; revisit after v1.
+
+**My recommendation: A.** #23 is the one with real leverage; #24 and #25 read as nice-to-haves you can defer without loss.
+
+### 10. Three "elevate or park" features *(§10 #36, #37, #22)*
+
+**The call.** Three features are recurring asks but not core; the question is simply whether to pursue each now or leave parked. Two are design-lane (they'd route to the design agent, not be built here); one is system-lane and needs a spike. **Rich visual content in Plans/Docs (#36, design-lane)** — diagrams / charts (e.g. mermaid) with visual commenting · **Authors / authorship view (#37, design-lane)** — a view surfacing who-wrote-what (the provenance data already exists) · **Subagent create / manage from the dashboard (#22, system-lane 🔧)** — go beyond *observing* subagents to creating, steering, and stopping them.
+
+- **A — Park all three for v1, revisit after the core ships.** None are load-bearing for the core dashboard.
+- **B — Pursue subagent-management (#22) only.** It's the most system-relevant; the two design-lane items wait for the design phase.
+- **C — Pursue all three now.**
+
+**My recommendation: A**, leaning **B** if subagent orchestration is central to how you plan to drive the fleet. The two design-lane items are natural fits for the dedicated design-review phase we discussed.
+
+### 11. ★ Agent Archive placement — the one that gates Phase 9 *(§11.3 #18)*
+
+**The call.** "Agent Archive" is a proposed feature — a browsable database of past agents with a short summary of each one's work and timestamps. It currently sits in the *build* backlog (§11, "decided, buildable"), but you've flagged that its *value* is unclear. Because Phase 9 refactors §10 (open questions) and §11 (decided work) as two clean buckets, this item has to be assigned to the right bucket before the refactor can run — which is why it's the single hard gate.
+
+- **A — Demote to §10 as an open question.** It moves to the "not-yet-decided, value-unclear" bucket where it honestly belongs, and stops implying it's approved to build.
+- **B — Keep in §11 as a decided build item.** Only if you *do* want it built — then it stays queued.
+- **C — Drop it entirely.** Remove it as a feature idea.
+
+**My recommendation: A** — it matches your own "value still unclear" note, keeps §11 to genuinely-decided work, and unblocks the refactor cleanly. Answering just this one lets Phase 9 proceed; the other ten make the refactored map complete.
+
+## Operator answers — TENTATIVE (pending end-of-block coherence review)
+
+> **Status: LIVE / INCOMPLETE — do not treat any answer here as settled.** The operator is answering the questions above in chunks and has asked that **every answer be held tentative**. When the operator signals the block is complete, run **one coherence pass** over the whole set — do the answers hang together for clean development? does any combination create contradictory or awkward build work? — then flag anything worth reconsidering (with rationale) and get sign-off. **Only after that pass does anything port into `docs/ARCHITECTURE.md` §10/§11 or convert a §F1 box.** An answer may need revisiting in light of another, by the operator's explicit instruction.
+
+- **Q1 — backend robustness posture → A** *(tentative)* — pragmatic single-machine v1 (schema stamp now · manual sidecar relaunch · single-machine no-merge · bounded log file).
+- **Q2 — security on untrusted network → A** *(tentative)* — OS firewall is the boundary; document + accept.
+- **Q3 — degraded-mode UX → A** *(tentative; IN DISCUSSION)* — operator accepts A (freeze + mark-stale + backoff) in principle, but the *display* of this state is not yet resolved and gates the answer's completeness. Findings (2026-07-04): the `connector-health-badge` is Settings/connector-scoped with 4 connector-auth states (Connected / OAuth ✓ / Parked / OAuth-expired), **not** an app-wide backend-health signal; problem-states are currently spread across **three surfaces** (connector badges in Settings · System Error/Warning Inbox cards, §10 #16 / §7.8 · the frontend "Sidecar offline" chip, §4.3). **Attached requirement (operator intent):** a consolidated, always-visible system-health indicator in the app chrome that carries sidecar-offline + degraded + the other problem-states, with a broadened state vocabulary (add down + stale/degraded) reconciled with §10 #16. → **design-lane follow-up (DESIGN.md + six-file propagation; not edited in this workflow) + explicit coherence-review item** (Q3 display ↔ §10 #16 ↔ §10 #28 are one underlying question).
+- Q4–Q11 — *not yet answered.*

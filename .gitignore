@@ -61,6 +61,7 @@ __pycache__/
 # Session transcripts (personal exports) — root transcripts/ holds web/ (claude.ai via
 # extract-web.py), desktop/ (desktop-app agent sessions via extract-desktop.py), and cli/
 # (Claude Code CLI sessions via the claude-history-viewer extension). Never tracked.
+# No-leading-slash pattern: this matches a `transcripts/` folder at ANY depth, not just this root one.
 transcripts/
 
 # Archive bucket for things kept on disk but intentionally NOT tracked in git
