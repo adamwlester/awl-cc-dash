@@ -478,15 +478,15 @@
   <header class="topbar">
     <div class="flex items-center gap-3 min-w-0">
       <span class="text-[13px] font-heading text-main-foreground tracking-tight" style="font-weight:900">AWL Multi-Agent Dashboard</span>
-      <span data-comp="chip" class="chip" style="font-family:'JetBrains Mono',monospace">v1.2</span>
+      <span data-comp="chip" class="chip" style="font-family:var(--font-mono)">v1.2</span>
       <span data-comp="active-project-chip" class="chip proj-chip" id="proj-chip" title="Active project — open Settings → Projects" onclick="openSettings('projects')"><i data-lucide="folder-open"></i><span class="proj-chip-nm" id="proj-chip-nm">awl-cc-dash</span></span>
       <span class="text-[11px] font-bold text-main-foreground/80">13 agents</span>
     </div>
     <div class="flex items-center gap-2">
-      <span class="chip" id="clock" style="font-family:'JetBrains Mono',monospace"></span>
+      <span class="chip" id="clock" style="font-family:var(--font-mono)"></span>
       <span class="chip">WSL2</span>
       <span class="chip">tmux</span>
-      <span class="chip" style="gap:6px"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
+      <span class="chip" style="gap:var(--space-6)"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
       <button data-comp="settings-gear" class="topbar-gear" id="settings-gear" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
     </div>
   </header>
@@ -510,7 +510,7 @@
           <!-- ===== DETAILS ===== -->
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
             <div class="flex items-center gap-2.5">
-              <span data-comp="agent-tile" data-variants="user system me" class="agtile" id="det-tile" style="width:40px;height:40px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <span data-comp="agent-tile" data-variants="user system me" class="agtile" id="det-tile" style="width:var(--size-40);height:var(--size-40);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide truncate" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight truncate" style="font-weight:900" id="det-name">01 sandy</div></div>
               <div class="flex flex-col items-end justify-between flex-1 min-w-0 h-10">
                 <button data-comp="status-badge" class="node-badge nb-pending det-badge" id="det-badge" style="position:static" onclick="statusJump('pending')" data-hc-title="Status badge" data-hc="Also a shortcut — Active jumps to Prompts → History, Idle to Prompts → Compose, Pending to the Inbox. Deliberately binary (not a count): an agent is blocked on one thing at a time; the fleet total lives on the Inbox tab badge." title="Pending — awaiting your input · open Inbox">Pending</button>
@@ -680,7 +680,7 @@
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
               </div>
-              <div id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:6px">
+              <div id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:var(--space-6)">
                 <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
                 <div data-comp="inline-confirm" data-variants="danger" class="tl-confirm" id="hist-confirm"></div>
                 <div data-comp="timeline" data-variants="now" class="tl" id="hist-panel" style="min-height:120px"></div>
@@ -732,7 +732,7 @@
           <!-- ===== CREATE ===== -->
           <div id="mid-create" data-group="mid" class="hidden p-3 space-y-3">
             <div class="flex items-center gap-2.5">
-              <span class="agtile agtile--user" style="width:40px;height:40px;border-style:dashed"><i data-lucide="user" class="agtile-luc"></i></span>
+              <span class="agtile agtile--user" style="width:var(--size-40);height:var(--size-40);border-style:dashed"><i data-lucide="user" class="agtile-luc"></i></span>
               <div class="min-w-0 flex-1"><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">New agent</div><div class="text-[10px] text-muted font-semibold">configure, then create</div></div>
             </div>
             <div class="grid grid-cols-[1fr_70px] gap-2">
@@ -823,7 +823,7 @@
           <!-- ===== CONSOLE (v1.2: raw terminal feed + slash-command catalog, scoped to the focused agent) ===== -->
           <div id="mid-console" data-group="mid" class="hidden flex flex-col console-pane">
             <div class="con-agentbar">
-              <span class="agtile" style="width:24px;height:24px;color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <span class="agtile" style="width:var(--size-24);height:var(--size-24);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1 leading-tight"><div class="text-[8px] text-muted font-bold uppercase tracking-wide" data-con-role>researcher</div><div class="text-[11px] font-heading text-foreground" style="font-weight:900" data-con-name>01 sandy</div></div>
               <span class="con-live"><i class="con-dot"></i>raw feed</span>
               <button class="btn btn-sm con-expand" onclick="openConsole()" title="Expand the Console to a full-window view"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>Expand</button>
@@ -838,7 +838,7 @@
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
-          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:8px"><button class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
+          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
 
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main" onclick="createAgent()">Create agent</button><button class="btn px-3" onclick="resetCreate()">Reset</button><button class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
@@ -1738,10 +1738,10 @@
                 <span class="set-scope-note">Last 24h · local sessions on this machine</span>
               </div>
               <div data-comp="settings-row" class="set-row"><span class="rk">This session</span><span class="rv"><b>Σ 1.42M</b> tokens</span></div>
-              <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:1px">&gt;150k context</span><span class="rv plain" style="font-weight:700">82% of usage<div class="set-sub">Longer sessions are more expensive even when cached. <b>/compact</b> mid-task, <b>/clear</b> when switching to new tasks.</div></span></div>
-              <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:1px">MCP server "playwright"</span><span class="rv plain" style="font-weight:700">38% of usage<div class="set-sub">MCP tool results stay in context for the rest of the session. <b>/compact</b> to flush, or disable servers you don't need.</div></span></div>
-              <div data-comp="settings-row" class="set-row"><span class="rk">playwright</span><span class="rv"><div class="use-bar" style="max-width:340px"><i style="width:38%;background:var(--warning)"></i></div></span><span class="rt" style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:10px">38%</span></div>
-              <div data-comp="settings-row" class="set-row"><span class="rk">firecrawl</span><span class="rv"><div class="use-bar" style="max-width:340px"><i style="width:3%;background:var(--success)"></i></div></span><span class="rt" style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:10px">3%</span></div>
+              <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:var(--space-1)">&gt;150k context</span><span class="rv plain" style="font-weight:700">82% of usage<div class="set-sub">Longer sessions are more expensive even when cached. <b>/compact</b> mid-task, <b>/clear</b> when switching to new tasks.</div></span></div>
+              <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:var(--space-1)">MCP server "playwright"</span><span class="rv plain" style="font-weight:700">38% of usage<div class="set-sub">MCP tool results stay in context for the rest of the session. <b>/compact</b> to flush, or disable servers you don't need.</div></span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">playwright</span><span class="rv"><div class="use-bar" style="max-width:340px"><i style="width:38%;background:var(--warning)"></i></div></span><span class="rt" style="font-family:var(--font-mono);font-weight:800;font-size:10px">38%</span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">firecrawl</span><span class="rv"><div class="use-bar" style="max-width:340px"><i style="width:3%;background:var(--success)"></i></div></span><span class="rt" style="font-family:var(--font-mono);font-weight:800;font-size:10px">3%</span></div>
             </div>
           </div>
         </div>
@@ -1798,7 +1798,7 @@
             <div class="set-sec">
               <div class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project servers (.mcp.json)</span><span class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">Defined</span><span class="rv plain">None — no <span style="font-family:'JetBrains Mono',monospace">.mcp.json</span> in this project</span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Defined</span><span class="rv plain">None — no <span style="font-family:var(--font-mono)">.mcp.json</span> in this project</span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">enableAllProjectMcpServers</span><span class="rv">false</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
               </div>
             </div>
@@ -1827,18 +1827,18 @@
             <div data-comp="search-input" class="set-search"><i data-lucide="search"></i><input type="text" placeholder="Search plugins…"></div>
             <div class="set-sec">
               <div class="set-sec-h"><span class="nm"><i data-lucide="store"></i>Marketplaces</span><span class="set-kind ro">5</span></div>
-              <div class="set-sec-b"><div class="pl-chips" style="margin-top:2px">
+              <div class="set-sec-b"><div class="pl-chips" style="margin-top:var(--space-2)">
                 <span data-comp="plugin-skill-chip" class="pl-chip">superpowers-marketplace</span><span class="pl-chip">everything-claude-code</span><span class="pl-chip">ui-ux-pro-max-skill</span><span class="pl-chip">thedotmack</span><span class="pl-chip">claude-plugins-official</span>
               </div></div>
             </div>
             <div class="set-sec">
               <div class="set-sec-h"><span class="nm"><i data-lucide="puzzle"></i>Installed</span><span class="set-kind edit">5 · enable / disable</span></div>
               <div class="set-sec-b">
-                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:7px;vertical-align:middle"></span>claude-mem@thedotmack</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>mcp-search</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:7px;vertical-align:middle"></span>everything-claude-code@everything-claude-code</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>github</span><span class="pl-chip"><span class="pd"></span>context7</span><span class="pl-chip"><span class="pd"></span>exa</span><span class="pl-chip"><span class="pd"></span>memory</span><span class="pl-chip"><span class="pd"></span>playwright</span><span class="pl-chip"><span class="pd"></span>sequential-thinking</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:7px;vertical-align:middle"></span>pyright-lsp@claude-plugins-official</div><div class="reg-meta">Python LSP · static type checking</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:7px;vertical-align:middle"></span>superpowers@superpowers-marketplace</div><div class="reg-meta">14 skills · v5.0.7</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:7px;vertical-align:middle"></span>ui-ux-pro-max@ui-ux-pro-max-skill</div><div class="reg-meta">7 skills · v2.5.0</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>claude-mem@thedotmack</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>mcp-search</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>everything-claude-code@everything-claude-code</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>github</span><span class="pl-chip"><span class="pd"></span>context7</span><span class="pl-chip"><span class="pd"></span>exa</span><span class="pl-chip"><span class="pd"></span>memory</span><span class="pl-chip"><span class="pd"></span>playwright</span><span class="pl-chip"><span class="pd"></span>sequential-thinking</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>pyright-lsp@claude-plugins-official</div><div class="reg-meta">Python LSP · static type checking</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>superpowers@superpowers-marketplace</div><div class="reg-meta">14 skills · v5.0.7</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>ui-ux-pro-max@ui-ux-pro-max-skill</div><div class="reg-meta">7 skills · v2.5.0</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
               </div>
             </div>
           </div>
@@ -1880,7 +1880,7 @@
             <div class="set-sec">
               <div class="set-sec-h"><span class="nm"><i data-lucide="shield"></i>Permissions &amp; sandbox</span><span class="set-kind edit">Editable · confirm</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:'JetBrains Mono',monospace">(Plan · Ask · Edit · Auto · Bypass)</span></span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:var(--font-mono)">(Plan · Ask · Edit · Auto · Bypass)</span></span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">Sandbox</span><span class="rv">disabled</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
               </div>
             </div>
@@ -1922,7 +1922,7 @@
                 <div data-comp="settings-row" class="set-row"><span class="rk">permissions.allow</span><span class="rv">22 rules</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">permissions.deny</span><span class="rv">claude.ai Gmail · Google Drive</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">additionalDirectories</span><span class="rv">~/.claude · ~/.claude/docs</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">Session · /add-dir</span></span></div>
-                <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:1px">Agent agreement</span><span class="rv plain" style="font-weight:600">All agents use only <span style="font-family:'JetBrains Mono',monospace">.claude/settings.json</span> — no settings.local.json.</span></div>
+                <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:var(--space-1)">Agent agreement</span><span class="rv plain" style="font-weight:600">All agents use only <span style="font-family:var(--font-mono)">.claude/settings.json</span> — no settings.local.json.</span></div>
               </div>
             </div>
           </div>

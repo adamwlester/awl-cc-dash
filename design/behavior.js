@@ -782,7 +782,7 @@
       /* fit the native <select> to its CURRENT value (+ chevron) — a native select otherwise sizes to its
          widest option ("Turn 34"), so the short "Total" label would float left of the chevron. */
       const meas=document.createElement('span');
-      meas.style.cssText='position:absolute;visibility:hidden;white-space:pre;font-family:Archivo,sans-serif;font-weight:800;font-size:12px;';
+      meas.style.cssText='position:absolute;visibility:hidden;white-space:pre;font-family:var(--font-sans);font-weight:800;font-size:12px;';
       document.body.appendChild(meas);
       const fitCtxScope=()=>{meas.textContent=sel.options[sel.selectedIndex].text;sel.style.width=(meas.offsetWidth+17)+'px';};
       sel.addEventListener('change',e=>{fitCtxScope();const bd=document.querySelector('#ctx-panel .bd');
@@ -865,7 +865,7 @@
     if(foot.querySelector('.foot-confirm'))return;
     const btns=[...foot.querySelectorAll('button')];btns.forEach(b=>b.style.display='none');
     const restore=()=>{c.remove();btns.forEach(b=>b.style.display='');};
-    const c=document.createElement('div');c.className='tl-confirm foot-confirm'+(opts.danger?' foot-confirm--danger':'');c.style.display='flex';c.style.width='100%';c.style.alignItems='center';c.style.gap='8px';
+    const c=document.createElement('div');c.className='tl-confirm foot-confirm'+(opts.danger?' foot-confirm--danger':'');c.style.display='flex';c.style.width='100%';c.style.alignItems='center';c.style.gap='var(--space-8)';
     c.innerHTML='<span>'+opts.msg+'</span>';
     const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=restore;
     const go=document.createElement('button');go.className=opts.goClass+' btn-sm';go.innerHTML=opts.goLabel;go.onclick=()=>{restore();opts.onGo();};
@@ -1634,7 +1634,7 @@
   function openComposer(host,verdict){const sel=SELby[host];if(!sel||sel.kind==='box'){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;   /* L3 (5c): a popover box selection isn't a line/section to comment on */
     deselectNavCards(host);clearFbHL(host);   /* composing is a separate flow from viewing existing feedback */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
-      +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:2px">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
+      +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:var(--space-2)">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
       +'<textarea class="in cmt-ta" oninput="syncCommentSave(\''+host+'\')" placeholder="Add a comment or tags…"></textarea>'
       +'<div class="cmt-foot"><span class="cmt-req"></span><span class="flex-1"></span><button class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button class="btn-main btn-sm cmt-save" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
     pop.classList.add('open');LU();syncCommentSave(host);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -2061,7 +2061,7 @@ Short-lived notes for the current run — kept brief on purpose.
     +'<div class="fcard-body"><div class="fcard-full fcard-log">'+a.name+' · '+o.txt+(o.warn?' · awaiting your input':'')+'</div></div></div>';}
   /* A9: whole-card select (teal) for Scratch/Log/Inbox — multi-select, drives the shared Copy + Embed/Attach strip */
   function fcardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard');if(c)c.classList.toggle('sel');eaUpdate(c&&c.closest('#hist-list')?'hist':'feed');}
-  function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeHTML(AG[k],true)).join('');if(keys.length>cap)h+='<span data-comp="overflow-badge" class="badge-more" style="height:26px">+'+(keys.length-cap)+'</span>';return h;}
+  function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeHTML(AG[k],true)).join('');if(keys.length>cap)h+='<span data-comp="overflow-badge" class="badge-more" style="height:var(--size-26)">+'+(keys.length-cap)+'</span>';return h;}
   /* I1/I2/I3: History adopts the feed-card model — header-click selects (light-teal), a separate flush chevron expands;
      EDIT is a header ghost button (after the attach tags, before the timestamp). The select region (.fcard-exp) holds
      only NON-interactive content; Edit/time/chevron are SIBLINGS in .fcard-head (a <button> can't nest in a <button>). */
@@ -2069,7 +2069,7 @@ Short-lived notes for the current run — kept brief on purpose.
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this prompt">'
     +'<span data-comp="lifecycle-badge" class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,false)
-    +'<i data-lucide="arrow-right" style="width:12px;height:12px;color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
+    +'<i data-lucide="arrow-right" style="width:var(--size-12);height:var(--size-12);color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
     +'<span class="flex-1"></span>'+attTrigHTML(o)+'</button>'
     +'<button class="ghost-ic" onclick="event.stopPropagation();histAct(\'edit\')" title="Edit in Compose"><i data-lucide="square-pen"></i></button>'
     /* Next-up item 5: prompts that haven't run yet (status not Active/Complete — Queued/Next/Held) carry a
@@ -2308,7 +2308,7 @@ Short-lived notes for the current run — kept brief on purpose.
   ];
   function inboxReplyHTML(dis){return '<button class="btn-secondary btn-sm ml-auto"'+(dis?' disabled':'')+' onclick="inboxReply(this)" title="'+(dis?'Reply is unavailable — System isn\'t addressable':'Reply via the Editor (quotes the request as a reference block)')+'"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. Item 15: dis=true on a System Error card — DISABLED, greyed not removed (the Export-menu convention). */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
-    if(o.type==='permission'){detail='<div class="rc-body" style="font-family:\'JetBrains Mono\',monospace">'+esc(o.cmd)+'</div>';
+    if(o.type==='permission'){detail='<div class="rc-body" style="font-family:var(--font-mono)">'+esc(o.cmd)+'</div>';
       acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
     else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plans & Docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
       const isDoc=o.plan&&o.plan.indexOf('doc-')===0;

@@ -100,8 +100,11 @@
 
   /* ---- Border / divider widths (primitive) ------------------------------- */
   --border-width:2px;    /* the navy border on every bordered element */
+  --border-width-thin:1.5px; /* fine border on micro chips / swatches / dots (.sw2, .rd, .md-code-i, .nav-cnt, .hbadge .hd) */
+  --hairline-width:1px;  /* 1px navy hairline row-divider inside bordered lists — deliberately finer than --border-width */
   --divider-width:3px;   /* the heavier splitter line between major panels */
   --ring-width:3px;      /* selection / focus ring outline width */
+  --ring-offset:1px;     /* selection-ring outline offset (companion to --ring-width) */
 
   /* ---- Shadow (hard offset, no blur) ------------------------------------- */
   --shadow:4px 4px 0 0 var(--border);
@@ -167,9 +170,11 @@
   --size-32:32px;  --size-34:34px;  --size-36:36px;  --size-40:40px;  --size-42:42px;
   --size-44:44px;  --size-54:54px;
 
-  /* ---- Spacing scale (primitive, by px — padding & gaps) ------------------ */
-  /* The padding/gap rhythm (values used 2+ times). Per the locked token scope,
-     any semantic alias tokens are confined to padding/gaps; the mockup uses the
+  /* ---- Spacing scale (primitive, by px — padding, margins & gaps) --------- */
+  /* The padding/margin/gap rhythm (values used 2+ times), including positional
+     insets/offsets (top/right/bottom/left nudges and overhangs — negated via
+     calc(-1 * var(--space-N)) where needed). Per the locked token scope, any
+     semantic alias tokens are confined to this family; the mockup uses the
      primitive scale directly. */
   --space-1:1px;    --space-2:2px;    --space-3:3px;    --space-4:4px;    --space-5:5px;
   --space-6:6px;    --space-7:7px;    --space-8:8px;    --space-9:9px;    --space-10:10px;

@@ -459,6 +459,14 @@ Files: assets/names/agent-names.json
 
 ---
 
+### 2026-07-05 12:45:00 — design: token run stage 1 — hardcode→token conversion (200 substitutions, zero rendered change)
+
+Stage 1 of [dev/prompts/token-curation-upkeep-run.md](dev/prompts/token-curation-upkeep-run.md) (the stage-0 checkpoint was answered "all as recommended"; audit, proposals, and answers recorded in `.scratch/token-upkeep/checkpoint.md`). 200 line-anchored substitutions across [design/styles.css](design/styles.css), [design/mockup.html](design/mockup.html), [design/behavior.js](design/behavior.js): 18× `color:#fff` → `var(--icon-fg)`; 15 rgba hover/tint washes + 5 flash-keyframe alpha-0 endpoints + 2 console diff washes rewired to **relative color syntax** `rgb(from var(--token) r g b / A)` (channels copied verbatim — the checkpoint's color-mix proposal was dropped after the real compositor measured it ±1/255 off on some alphas; relative syntax leaves a residual ±1/255 quantum only on the two console `--term-*` washes and the 12% chip-hover wash, sub-perceptual, evidence in `.scratch/token-upkeep/`); 9 hardcoded font stacks → `var(--font-mono)` / `var(--font-sans)`; ~130 on-scale spacing/sizing literals → existing `--space-*`/`--size-*` (incl. calc-negated overhangs/full-bleeds per the `.ovl-count` precedent, 10 popover-gap stragglers, and the step-into views' topbar/footbar-height bindings); `.msel-pop` max-height 236→230 (the one approved normalize — matches its `.combo-pop` twin; before/after pair in `.scratch/token-upkeep/shots/`). [design/tokens.css](design/tokens.css) gains three width tokens (`--border-width-thin:1.5px`, `--hairline-width:1px`, `--ring-offset:1px` — checkpoint S3–S5, wired to their 13 consumers) and the `--space-*` comment widened to "padding, margins & gaps" (S6). Kept + flagged per checkpoint: the two white shimmer stripes (C3), the `.bd-scope` data-URI stroke (can't `var()` inside `url()`), and the audit's keep-flag list (full report at wrap-up). Verified: a 24-state before/after pixel harness (fresh boot per state, frozen `Date`, cleared storage, pseudo-element animation freeze, headed-parked via ui-verify) — 22 states **byte-identical** incl. all hover washes, panel-resize extremes, popovers, drawer, settings, console, toast; `console` differs only by the documented ±1 quantum; the `default`-state delta was reproduced exactly on unchanged code (first-load browser noise — control experiment logged). Token-check clean (every border-radius hit a documented exception); `node --check` clean.
+
+Files: design/tokens.css, design/styles.css, design/mockup.html, design/behavior.js, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
