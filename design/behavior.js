@@ -217,7 +217,7 @@
     if(main)main.querySelectorAll('.assetdoc').forEach(d=>d.classList.toggle('on',d.dataset.asset===id));LU();}
   /* P3 (#119): the Library "Editor" header for Plans + Documents — ghost Copy·Edit·Comment, right-aligned,
      reusing Compose's ghost icon-buttons. Assets gets no header (an image isn't text-editable). */
-  function editHeadHTML(copyClick,editClick,cmtHost,editCls,micField){return '<div data-comp="editor-header" class="lib-edit-head"><span class="lib-edit-lab">Editor</span>'
+  function editHeadHTML(copyClick,editClick,cmtHost,editCls,micField){return '<div data-comp="editor-header" data-variants="rec" class="lib-edit-head"><span class="lib-edit-lab">Editor</span>'
     +'<button class="ghost-ic editor-mic" data-micfield="'+(micField||'')+'" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button>'
     +'<span class="flex-1"></span>'
     +'<button class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
@@ -364,7 +364,7 @@
   function resetPlaceholder(){if(!phSel)return;phSel.dataset.value='';phSel.classList.remove('filled');phSel.textContent=phSel.dataset.tag;const ta=document.getElementById('tpl-fill-input');if(ta){ta.value='';autosize(ta);ta.focus();}}
   /* a placeholder pill — contenteditable=false so it stays an atomic, clickable token inside the box */
   function phSpan(tag,value){const filled=value!=null&&value!=='';
-    return '<span data-comp="placeholder-pill" class="ph-text'+(filled?' filled':'')+'" data-tag="'+esc(tag)+'"'+(filled?' data-value="'+esc(value)+'"':'')+' contenteditable="false" onclick="pickPlaceholder(this)">'+esc(filled?value:tag)+'</span>';}
+    return '<span data-comp="placeholder-pill" data-variants="filled" class="ph-text'+(filled?' filled':'')+'" data-tag="'+esc(tag)+'"'+(filled?' data-value="'+esc(value)+'"':'')+' contenteditable="false" onclick="pickPlaceholder(this)">'+esc(filled?value:tag)+'</span>';}
   const TEMPLATES=[
     {name:'Security audit request',body:()=>'Run a focused security audit of '+phSpan('{target_module}','src/auth/*')+'. Flag anything at or above '+phSpan('{severity_threshold}')+' severity, with a concrete exploit path for each finding. Post results to '+phSpan('{destination}','the shared scratchpad')+' grouped by severity, and notify '+phSpan('{notify_agent}')+' when the '+phSpan('{format}')+' summary is ready.'},
     {name:'Code review request',body:()=>'Review the diff on '+phSpan('{branch}','feature/*')+' for '+phSpan('{focus}','correctness & security')+'. Call out blocking issues first, then nits, and confirm the '+phSpan('{test_scope}')+' tests cover the change before approving.'},
@@ -408,7 +408,7 @@
     if(!ATTACH.length){if(sec)sec.style.display='none';el.innerHTML='';return;}
     if(sec)sec.style.display='';
     el.innerHTML=ATTACH.map((at,i)=>
-      '<span data-comp="attachment-chip" class="att-card" data-ai="'+i+'" data-att="'+esc(at.id)+'" title="'+esc(at.path)+'"><i data-lucide="'+attIcon(at.type)+'" class="att-card-ic"></i>'
+      '<span data-comp="attachment-chip" data-variants="flash" class="att-card" data-ai="'+i+'" data-att="'+esc(at.id)+'" title="'+esc(at.path)+'"><i data-lucide="'+attIcon(at.type)+'" class="att-card-ic"></i>'
         +'<span class="att-card-nm" onclick="openAttachmentCard(event,'+i+')">'+esc(at.name)+'</span>'
         +'<button class="att-card-cite" type="button" onclick="citeAttachment(event,'+i+')" title="Cite this attachment in the prose"><i data-lucide="link"></i></button>'   /* P4b: insert an inline citation pill at the cursor */
         +'<button class="att-card-x" type="button" onclick="removeAttachment(event,'+i+')" title="Remove attachment"><i data-lucide="x"></i></button></span>').join('');
@@ -585,7 +585,7 @@
       +(o.clamp?'<button class="ed-block-more" type="button" onclick="toggleBlockClamp(event,this)">Show more</button>':'');
     const cls='ed-block ed-block--'+kind+(isTpl&&o.active?' sel':'');
     const dataAttr=(isTpl?(' data-tpl="'+(o.tpl!=null?o.tpl:'')+'" onclick="selectTplBlock(this)"'):'')+(o.src?' data-src="'+esc(o.src)+'"':'');
-    return '<div data-comp="inserted-block" class="'+cls+'" data-block="'+kind+'"'+dataAttr+' contenteditable="false">'+head+body+'</div>';}
+    return '<div data-comp="inserted-block" data-variants="embed template clamp" class="'+cls+'" data-block="'+kind+'"'+dataAttr+' contenteditable="false">'+head+body+'</div>';}
   function citeHTML(o){o=o||{};return '<span data-comp="citation-pill" data-status="planned" class="ed-cite" contenteditable="false" data-att="'+esc(o.att||'')+'" onclick="gotoCitation(event,this)" title="Citation → '+esc(o.source||o.label||'attachment')+'"><i data-lucide="link"></i>'+esc(o.label||o.source||'source')+'</span>';}
   function removeBlock(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const b=btn.closest('.ed-block');if(b)b.remove();}
   function toggleBlockClamp(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const body=btn.previousElementSibling;if(!body)return;const clamped=body.classList.toggle('clamp');btn.textContent=clamped?'Show more':'Show less';}
@@ -737,7 +737,7 @@
     +'<div class="bd-sub"><h5>/ Custom agents</h5>'+ACTX.map(a=>'<div class="ml"><span class="p">'+a.n+'</span><span class="t">'+a.t+'</span></div>').join('')+'</div>';
   /* static shell — the head <select> + empty containers the scope renderer fills.
      (.bd-rows marks the stale-dimmable row containers for the .is-loading pull state — Next-up item 1) */
-  function breakdownHTML(){return '<div data-comp="context-breakdown" class="bd"><div class="bd-head bd-head--scope"><select data-comp="scope-select" class="bd-scope" id="ctx-scope" aria-label="Context scope"></select><span class="bd-tot" id="ctx-bd-tot"></span></div>'
+  function breakdownHTML(){return '<div data-comp="context-breakdown" data-variants="is-loading" class="bd"><div class="bd-head bd-head--scope"><select data-comp="scope-select" class="bd-scope" id="ctx-scope" aria-label="Context scope"></select><span class="bd-tot" id="ctx-bd-tot"></span></div>'
     +'<div class="bd-bar" id="ctx-bd-bar"></div><div id="ctx-bd-cats" class="bd-rows"></div><div id="ctx-bd-subs" class="bd-rows"></div></div>';}
   const catRow=(c,nm,tk,pc)=>'<div class="cat"><span class="sw2" style="background:'+c+'"></span><span class="nm">'+nm+'</span><span class="tk">'+tk+'</span><span class="pc">'+pc+'</span></div>';
   function renderCtxTotal(){
@@ -768,7 +768,7 @@
     function ctxPullStart(){const bd=document.querySelector('#ctx-panel .bd');if(!bd)return;
       bd.classList.add('is-loading');
       const bar=document.getElementById('ctx-bd-bar');
-      if(bar)bar.innerHTML='<span data-comp="loading-strip" class="loading-strip loading-strip--fill" title="Pulling fresh context…"></span>';
+      if(bar)bar.innerHTML='<span data-comp="loading-strip" data-variants="fill" class="loading-strip loading-strip--fill" title="Pulling fresh context…"></span>';
       clearTimeout(ctxPullT);
       ctxPullT=setTimeout(()=>{ctxPullT=null;bd.classList.remove('is-loading');ctxRenderScope();},650);}
     function ctxPullCancel(){clearTimeout(ctxPullT);ctxPullT=null;
@@ -1191,7 +1191,7 @@
       if(!mine.length||!AG[key])return;const a=AG[key];
       mine.sort((x,y)=>AG_ORDER.indexOf(x.lk.a===key?x.lk.b:x.lk.a)-AG_ORDER.indexOf(y.lk.a===key?y.lk.b:y.lk.a));   /* peer-adjacent */
       html+='<div data-comp="registry-group-header" class="reg-grp link-grp"><span class="ovl-host">'+badgeHTML(a,true)
-        +'<span data-comp="corner-count-badge" class="ovl-count" title="'+mine.length+' link'+(mine.length===1?'':'s')+'">'+mine.length+'</span></span></div>';
+        +'<span data-comp="corner-count-badge" data-variants="none" class="ovl-count" title="'+mine.length+' link'+(mine.length===1?'':'s')+'">'+mine.length+'</span></span></div>';
       html+=mine.map(({lk,i})=>{const isA=lk.a===key;const other=AG[isA?lk.b:lk.a];if(!other)return '';
         const arrow=linkArrow(lk.dir,isA);const ttl=arrow==='arrow-right'?'to':(arrow==='arrow-left'?'from':'both ways');
         return '<button class="link-row" onclick="linkListPick(this)" data-link="'+i+'" title="Load this link to edit (planned)">'
@@ -1337,7 +1337,7 @@
       : (p.running ? `<span data-comp="connector-health-badge" class="hbadge hb-warn">Agents running</span>` : '');
     const action = isOpen ? '' :
       `<button class="btn-secondary btn-sm" onclick="projOpen(${i})" ${projOpenIdx!==null?'disabled title="One project at a time — close the current project first."':''}><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button>`;
-    return `<div data-comp="registry-row" class="reg-row${isOpen?' proj-open':''}${projFlashIdx===i?' proj-flash':''}">`
+    return `<div data-comp="registry-row" data-variants="proj-flash" class="reg-row${isOpen?' proj-open':''}${projFlashIdx===i?' proj-flash':''}">`
       +`<div class="reg-main"><div class="reg-name">${p.name}</div><div class="reg-meta">${p.path} · ${projAgentsLabel(p)} · last opened ${p.last}</div></div>`
       +`<div class="reg-rt">${badge}${action}</div></div>`;
   }
@@ -1424,7 +1424,7 @@
     :a.system
     ?'<span class="agtile agtile--system"><i data-lucide="settings" class="agtile-luc"></i></span>'   /* item 15: gear on navy — reads as WHO (an identity tile), not the Settings control */
     :'<span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span>';}
-  function badgeHTML(a,sm){return '<span data-comp="identity-badge" class="badge badge-c'+(sm?' badge-sm':'')+(a.user?' ag-user-badge':'')+'">'
+  function badgeHTML(a,sm){return '<span data-comp="identity-badge" data-variants="sub" class="badge badge-c'+(sm?' badge-sm':'')+(a.user?' ag-user-badge':'')+'">'
     +agtileHTML(a)+'<span class="b-lab"><span class="b-role">'+a.role+'</span><span class="b-name">'+a.name+'</span></span></span>';}
   function agrowHTML(k,on){const a=AG[k];return '<button class="agrow'+(on?' on':'')+'" onclick="toggleAgRow(this)" data-ag="'+k+'">'
     +agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
@@ -1503,7 +1503,7 @@
       else if(/^\s*-\s*\[( |x|X)\]\s+/.test(ln)){const done=/\[(x|X)\]/.test(ln);const t=ln.replace(/^\s*-\s*\[( |x|X)\]\s+/,'');body='<span class="md-line md-task'+(done?' done':'')+'"><span class="md-box">'+(done?'☑':'☐')+'</span> '+inlineMd(t)+'</span>';}
       else if(ln.trim()==='')body='<span class="md-line md-blank"> </span>';
       else body='<span class="md-line">'+inlineMd(ln)+'</span>';
-      return '<div data-comp="markdown-row" class="md-row'+(isHead?' md-h-row':'')+'" data-line="'+n+'"'+hAttrs+'>'+rail+body+'</div>';
+      return '<div data-comp="markdown-row" data-variants="revise block author" class="md-row'+(isHead?' md-h-row':'')+'" data-line="'+n+'"'+hAttrs+'>'+rail+body+'</div>';
     }).join('');
     /* A4 bullet 2 — trailing filler row continues the rail track to the bottom past the last line */
     return '<div data-comp="doc-editor" class="doc-ed" data-edhost="'+host+'"><div class="md">'+rows+'<div class="md-row md-fill" aria-hidden="true"><span class="md-rail md-rail--fill"></span><span class="md-line"></span></div></div><div data-comp="comment-popover" class="plan-cmt-pop"></div></div>';}
@@ -1624,7 +1624,7 @@
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   /* v9p14c: a small "Mark as" verdict dropdown lives INSIDE the composer (the Comment control is now a
      plain button); pick a verdict here, then Save commits it */
-  function verdictDropdownHTML(verdict){return '<span data-comp="verdict-dropdown" class="vdd" data-vdd data-verdict="'+verdict+'">'
+  function verdictDropdownHTML(verdict){return '<span data-comp="verdict-dropdown" data-variants="approve revise block" class="vdd" data-vdd data-verdict="'+verdict+'">'
     +'<button type="button" class="vdd-trig" onclick="toggleVdd(this)">'+verdictBadgeHTML(verdict)+'<i data-lucide="chevron-down" class="vdd-cv"></i></button>'
     +'<span class="vdd-menu">'+['approve','revise','block'].map(v=>'<button type="button" class="vdd-opt" onclick="pickVdd(this,\''+v+'\')">'+verdictBadgeHTML(v)+'</button>').join('')+'</span></span>';}
   function toggleVdd(btn){const dd=btn.closest('.vdd');document.querySelectorAll('.vdd.open').forEach(x=>{if(x!==dd)x.classList.remove('open');});dd.classList.toggle('open');}
@@ -1892,9 +1892,9 @@ Short-lived notes for the current run — kept brief on purpose.
        textarea + a mic bound to it; planAct stays for approve/reject/revise only (its 'edit' branch is now dead). */
     const editHead=editHeadHTML("planCopy('"+p.id+"')","entryEdit(this,'"+p.id+"')",p.id,'',p.id+'-ta');
     const rawTa='<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>';
-    return '<div data-comp="plan-card" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
+    return '<div data-comp="plan-card" data-variants="flash" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
+      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" data-variants="sent" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
       +'<div class="plan-row r2"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
       +'<div class="plan-body">'   /* A4 bullet 1: editHeadHTML moved INSIDE .plan-main (below) so the Editor header sits over the editor box only; the Outline/Feedback/Authors nav rail rises full-height (Documents-style) */
@@ -1951,7 +1951,7 @@ Short-lived notes for the current run — kept brief on purpose.
      exception) after the sender: sender → "→" → recipient(s) → status → dir. Reuses agent identity (tile + short
      name); User and Scratch are the two non-agent recipients. */
   function recipientBadge(rid){
-    if(rid==='user')return '<span data-comp="recipient-badge" class="rcpt" title="addressed to User"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="rcpt-nm">User</span></span>';
+    if(rid==='user')return '<span data-comp="recipient-badge" data-variants="scratch" class="rcpt" title="addressed to User"><span class="agtile agtile--user agtile--me"><i data-lucide="user" class="agtile-luc"></i></span><span class="rcpt-nm">User</span></span>';
     if(rid==='scratch')return '<span data-comp="recipient-badge" class="rcpt" title="addressed to the shared Scratchpad"><span class="agtile rcpt-scratch"><i data-lucide="notebook-pen" class="agtile-luc"></i></span><span class="rcpt-nm">Scratch</span></span>';
     const a=AG[rid];if(!a)return '';
     return '<span data-comp="recipient-badge" class="rcpt" title="addressed to '+a.role+' '+a.name+'"><span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span><span class="rcpt-nm">'+a.name.replace(/^\d+\s*/,'')+'</span></span>';}
@@ -1986,7 +1986,7 @@ Short-lived notes for the current run — kept brief on purpose.
   /* P1b: a Messages card uses the shared select-to-act model — click the header to select the WHOLE card
      (pink, multi + select-all), a per-block rail to select one block (teal), the chevron to expand
      (select ≠ expand). Scratch still uses fcardHTML (checkbox). */
-  function msgCardHTML(o,i){const a=AG[o.ag];return '<div data-comp="message-card" class="fcard msgcard'+(o.sub?' msgcard--sub':'')+'" data-selcard data-msgi="'+i+'">'
+  function msgCardHTML(o,i){const a=AG[o.ag];return '<div data-comp="message-card" data-variants="reply-flash" class="fcard msgcard'+(o.sub?' msgcard--sub':'')+'" data-selcard data-msgi="'+i+'">'
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
     +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
@@ -2336,7 +2336,7 @@ Short-lived notes for the current run — kept brief on purpose.
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
     const runs=(o.type==='response'&&o.runs>1)?'<span class="inbox-runs" title="'+o.runs+' unseen runs coalesced — a new unseen run updates this card, never stacks">×'+o.runs+' runs</span>':'';   /* item 14: the coalesce marker */
     const _inboxComp={error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card';
-    return '<div data-comp="'+_inboxComp+'" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
+    return '<div data-comp="'+_inboxComp+'" data-variants="reply-flash" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
       +'<div class="fcard-head">'
       +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a,false)+sub+runs
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
@@ -2403,7 +2403,7 @@ Short-lived notes for the current run — kept brief on purpose.
 
   /* shared send-to-agents control (Share on the feed · Review on a plan) */
   let _tt=null;
-  function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('data-comp','toast');document.body.appendChild(t);}t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2400);}
+  function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('data-comp','toast');t.setAttribute('data-variants','show');document.body.appendChild(t);}t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2400);}
 
   /* ===== v1.2: Console — raw feed + slash-command catalog (scoped to the focused agent) ===== */
   const CON_FEED=[

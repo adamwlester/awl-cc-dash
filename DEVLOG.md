@@ -314,6 +314,14 @@ Files: dev/prompts/variant-sweep-states-page-run.md, DEVLOG.md
 
 ---
 
+### 2026-07-05 05:58:00 — variant sweep stage 1: 42 slugs get their data-variants declarations (attribute-only)
+
+Executed stage 1 of [dev/prompts/variant-sweep-states-page-run.md](dev/prompts/variant-sweep-states-page-run.md): every existing component with hidden appearance states now carries its `data-variants` declaration. Inventory cross-checked from all four prompt-named sources — the Variant-check grep, a booted-DOM enumeration driven headed via ui-verify (the label-overlay completeness property), the frozen gallery snapshot's specimen labels, and the styles.css/behavior.js state hooks — across all **123** tagged slugs (114 in the booted DOM + 8 boot-absent builder slugs + the lazy toast); per-slug judgment ran as a 7-family analyze + adversarial-verify workflow (14 subagents), then the coordinating uniformity review ratified **42 declarations** (79 slugs need none; the kept no-live-root trio untouched): 20 static attributes in mockup.html + 17 builder emissions in behavior.js (one `_inboxComp` emission covers all six inbox-card slugs; toast declares via its setAttribute build). Coordinator rulings, recorded for the wrap-up report: "shown at boot" = states carried by *tagged* instances in the booted DOM (untagged class-mates don't count — the only lint-reproducible reading); confirm strips' `.show` reveals are interaction states (confirm-gate flipped to no-declaration, uniform with project-close-confirm) while toast's auto-dismissing `show` is declared transient feedback; states with no implemented hook (active-project-chip's text-only "No project", agent-node-card's inline-style retired dimming) are flagged, never declared. Verified per the prompt: `node --check` clean; a word-diff audit proves the change is attribute-only (every added token is a `data-variants` attribute; 37 lines across the two files); the booted DOM is **identical** to the pre-edit baseline (instance counts, visibility, classes); headed ui-verify pass covered the default view, a fired toast, the Inbox cards, a hover card, the Ctrl+L label overlay on/off, and a splitter drag to both extremes — zero page errors beyond the known favicon-probe 404; screenshots in `.scratch/variant-sweep/`.
+
+Files: design/mockup.html, design/behavior.js, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
