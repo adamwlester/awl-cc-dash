@@ -483,10 +483,10 @@
       <span class="text-[11px] font-bold text-main-foreground/80">13 agents</span>
     </div>
     <div class="flex items-center gap-2">
-      <span class="chip" id="clock" style="font-family:var(--font-mono)"></span>
-      <span class="chip">WSL2</span>
-      <span class="chip">tmux</span>
-      <span class="chip" style="gap:var(--space-6)"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
+      <span data-comp="chip" class="chip" id="clock" style="font-family:var(--font-mono)"></span>
+      <span data-comp="chip" class="chip">WSL2</span>
+      <span data-comp="chip" class="chip">tmux</span>
+      <span data-comp="chip" class="chip" style="gap:var(--space-6)"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
       <button data-comp="settings-gear" class="topbar-gear" id="settings-gear" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
     </div>
   </header>
@@ -510,7 +510,7 @@
           <!-- ===== DETAILS ===== -->
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
             <div class="flex items-center gap-2.5">
-              <span data-comp="agent-tile" data-variants="user system me" class="agtile" id="det-tile" style="width:var(--size-40);height:var(--size-40);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
+              <span data-comp="agent-tile" data-variants="system me" class="agtile" id="det-tile" style="width:var(--size-40);height:var(--size-40);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide truncate" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight truncate" style="font-weight:900" id="det-name">01 sandy</div></div>
               <div class="flex flex-col items-end justify-between flex-1 min-w-0 h-10">
                 <button data-comp="status-badge" class="node-badge nb-pending det-badge" id="det-badge" style="position:static" onclick="statusJump('pending')" data-hc-title="Status badge" data-hc="Also a shortcut — Active jumps to Prompts → History, Idle to Prompts → Compose, Pending to the Inbox. Deliberately binary (not a count): an agent is blocked on one thing at a time; the fleet total lives on the Inbox tab badge." title="Pending — awaiting your input · open Inbox">Pending</button>
@@ -523,7 +523,7 @@
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div class="field">
                 <div class="flex items-center justify-between mb-1"><label class="lbl">Role</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-                <div class="lockable combo" data-rolecombo>
+                <div data-comp="role-combobox" class="lockable combo" data-rolecombo>
                   <div class="combo-trig"><input class="combo-in" value="researcher" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Choose from agent.md files"><i data-lucide="chevrons-up-down"></i></button></div>
                   <div class="combo-pop"></div>
                 </div>
@@ -546,7 +546,7 @@
 
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">Skills</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-              <div class="lockable msel" data-msel="skills" data-sel='["security-review","threat-model"]'>
+              <div data-comp="multi-select" class="lockable msel" data-msel="skills" data-sel='["security-review","threat-model"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -554,7 +554,7 @@
 
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">Tools</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-              <div class="lockable msel" data-msel="tools" data-sel='["Bash","Read","Write","Grep","WebSearch"]'>
+              <div data-comp="multi-select" class="lockable msel" data-msel="tools" data-sel='["Bash","Read","Write","Grep","WebSearch"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -563,7 +563,7 @@
             <!-- per-agent scoping — which MCP servers / plugins this agent may use + the deny rules that hard-block it. Lockable like the rest of the on-demand config; MCP/plugins take effect at the agent's next launch, deny is the reliable hard-block. -->
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">MCP servers</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-              <div class="lockable msel" data-msel="mcp" data-sel='["playwright","github"]'>
+              <div data-comp="multi-select" class="lockable msel" data-msel="mcp" data-sel='["playwright","github"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -572,7 +572,7 @@
 
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">Plugins</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-              <div class="lockable msel" data-msel="plugins" data-sel='["superpowers"]'>
+              <div data-comp="multi-select" class="lockable msel" data-msel="plugins" data-sel='["superpowers"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -581,7 +581,7 @@
 
             <div class="field">
               <div class="flex items-center justify-between mb-1"><label class="lbl">Deny rules</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-              <div class="lockable msel" data-msel="denyrules" data-sel='["Bash(rm -rf:*)","Bash(sudo:*)"]'>
+              <div data-comp="multi-select" class="lockable msel" data-msel="denyrules" data-sel='["Bash(rm -rf:*)","Bash(sudo:*)"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -633,7 +633,7 @@
               <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Opus Fast-Mode = /fast (gated to Opus) · Thinking Mode = extended thinking.">Mode</label>
               <div data-comp="segmented-control" class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
               <div class="grid grid-cols-2 gap-2 mt-2">
-                <button data-comp="toggle-button" data-variants="gated" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button>
+                <button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button>
                 <button data-comp="toggle-button" class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode On</span></button>
               </div>
             </div>
@@ -649,7 +649,7 @@
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
               <div class="grid grid-cols-2 gap-2.5">
                 <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="50" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
-                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="80" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="80" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
               </div>
             </div>
 
@@ -657,9 +657,9 @@
 
             <!-- CONTEXT -->
             <div>
-              <div class="ro-head"><span class="ro-label">Context</span><button data-comp="text-button" data-variants="mini-link" id="ctx-compact" class="link-act ml-auto">Compact</button><span class="ml-2 text-[10px] font-bold text-muted font-mono">399.1k / 1.0M</span></div>
+              <div class="ro-head"><span class="ro-label">Context</span><button data-comp="text-button" id="ctx-compact" class="link-act ml-auto">Compact</button><span class="ml-2 text-[10px] font-bold text-muted font-mono">399.1k / 1.0M</span></div>
               <button class="ctx-trigger" id="ctx-btn" type="button">
-                <div class="summary-row"><div data-comp="progress-bar" data-variants="warning danger" class="ctxbar" id="ctx-bar"></div><span class="text-[10px] font-bold text-muted font-mono" id="det-ctx-pct">40%</span><i data-lucide="chevron-down" class="chev" id="ctx-chev"></i></div>
+                <div class="summary-row"><div data-comp="progress-bar" data-variants="danger" class="ctxbar" id="ctx-bar"></div><span class="text-[10px] font-bold text-muted font-mono" id="det-ctx-pct">40%</span><i data-lucide="chevron-down" class="chev" id="ctx-chev"></i></div>
               </button>
               <div data-comp="accordion" class="acc" id="ctx-panel"></div>
             </div>
@@ -670,9 +670,9 @@
             <div class="flex flex-col">
               <div class="ro-head"><span class="ro-label">Turns</span><span class="ml-2 text-[10px] font-bold text-muted font-mono" id="det-turns">34/50</span></div>
               <button class="ctx-trigger" id="turns-btn" type="button">
-                <div class="summary-row"><div class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
+                <div class="summary-row"><div data-comp="progress-bar" class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
-              <div class="acc" id="turns-bd-panel"></div>
+              <div data-comp="accordion" class="acc" id="turns-bd-panel"></div>
               <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above.
                    Turns→Timeline gap: the accordion body is display:none when collapsed (so a margin on it is a no-op) — the 12px gap that matches the Context→Turns section gap lives on the always-rendered heading via mt-3 (collapses with the panel's own spacing when expanded). -->
               <div class="sec-h mt-3">Timeline</div>
@@ -680,7 +680,7 @@
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
               </div>
-              <div id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:var(--space-6)">
+              <div data-comp="accordion" id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:var(--space-6)">
                 <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
                 <div data-comp="inline-confirm" data-variants="danger" class="tl-confirm" id="hist-confirm"></div>
                 <div data-comp="timeline" data-variants="now" class="tl" id="hist-panel" style="min-height:120px"></div>
@@ -695,32 +695,32 @@
                 <div class="sa-run">
                   <div class="sa-run-h">Run A <span class="sa-run-n">· 6 subagents</span></div>
                   <div class="sa-row" data-sub="A1">
-                    <div class="sa-row-top"><span class="sbadge sb-active">A1</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A1’s transcript" onclick="toast('Open subagent A1 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-active">A1</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A1’s transcript" onclick="toast('Open subagent A1 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Map the JWT-middleware call-sites and every validateToken() path</div>
                     <div class="sa-usage"><span>12.4k tok</span><span class="sep">·</span><span>38 tools</span><span class="sep">·</span><span>2m 14s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
                   </div>
                   <div class="sa-row" data-sub="A2">
-                    <div class="sa-row-top"><span class="sbadge sb-active">A2</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A2’s transcript" onclick="toast('Open subagent A2 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-active">A2</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A2’s transcript" onclick="toast('Open subagent A2 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Trace refresh-token rotation across the session lifecycle</div>
                     <div class="sa-usage"><span>9.1k tok</span><span class="sep">·</span><span>24 tools</span><span class="sep">·</span><span>1m 48s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
                   </div>
                   <div class="sa-row" data-sub="A3">
-                    <div class="sa-row-top"><span class="sbadge sb-active">A3</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A3’s transcript" onclick="toast('Open subagent A3 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-active">A3</span><span class="sa-type">Explore</span><span class="sa-status sa-st-running">running</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A3’s transcript" onclick="toast('Open subagent A3 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Find every place the staging smoke test asserts expiry</div>
                     <div class="sa-usage"><span>4.0k tok</span><span class="sep">·</span><span>11 tools</span><span class="sep">·</span><span>0m 31s</span><span class="sep">·</span><span>haiku 4.5</span></div>
                   </div>
                   <div class="sa-row" data-sub="A4">
-                    <div class="sa-row-top"><span class="sbadge sb-idle">A4</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-done">done</span><button class="ghost-ic sa-tx" title="Open subagent A4’s transcript" onclick="toast('Open subagent A4 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-idle">A4</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-done">done</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A4’s transcript" onclick="toast('Open subagent A4 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Inventory the auth tests and their coverage gaps</div>
                     <div class="sa-usage"><span>6.7k tok</span><span class="sep">·</span><span>19 tools</span><span class="sep">·</span><span>1m 02s</span><span class="sep">·</span><span>haiku 4.5</span></div>
                   </div>
                   <div class="sa-row" data-sub="A5">
-                    <div class="sa-row-top"><span class="sbadge sb-active">A5</span><span class="sa-type">code-reviewer</span><span class="sa-status sa-st-running">running</span><button class="ghost-ic sa-tx" title="Open subagent A5’s transcript" onclick="toast('Open subagent A5 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-active">A5</span><span class="sa-type">code-reviewer</span><span class="sa-status sa-st-running">running</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A5’s transcript" onclick="toast('Open subagent A5 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Review the expiry-check patch against the remediation plan</div>
                     <div class="sa-usage"><span>8.2k tok</span><span class="sep">·</span><span>12 tools</span><span class="sep">·</span><span>0m 54s</span><span class="sep">·</span><span>sonnet 4.6</span></div>
                   </div>
                   <div class="sa-row" data-sub="A6">
-                    <div class="sa-row-top"><span class="sbadge sb-error">A6</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-error">error</span><button class="ghost-ic sa-tx" title="Open subagent A6’s transcript" onclick="toast('Open subagent A6 transcript')"><i data-lucide="file-text"></i></button></div>
+                    <div class="sa-row-top"><span data-comp="subagent-badge" class="sbadge sb-error">A6</span><span class="sa-type">general-purpose</span><span class="sa-status sa-st-error">error</span><button data-comp="ghost-icon-button" class="ghost-ic sa-tx" title="Open subagent A6’s transcript" onclick="toast('Open subagent A6 transcript')"><i data-lucide="file-text"></i></button></div>
                     <div class="sa-task">Reproduce the ECONNREFUSED on the rotation branch</div>
                     <div class="sa-usage"><span>2.1k tok</span><span class="sep">·</span><span>6 tools</span><span class="sep">·</span><span>0m 18s</span><span class="sep">·</span><span>haiku 4.5</span></div>
                   </div>
@@ -746,7 +746,7 @@
             </div>
             <div>
               <label class="lbl mb-1">Name</label>
-              <div class="flex items-center gap-2"><input class="in flex-1" placeholder="auto-generated if blank" value="vale"><button class="btn btn-sm shrink-0" title="Randomize name" onclick="randomizeCreateName(this)"><i data-lucide="dices" class="w-3.5 h-3.5"></i>Random</button></div>
+              <div class="flex items-center gap-2"><input class="in flex-1" placeholder="auto-generated if blank" value="vale"><button data-comp="button" class="btn btn-sm shrink-0" title="Randomize name" onclick="randomizeCreateName(this)"><i data-lucide="dices" class="w-3.5 h-3.5"></i>Random</button></div>
             </div>
             <div><label class="lbl mb-1">Description</label><textarea class="in autosize" placeholder="What is this agent responsible for?"></textarea></div>
             <div><label class="lbl mb-1">Skills</label>
@@ -756,26 +756,26 @@
               </div>
             </div>
             <div><label class="lbl mb-1">Tools <span class="normal-case font-semibold text-muted-2">— none selected = all tools</span></label>
-              <div class="msel" data-msel="tools" data-sel='[]'>
+              <div data-comp="multi-select" class="msel" data-msel="tools" data-sel='[]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
             </div>
             <!-- per-agent scoping at create — MCP servers / Plugins this agent may use + deny rules (the hard-block); same multi-select primitive as Skills/Tools. -->
             <div><label class="lbl mb-1">MCP servers <span class="normal-case font-semibold text-muted-2">— none = all · at launch</span></label>
-              <div class="msel" data-msel="mcp" data-sel='[]'>
+              <div data-comp="multi-select" class="msel" data-msel="mcp" data-sel='[]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
             </div>
             <div><label class="lbl mb-1">Plugins <span class="normal-case font-semibold text-muted-2">— none = all · at launch</span></label>
-              <div class="msel" data-msel="plugins" data-sel='[]'>
+              <div data-comp="multi-select" class="msel" data-msel="plugins" data-sel='[]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
             </div>
             <div><label class="lbl mb-1">Deny rules <span class="normal-case font-semibold text-muted-2">— the hard-block; deny-based scoping</span></label>
-              <div class="msel" data-msel="denyrules" data-sel='[]'>
+              <div data-comp="multi-select" class="msel" data-msel="denyrules" data-sel='[]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
               </div>
@@ -806,16 +806,16 @@
             <div class="grp-div"></div>
             <div>
               <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold model-cur">inherit ← parent</span></div>
-              <div class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
-              <div class="ver-panel"></div>
+              <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
+              <div data-comp="version-popout" class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
-            <div><label class="ro-label block mb-1.5">Effort</label><div class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Effort</label><div data-comp="segmented-control" class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
               <div class="grid grid-cols-2 gap-2.5">
-                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="40" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
-                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="40" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
               </div>
             </div>
           </div>
@@ -826,25 +826,25 @@
               <span class="agtile" style="width:var(--size-24);height:var(--size-24);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1 leading-tight"><div class="text-[8px] text-muted font-bold uppercase tracking-wide" data-con-role>researcher</div><div class="text-[11px] font-heading text-foreground" style="font-weight:900" data-con-name>01 sandy</div></div>
               <span class="con-live"><i class="con-dot"></i>raw feed</span>
-              <button class="btn btn-sm con-expand" onclick="openConsole()" title="Expand the Console to a full-window view"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>Expand</button>
+              <button data-comp="button" class="btn btn-sm con-expand" onclick="openConsole()" title="Expand the Console to a full-window view"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>Expand</button>
             </div>
             <div data-comp="console-feed" class="con-feed" id="con-feed-col"></div>
             <!-- catalog: collapsed by default in-column; slides up over the feed (full panel width) -->
             <div data-comp="command-palette" class="con-catalog" id="con-catalog-col">
-              <div class="con-cat-head"><span class="con-cat-title">Commands</span><div class="con-search"><i data-lucide="search"></i><input placeholder="Filter commands…" oninput="filterCmds(this)"></div><button data-comp="ghost-icon-button" data-variants="danger rec" class="ghost-ic" onclick="toggleCmdPanel(this)" title="Close"><i data-lucide="x"></i></button></div>
+              <div class="con-cat-head"><span class="con-cat-title">Commands</span><div class="con-search"><i data-lucide="search"></i><input placeholder="Filter commands…" oninput="filterCmds(this)"></div><button data-comp="ghost-icon-button" data-variants="rec" class="ghost-ic" onclick="toggleCmdPanel(this)" title="Close"><i data-lucide="x"></i></button></div>
               <div class="con-cat-list" data-cmdlist></div>
             </div>
           </div>
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
-          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
+          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button data-comp="button" class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button data-comp="button" class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
 
-          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button class="btn-main" onclick="createAgent()">Create agent</button><button class="btn px-3" onclick="resetCreate()">Reset</button><button class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
+          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button data-comp="button" class="btn-main" onclick="createAgent()">Create agent</button><button data-comp="button" class="btn px-3" onclick="resetCreate()">Reset</button><button data-comp="button" class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
             <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface (feed · catalog · run bar) is design-final/built; the live raw-terminal feed + slash-route are BACKEND wiring (separate stream), so runConsoleCmd stays a static-mockup demo -->
-            <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
+            <button data-comp="button" class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
           </div>
         </div>
       </section>
@@ -883,14 +883,14 @@
                     </div>
                     <div class="node-band">
                       <!-- segment-recolor: sandy self-reported a 6-step checklist and is PAUSED at step 3 — blocked awaiting your permission on the settings.json edit. A BLOCKING pause, so the current segment recolours WARM (.cur-paused — static, no shimmer) and the graph badge reads Pending. Step name stays hover-only (the bar's title). (A non-blocking Warning would keep the segment shimmering; a structural whole-run error would fall back to the flat .run-error whole-bar.) -->
-                      <div data-comp="run-strip" data-variants="active pending error idle indet cur-error" class="run-strip run-seg" title="Step 3 of 6 · Apply settings.json edit (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i><i class="rseg"></i></div>
+                      <div data-comp="run-strip" data-variants="pending cur-error" class="run-strip run-seg" title="Step 3 of 6 · Apply settings.json edit (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div data-comp="marquee" data-variants="idle" class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on edit to settings.json&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div data-comp="node-subagents" data-variants="empty" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A3 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A3</span><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent A4 — idle · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A4</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A5 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A5</span><span data-comp="subagent-badge" class="sbadge sb-error" title="subagent A6 — error · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A6</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A3 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A3</span><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent A4 — idle · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A4</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A5 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A5</span><span data-comp="subagent-badge" class="sbadge sb-error" title="subagent A6 — error · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A6</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cobalt)">
@@ -909,11 +909,11 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:24%;background:var(--success)"></i></div><span class="nbv">12/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-idle"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-idle"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                      <div data-comp="marquee" class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)" style="--nc:var(--ag-fern)">
@@ -933,14 +933,14 @@
                     </div>
                     <div class="node-band">
                       <!-- segment-recolor: drew failed on a STRUCTURAL / whole-run error (staging unreachable — ECONNREFUSED; the session can't proceed), so the strip uses the flat .run-error whole-bar danger fallback, not a segmented per-step recolour (a STEP-scoped failure would instead recolour just the current segment via .cur-error on a segmented bar). Static — halted, not working. -->
-                      <div class="run-strip run-error"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-error"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">run failed — see Inbox&nbsp;&nbsp;·&nbsp;&nbsp;staging unreachable (ECONNREFUSED)&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">run failed — see Inbox&nbsp;&nbsp;·&nbsp;&nbsp;staging unreachable (ECONNREFUSED)&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)" style="--nc:var(--ag-amber)">
@@ -962,7 +962,7 @@
                       <!-- segmented run-strip — the agent self-reported a 5-step checklist; 3 done, step 4 (Run typecheck) in progress (barber-pole shimmer on the current segment), 1 remaining. The step NAME is hover-only (the bar's title, "Step 4 of 5 · Run typecheck") so it never adds an always-on label or changes the card layout. Separate from the marquee below (liveness). The barber-pole single-fill stays the floor on cards with no checklist. -->
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 4 of 5 · Run typecheck"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
@@ -988,12 +988,12 @@
                     <div class="node-band">
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 5 of 5 · Synthesize source findings (paused — max turns reached)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">max turns reached — paused for your input&nbsp;&nbsp;·&nbsp;&nbsp;50/50 turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">max turns reached — paused for your input&nbsp;&nbsp;·&nbsp;&nbsp;50/50 turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)" style="--nc:var(--ag-violet)">
@@ -1012,11 +1012,11 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:6%;background:var(--success)"></i></div><span class="nbv">3/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-idle"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-idle"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                      <div data-comp="marquee" class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cyan)">
@@ -1037,12 +1037,12 @@
                     <div class="node-band">
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 3 of 5 · Post review verdict (paused — needs your sign-off)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;review needs your sign-off&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;review needs your sign-off&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)" style="--nc:var(--ag-vermilion)">
@@ -1061,11 +1061,11 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:18%;background:var(--success)"></i></div><span class="nbv">9/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-idle"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-idle"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                      <div data-comp="marquee" class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)" style="--nc:var(--ag-citron)">
@@ -1085,14 +1085,14 @@
                     </div>
                     <div class="node-band">
                       <!-- segmented run-strip — 4-step checklist, 2 done, step 3 (Regenerate API table) in progress. Step name is hover-only (the bar's title). -->
-                      <div class="run-strip run-seg" title="Step 3 of 4 · Regenerate API table"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 3 of 4 · Regenerate API table"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">updating README.md&nbsp;&nbsp;·&nbsp;&nbsp;regenerating API table&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">updating README.md&nbsp;&nbsp;·&nbsp;&nbsp;regenerating API table&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)" style="--nc:var(--ag-magenta)">
@@ -1111,14 +1111,14 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:38%;background:var(--success)"></i></div><span class="nbv">19/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-active run-indet"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-active run-indet"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">tuning tokens.css&nbsp;&nbsp;·&nbsp;&nbsp;rebuilding mockup states&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">tuning tokens.css&nbsp;&nbsp;·&nbsp;&nbsp;rebuilding mockup states&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)" style="--nc:var(--ag-teal)">
@@ -1139,12 +1139,12 @@
                     <div class="node-band">
                       <div data-comp="run-strip" class="run-strip run-seg" title="Step 4 of 6 · Deploy to staging (paused — awaiting permission)"><i class="rseg done"></i><i class="rseg done"></i><i class="rseg done"></i><i class="rseg cur cur-paused"></i><i class="rseg"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on deploy step&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">awaiting approval&nbsp;&nbsp;·&nbsp;&nbsp;blocked on deploy step&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)" style="--nc:var(--ag-indigo)">
@@ -1163,11 +1163,11 @@
                       <div class="nbar-row"><span class="nbl">Turns</span><div class="pbar"><i style="width:28%;background:var(--success)"></i></div><span class="nbv">14/50</span></div>
                     </div>
                     <div class="node-band">
-                      <div class="run-strip run-idle"><i></i></div>
+                      <div data-comp="run-strip" class="run-strip run-idle"><i></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
+                      <div data-comp="marquee" class="node-feed idle"><span class="trk a">idle — awaiting prompt</span></div>
                     </div>
-                    <div class="node-subs"><span class="subs-empty">no subagents</span></div>
+                    <div data-comp="node-subagents" class="node-subs"><span class="subs-empty">no subagents</span></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)" style="--nc:var(--ag-gold)">
@@ -1187,14 +1187,14 @@
                     </div>
                     <div class="node-band">
                       <!-- segmented run-strip — 3-step checklist, 1 done, step 2 (Summarise turns) in progress. Step name is hover-only (the bar's title). -->
-                      <div class="run-strip run-seg" title="Step 2 of 3 · Summarise turns"><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
+                      <div data-comp="run-strip" class="run-strip run-seg" title="Step 2 of 3 · Summarise turns"><i class="rseg done"></i><i class="rseg cur"></i><i class="rseg"></i></div>
                       <div class="node-div"></div>
-                      <div class="node-feed">
+                      <div data-comp="marquee" class="node-feed">
                         <span class="trk a">transcribing session log&nbsp;&nbsp;·&nbsp;&nbsp;summarising turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                         <span class="trk b">transcribing session log&nbsp;&nbsp;·&nbsp;&nbsp;summarising turns&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span><span data-comp="subagent-badge" class="sbadge sb-pending" title="subagent A3 — pending · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A3</span><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent B1 — idle · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent B2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B2</span><span data-comp="subagent-badge" class="sbadge sb-error" title="subagent B3 — error · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B3</span><span data-comp="subagent-badge" class="sbadge sb-pending" title="subagent C1 — pending · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">C1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent C2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">C2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A2</span><span data-comp="subagent-badge" class="sbadge sb-pending" title="subagent A3 — pending · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A3</span><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent B1 — idle · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent B2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B2</span><span data-comp="subagent-badge" class="sbadge sb-error" title="subagent B3 — error · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">B3</span><span data-comp="subagent-badge" class="sbadge sb-pending" title="subagent C1 — pending · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">C1</span><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent C2 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">C2</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
                 </div>
@@ -1209,9 +1209,9 @@
           <section class="rz-panel" id="pDocs" style="flex:1 1 44%; min-height:var(--pane-docs-min-h); max-height:var(--pane-docs-max-h)">
             <div class="pcard-head">
               <h3>Library</h3>
-              <div class="tabset">
-                <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plans<span data-comp="count-chip" class="req-badge ml-1" id="plans-badge">2</span></button>
-                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents<span data-comp="count-chip" class="req-badge ml-1" id="docs-badge">3</span></button>
+              <div data-comp="tab-bar" class="tabset">
+                <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plans<span data-comp="count-square" class="req-badge ml-1" id="plans-badge">2</span></button>
+                <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents<span data-comp="count-square" class="req-badge ml-1" id="docs-badge">3</span></button>
                 <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
               </div>
             </div>
@@ -1247,7 +1247,7 @@
                    the selected asset's preview on the right, with the shared header (#19) + footer (#19).
                    The rail + preview + footer are rendered from the ASSETS array by renderAssets(). -->
               <div id="doc-assets" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
-                <nav class="docnav assetnav" id="asset-nav"></nav>
+                <nav data-comp="entry-nav" class="docnav assetnav" id="asset-nav"></nav>
                 <div class="docmain assetmain flex-1 min-h-0 flex flex-col" id="asset-main"></div>
               </div><!-- /doc-assets -->
 
@@ -1264,7 +1264,7 @@
 
         <!-- Link Config drawer (Sheet) — v1.x #3 (rev): lives in #pRight so it opens against this pane's
              LEFT edge, i.e. immediately to the RIGHT of the Team Graph, keeping all graph cards visible. -->
-        <div data-comp="link-drawer" data-status="planned" id="link-drawer" class="hidden drawer">
+        <div data-comp="link-drawer" id="link-drawer" class="hidden drawer">
           <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
           <div class="p-3 space-y-3">
             <!-- Next-up item 11: the agent pair is two single-select agent dropdowns (the Compose-From source-dropdown
@@ -1309,12 +1309,12 @@
                 <div class="flex flex-wrap gap-1.5">
                   <!-- Next-up item 4: Text mirrored here from the Messages Content filter (the two deliberately share one taxonomy) — without it a share never carries what the agent actually said -->
                   <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
-                  <button class="minitog on" onclick="linkRel(this)">Thoughts</button>
-                  <button class="minitog" onclick="linkRel(this)">Read</button>
-                  <button class="minitog" onclick="linkRel(this)">Write</button>
-                  <button class="minitog" onclick="linkRel(this)">Bash</button>
-                  <button class="minitog" onclick="linkRel(this)">Diffs</button>
-                  <button class="minitog" onclick="linkRel(this)">Meta</button>
+                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)">Thoughts</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Read</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Write</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Bash</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Diffs</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Meta</button>
                 </div>
                 <div class="flex items-center gap-2 mt-2">
                   <button data-comp="switch" class="swh" onclick="linkSwitch(this)" title="Off — incremental updates only"></button>
@@ -1344,7 +1344,7 @@
                 <div><button class="lim-tog" onclick="toggleLimit(this)">Tokens</button><input type="text" class="lim-in" placeholder="100k" disabled></div>
               </div>
             </div>
-            <div class="flex gap-2 pt-1"><button data-status="planned" class="btn-main flex-1" onclick="linkSave()">Save</button><button data-status="planned" class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div><!-- planned: linkSave/linkDelete are toast + counter only -->
+            <div class="flex gap-2 pt-1"><button data-comp="button" data-status="planned" class="btn-main flex-1" onclick="linkSave()">Save</button><button data-comp="button" data-status="planned" class="btn-danger flex-1" onclick="linkDelete()">Delete</button></div><!-- planned: linkSave/linkDelete are toast + counter only -->
             <!-- link tracking list (amended, next-up item 17) — collapsible Active Links / Expired Links sections (the section carries the state; NO gray-out on expired rows) replacing the old static "All links — grouped by agent" heading. Inside each section, links group by agent (double-listed under BOTH endpoints, entries sorted peer-adjacent), each entry showing a directional arrow relative to that group's agent (Lucide arrow-right/arrow-left/arrow-left-right — next-up item 18) + the other agent + its FULL relationship label (one relationship per link). Group-header identity badges carry the corner-count overlay badge (teal >0 / muted at none — the node-inbox envelope convention). Rendered by renderLinkList. -->
             <div>
               <div data-comp="link-list" data-variants="empty" id="link-list" class="link-list"></div>
@@ -1358,11 +1358,11 @@
           <section class="rz-panel" id="pFeed" style="flex:1 1 52%; min-height:var(--pane-feed-min-h); max-height:var(--pane-feed-max-h)">
         <div class="pcard-head">
           <h3>Team Feed</h3>
-          <div class="tabset">
+          <div data-comp="tab-bar" class="tabset">
             <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
             <button data-tab-group="feed" data-tab="log" onclick="switchTab('feed','log')" class="tab-btn">Log</button>
-            <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span data-comp="count-chip" class="req-badge ml-1" id="inbox-badge">9</span></button>
+            <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span data-comp="count-square" class="req-badge ml-1" id="inbox-badge">9</span></button>
           </div>
         </div>
         <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
@@ -1371,10 +1371,10 @@
           <div class="subbar">
             <span class="subbar-lab">From/To</span>
             <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team Graph cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
-            <div data-comp="source-dropdown" data-variants="empty" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
-              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
+            <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
+              <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" data-variants="empty" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
               <div class="src-pop src-acc">
-                <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                <div class="src-pop-head"><span class="sec-h" style="margin:0">From/To</span><button data-comp="text-button" class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                 <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="tree" data-off="nova,quinn,io" style="max-height:300px"></div>
               </div>
             </div>
@@ -1388,17 +1388,17 @@
               <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:var(--border-width) solid var(--border)">
                 <span class="mini-cap">Type</span>
                 <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Messages you sent to the team"><i data-lucide="arrow-up-right"></i>Sent</button>
-                <button class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
                 <span class="mini-div"></span>
                 <span class="mini-cap">Content</span>
                 <!-- Next-up item 4: Text leads the Content row (default on) — the main reply text, Claude Code's `text` content block (rail tag "txt"); toggleable like any tool block -->
-                <button class="minitog on" onclick="miniToggle(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
-                <button class="minitog on" onclick="miniToggle(this)">Thoughts</button>
-                <button class="minitog" onclick="miniToggle(this)">Read</button>
-                <button class="minitog" onclick="miniToggle(this)">Write</button>
-                <button class="minitog" onclick="miniToggle(this)">Bash</button>
-                <button class="minitog" onclick="miniToggle(this)">Diffs</button>
-                <button class="minitog" onclick="miniToggle(this)">Meta</button>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)">Thoughts</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Read</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Write</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Bash</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Diffs</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Meta</button>
               </div>
               <div id="msg-list" class="flex flex-col gap-2 mt-2"></div>
                         </div>
@@ -1429,8 +1429,8 @@
                 <div class="fo-title"><i data-lucide="sparkles"></i>Conversation summary</div>
                 <span class="fo-sub" id="fo-count">7 messages</span>
                 <span class="flex-1"></span>
-                <button class="ghost-ic" title="Copy summary" onclick="copyField('fo-body')"><i data-lucide="copy"></i></button>
-                <button class="btn btn-sm" onclick="toggleSummary()"><i data-lucide="x" class="w-3.5 h-3.5"></i>Close</button>
+                <button data-comp="ghost-icon-button" class="ghost-ic" title="Copy summary" onclick="copyField('fo-body')"><i data-lucide="copy"></i></button>
+                <button data-comp="button" class="btn btn-sm" onclick="toggleSummary()"><i data-lucide="x" class="w-3.5 h-3.5"></i>Close</button>
               </div>
               <div class="fo-body" id="fo-body">
                 <h4>Auth token-rotation — where the thread stands</h4>
@@ -1456,13 +1456,13 @@
         <!-- SHARED FEED ACTION STRIP (acts on selected cards across Messages/Scratch/Log/Inbox) -->
         <div class="pcard-foot px-2 py-2.5" id="feed-messages-actions">
           <div class="flex items-center gap-2 flex-wrap">   <!-- P4a: wraps at narrow so the wider Embed/Attach control never overflows -->
-            <button data-comp="icon-button" data-variants="is-off danger danger-solid" class="icon-btn" id="feed-selall-btn" title="Select / deselect all cards in this tab" onclick="feedSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- G2: select/deselect-all on every feed tab -->
+            <button data-comp="icon-button" data-variants="is-off" class="icon-btn" id="feed-selall-btn" title="Select / deselect all cards in this tab" onclick="feedSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- G2: select/deselect-all on every feed tab -->
             <!-- R-batch items 6-10: ONE merged Export control (Export: Copy · Export→file · Add to prompt: Embed · Attach), mounted from expMenuHTML('feed') on boot — replaces the separate Output Export + Embed/Attach dropdowns -->
             <span data-expmount="feed"></span>
-            <button data-comp="button" data-variants="main secondary danger danger-solid ghost sm disabled" class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
+            <button data-comp="button" data-variants="ghost" class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
             <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab. Next-up item 10: solid --danger fill + white square icon -->
-            <button class="icon-btn icon-btn--danger-solid" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
+            <button data-comp="icon-button" class="icon-btn icon-btn--danger-solid" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
           </div>
         </div>
       </section>
@@ -1473,7 +1473,7 @@
           <section class="rz-panel" id="pPrompts" style="flex:1 1 48%; min-height:var(--pane-prompts-min-h); max-height:var(--pane-prompts-max-h)">
             <div class="pcard-head">
               <h3>Prompt</h3>
-              <div class="tabset">
+              <div data-comp="tab-bar" class="tabset">
                 <button data-tab-group="prompt" data-tab="compose" onclick="switchTab('prompt','compose')" class="tab-btn active">Compose</button>
                 <button data-tab-group="prompt" data-tab="history" onclick="switchTab('prompt','history')" class="tab-btn">History</button>
               </div>
@@ -1496,18 +1496,18 @@
                   </div>
                 <!-- Next-up item 9: on the HISTORY tab the From column swaps to this multi-select FILTER (the To list minus Scratch — agents only; your own from-User prompts always show since User isn't a row). Compose keeps the single-select source above; switchTab swaps their visibility. -->
                 <div data-comp="source-dropdown" id="hist-from" class="src-dd dd multi dd--acc hidden" data-agscope data-badge-cap="3">
-                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
                   <div class="src-pop src-acc">
-                    <div class="src-pop-head"><span class="sec-h" style="margin:0">From</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                    <div class="src-pop-head"><span class="sec-h" style="margin:0">From</span><button data-comp="text-button" class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                     <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="agents" style="max-height:264px"></div>
                   </div>
                 </div>
                 <span class="subbar-lab">To</span>
                 <!-- Next-up items 6+8: the To multi-select — an in-flow accordion selector; the Scratch-led target list renders from the shared roster (all 13 agents — nova/io/fen were missing from the old hand-authored copy). data-on = the demo selection. -->
                 <div data-comp="source-dropdown" id="prompt-targets" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
-                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
+                  <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
                   <div class="src-pop src-acc">
-                  <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
+                  <div class="src-pop-head"><span class="sec-h" style="margin:0">Target</span><button data-comp="text-button" class="mini-link" data-allnone onclick="agAllNone(this)">All</button></div>
                   <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="targets" data-on="kai,drew" style="max-height:264px"></div>
                   </div>
                 </div>
@@ -1526,7 +1526,7 @@
                   <!-- #16: "Attachments" section heading (.sec-h, styled like the sibling "Templates"/"Editor" Compose labels) sits above the strip; the whole section hides when empty. -->
                   <div id="attach-section" class="shrink-0" style="display:none"><div class="sec-h">Attachments</div><div id="attach-strip" class="attach-strip"></div></div>
                   <!-- P3 (#118): the compose box is the "Editor" (renamed from "Compose") -->
-                  <div class="flex items-center gap-1.5 mb-1.5"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Editor</span><button class="ghost-ic editor-mic" data-micfield="compose-field" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button><span class="flex-1"></span><button class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
+                  <div class="flex items-center gap-1.5 mb-1.5"><span class="text-[9px] font-heading uppercase tracking-wide text-muted">Editor</span><button data-comp="ghost-icon-button" class="ghost-ic editor-mic" data-micfield="compose-field" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button><span class="flex-1"></span><button data-comp="ghost-icon-button" class="ghost-ic" title="Copy" onclick="copyCompose()"><i data-lucide="copy"></i></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Clear" onclick="clearCompose()"><i data-lucide="trash-2"></i></button></div>
                   <!-- D: outer relative wrapper hosts the jump-pill overlay WITHOUT injecting a child into the contenteditable (which would corrupt its text). Inherits the field's flex-cap role so it still scrolls. -->
                   <div class="compose-jump-wrap flex-1 min-h-0 flex flex-col">
                     <div data-comp="prompt-editor" id="compose-field" class="in compose-rich flex-1 min-h-[90px] text-[12px] leading-relaxed" contenteditable="true">Re-run the auth test suite against the rotation branch and confirm the expiry-bypass path is closed under token reuse. If anything fails, post the failing case to the scratchpad and tag coder-01.</div>
@@ -1538,8 +1538,8 @@
                   </select>
                   <div data-comp="template-fill" class="tpl-fill mt-2 shrink-0">
                     <textarea id="tpl-fill-input" class="autosize" rows="1" placeholder="Insert a template, then tap a placeholder pill…" disabled></textarea>
-                    <button data-comp="fill-button" data-variants="go" class="fill-btn" title="Reset placeholder" onclick="resetPlaceholder()" disabled><i data-lucide="rotate-ccw"></i></button>
-                    <button class="fill-btn fill-btn--go" title="Apply value" onclick="fillPlaceholder()" disabled><i data-lucide="corner-down-left"></i></button>
+                    <button data-comp="fill-button" class="fill-btn" title="Reset placeholder" onclick="resetPlaceholder()" disabled><i data-lucide="rotate-ccw"></i></button>
+                    <button data-comp="fill-button" class="fill-btn fill-btn--go" title="Apply value" onclick="fillPlaceholder()" disabled><i data-lucide="corner-down-left"></i></button>
                   </div>
                 </div>
 
@@ -1555,8 +1555,8 @@
             <div class="pcard-foot px-2 py-2.5" id="prompt-actions">
               <div class="flex items-center gap-2">
                 <!-- A13: the dictation mic moved OUT to the main window footer (.footbar) as a universal control; the paperclip (Attach) stays here -->
-                <button data-comp="mic-button" data-variants="rec disabled" data-status="planned" class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button><!-- planned: composeAttach is toast + tab-switch only -->
-                <div data-comp="split-button" data-variants="primary" class="split split--outline" id="revise-split">
+                <button data-comp="attach-button" data-status="planned" class="mic-btn attach-btn" id="compose-attach" title="Attach an asset (from the Library → Assets)" onclick="composeAttach(this)"><i data-lucide="paperclip"></i></button><!-- planned: composeAttach is toast + tab-switch only -->
+                <div data-comp="split-button" class="split split--outline" id="revise-split">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Grammar</span></button>
                   <button class="split-act" title="Revise the draft" onclick="reviseDraft()"><i data-lucide="wand-sparkles"></i></button>
                   <div class="split-menu">
@@ -1566,9 +1566,9 @@
                     <button class="split-mi" data-short="Refactor" onclick="pickSplit(this)"><span class="lead"><b>Refactor</b><span class="sub">Restructure for clarity</span></span><span class="ck">✓</span></button>
                   </div>
                 </div>
-                <div data-comp="response-format-control" class="fmt" id="fmt"><button class="fmt-btn" id="fmt-btn" onclick="event.stopPropagation();toggleFmt('fmt')" title="Response format"><i data-lucide="sliders-horizontal" class="ic"></i><span class="fmt-lbl">Response</span><span data-comp="count-chip" class="fmt-badge" id="fmt-badge">0</span><i data-lucide="chevron-down" class="cv"></i></button><div data-comp="format-popover" class="fmt-menu up left" id="fmt-menu"></div></div>
+                <div data-comp="response-format-control" class="fmt" id="fmt"><button class="fmt-btn" id="fmt-btn" onclick="event.stopPropagation();toggleFmt('fmt')" title="Response format"><i data-lucide="sliders-horizontal" class="ic"></i><span class="fmt-lbl">Response</span><span data-comp="count-square" class="fmt-badge" id="fmt-badge">0</span><i data-lucide="chevron-down" class="cv"></i></button><div data-comp="format-popover" class="fmt-menu up left" id="fmt-menu"></div></div>
                 <div class="flex-1"></div>
-                <div class="split split--primary">
+                <div data-comp="split-button" class="split split--primary">
                   <button class="split-drop" onclick="event.stopPropagation();toggleSplitMenu(this)"><i data-lucide="chevron-down"></i><span class="split-lbl">Now</span></button>
                   <button class="split-act" title="Send to target agents" onclick="sendPrompt()"><i data-lucide="send-horizontal"></i></button>
                   <div class="split-menu split-menu--right">
@@ -1585,12 +1585,12 @@
             <!-- HISTORY ACTION STRIP (acts on the selected card) -->
             <div class="pcard-foot px-2 py-2.5 hidden" id="prompt-history-actions">
               <div class="flex items-center gap-2 flex-wrap">
-                <button class="icon-btn" id="hist-selall-btn" title="Select / deselect all prompts" onclick="histSelectAll(this)"><i data-lucide="list-checks"></i></button>
+                <button data-comp="icon-button" class="icon-btn" id="hist-selall-btn" title="Select / deselect all prompts" onclick="histSelectAll(this)"><i data-lucide="list-checks"></i></button>
                 <!-- R-batch items 6-10: ONE merged Export control (Export: Copy · Export→file · Add to prompt: Embed · Attach), mounted from expMenuHTML('hist') on boot — replaces the separate Output Export + Embed/Attach dropdowns -->
                 <span data-expmount="hist"></span>
                 <div class="flex-1"></div>
-                <button class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
-                <button class="icon-btn icon-btn--danger-solid" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>   <!-- Next-up item 10: solid --danger fill + white square icon -->
+                <button data-comp="icon-button" class="icon-btn" title="Retry prompt" onclick="histAct('retry')"><i data-lucide="rotate-ccw"></i></button>
+                <button data-comp="icon-button" class="icon-btn icon-btn--danger-solid" title="Stop this run" onclick="histAct('stop')"><i data-lucide="square"></i></button>   <!-- Next-up item 10: solid --danger fill + white square icon -->
               </div>
             </div>
           </section>
@@ -1636,14 +1636,14 @@
         <button class="tab-btn" data-set-tab="plugins" onclick="settingsTab('plugins')">Plugins</button>
         <button class="tab-btn" data-set-tab="config" onclick="settingsTab('config')">Config</button>
       </div>
-      <button class="btn set-close" onclick="closeSettings()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
+      <button data-comp="button" class="btn set-close" onclick="closeSettings()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
     </div>
     <div class="set-body">
       <div class="set-wrap">
 
         <!-- ========== PROJECTS (first tab · shipped in the PROJECT-OPEN state) ========== -->
         <div class="set-pane active" id="set-projects">
-          <div data-comp="settings-note" data-variants="warn" class="set-note"><i data-lucide="info"></i><span>Open, switch, and register <b>projects</b> — the repo/folder a fleet of agents works in. <b>One project is open at a time</b>; close the current project before opening another. Closing can leave its agents running in tmux (reopening reattaches them) or stop them.</span></div>
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Open, switch, and register <b>projects</b> — the repo/folder a fleet of agents works in. <b>One project is open at a time</b>; close the current project before opening another. Closing can leave its agents running in tmux (reopening reattaches them) or stop them.</span></div>
 
           <!-- ACTIVE PROJECT — pinned on top; hidden when no project is open -->
           <div data-comp="active-project-card" class="set-sec" id="proj-active">
@@ -1653,17 +1653,17 @@
               <div data-comp="settings-row" class="set-row"><span class="rk">Repo path</span><span class="rv" id="proj-a-path">~/MeDocuments/AppData/Anthropic/awl-cc-dash</span></div>
               <div data-comp="settings-row" class="set-row"><span class="rk">Agents</span><span class="rv plain" id="proj-a-agents"><b>13</b> agents attached</span></div>
               <div data-comp="settings-row" class="set-row"><span class="rk">Last opened</span><span class="rv" id="proj-a-opened">2026-07-01 18:42 · just now</span></div>
-              <div data-comp="settings-row" class="set-row"><span class="rk">Close</span><span class="rv plain" style="color:var(--muted)">Returns the dashboard to no-project. Its agents can keep running in tmux, or be stopped.</span><span class="rt"><button class="btn btn-sm" id="proj-close-btn" onclick="projAskClose()"><i data-lucide="x-circle" class="w-3 h-3"></i>Close project</button></span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Close</span><span class="rv plain" style="color:var(--muted)">Returns the dashboard to no-project. Its agents can keep running in tmux, or be stopped.</span><span class="rt"><button data-comp="button" class="btn btn-sm" id="proj-close-btn" onclick="projAskClose()"><i data-lucide="x-circle" class="w-3 h-3"></i>Close project</button></span></div>
 
               <!-- two-button close confirm (initially hidden; ghost-x / Esc cancels) -->
               <div data-comp="project-close-confirm" class="proj-close-confirm" id="proj-close-confirm" role="group" aria-label="Close project confirm">
-                <div class="proj-cc-head"><i data-lucide="alert-triangle"></i><span>Close this project?</span><button class="ghost-ic" title="Cancel (Esc)" onclick="projCancelClose()"><i data-lucide="x"></i></button></div>
+                <div class="proj-cc-head"><i data-lucide="alert-triangle"></i><span>Close this project?</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Cancel (Esc)" onclick="projCancelClose()"><i data-lucide="x"></i></button></div>
                 <div class="proj-opt">
-                  <button class="btn-main btn-sm" onclick="projClose(false)"><i data-lucide="x-circle" class="w-3 h-3"></i>Close</button>
+                  <button data-comp="button" class="btn-main btn-sm" onclick="projClose(false)"><i data-lucide="x-circle" class="w-3 h-3"></i>Close</button>
                   <span class="proj-opt-note">Agents keep running in tmux — reopening the project reattaches them.</span>
                 </div>
                 <div class="proj-opt">
-                  <button class="btn-danger btn-sm" onclick="projClose(true)"><i data-lucide="square" class="w-3 h-3"></i>Close &amp; stop agents</button>
+                  <button data-comp="button" class="btn-danger btn-sm" onclick="projClose(true)"><i data-lucide="square" class="w-3 h-3"></i>Close &amp; stop agents</button>
                   <span class="proj-opt-note">Ends every agent session in this project first.</span>
                 </div>
               </div>
@@ -1675,19 +1675,16 @@
 
           <!-- KNOWN PROJECTS — the registry (JS renders the rows from the project model) -->
           <div class="set-sec">
-            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-git-2"></i>Known projects</span><span class="set-kind edit" id="proj-count">3 · open / register</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-git-2"></i>Known projects</span><span data-comp="settings-kind-badge" class="set-kind edit" id="proj-count">3 · open / register</span></div>
             <div class="set-sec-b" id="proj-list">
-              <div data-comp="registry-row" class="reg-row proj-open"><div class="reg-main"><div class="reg-name">awl-cc-dash</div><div class="reg-meta">~/MeDocuments/AppData/Anthropic/awl-cc-dash · 13 agents running · last opened 2026-07-01 18:42</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Open</span></div></div>
-              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">claude-code-sandbox</div><div class="reg-meta">~/MeDocuments/AppData/Anthropic/claude-code-sandbox · 6 agents · last opened 2026-06-21 11:05</div></div><div class="reg-rt"><button class="btn-secondary btn-sm" disabled title="One project at a time — close the current project first."><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button></div></div>
-              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">vault-notes</div><div class="reg-meta">~/MeDocuments/Obsidian/vault-notes · 2 agents · last opened 2026-06-28 09:30</div></div><div class="reg-rt"><button class="btn-secondary btn-sm" disabled title="One project at a time — close the current project first."><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button></div></div>
             </div>
           </div>
 
           <!-- REGISTER — add any folder as a new project -->
           <div class="set-sec">
-            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-plus"></i>Register</span><span class="set-kind edit">Editable</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder-plus"></i>Register</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable</span></div>
             <div class="set-sec-b">
-              <div data-comp="settings-row" class="set-row"><span class="rk">Other folder</span><span class="rv plain" style="color:var(--muted)">Register any folder as a new project — it joins the list above.</span><span class="rt"><button class="btn btn-sm" onclick="projOpenOther()"><i data-lucide="folder-plus" class="w-3 h-3"></i>Open other folder…</button></span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Other folder</span><span class="rv plain" style="color:var(--muted)">Register any folder as a new project — it joins the list above.</span><span class="rt"><button data-comp="button" class="btn btn-sm" onclick="projOpenOther()"><i data-lucide="folder-plus" class="w-3 h-3"></i>Open other folder…</button></span></div>
             </div>
           </div>
         </div>
@@ -1697,7 +1694,7 @@
           <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Plan, limits, and token consumption — the <b>/stats</b> · <b>/status</b> surface. Usage only; per-agent cost/dollar spend is deliberately out of scope.</span></div>
 
           <div class="set-sec">
-            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="user"></i>Account</span><span class="set-kind ro">Read-only</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="user"></i>Account</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
             <div class="set-sec-b">
               <div data-comp="settings-row" class="set-row"><span class="rk">Auth method</span><span class="rv plain">Claude AI</span></div>
               <div data-comp="settings-row" class="set-row"><span class="rk">Email</span><span class="rv plain">adamwardlester@gmail.com</span></div>
@@ -1707,19 +1704,19 @@
           </div>
 
           <div class="set-sec">
-            <div class="set-sec-h"><span class="nm"><i data-lucide="gauge"></i>Limits</span><span class="set-kind ro">Read-only · health-colored</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="gauge"></i>Limits</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only · health-colored</span></div>
             <div class="set-sec-b">
-              <div data-comp="usage-meter-row" data-variants="success warning" class="use-row">
+              <div data-comp="usage-meter-row" data-variants="warning" class="use-row">
                 <div class="use-top"><span class="use-nm">Session (5 hr)</span><span class="use-pct" style="color:var(--danger)">95%</span></div>
                 <div class="use-bar"><i style="width:95%;background:var(--danger)"></i></div>
                 <div class="use-reset">Resets in 4m</div>
               </div>
-              <div class="use-row">
+              <div data-comp="usage-meter-row" class="use-row">
                 <div class="use-top"><span class="use-nm">Weekly (7 day)</span><span class="use-pct" style="color:var(--success)">13%</span></div>
                 <div class="use-bar"><i style="width:13%;background:var(--success)"></i></div>
                 <div class="use-reset">Resets in 5d</div>
               </div>
-              <div class="use-row">
+              <div data-comp="usage-meter-row" class="use-row">
                 <div class="use-top"><span class="use-nm">Weekly Sonnet</span><span class="use-pct" style="color:var(--success)">0%</span></div>
                 <div class="use-bar"><i style="width:0%;background:var(--success)"></i></div>
                 <div class="use-reset">Independent characteristic of your usage</div>
@@ -1728,7 +1725,7 @@
           </div>
 
           <div class="set-sec">
-            <div class="set-sec-h"><span class="nm"><i data-lucide="sigma"></i>Token consumption</span><span class="set-kind ro">Read-only</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="sigma"></i>Token consumption</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
             <div class="set-sec-b">
               <div class="set-scopebar">
                 <div data-comp="scope-switcher" class="set-scope" id="usage-window">
@@ -1748,7 +1745,7 @@
 
         <!-- ========== MCP ========== -->
         <div class="set-pane" id="set-mcp">
-          <div class="set-note"><i data-lucide="info"></i><span>The <b>global registry</b> and enablement of MCP servers — enable/disable, connection &amp; OAuth health, and the disabled-server "parking" state. Per-agent access (which agent may use which server) stays in the <b>Agent</b> panel.</span></div>
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>The <b>global registry</b> and enablement of MCP servers — enable/disable, connection &amp; OAuth health, and the disabled-server "parking" state. Per-agent access (which agent may use which server) stays in the <b>Agent</b> panel.</span></div>
           <div class="set-scopebar">
             <div class="set-scope">
               <button class="active" onclick="setScope('mcp','user',this)">User</button>
@@ -1759,7 +1756,7 @@
 
           <div class="set-scopepane active" data-scopepane="mcp" id="mcp-user">
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="activity"></i>Health</span><span class="set-kind ro">Read-only</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="activity"></i>Health</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b">
                 <div data-comp="settings-row" class="set-row"><span class="rk">Connected</span><span class="rv"><b>8</b> servers</span><span class="rt"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>OK</span></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">Disabled / parked</span><span class="rv"><b>10</b> servers</span><span class="rt"><span data-comp="connector-health-badge" class="hbadge hb-parked">Parked</span></span></div>
@@ -1767,7 +1764,7 @@
               </div>
             </div>
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="server"></i>Server registry</span><span class="set-kind edit">Enable / disable</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="server"></i>Server registry</span><span data-comp="settings-kind-badge" class="set-kind edit">Enable / disable</span></div>
               <div class="set-sec-b">
                 <div data-comp="registry-group-header" class="reg-grp">Connected<span class="ct">8</span></div>
                 <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">apify</div><div class="reg-meta">stdio · token</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Connected</span><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button></div></div>
@@ -1779,7 +1776,7 @@
                 <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">google-workspace</div><div class="reg-meta">stdio · OAuth</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-oauth">OAuth ✓</span><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Connected</span><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button></div></div>
                 <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">playwright</div><div class="reg-meta">stdio · local</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Connected</span><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button></div></div>
 
-                <div class="reg-grp">Disabled — parked<span class="ct">10</span></div>
+                <div data-comp="registry-group-header" class="reg-grp">Disabled — parked<span class="ct">10</span></div>
                 <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name">supabase</div><div class="reg-meta">~/.claude.json · OAuth</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-warn">OAuth expired</span><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button></div></div>
                 <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name">neon</div><div class="reg-meta">~/.claude.json · key</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-parked">Parked</span><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button></div></div>
                 <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name">notion</div><div class="reg-meta">~/.claude.json · token</div></div><div class="reg-rt"><span data-comp="connector-health-badge" class="hbadge hb-parked">Parked</span><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button></div></div>
@@ -1796,16 +1793,16 @@
 
           <div class="set-scopepane" data-scopepane="mcp" id="mcp-project">
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project servers (.mcp.json)</span><span class="set-kind ro">Read-only</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project servers (.mcp.json)</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b">
                 <div data-comp="settings-row" class="set-row"><span class="rk">Defined</span><span class="rv plain">None — no <span style="font-family:var(--font-mono)">.mcp.json</span> in this project</span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">enableAllProjectMcpServers</span><span class="rv">false</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
               </div>
             </div>
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="plus"></i>Add</span><span class="set-kind edit">Editable</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="plus"></i>Add</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">Project server</span><span class="rv plain" style="color:var(--muted)">Register a server scoped to this repo</span><span class="rt"><button class="btn btn-sm"><i data-lucide="plus" class="w-3 h-3"></i>Add server</button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Project server</span><span class="rv plain" style="color:var(--muted)">Register a server scoped to this repo</span><span class="rt"><button data-comp="button" class="btn btn-sm"><i data-lucide="plus" class="w-3 h-3"></i>Add server</button></span></div>
               </div>
             </div>
           </div>
@@ -1813,7 +1810,7 @@
 
         <!-- ========== PLUGINS ========== -->
         <div class="set-pane" id="set-plugins">
-          <div class="set-note"><i data-lucide="info"></i><span>Installed plugins, their enabled state, and marketplaces. Toggle a plugin on/off here (global registry); per-agent capability stays in the <b>Agent</b> panel.</span></div>
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Installed plugins, their enabled state, and marketplaces. Toggle a plugin on/off here (global registry); per-agent capability stays in the <b>Agent</b> panel.</span></div>
           <div class="set-scopebar">
             <div class="set-scope">
               <button class="active" onclick="setScope('plugins','user',this)">User</button>
@@ -1826,36 +1823,36 @@
           <div class="set-scopepane active" data-scopepane="plugins" id="plugins-user">
             <div data-comp="search-input" class="set-search"><i data-lucide="search"></i><input type="text" placeholder="Search plugins…"></div>
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="store"></i>Marketplaces</span><span class="set-kind ro">5</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="store"></i>Marketplaces</span><span data-comp="settings-kind-badge" class="set-kind ro">5</span></div>
               <div class="set-sec-b"><div class="pl-chips" style="margin-top:var(--space-2)">
-                <span data-comp="plugin-skill-chip" class="pl-chip">superpowers-marketplace</span><span class="pl-chip">everything-claude-code</span><span class="pl-chip">ui-ux-pro-max-skill</span><span class="pl-chip">thedotmack</span><span class="pl-chip">claude-plugins-official</span>
+                <span data-comp="plugin-skill-chip" class="pl-chip">superpowers-marketplace</span><span data-comp="plugin-skill-chip" class="pl-chip">everything-claude-code</span><span data-comp="plugin-skill-chip" class="pl-chip">ui-ux-pro-max-skill</span><span data-comp="plugin-skill-chip" class="pl-chip">thedotmack</span><span data-comp="plugin-skill-chip" class="pl-chip">claude-plugins-official</span>
               </div></div>
             </div>
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="puzzle"></i>Installed</span><span class="set-kind edit">5 · enable / disable</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="puzzle"></i>Installed</span><span data-comp="settings-kind-badge" class="set-kind edit">5 · enable / disable</span></div>
               <div class="set-sec-b">
-                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>claude-mem@thedotmack</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>mcp-search</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>everything-claude-code@everything-claude-code</div><div class="pl-chips"><span class="pl-chip"><span class="pd"></span>github</span><span class="pl-chip"><span class="pd"></span>context7</span><span class="pl-chip"><span class="pd"></span>exa</span><span class="pl-chip"><span class="pd"></span>memory</span><span class="pl-chip"><span class="pd"></span>playwright</span><span class="pl-chip"><span class="pd"></span>sequential-thinking</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>pyright-lsp@claude-plugins-official</div><div class="reg-meta">Python LSP · static type checking</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>superpowers@superpowers-marketplace</div><div class="reg-meta">14 skills · v5.0.7</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
-                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>ui-ux-pro-max@ui-ux-pro-max-skill</div><div class="reg-meta">7 skills · v2.5.0</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>claude-mem@thedotmack</div><div class="pl-chips"><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>mcp-search</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row off"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--muted-2);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>everything-claude-code@everything-claude-code</div><div class="pl-chips"><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>github</span><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>context7</span><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>exa</span><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>memory</span><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>playwright</span><span data-comp="plugin-skill-chip" class="pl-chip"><span class="pd"></span>sequential-thinking</span></div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh" onclick="setSwitch(this)" title="Disabled"></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>pyright-lsp@claude-plugins-official</div><div class="reg-meta">Python LSP · static type checking</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>superpowers@superpowers-marketplace</div><div class="reg-meta">14 skills · v5.0.7</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
+                <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name"><span class="set-dot" style="background:var(--success);display:inline-block;margin-right:var(--space-7);vertical-align:middle"></span>ui-ux-pro-max@ui-ux-pro-max-skill</div><div class="reg-meta">7 skills · v2.5.0</div></div><div class="reg-rt"><button data-comp="switch" data-status="planned" class="swh on" onclick="setSwitch(this)" title="Enabled"></button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Remove"><i data-lucide="trash-2"></i></button></div></div>
               </div>
             </div>
           </div>
 
           <div class="set-scopepane" data-scopepane="plugins" id="plugins-project">
-            <div class="set-sec"><div class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project plugins</span><span class="set-kind ro">Read-only</span></div>
+            <div class="set-sec"><div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project plugins</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b"><div data-comp="settings-row" class="set-row"><span class="rk">Installed</span><span class="rv plain">None at project scope (.claude/plugins)</span></div></div></div>
           </div>
           <div class="set-scopepane" data-scopepane="plugins" id="plugins-local">
-            <div class="set-sec"><div class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Local plugins</span><span class="set-kind ro">Read-only</span></div>
+            <div class="set-sec"><div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Local plugins</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b"><div data-comp="settings-row" class="set-row"><span class="rk">Installed</span><span class="rv plain">None at local scope</span></div></div></div>
           </div>
         </div>
 
         <!-- ========== CONFIG ========== -->
         <div class="set-pane" id="set-config">
-          <div class="set-note"><i data-lucide="info"></i><span>Default model, permission mode, sandbox, hooks, env, CLAUDE.md, and plans. Each setting is tagged <b>LIVE</b> (takes effect immediately) or <b>NEW SESSION</b> (needs a restart), per the CLI lifecycle map.</span></div>
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Default model, permission mode, sandbox, hooks, env, CLAUDE.md, and plans. Each setting is tagged <b>LIVE</b> (takes effect immediately) or <b>NEW SESSION</b> (needs a restart), per the CLI lifecycle map.</span></div>
           <div class="set-scopebar">
             <div class="set-scope">
               <button class="active" onclick="setScope('config','global',this)">Global</button>
@@ -1865,28 +1862,28 @@
           </div>
 
           <div class="set-scopepane active" data-scopepane="config" id="config-global">
-            <div class="set-warn"><i data-lucide="alert-triangle"></i>Editing <b>~/.claude</b> (global) affects every project — changes require an explicit confirm.</div>
+            <div data-comp="settings-note" class="set-warn"><i data-lucide="alert-triangle"></i>Editing <b>~/.claude</b> (global) affects every project — changes require an explicit confirm.</div>
 
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="cpu"></i>Identity &amp; model</span><span class="set-kind edit">Editable · confirm</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="cpu"></i>Identity &amp; model</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable · confirm</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">Default model</span><span class="rv">claude-opus-4-8</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Default model</span><span class="rv">claude-opus-4-8</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">Available models</span><span class="rv">opus 4.8 · sonnet 4.6 · haiku 4.5 · fable 5</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
-                <div data-comp="settings-row" class="set-row"><span class="rk">Effort</span><span class="rv">medium</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · /effort</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
-                <div data-comp="settings-row" class="set-row"><span class="rk">Extended thinking</span><span class="rv">on</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · /config</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Effort</span><span class="rv">medium</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · /effort</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Extended thinking</span><span class="rv">on</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · /config</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
               </div>
             </div>
 
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="shield"></i>Permissions &amp; sandbox</span><span class="set-kind edit">Editable · confirm</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="shield"></i>Permissions &amp; sandbox</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable · confirm</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:var(--font-mono)">(Plan · Ask · Edit · Auto · Bypass)</span></span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
-                <div data-comp="settings-row" class="set-row"><span class="rk">Sandbox</span><span class="rv">disabled</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Permission mode</span><span class="rv plain">default <span style="color:var(--muted);font-family:var(--font-mono)">(Plan · Ask · Edit · Auto · Bypass)</span></span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session · ⇧⇥ cycles</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">Sandbox</span><span class="rv">disabled</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
               </div>
             </div>
 
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="webhook"></i>Hooks</span><span class="set-kind ro">Read-only · 5 active</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="webhook"></i>Hooks</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only · 5 active</span></div>
               <div class="set-sec-b">
                 <div data-comp="settings-row" class="set-row"><span class="rk">SessionStart</span><span class="rv">gsd-check-update.js</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">PostToolUse</span><span class="rv">gsd-context-monitor.js</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span></span></div>
@@ -1896,31 +1893,31 @@
             </div>
 
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="terminal"></i>Environment</span><span class="set-kind edit">Editable · confirm</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="terminal"></i>Environment</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable · confirm</span></div>
               <div class="set-sec-b">
                 <div data-comp="settings-row" class="set-row"><span class="rk">ANTHROPIC_DEFAULT_OPUS_MODEL</span><span class="rv">claude-opus-4-8</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">ANTHROPIC_DEFAULT_SONNET_MODEL</span><span class="rv">claude-sonnet-4-6</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
-                <div data-comp="settings-row" class="set-row"><span class="rk">ANTHROPIC_DEFAULT_HAIKU_MODEL</span><span class="rv">claude-haiku-4-5-20251001</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">ANTHROPIC_DEFAULT_HAIKU_MODEL</span><span class="rv">claude-haiku-4-5-20251001</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit (global)" onclick="askGlobalEdit()"><i data-lucide="pencil"></i></button></span></div>
               </div>
             </div>
 
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="file-text"></i>Memory &amp; plans</span><span class="set-kind ro">Read-only</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="file-text"></i>Memory &amp; plans</span><span data-comp="settings-kind-badge" class="set-kind ro">Read-only</span></div>
               <div class="set-sec-b">
                 <div data-comp="settings-row" class="set-row"><span class="rk">CLAUDE.md</span><span class="rv">~/.claude/CLAUDE.md · project CLAUDE.md</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live · re-read</span></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">plansDirectory</span><span class="rv">default</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">New session</span></span></div>
               </div>
             </div>
 
-            <div data-comp="confirm-gate" class="set-confirm" id="config-confirm"><i data-lucide="alert-triangle" class="w-3 h-3"></i><span>This change writes to <b>~/.claude</b> and applies to every project. Apply it?</span><button class="btn-main btn-sm" style="margin-left:auto" onclick="setGlobalConfirm(false)">Confirm</button><button class="btn btn-sm" onclick="setGlobalConfirm(false)">Cancel</button></div>
+            <div data-comp="confirm-gate" class="set-confirm" id="config-confirm"><i data-lucide="alert-triangle" class="w-3 h-3"></i><span>This change writes to <b>~/.claude</b> and applies to every project. Apply it?</span><button data-comp="button" class="btn-main btn-sm" style="margin-left:auto" onclick="setGlobalConfirm(false)">Confirm</button><button data-comp="button" class="btn btn-sm" onclick="setGlobalConfirm(false)">Cancel</button></div>
           </div>
 
           <div class="set-scopepane" data-scopepane="config" id="config-project">
             <div class="set-sec">
-              <div class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project config (.claude/settings.json)</span><span class="set-kind edit">Editable</span></div>
+              <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="folder"></i>Project config (.claude/settings.json)</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable</span></div>
               <div class="set-sec-b">
-                <div data-comp="settings-row" class="set-row"><span class="rk">permissions.allow</span><span class="rv">22 rules</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
-                <div data-comp="settings-row" class="set-row"><span class="rk">permissions.deny</span><span class="rv">claude.ai Gmail · Google Drive</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">permissions.allow</span><span class="rv">22 rules</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
+                <div data-comp="settings-row" class="set-row"><span class="rk">permissions.deny</span><span class="rv">claude.ai Gmail · Google Drive</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-live">Live</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Edit"><i data-lucide="pencil"></i></button></span></div>
                 <div data-comp="settings-row" class="set-row"><span class="rk">additionalDirectories</span><span class="rv">~/.claude · ~/.claude/docs</span><span class="rt"><span data-comp="config-scope-badge" class="lc-badge lc-session">Session · /add-dir</span></span></div>
                 <div data-comp="settings-row" class="set-row" style="align-items:flex-start"><span class="rk" style="padding-top:var(--space-1)">Agent agreement</span><span class="rv plain" style="font-weight:600">All agents use only <span style="font-family:var(--font-mono)">.claude/settings.json</span> — no settings.local.json.</span></div>
               </div>
@@ -1930,22 +1927,22 @@
 
         <!-- ========== SETUPS ========== -->
         <div class="set-pane" id="set-setups">
-          <div class="set-note"><i data-lucide="info"></i><span>Save &amp; load a full dashboard setup — its agents and the links between them. The full list lives here.</span></div>
+          <div data-comp="settings-note" class="set-note"><i data-lucide="info"></i><span>Save &amp; load a full dashboard setup — its agents and the links between them. The full list lives here.</span></div>
 
           <div class="set-sec">
-            <div class="set-sec-h"><span class="nm"><i data-lucide="download"></i>Save current setup</span><span class="set-kind edit">Editable</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="download"></i>Save current setup</span><span data-comp="settings-kind-badge" class="set-kind edit">Editable</span></div>
             <div class="set-sec-b">
               <div data-comp="settings-row" class="set-row"><span class="rk">Captures</span><span class="rv plain"><b>13</b> agents · <b>6</b> links · <b>4</b> subagents</span></div>
-              <div data-comp="settings-row" class="set-row"><span class="rk">Name</span><span class="rv"><div class="in-wrap"><input class="in" type="text" placeholder="e.g. security-audit-fleet"></div></span><span class="rt"><button class="btn-main btn-sm"><i data-lucide="download" class="w-3 h-3"></i>Save setup</button></span></div>
+              <div data-comp="settings-row" class="set-row"><span class="rk">Name</span><span class="rv"><div class="in-wrap"><input class="in" type="text" placeholder="e.g. security-audit-fleet"></div></span><span class="rt"><button data-comp="button" class="btn-main btn-sm"><i data-lucide="download" class="w-3 h-3"></i>Save setup</button></span></div>
             </div>
           </div>
 
           <div class="set-sec">
-            <div class="set-sec-h"><span class="nm"><i data-lucide="inbox"></i>Saved setups</span><span class="set-kind edit">3 · load / delete</span></div>
+            <div data-comp="settings-section-header" class="set-sec-h"><span class="nm"><i data-lucide="inbox"></i>Saved setups</span><span data-comp="settings-kind-badge" class="set-kind edit">3 · load / delete</span></div>
             <div class="set-sec-b">
-              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">security-audit-fleet</div><div class="reg-meta">5 agents · 3 links · saved 2026-06-18</div></div><div class="reg-rt"><button class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
-              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">research-swarm</div><div class="reg-meta">8 agents · 6 links · saved 2026-06-15</div></div><div class="reg-rt"><button class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
-              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">ui-refactor-pair</div><div class="reg-meta">2 agents · 1 link · saved 2026-06-12</div></div><div class="reg-rt"><button class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
+              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">security-audit-fleet</div><div class="reg-meta">5 agents · 3 links · saved 2026-06-18</div></div><div class="reg-rt"><button data-comp="button" class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
+              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">research-swarm</div><div class="reg-meta">8 agents · 6 links · saved 2026-06-15</div></div><div class="reg-rt"><button data-comp="button" class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
+              <div data-comp="registry-row" class="reg-row"><div class="reg-main"><div class="reg-name">ui-refactor-pair</div><div class="reg-meta">2 agents · 1 link · saved 2026-06-12</div></div><div class="reg-rt"><button data-comp="button" class="btn-secondary btn-sm"><i data-lucide="upload" class="w-3 h-3"></i>Load</button><button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" title="Delete"><i data-lucide="trash-2"></i></button></div></div>
             </div>
           </div>
         </div>
@@ -1960,19 +1957,19 @@
       <span class="con-title"><i data-lucide="terminal"></i>Console</span>
       <span class="badge badge-c con-head-agent"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="b-lab"><span class="b-role">researcher</span><span class="b-name">01 sandy</span></span></span>
       <span class="con-live"><i class="con-dot"></i>raw feed</span>
-      <button class="btn con-close" onclick="closeConsole()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
+      <button data-comp="button" class="btn con-close" onclick="closeConsole()"><i data-lucide="x" class="w-3 h-3"></i>Close</button>
     </div>
     <div class="con-body">
-      <aside class="con-rail">
+      <aside data-comp="command-palette" class="con-rail">
         <div class="con-cat-head"><span class="con-cat-title">Commands</span><div class="con-search"><i data-lucide="search"></i><input placeholder="Filter commands…" oninput="filterCmds(this)"></div></div>
         <div class="con-cat-list" data-cmdlist></div>
       </aside>
       <main class="con-main">
-        <div class="con-feed" id="con-feed-full"></div>
-        <div class="con-run con-run--full">
+        <div data-comp="console-feed" class="con-feed" id="con-feed-full"></div>
+        <div data-comp="console-runbar" class="con-run con-run--full">
           <button class="con-cmds-btn" onclick="filterFocus(this)" title="Jump to the command filter"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
           <input class="con-input" id="con-input-full" placeholder="Type a command, or pick one from the list…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface is design-final/built; live feed + slash-route are BACKEND wiring (separate stream) -->
-          <button class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
+          <button data-comp="button" class="btn-main con-run-btn" onclick="runConsoleCmd(this)">Run</button>
         </div>
       </main>
     </div>

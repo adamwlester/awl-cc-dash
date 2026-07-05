@@ -62,7 +62,6 @@
     .pcard-head h3{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--foreground); white-space:nowrap; }
     .pcard-body{ flex:1 1 auto; min-height:0; background:var(--background); }   /* v9p5: cream is the content surface for all panel bodies (matches the Team Graph well); cards/inputs/lists keep their own fills so they pop. The Settings step-into view is separate (.set-*) and unaffected. */
     .pcard-foot{ flex-shrink:0; background:var(--surface-3); border-top:var(--border-width) solid var(--border); }
-    .panel-divider{ border-bottom:var(--border-width) solid var(--border); }    /* between stacked panels in a group, when no handle */
     .rz-panel + .rz-handle.hstyle + .rz-panel .pcard-head{ } /* (handle owns the divider line) */
 
     /* ============================ Button (mirrors neobrutalism Button variants) ============================ */
@@ -121,14 +120,9 @@
     .in::placeholder{ color:var(--muted-2); font-weight:500; }
     textarea.in{ line-height:1.5; }
     textarea.autosize{ resize:none; overflow:hidden; min-height:var(--size-32); }
-    textarea.ta-resize{ resize:vertical; }
     .lbl{ display:block; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
     .in-wrap{ position:relative; display:block; }
     .in-wrap > input{ padding-right:26px; }
-    .in-x{ position:absolute; top:50%; right:var(--space-6); transform:translateY(-50%); width:var(--size-17); height:var(--size-17); display:inline-flex;
-      align-items:center; justify-content:center; color:var(--muted-2); cursor:pointer; border:none; background:transparent; border-radius:var(--radius-sm); }
-    .in-x:hover{ color:var(--foreground); background:rgb(from var(--foreground) r g b / 0.08); }
-    .in-x svg{ width:var(--size-11); height:var(--size-11); }
   
 
     /* ============================ agent identity tile (recolorable game-icon) ============================ */
@@ -159,7 +153,6 @@
     .node:hover{ transform:translate(2px,2px); box-shadow:none; }
     .node.selected{ background:color-mix(in srgb, var(--nc) var(--node-tint-selected), var(--secondary-background)); box-shadow:var(--shadow); transform:none; outline:var(--ring-width) solid var(--ring); outline-offset:-3px; }   /* icon-fill (light): selected = a stronger tint of the agent colour + teal inner ring + hard shadow (bumped to stay distinct from the new 22% base field) */
     .node.selected:hover{ transform:none; box-shadow:var(--shadow); }
-    .node-dot{ position:absolute; top:-7px; left:-7px; width:var(--size-15); height:var(--size-15); border-radius:50%; border:var(--border-width) solid var(--border); }
     /* v8p9: removed .node-view ("VIEWING" badge) — selection now reads from the card fill */
     /* v10p10: .node-meta is now a hidden data carrier (model · mode · effort · think) read by repaintAgentPanel;
        the visible config is the .node-settings chips. Keep it in the DOM but out of the layout. */
@@ -493,7 +486,6 @@
     .ro-head{ display:flex; align-items:center; gap:var(--space-8); margin-bottom:var(--space-6); }
     .ro-label{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
     .model-tabs{ display:flex; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; versions open as a separate popout below */
-    .model-tabs.flat{ border-radius:var(--radius-base); }
     .model-tab{ flex:1; min-width:0; font-size:9.5px; font-weight:700; padding:var(--space-7) var(--space-3); color:var(--muted); background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; }
     .model-tab:last-child{ border-right:none; }
     .model-tab:hover:not(.active){ color:var(--foreground); background:rgb(from var(--foreground) r g b / 0.05); }
@@ -566,8 +558,7 @@
     .tl-top{ display:flex; align-items:center; flex-wrap:wrap; gap:0; margin-bottom:var(--space-2); }
     .tl-turn{ font-size:10px; font-weight:800; font-family:var(--font-mono); color:var(--foreground); }
     .tl-now{ font-size:7.5px; font-weight:900; text-transform:uppercase; color:var(--main-foreground); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); padding:0 var(--space-4); display:inline-flex; align-items:center; height:var(--badge-s-h); margin-left:var(--space-6); }
-    .tl-time{ font-size:9.5px; color:var(--muted); font-family:var(--font-mono); }
-    .tl-time::before{ content:'·'; margin:0 var(--space-5); color:var(--muted-2); }
+    .tl-time{ font-size:9.5px; color:var(--muted); font-family:var(--font-mono); margin-left:auto; }   /* timestamps right-align (DESIGN.md convention) — the '·' prefix went with the old inline placement */
     .tl-ctx{ font-size:9.5px; font-weight:800; font-family:var(--font-mono); } .tl-ctx::before{ content:'·'; margin:0 var(--space-5); color:var(--muted-2); font-weight:400; }
     .tl-desc{ font-size:11px; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85; }
     .tl-ic{ flex:0 0 auto; width:var(--size-28); height:var(--size-28); display:inline-flex; align-items:center; justify-content:center; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
@@ -699,10 +690,6 @@
 
     /* ============================ readout cards (feed/history/scratch/requests) ============================ */
     .rcard{ position:relative; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-8) var(--space-10); }
-    .rcard .rc-copy{ position:absolute; top:var(--space-6); right:var(--space-7); opacity:0; transition:opacity .12s; }
-    .rcard:hover .rc-copy,.rcard:focus-within .rc-copy{ opacity:1; }
-    .rc-name{ font-size:11px; font-weight:800; }
-    .rc-time{ font-size:9px; color:var(--muted); font-family:var(--font-mono); }
     .rc-body{ font-size:11px; color:var(--foreground); line-height:1.45; margin-top:var(--space-2); opacity:.92; }
     .rc-log{ font-family:var(--font-mono); font-size:10px; padding:var(--space-5) var(--space-9); }
     .dir-tag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; display:inline-flex; align-items:center; height:var(--badge-m-h); padding:0 var(--space-6); border-radius:var(--radius-sm); border:var(--border-width) solid var(--border); background:transparent; color:var(--muted); }
@@ -710,7 +697,6 @@
     .dbadge{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; display:inline-flex; align-items:center; height:var(--badge-m-h); padding:0 var(--space-7); border-radius:var(--radius-sm); border:var(--border-width) solid var(--border); }
     .db-sent{ background:var(--status-done-soft); color:var(--success-text); } .db-next{ background:var(--status-next-soft); color:var(--status-next-text); }
     .db-queued{ background:var(--warning-soft); color:var(--warning-text); } .db-held{ background:var(--status-held-soft); color:var(--status-held-text); }
-    .hist-acts{ display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-7); padding-top:var(--space-6); border-top:var(--border-width) solid var(--border); }
     .opt{ display:block; width:100%; text-align:left; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:var(--space-6) var(--space-9); cursor:pointer; transition:transform .06s, box-shadow .06s; }
     .opt:hover:not(.on){ box-shadow:var(--shadow-sm); transform:translate(-1px,-1px); }
     .opt.on{ background:var(--select); }
@@ -729,13 +715,11 @@
 
     /* ============================ library ============================ */
     .sec-h{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:var(--space-6); display:flex; justify-content:space-between; align-items:center; }
-    .lib-list{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--secondary-background); }
     .lib-row{ display:flex; align-items:center; gap:var(--space-7); width:100%; text-align:left; font-size:11px; font-weight:600; padding:var(--space-6) var(--space-9); color:var(--foreground); background:transparent; border:none; border-top:var(--border-width) solid var(--border); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .lib-row:first-child{ border-top:none; }
     .lib-row:hover:not(.on){ background:var(--surface-3); }
     .lib-row.on{ background:var(--select); color:var(--foreground); font-weight:800; }
     .lib-row svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; color:var(--muted); } .lib-row.on svg{ color:var(--foreground); }
-    .tpl-view{ background:var(--background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-9) var(--space-11); font-size:12px; line-height:1.9; color:var(--foreground); overflow-y:auto; }
     .ph-text{ font-weight:800; cursor:pointer; border-bottom:var(--border-width) dashed currentColor; padding-bottom:var(--space-1); }
     .ph-text:hover{ background:rgb(from var(--foreground) r g b / 0.06); }
     .ph-text.filled{ font-style:italic; border-bottom-style:solid; }
@@ -922,7 +906,6 @@
     .msel-opt .mck{ width:var(--size-13); height:var(--size-13); color:var(--foreground); opacity:0; flex:0 0 auto; }
     .msel-opt.on{ background:var(--select); } .msel-opt.on .mck{ opacity:1; }
     .msel-opt .mname{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .msel-opt .mtag{ font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted-2); }
 
     /* ============================ v8p6 — mic icon button (voice dictation) — v8p8: lives in the Prompts footer ============================ */
     .mic-btn{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-30); height:var(--size-30); flex:0 0 auto; padding:0;
@@ -1011,7 +994,6 @@
     /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
     .msg-blocks{ display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-7); }
     .msg-blk{ font-family:var(--font-mono); font-size:10px; line-height:1.5; padding:var(--space-4) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
-    .msg-blk-lbl{ display:inline-block; font-weight:800; text-transform:uppercase; font-size:7.5px; letter-spacing:.05em; color:var(--muted); margin-right:var(--space-6); }
     .msg-blk.blk-think{ background:var(--secondary-background); color:var(--muted); font-style:italic; }
     .msg-blk.blk-meta{ background:var(--secondary-background); color:var(--muted-2); }
     .msg-blk.blk-diff .blk-add{ color:var(--success); } .msg-blk.blk-diff .blk-del{ color:var(--danger); }
@@ -1028,11 +1010,6 @@
     #hcpop .hc-title{ font-weight:800; font-size:10.5px; letter-spacing:.01em; color:var(--foreground); margin-bottom:var(--space-3); }
     #hcpop .hc-body{ font-size:10.5px; line-height:1.5; color:var(--muted); }
     .db-approved{ background:var(--status-done-soft); color:var(--success-text); }   /* green = approved */
-    /* "+" add-doc affordance in the tabset */
-    .doc-add{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-24); height:var(--size-24); flex:0 0 auto;
-      border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base); background:transparent; color:var(--muted); cursor:pointer; }
-    .doc-add:hover{ color:var(--foreground); border-color:var(--border); background:var(--secondary-background); }
-    .doc-add svg{ width:var(--size-13); height:var(--size-13); }
     /* plan cards (expandable) */
     .plan-card{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); overflow:hidden; }
     /* R11 item 5: footer popovers (the reviewer-chip .rev-pop, the merged Export .ea-dd, the verdict .vpop) are
@@ -1045,22 +1022,10 @@
     .plan-chev{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); transition:transform .15s; }
     .plan-card.open .plan-chev{ transform:rotate(90deg); }
     .plan-title{ font-size:11.5px; font-weight:800; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
-    .plan-meta{ font-size:8.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); flex:0 0 auto; }
     .plan-body{ display:none; padding:0 var(--space-10) var(--space-10); border-top:var(--border-width) solid var(--border); }
     .plan-card.open .plan-body{ display:block; }
-    .plan-desc{ font-size:11px; line-height:1.45; color:var(--foreground); opacity:.92; margin:var(--space-9) 0 var(--space-9); }
-    .plan-steps{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--space-5); }
-    .plan-steps li{ display:flex; align-items:flex-start; gap:var(--space-7); font-size:11px; line-height:1.35; color:var(--foreground); }
-    .plan-steps li svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; margin-top:var(--space-1); }
-    .plan-steps li.done{ color:var(--muted); }
-    .plan-steps li.done svg{ color:var(--success); }
-    .plan-steps li.doing svg{ color:var(--warning); }
-    .plan-steps li .step-dot{ width:var(--size-11); height:var(--size-11); flex:0 0 auto; margin-top:var(--space-1); border:var(--border-width) solid var(--muted-2); border-radius:50%; }
     .plan-foot{ display:flex; align-items:center; gap:var(--space-7); margin-top:var(--space-11); padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
     /* doc viewer (README / CLAUDE / TODO) */
-    .doc-toolbar{ display:flex; align-items:center; gap:var(--space-7); margin-bottom:var(--space-8); flex:0 0 auto; }
-    .doc-path{ font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--muted); padding:var(--space-3) var(--space-8);
-      background:var(--surface-3); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .doc-view{ flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--secondary-background); border:var(--border-width) solid var(--border);
       border-radius:var(--radius-base); box-shadow:var(--shadow-sm); padding:var(--space-12) var(--space-14); font-size:12px; line-height:1.6; color:var(--foreground); }
     .doc-view h4{ font-size:13px; font-weight:900; margin:0 0 var(--space-6); color:var(--foreground); }
@@ -1069,7 +1034,6 @@
     .doc-view ul{ margin:0 0 var(--space-9); padding-left:17px; } .doc-view li{ margin:var(--space-2) 0; opacity:.94; }
     .doc-view code{ font-family:var(--font-mono); font-size:10.5px; background:var(--surface-3); border:var(--border-width-thin) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-4); }
     .doc-view a{ color:var(--ag-azure); font-weight:700; text-decoration:none; } .doc-view a:hover{ text-decoration:underline; }
-    .doc-view .doc-hr{ border:none; border-top:var(--border-width) solid var(--border); margin:var(--space-12) 0; }
     .doc-edit{ flex:1 1 auto; min-height:0; width:100%; resize:none; font-family:var(--font-mono); font-size:11px; line-height:1.55; }
 
     /* ---- Library: Documents tab — doc-switcher rail + one-at-a-time editor host ---- */
@@ -1103,23 +1067,6 @@
 
     /* ---- Library: Assets tab — thumbnail grid IS the nav, + selected-asset detail strip ---- */
     .asset-grid{ flex:1 1 auto; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:var(--space-9); align-content:start; padding:var(--space-2); }
-    .asset-tile{ display:flex; flex-direction:column; gap:var(--space-5); cursor:pointer; text-align:left;
-      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:var(--space-5);
-      transition:transform .07s, box-shadow .07s; }
-    .asset-tile:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .asset-tile.on{ outline:var(--ring-width) solid var(--ring); outline-offset:var(--ring-offset); }
-    .asset-thumb{ display:flex; align-items:center; justify-content:center; aspect-ratio:4/3; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); color:var(--icon-fg); }
-    .asset-thumb svg{ width:var(--size-22); height:var(--size-22); opacity:.85; }
-    .asset-name{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .asset-detail{ flex:0 0 auto; display:none; align-items:center; gap:var(--space-11); margin-top:var(--space-9); padding:var(--space-9);
-      border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); }
-    .asset-detail.on{ display:flex; }
-    .asset-detail-thumb{ display:flex; align-items:center; justify-content:center; width:64px; height:48px; flex:0 0 auto; border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); color:var(--icon-fg); }
-    .asset-detail-thumb svg{ width:var(--size-20); height:var(--size-20); opacity:.85; }
-    .asset-detail-info{ min-width:0; display:flex; flex-direction:column; gap:var(--space-3); }
-    .asset-detail-name{ font-family:var(--font-mono); font-size:11px; font-weight:800; color:var(--foreground); }
-    .asset-detail-meta{ font-size:9.5px; font-weight:600; color:var(--muted); }
-    .asset-detail-actions{ display:flex; gap:var(--space-6); margin-top:var(--space-2); }
 
     /* ============================ v10p1 #18-21 — Library: unified Documents/Assets cards, Assets rail+preview, nav rename/delete + Add menu ============================ */
     /* shared header — file path + Created/Edited dates (a simplified Plans header; no owner/title/tally/steps) */
@@ -1131,7 +1078,6 @@
     /* shared Documents/Assets footer — the Embed/Attach control + Remove (danger), right-aligned (P3 moved Copy·Edit·Comment up to the Editor header; P4 replaced Link-to-prompt with Embed/Attach).
        NEXT-UP item 12: Documents now carries the Plans action strip (Export · Reviewer chip · right group), so the footer wraps on a narrow column exactly like .plan-foot (the right group reuses .plan-foot-right). */
     .doc-foot{ display:flex; align-items:center; gap:var(--space-7); flex-wrap:wrap; row-gap:var(--space-7); flex:0 0 auto; margin-top:var(--space-9); padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); }
-    .doc-foot-l{ display:flex; align-items:center; gap:var(--space-7); flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     /* nav-row rename/delete ghost icons (#21) — rows are now <div role=button> so the icon buttons nest legally */
     .docnav-row{ position:relative; }
     .docnav-acts{ display:flex; align-items:center; gap:var(--space-1); margin-left:auto; flex:0 0 auto; opacity:0; transition:opacity .12s; }
@@ -1157,12 +1103,6 @@
 
     /* ============================ v8p7 — Source dropdown (single-select, shows active selection) ============================ */
     .src-dd{ position:relative; }
-    .src-trig{ width:100%; display:flex; align-items:center; gap:var(--space-8); padding:var(--space-6) var(--space-8); text-align:left; cursor:pointer;
-      background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm);
-      transition:transform .07s, box-shadow .07s; }
-    .src-trig:hover{ transform:translate(2px,2px); box-shadow:none; }
-    .src-trig .agtile{ width:var(--size-28); height:var(--size-28); flex:0 0 auto; }
-    .src-trig .picker-cv{ margin-left:auto; }
     .src-pop{ display:none; position:absolute; z-index:70; top:calc(100% + var(--space-6)); left:0; right:0; max-height:266px; overflow-y:auto;
       background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
     .src-pop.open{ display:block; }
@@ -1243,9 +1183,6 @@
       border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); overflow:auto; }
     .md-row{ display:flex; align-items:stretch; }   /* A4 bullet 2: stretch so the rail cell covers a wrapped line's FULL height (was flex-start) */
     .md-row:hover{ background:var(--surface-3); }
-    .md-row.md-target{ background:var(--select); }
-    .md-num{ flex:0 0 auto; width:var(--size-34); padding:0 var(--space-8) 0 0; text-align:right; color:var(--muted-2); font-size:9.5px;
-      user-select:none; border-right:var(--border-width) solid var(--border); background:var(--surface-3); }   /* A4: structural gutter divider tan(--rule)→navy(--border) */
     .md-line{ flex:1 1 auto; min-width:0; padding:0 var(--space-9); white-space:pre-wrap; word-break:break-word; color:var(--foreground); }
     .md-h1{ font-weight:900; font-size:12px; color:var(--foreground); }
     .md-h2{ font-weight:800; color:var(--ag-azure); }
@@ -1279,7 +1216,7 @@
 
     /* plan expanded = outline/feedback/authors nav rail + line-numbered body */
     .plan-rev{ display:flex; gap:var(--space-9); margin-top:var(--space-9); max-height:520px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback/Authors nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). NEXT-UP item 13: raised 346→520 so the docked comment popout (which never shrinks — see .plan-cmt-pop) fits below a still-useful stretch of editor. */
-    .plan-nav{ flex:0 0 132px; display:flex; flex-direction:column; min-width:0; }
+    .plan-nav{ display:flex; flex-direction:column; min-width:0; }
     .nav-tabs{ display:flex; gap:var(--space-4); margin-bottom:var(--space-6); }
     .nav-tab{ flex:1; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; padding:var(--space-4) 0; text-align:center;
       border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--muted); cursor:pointer; }
@@ -1310,19 +1247,12 @@
     .ol-c{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); flex:0 0 auto; }
     .plan-main{ flex:1 1 auto; min-width:0; }
     /* feedback cards (the comment detail, in the nav rail's Feedback mode) */
-    .fb-list{ display:flex; flex-direction:column; gap:var(--space-6); max-height:300px; overflow-y:auto; }
+    .fb-list{ display:flex; flex-direction:column; gap:var(--space-6); overflow-y:auto; }
     .fb-card{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); box-shadow:var(--shadow-sm); padding:var(--space-6) var(--space-7); }
     .fb-top{ display:flex; align-items:center; gap:var(--space-6); margin-bottom:var(--space-4); }
-    .fb-sec{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); margin-left:auto; flex:0 0 auto;
-      background:var(--surface-3); border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-5); }
-    .fb-vic{ flex:0 0 auto; } .fb-vic svg{ width:var(--size-13); height:var(--size-13); }
-    .fb-vic.v-approve{ color:var(--success); } .fb-vic.v-revise{ color:var(--warning); } .fb-vic.v-block{ color:var(--danger); }
     .fb-cmt{ font-size:10.5px; line-height:1.4; color:var(--foreground); opacity:.92; }
     .fb-empty{ font-size:10px; font-weight:700; color:var(--muted-2); padding:var(--space-10) var(--space-4); text-align:center; }
 
-    .plan-review-bar{ display:flex; align-items:center; gap:var(--space-8); margin-top:var(--space-10); padding-top:var(--space-9); border-top:var(--border-width) solid var(--border); flex-wrap:wrap; }
-    .prb-lab{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
-    .prb-sent{ font-size:9px; font-weight:700; font-family:var(--font-mono); color:var(--success); display:none; }
 
     /* expandable feed/history cards (Plan-style) + header checkbox multi-select */
     .fcard{ position:relative; background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow-sm); overflow:hidden; }
@@ -1428,8 +1358,6 @@
     .exp-menu{ display:none; position:absolute; bottom:calc(100% + var(--space-6)); left:0; z-index:60; min-width:218px;
       background:var(--secondary-background); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:var(--space-5); }
     .exp.open .exp-menu{ display:block; }
-    /* H1: right-aligned menu for footer link-dd controls in the right group (anchor to the trigger's right edge so it never overflows off the left) */
-    .exp-menu--right{ left:auto; right:0; }
     /* H1: link-dd menu items grey when the current selection can't use that mode (selection-gating) */
     .exp-mi:disabled{ opacity:.4; cursor:not-allowed; }
     .exp-mi:disabled:hover{ background:transparent; }
@@ -1474,10 +1402,6 @@
     .fo-body p{ font-size:11.5px; line-height:1.5; margin:0 0 var(--space-9); color:var(--foreground); opacity:.94; }
     .fo-body ul{ margin:0 0 var(--space-9); padding-left:18px; } .fo-body li{ font-size:11.5px; line-height:1.5; margin:var(--space-3) 0; opacity:.94; }
     .fo-body b.k{ color:var(--foreground); }
-    /* plan file path chip (each card shows its source file) */
-    .plan-file{ display:inline-flex; align-items:center; gap:var(--space-5); font-family:var(--font-mono); font-size:9px; font-weight:700;
-      color:var(--muted); background:var(--surface-3); border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:var(--space-2) var(--space-7); margin:var(--space-9) 0 var(--space-2); }
-    .plan-file svg{ color:var(--muted); }
     .plan-head .badge{ flex:0 0 auto; } .plan-title{ flex:1 1 auto; }
     /* mock toast (action confirmations) */
     .toast{ position:fixed; left:50%; bottom:56px; transform:translateX(-50%) translateY(8px); z-index:200; max-width:70vw;
@@ -1487,11 +1411,7 @@
 
     /* two-row plan header (row 1: owner badge → state → title · row 2: filename · counts · dates) */
     .plan-head{ align-items:flex-start; }
-    .plan-head .plan-chev{ margin-top:3px; }
     .plan-head-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--space-5); }
-    .plan-head-row1{ display:flex; align-items:center; gap:var(--space-8); min-width:0; }
-    .plan-head-row1 .badge{ flex:0 0 auto; }
-    .plan-head-row1 .plan-title{ flex:1 1 auto; min-width:0; }
     .plan-sub{ display:flex; align-items:center; gap:var(--space-10) var(--space-12); flex-wrap:wrap; }
     .plan-fname{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .plan-dates{ font-family:var(--font-mono); font-size:8.5px; font-weight:600; color:var(--muted-2); white-space:nowrap; flex:0 0 auto; }
@@ -1505,7 +1425,7 @@
     .cnt-chip.c-approve svg{ color:var(--success); } .cnt-chip.c-revise svg{ color:var(--warning); } .cnt-chip.c-block svg{ color:var(--danger); }
 
     /* nav pane — outlined, fixed-width hug; no horizontal scroll, content wraps inside each card */
-    .plan-nav{ flex:0 0 184px; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); box-shadow:var(--shadow-sm); padding:var(--space-7); overflow:hidden; }
+    .plan-nav{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); box-shadow:var(--shadow-sm); padding:var(--space-7); overflow:hidden; }
     .nav-cnt{ font-family:var(--font-mono); font-size:var(--badge-s-fs); font-weight:800; background:var(--secondary-background); border:var(--border-width-thin) solid var(--border);
       border-radius:var(--radius-sm); padding:0 var(--space-4); display:inline-flex; align-items:center; height:var(--badge-s-h); line-height:1; margin-left:var(--space-5); color:var(--foreground); }   /* v9p14: rounded square */
     .fb-list{ max-height:none; flex:1 1 auto; min-height:0; }   /* NEXT-UP item 13: the fixed 288px cap (hardwired to the old 346px .plan-rev row cap) becomes a flex-fill — the list tracks the nav column's height inside whatever the row cap is, and still scrolls internally (overflow-y from the base rule) */
@@ -1513,7 +1433,6 @@
     .fb-card:hover{ background:var(--surface-3); }
     .fb-top{ flex-wrap:wrap; row-gap:var(--space-3); }
     .fb-top .badge{ flex:0 0 auto; }
-    .fb-sec{ margin-left:0; }
     .fb-cmt{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
     /* v9p12: inline in-text verdict chips removed — feedback badges now live in the editor's left rail */
@@ -1531,8 +1450,6 @@
     .cmt-pop-head{ display:flex; align-items:center; gap:var(--space-8); flex:0 0 auto; padding:var(--space-7) var(--space-9); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); }
     .cmt-pop-head .cph-ic{ flex:0 0 auto; } .cmt-pop-head .cph-ic svg{ width:var(--size-14); height:var(--size-14); }
     .cph-ic.v-approve{ color:var(--success); } .cph-ic.v-revise{ color:var(--warning); } .cph-ic.v-block{ color:var(--danger); }
-    .cph-sec{ font-family:var(--font-mono); font-size:8px; font-weight:800; color:var(--muted); background:var(--secondary-background);
-      border:var(--border-width) solid var(--rule); border-radius:var(--radius-sm); padding:0 var(--space-5); }
     .cph-lab{ font-size:9px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
     .cph-time{ font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }
     .cmt-pop-body{ padding:var(--space-9) var(--space-10); display:flex; flex-direction:column; gap:var(--space-9); min-height:0; max-height:300px; overflow-y:auto; }   /* NEXT-UP item 13: the body scrolls past its cap (matching .fb-list/.aglist-scroll) instead of the whole popout being crushed/clipped */
@@ -1568,9 +1485,6 @@
     .plan-row.r1{ flex-wrap:wrap; row-gap:var(--space-3); }
     .plan-row.r1 .cnt-strip{ flex:0 0 auto; margin-left:auto; }
     .cnt-chip.c-steps.all{ color:var(--success); }   /* all steps done — the whole steps chip reads green */
-    .steps-txt{ font-family:var(--font-mono); font-size:9px; font-weight:800; color:var(--muted); white-space:nowrap; flex:0 0 auto; }
-    .steps-txt.all{ color:var(--success); }
-    .fb-none{ font-size:9px; font-weight:700; font-style:italic; color:var(--muted-2); }
     .plan-dates b{ color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.02em; }
 
     /* doc editor — interactive left rail (line + section index) and the rendered body */
@@ -1636,7 +1550,7 @@
     .fb-mid{ display:flex; align-items:center; gap:var(--space-6); flex-wrap:wrap; row-gap:var(--space-3); margin:var(--space-5) 0 var(--space-4); }
     /* Authors rail card (.fb-card.au-card): reuses .fb-card / .fb-top / .sel-badge; its second row is a timestamp
        line (no verdict badge, no comment) — the clock glyph (.au-clk) is reused in the docked box entries too. */
-    .au-line{ display:flex; align-items:center; gap:var(--space-5); margin-top:var(--space-5); font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }
+    .au-line{ display:flex; align-items:center; justify-content:flex-end; gap:var(--space-5); margin-top:var(--space-5); font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--muted); }   /* timestamps right-align (DESIGN.md convention) */
     .au-line svg, .au-clk{ width:var(--size-11); height:var(--size-11); flex:0 0 auto; color:var(--muted); }
     .fb-card .fb-top{ align-items:center; }
     /* v9p13: keep row 1 (agent badge + thumbs) on ONE line in the narrow nav — the badge shrinks (ellipsis on a long role) instead of bumping the thumbs to a second row */
@@ -1652,9 +1566,6 @@
     .plan-foot-right{ display:flex; align-items:center; gap:var(--space-7); margin-left:auto; }
     .plan-foot-right > .btn,.plan-foot-right > .btn-main,.plan-foot-right > .btn-danger{ height:var(--size-30); }
 
-    /* doc toolbar control alignment */
-    .doc-toolbar{ align-items:center; }
-    .doc-cmt-slot{ display:inline-flex; }
 
     /* ============================ v9p14 — Plan nav resize/flush, footer strip, send-group alignment ============================ */
     /* A1+A6: the nav is a flex COLUMN that stretches to the text column's height (so it grows when the
@@ -1752,8 +1663,6 @@
     #prompt-history .rcard.sel, #feed-messages .rcard.sel{ background:var(--select); box-shadow:var(--shadow); transform:none; }   /* v9p1: --select selection fill (light teal), matches .node.selected */
     #prompt-history .rcard.sel:hover, #feed-messages .rcard.sel:hover{ transform:none; box-shadow:var(--shadow); }
 
-    /* ============================ v8p8 — Team Graph live turn count (health-colored, precedes the context bar) ============================ */
-    .node-turns{ font-size:8px; font-family:var(--font-mono); font-weight:700; white-space:nowrap; flex:0 0 auto; }
     /* v9p14 (A13): agent-card status bars — a leading label, the health-colored bar, then the inline value; turns + context aligned */
     .node-bars{ display:flex; flex-direction:column; gap:var(--space-4); }
     .nbar-row{ display:flex; align-items:center; gap:var(--space-6); }

@@ -105,7 +105,6 @@
   function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllPopups();if(!open)m.classList.add('open');}
   function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const l=menu.closest('.split').querySelector('.split-lbl');if(l){const base=mi.dataset.short||mi.querySelector('b').textContent;l.textContent=(l.dataset.prefix||'')+base;}menu.classList.remove('open');}
   function clearField(id){const el=document.getElementById(id);if(el){el.value='';if(el.classList.contains('autosize'))autosize(el);el.focus();}}
-  function clearInput(b){const i=b.closest('.tpl-fill,.in-wrap,div').querySelector('input,textarea');if(i){i.value='';i.focus();}}
   function copyField(id){const el=document.getElementById(id);if(el&&navigator.clipboard)navigator.clipboard.writeText(el.value||el.textContent||'').catch(()=>{});}
   function copyCard(b){const c=b.closest('.rcard');const x=c?c.querySelector('.rc-body,.rc-log'):null;if(x&&navigator.clipboard)navigator.clipboard.writeText(x.textContent||'').catch(()=>{});}
   function replyTo(name){switchTab('prompt','compose');const w=document.getElementById('prompt-targets');if(w){const cs=[...w.querySelectorAll('.agrow')];cs.forEach(c=>c.classList.remove('on'));const m=cs.find(c=>{const n=c.querySelector('.ag-name');return n&&n.textContent.trim()===name;});if(m){m.classList.add('on');m.scrollIntoView({block:'nearest'});}agSync(w);updateAgBadges(w);}const pc=document.getElementById('pPrompts');if(pc){pc.classList.add('reply-flash');setTimeout(()=>pc.classList.remove('reply-flash'),900);}const f=document.getElementById('compose-field');if(f)f.focus();}
@@ -191,7 +190,7 @@
   let assetSel='mockup-v9';
   /* A18: nav rows keep ONLY the Rename (pencil) ghost icon — the Delete (trash) ghost icon is removed (remove still
      available from the card footer). Rename works on images too, so it stays un-greyed. */
-  function navActsHTML(){return '<span class="docnav-acts"><button class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>';}
+  function navActsHTML(){return '<span class="docnav-acts"><button data-comp="ghost-icon-button" class="ghost-ic" title="Rename" onclick="navRename(event,this)"><i data-lucide="pencil"></i></button></span>';}
   /* A18: per-type file icon (lucide) by extension — doc vs image — replacing the doc-icon / gradient thumbnail */
   function fileTypeIcon(name){const ext=(name.split('.').pop()||'').toLowerCase();
     if(['png','jpg','jpeg','gif','webp','svg','bmp','tiff'].includes(ext))return 'file-image';
@@ -218,16 +217,16 @@
   /* P3 (#119): the Library "Editor" header for Plans + Documents — ghost Copy·Edit·Comment, right-aligned,
      reusing Compose's ghost icon-buttons. Assets gets no header (an image isn't text-editable). */
   function editHeadHTML(copyClick,editClick,cmtHost,editCls,micField){return '<div data-comp="editor-header" data-variants="rec" class="lib-edit-head"><span class="lib-edit-lab">Editor</span>'
-    +'<button class="ghost-ic editor-mic" data-micfield="'+(micField||'')+'" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button>'
+    +'<button data-comp="ghost-icon-button" class="ghost-ic editor-mic" data-micfield="'+(micField||'')+'" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button>'
     +'<span class="flex-1"></span>'
-    +'<button class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
-    +'<button class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
-    +'<button class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
+    +'<button data-comp="ghost-icon-button" class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
+    +'<button data-comp="ghost-icon-button" class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
+    +'<button data-comp="ghost-icon-button" class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
   /* L1: libFootHTML now serves ASSETS only — the Documents footer became the FULL planFootHTML (Export · Reviewer chip ·
      Revise·Reject·Approve, same as Plans). Assets keep the plain Export + Remove footer (an image is whole-file, so only
      Attach is enabled on it; no Review chip / Revise). The old doc-footer branch + its docRevise are retired. */
   function libFootHTML(host,kind){return expMenuHTML(host)+'<span class="flex-1"></span>'
-      +'<button class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
+      +'<button data-comp="icon-button" class="icon-btn icon-btn--danger" onclick="libRemove(\''+host+'\',\''+kind+'\')" title="Remove"><i data-lucide="trash-2"></i></button>';}
   function libCopy(host,kind){if(kind==='asset'){const a=ASSETS.find(x=>'asset-'+x.id===host);if(a){if(navigator.clipboard)navigator.clipboard.writeText(a.path).catch(()=>{});toast('Copied '+a.name+' path');}return;}copyField(host+'-edit');toast('Copied');}
   function libRemove(host,kind){if(kind==='asset'){const id=host.replace('asset-','');const i=ASSETS.findIndex(x=>x.id===id);if(i<0)return;const nm=ASSETS[i].name;ASSETS.splice(i,1);if(assetSel===id)assetSel=ASSETS.length?ASSETS[0].id:'';renderAssets();toast('Removed '+nm);return;}
     const i=DOCS.findIndex(d=>d.id===host);if(i<0)return;const nm=DOCS[i].file;DOCS.splice(i,1);renderDocs();toast('Removed '+nm);}   /* L1: docs live in DOCS now (the Remove button itself is dropped from the doc footer; this stays for nav-delete/programmatic use) */
@@ -865,7 +864,7 @@
     if(foot.querySelector('.foot-confirm'))return;
     const btns=[...foot.querySelectorAll('button')];btns.forEach(b=>b.style.display='none');
     const restore=()=>{c.remove();btns.forEach(b=>b.style.display='');};
-    const c=document.createElement('div');c.className='tl-confirm foot-confirm'+(opts.danger?' foot-confirm--danger':'');c.style.display='flex';c.style.width='100%';c.style.alignItems='center';c.style.gap='var(--space-8)';
+    const c=document.createElement('div');c.className='tl-confirm foot-confirm'+(opts.danger?' foot-confirm--danger':'');c.setAttribute('data-comp','inline-confirm');c.style.display='flex';c.style.width='100%';c.style.alignItems='center';c.style.gap='var(--space-8)';
     c.innerHTML='<span>'+opts.msg+'</span>';
     const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=restore;
     const go=document.createElement('button');go.className=opts.goClass+' btn-sm';go.innerHTML=opts.goLabel;go.onclick=()=>{restore();opts.onGo();};
@@ -918,7 +917,7 @@
   function fmtGroupHTML(id,si,gi,g){
     let body;
     if(g.kind==='seg'){
-      body='<div class="seg">'+g.opts.map(o=>'<button class="'+(g.sel===o?'active':'')+'" onclick="pickFmtSeg(\''+id+'\','+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
+      body='<div data-comp="segmented-control" class="seg">'+g.opts.map(o=>'<button class="'+(g.sel===o?'active':'')+'" onclick="pickFmtSeg(\''+id+'\','+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
     }else{
       body='<div class="fmt-grid c'+(g.cols||2)+'">'+g.opts.map(o=>'<button class="tog-cell'+(g.sel.indexOf(o)>=0?' on':'')+'" onclick="toggleFmtCell(\''+id+'\','+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
     }
@@ -1336,7 +1335,7 @@
       ? `<span data-comp="connector-health-badge" class="hbadge hb-conn"><span class="hd" style="background:var(--success)"></span>Open</span>`
       : (p.running ? `<span data-comp="connector-health-badge" class="hbadge hb-warn">Agents running</span>` : '');
     const action = isOpen ? '' :
-      `<button class="btn-secondary btn-sm" onclick="projOpen(${i})" ${projOpenIdx!==null?'disabled title="One project at a time — close the current project first."':''}><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button>`;
+      `<button data-comp="button" class="btn-secondary btn-sm" onclick="projOpen(${i})" ${projOpenIdx!==null?'disabled title="One project at a time — close the current project first."':''}><i data-lucide="folder-open" class="w-3 h-3"></i>Open</button>`;
     return `<div data-comp="registry-row" data-variants="proj-flash" class="reg-row${isOpen?' proj-open':''}${projFlashIdx===i?' proj-flash':''}">`
       +`<div class="reg-main"><div class="reg-name">${p.name}</div><div class="reg-meta">${p.path} · ${projAgentsLabel(p)} · last opened ${p.last}</div></div>`
       +`<div class="reg-rt">${badge}${action}</div></div>`;
@@ -1597,7 +1596,7 @@
     const items=list.filter(f=>f.sec===sec);
     /* L3 (5b): row-1 order is badge · verdict · thumbs · spacer · timestamp (the time pins right). L3 (5c): each
        row is click-to-select (toggleBoxSel) → the merged Export control can Embed/Copy the picked comment(s). */
-    pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
+    pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length===1?'':'s')+'</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
         return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+verdictBadgeHTML(f.verdict)+thumbsHTML()+'<span class="flex-1"></span><span class="cph-time">'+(f.time||'')+'</span></div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -1612,13 +1611,13 @@
   /* L3 (5a): each author-box row uses the comment-box layout grammar minus the thumbs — row 1 = agent badge + a
      Drafted/Edited/Revised action badge (a neutral .dbadge variant, .au-act) + the timestamp right-aligned; row 2 =
      the edit summary (wraps). L3 (5c): rows are click-to-select (toggleBoxSel) so an edit can be embedded in a prompt. */
-  function authorActionBadge(action){return '<span class="dbadge au-act">'+esc(action||'Edited')+'</span>';}
+  function authorActionBadge(action){return '<span data-comp="lifecycle-badge" class="dbadge au-act">'+esc(action||'Edited')+'</span>';}
   function openAuthorPop(host,sec){const list=getAuthors(host);const pop=popFor(host);if(!pop)return;
     dropBoxSel(host);   /* L3-panel fix: same stale-box drop as openCmtPop */
     /* L3: key ''/null to the ONE document-wide group (L2's {sec:null} draft seed) — navCardClick passes '' for it;
        the header then reads "Whole document" (the title-cell register) rather than an empty "§" badge. */
     const items=list.filter(f=>(f.sec||'')===(sec||''));const secLab=sec?('§ '+esc(sec)):'Whole document';
-    pop.innerHTML='<div class="cmt-pop-head"><span class="cph-ic"><i data-lucide="users"></i></span><span class="sel-badge">'+secLab+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' edit'+(items.length===1?'':'s')+'</span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
+    pop.innerHTML='<div class="cmt-pop-head"><span class="cph-ic"><i data-lucide="users"></i></span><span class="sel-badge">'+secLab+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' edit'+(items.length===1?'':'s')+'</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
         return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+authorActionBadge(f.action)+'<span class="flex-1"></span><span class="cph-time cph-time--clk"><i data-lucide="clock" class="au-clk"></i>'+(f.time||'')+'</span></div>'+(f.summary?'<div class="cpi-txt">'+esc(f.summary)+'</div>':'')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -1633,10 +1632,10 @@
   /* user comment composer — opens in the same popout for the current line/section selection */
   function openComposer(host,verdict){const sel=SELby[host];if(!sel||sel.kind==='box'){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;   /* L3 (5c): a popover box selection isn't a line/section to comment on */
     deselectNavCards(host);clearFbHL(host);   /* composing is a separate flow from viewing existing feedback */
-    pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
+    pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:var(--space-2)">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
       +'<textarea class="in cmt-ta" oninput="syncCommentSave(\''+host+'\')" placeholder="Add a comment or tags…"></textarea>'
-      +'<div class="cmt-foot"><span class="cmt-req"></span><span class="flex-1"></span><button class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button class="btn-main btn-sm cmt-save" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
+      +'<div class="cmt-foot"><span class="cmt-req"></span><span class="flex-1"></span><button data-comp="button" class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button data-comp="button" class="btn-main btn-sm cmt-save" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
     pop.classList.add('open');LU();syncCommentSave(host);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   /* L2 (f): a revise/block verdict REQUIRES a non-empty comment — keep Save disabled (+ a hint) until the note
      is typed; approve stays comment-optional. Re-run on every keystroke and on a verdict switch. */
@@ -1873,7 +1872,7 @@ Short-lived notes for the current run — kept brief on purpose.
      wraps (Approve drops to its own line, still right-aligned) so nothing clips at narrow widths. */
   function planFootHTML(p){let right;
     if(p.status==='approved')right='<span class="text-[9px] font-bold font-mono" style="color:var(--success)">Approved 14:09</span>';
-    else right='<button class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
+    else right='<button data-comp="button" class="btn-secondary" onclick="planAct(\'revise\',\''+p.id+'\')" title="Send the flagged sections back to the agent to revise"><i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>Revise</button><button data-comp="button" class="btn-danger" onclick="planAct(\'reject\',\''+p.id+'\')"><i data-lucide="x" class="w-3.5 h-3.5"></i>Reject</button><button data-comp="button" class="btn-main" onclick="planAct(\'approve\',\''+p.id+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Approve</button>';
     return '<div class="plan-foot">'   /* item 10: [Export][reviewer chip] left · [Revise·Reject·Approve] right */
       +expMenuHTML(p.id)+reviewChipHTML(p.id)
       +'<div class="plan-foot-right">'+right+'</div></div>';}
@@ -1894,7 +1893,7 @@ Short-lived notes for the current run — kept brief on purpose.
     const rawTa='<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>';
     return '<div data-comp="plan-card" data-variants="flash" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" data-variants="sent" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
+      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" data-variants="sent au-act" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
       +'<div class="plan-row r2"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
       +'<div class="plan-body">'   /* A4 bullet 1: editHeadHTML moved INSIDE .plan-main (below) so the Editor header sits over the editor box only; the Outline/Feedback/Authors nav rail rises full-height (Documents-style) */
@@ -2071,10 +2070,10 @@ Short-lived notes for the current run — kept brief on purpose.
     +'<span data-comp="lifecycle-badge" class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,false)
     +'<i data-lucide="arrow-right" style="width:var(--size-12);height:var(--size-12);color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
     +'<span class="flex-1"></span>'+attTrigHTML(o)+'</button>'
-    +'<button class="ghost-ic" onclick="event.stopPropagation();histAct(\'edit\')" title="Edit in Compose"><i data-lucide="square-pen"></i></button>'
+    +'<button data-comp="ghost-icon-button" class="ghost-ic" onclick="event.stopPropagation();histAct(\'edit\')" title="Edit in Compose"><i data-lucide="square-pen"></i></button>'
     /* Next-up item 5: prompts that haven't run yet (status not Active/Complete — Queued/Next/Held) carry a
        danger trash ghost right after Edit, so a prompt can be deleted before it ever runs. */
-    +(o.badge!=='db-active'&&o.badge!=='db-complete'?'<button class="ghost-ic ghost-ic--danger" onclick="event.stopPropagation();histDelete(this)" title="Delete prompt (not yet run)"><i data-lucide="trash-2"></i></button>':'')
+    +(o.badge!=='db-active'&&o.badge!=='db-complete'?'<button data-comp="ghost-icon-button" class="ghost-ic ghost-ic--danger" onclick="event.stopPropagation();histDelete(this)" title="Delete prompt (not yet run)"><i data-lucide="trash-2"></i></button>':'')
     +'<span class="fcard-time">'+o.time+'</span>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
@@ -2306,15 +2305,15 @@ Short-lived notes for the current run — kept brief on purpose.
     {ag:'system',type:'error',subtype:'Infrastructure',time:'14:50',title:'tmux bridge unreachable — agent control suspended',body:`The sidecar lost the tmux/WSL2 bridge (connect timeout after 3 retries) — run control, sends, and reads are suspended fleet-wide until the bridge is back. One System card stands in for 13 identical per-agent errors.`,cmd:'wsl.exe -d Ubuntu -- tmux ls'},   /* Next-up item 15: a SYSTEM-WIDE failure fronts the reserved System identity (infrastructure / account-level / shared services). Reply renders DISABLED — greyed, not removed (the Export-menu convention): System is never addressable. No graph card exists, so there's no node-inbox envelope mirror. */
     {ag:'kai',type:'response',time:'14:49',runs:2,title:'Run ended — final reply not yet reviewed',body:`kai's last 2 runs ended with replies you haven't reviewed — latest: the remediation-plan synthesis (Turn 14). View jumps to the run's final reply in Messages, scoped to kai; Reply quotes it in the Editor. Either completes this item; it also clears on Retire/Delete — never on a glance.`}   /* Next-up item 14: the Response demo — kai's graph card stays plain IDLE (no fifth badge state) while his node-inbox envelope counts this like a Warning. runs:2 = two unseen runs COALESCED into the one card (the ×2 runs marker), never stacked. */
   ];
-  function inboxReplyHTML(dis){return '<button class="btn-secondary btn-sm ml-auto"'+(dis?' disabled':'')+' onclick="inboxReply(this)" title="'+(dis?'Reply is unavailable — System isn\'t addressable':'Reply via the Editor (quotes the request as a reference block)')+'"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. Item 15: dis=true on a System Error card — DISABLED, greyed not removed (the Export-menu convention). */
+  function inboxReplyHTML(dis){return '<button data-comp="button" class="btn-secondary btn-sm ml-auto"'+(dis?' disabled':'')+' onclick="inboxReply(this)" title="'+(dis?'Reply is unavailable — System isn\'t addressable':'Reply via the Editor (quotes the request as a reference block)')+'"><i data-lucide="send-horizontal" class="w-3 h-3"></i>Reply</button>';}   /* Reply = teal hand-off → the Editor, pre-filled with a frozen embed block of this card + the agent pre-targeted. R11 item 2: the old 2px navy divider before Reply was dropped; ml-auto on the button preserves its right-alignment. Item 15: dis=true on a System Error card — DISABLED, greyed not removed (the Export-menu convention). */
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:var(--font-mono)">'+esc(o.cmd)+'</div>';
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
+      acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
     else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plans & Docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
       const isDoc=o.plan&&o.plan.indexOf('doc-')===0;
-      acts='<button class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+      acts='<button data-comp="button" class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
-      acts='<button class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
+      acts='<button data-comp="button" class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
     else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
       /* Warning simplified per user: a Warning is a plain FYI — the cap-specific actions (Continue / Raise cap / Stop)
          and the generic Acknowledge are ALL gone, so a Warning carries no warning-specific dependency. Just two actions:
@@ -2324,17 +2323,17 @@ Short-lived notes for the current run — kept brief on purpose.
            · Reply — the shared teal hand-off every card carries (never completes the item).
          Warnings are notify-only and never hard-block: the run-state badge stays active and the run-strip keeps
          shimmering (only Permission/Plan/Decision/max-turns pause). */
-      acts='<button class="btn-main btn-sm" onclick="inboxResolve(this,\'Dismissed\')" title="Dismiss this warning (clears it from the Inbox)">Dismiss</button>'+inboxReplyHTML();}
+      acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxResolve(this,\'Dismissed\')" title="Dismiss this warning (clears it from the Inbox)">Dismiss</button>'+inboxReplyHTML();}
     else if(o.type==='response'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
       /* Next-up item 14: Response — the lone non-blocking card (a run ended with output the user hasn't
          reviewed). View (pink — this card's completion action, like the Warning's Dismiss) jumps to Team Feed →
          Messages scoped to the agent + flashes the run's final reply, and COMPLETES the item; the shared Reply
          ALSO completes here (inboxReply special-cases response). No Dismiss; no read-tracking. */
-      acts='<button class="btn-main btn-sm" onclick="inboxView(this)" title="View — jump to the run\'s final reply in Messages (completes this item)"><i data-lucide="eye" class="w-3 h-3"></i>View</button>'+inboxReplyHTML();}
+      acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxView(this)" title="View — jump to the run\'s final reply in Messages (completes this item)"><i data-lucide="eye" class="w-3 h-3"></i>View</button>'+inboxReplyHTML();}
     else{detail='<div class="rc-body inbox-err">'+esc(o.body)+'</div>';   /* Error: inline error text + Retry · Dismiss · Reply (no View, no Forward). Item 15: on a SYSTEM error card Reply is disabled — greyed, not removed. */
-      acts='<button class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML(!!a.system);}
+      acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML(!!a.system);}
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
-    const runs=(o.type==='response'&&o.runs>1)?'<span class="inbox-runs" title="'+o.runs+' unseen runs coalesced — a new unseen run updates this card, never stacks">×'+o.runs+' runs</span>':'';   /* item 14: the coalesce marker */
+    const runs=(o.type==='response'&&o.runs>1)?'<span data-comp="inbox-runs-chip" class="inbox-runs" title="'+o.runs+' unseen runs coalesced — a new unseen run updates this card, never stacks">×'+o.runs+' runs</span>':'';   /* item 14: the coalesce marker */
     const _inboxComp={error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card';
     return '<div data-comp="'+_inboxComp+'" data-variants="reply-flash" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
       +'<div class="fcard-head">'
@@ -2350,7 +2349,7 @@ Short-lived notes for the current run — kept brief on purpose.
   function renderInbox(){const el=document.getElementById('inbox-list');if(el){
       let html='';INBOX_SECTIONS.forEach(sec=>{const items=REQS.filter(r=>r.type===sec.type);if(!items.length)return;
         html+='<div data-comp="inbox-section" class="inbox-sec inbox-sec--'+sec.type+' open">'
-          +'<button class="inbox-sec-head" onclick="toggleInboxSec(this)" title="Collapse / expand this section"><i data-lucide="chevron-down" class="inbox-sec-chev"></i><span class="inbox-sec-lab">'+sec.lab+'</span><span class="inbox-sec-n">'+items.length+'</span></button>'
+          +'<button class="inbox-sec-head" onclick="toggleInboxSec(this)" title="Collapse / expand this section"><i data-lucide="chevron-down" class="inbox-sec-chev"></i><span class="inbox-sec-lab">'+sec.lab+'</span><span data-comp="count-square" class="inbox-sec-n">'+items.length+'</span></button>'
           +'<div class="inbox-sec-cards">'+items.map(o=>inboxCardHTML(o,REQS.indexOf(o))).join('')+'</div></div>';});
       el.innerHTML=html;LU();}refreshInbox();}
   function toggleInboxSec(btn){const s=btn.closest('.inbox-sec');if(s)s.classList.toggle('open');LU();}
