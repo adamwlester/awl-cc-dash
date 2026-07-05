@@ -322,6 +322,14 @@ Files: design/mockup.html, design/behavior.js, DEVLOG.md
 
 ---
 
+### 2026-07-05 06:35:00 — variant sweep stage 2: the auto-generated states page (design/states.html)
+
+New [design/states.html](design/states.html) — the dev-tooling page that renders every declared `data-variants` state beside its component's default, replacing the retired gallery's one legitimate job with something that structurally cannot drift: everything on it is derived at load time (the real mockup boots in an off-screen iframe and the live DOM is walked for `data-comp`/`data-variants` — the label-overlay completeness property — plus a behavior.js source-text scan that picks up declarations whose builders never run at boot, e.g. toast and the verdict dropdown; zero per-component content lives in the file). State names map to renderings via generic rules only — harvest a real live twin from the booted DOM, family-modifier swap or additive add, compound-evidenced or standalone class add (standalone marked APPROXIMATE), `disabled` attribute, value-clear, and one commented health-token recipe for the success/warning/danger family — each specimen captioned with the exact mapping used, one-shot animations getting a replay button, and an **effectiveness check** (a mapping counts only if a stylesheet rule mentioning the class actually matches the mapped clone) that demotes silently-identical renders to the loud red UNRENDERED placeholders. Current honest tally: 42 declared components · 68 states → 43 rendered · 8 approximate · **17 unrendered** (the 5 boot-absent builder slugs' 9 states plus 8 child-composed/builder-content states like the markdown-row gutter badges and identity-badge's sub form) — the gap list renders on the page and is exposed as `window.__statesReport` for the stage-3 lint to consume. Same dev-tooling class as the overlays: outside the five-file design system, exempt from propagation (linking the real tokens.css/styles.css to render specimens faithfully, per the run prompt); serve `design/` over localhost (ui-verify) since the iframe needs same-origin. Verified headed via ui-verify: page generates cleanly (only the known favicon 404), spot-checked against the archive snapshot — the run-strip ramp reproduces the gallery specimen spread, settings-note `warn` matches the dashed warning banner, button renders all seven tiers, agent-tile harvests the real user/system/me tiles — screenshots + the machine-readable report in `.scratch/variant-sweep/`.
+
+Files: design/states.html (new), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
