@@ -475,6 +475,13 @@ Files: design/tokens.css, design/styles.css, design/DESIGN.md, DEVLOG.md
 
 ---
 
+### 2026-07-05 08:25:00 — docs: logged the external-context Import feature (ARCHITECTURE §11.3 #29)
+
+Captured the dashboard-integration idea for the `claude-context-extractor` scripts as a Feature-backlog item, at the operator's request to document (not build) it. New **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §11.3 #29, "Import external Claude context"**: wrap the two working extractors behind a sidecar import module + a thin frontend Import control — one engine, one selectable destination (agent-to-agent prompt-queue/Inbox inject · operator-facing read panel · Library doc) — deliberately distinct from §8.6's own-transcript policy. Homed in the ARCHITECTURE build backlog (not `design/`, which the repo keeps backlog-free); given the next free backlog ID (#29 — IDs are cross-referenced, so appended rather than inserted-and-renumbered). Recorded inline as operator's-call opens: destination order (default agents-first) and which panel owns the Import button. Not built — flagged not critical.
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
