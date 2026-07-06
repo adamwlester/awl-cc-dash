@@ -1,15 +1,16 @@
 # claude-context-extractor
 
-Two stdlib-only Python exporters that capture full Claude conversations — including the parts ordinary exporters drop (tool calls, tool results, thinking, citations, artifacts) — as clean Markdown, so external Claude context can be handed to another session.
+Three stdlib-only Python exporters that capture full assistant conversations — including the parts ordinary exporters drop (tool calls, tool results, thinking, citations, artifacts) — as clean Markdown, so context from an outside session can be handed to another one. Two cover Claude (claude.ai web + the Claude desktop app); the third covers the **OpenAI Codex CLI**.
 
 | Script | Source | Access | Default output |
 |--------|--------|--------|----------------|
 | [`extract-web.py`](extract-web.py) | **claude.ai** (web) conversations | network + `sessionKey` cookie | `<repo>/transcripts/web/` |
 | [`extract-desktop.py`](extract-desktop.py) | **Claude desktop app** local-agent-mode sessions | local disk only — no network, no auth | `<repo>/transcripts/desktop/` |
+| [`extract-codex.py`](extract-codex.py) | **OpenAI Codex CLI** sessions | local disk only — no network, no auth | `<repo>/transcripts/codex/` |
 
 The third transcript surface, `<repo>/transcripts/cli/` (Claude Code CLI sessions), is not covered here — the **claude-history-viewer** VS Code extension exports those directly (its export dir is set in `.vscode/awl-cc-dash.code-workspace`).
 
-Both scripts share one convention, matching that extension's filenames: exports are named `claude-<session-date>-<title-slug>` (lowercase slug, max 50 chars). A stats sidecar `<name>.summary.md` (message/tool/thinking counts, timing, token estimate) is written **only** when `--summary` is passed. Override the output folder with `--out <dir>`. The whole `transcripts/` tree is gitignored — personal data never gets committed.
+All three share one convention, matching that extension's filenames: exports are named `<source>-<session-date>-<title-slug>` (lowercase slug, max 50 chars) — the Claude exporters prefix `claude-`, `extract-codex.py` prefixes `codex-`. A stats sidecar `<name>.summary.md` (message/tool/thinking counts, timing, token count) is written **only** when `--summary` is passed. Override the output folder with `--out <dir>`. The whole `transcripts/` tree is gitignored — personal data never gets committed.
 
 When an export finishes, the readable transcript `.md` (and the `.summary.md`, when written) opens as a tab in your running VS Code window — via the `code` CLI, the same convenience the claude-history-viewer extension gives — so you can grab the path and read it immediately. The bulky raw `.source.json` and any artifacts folder are left closed. Pass `--no-open` to skip it (batch/headless runs); if `code` isn't on PATH the export still completes and just prints a "skipped auto-open" note.
 
@@ -25,6 +26,25 @@ python dev/tools/claude-context-extractor/extract-desktop.py --session local_62d
 ```
 
 Escape hatches: `--no-open` skips opening the export in VS Code; `--root <dir>` if sessions live somewhere non-standard; `--transcript <file.jsonl>` (optionally + `--config <file.json>`) renders one transcript directly.
+
+## extract-codex.py — OpenAI Codex CLI sessions (no setup)
+
+The Codex CLI stores every session as a JSONL "rollout" file under `~/.codex/sessions/YYYY/MM/DD/` (archived chats move to `~/.codex/archived_sessions/`), and keeps `~/.codex/session_index.jsonl` mapping each session's uuid to its **thread name** — the human title Codex shows ("Review subagent messaging", "Implement live bridge tests"). That thread name is what `--name` matches, so you pull a session by the title you actually remember. Local disk only — no network, no auth. Run these from the repo root:
+
+```
+python dev/tools/claude-context-extractor/extract-codex.py --list                             # your chats, by thread name
+python dev/tools/claude-context-extractor/extract-codex.py --name "Review subagent messaging"  # export by title
+python dev/tools/claude-context-extractor/extract-codex.py --name "subagent" --summary         # + stats sidecar
+python dev/tools/claude-context-extractor/extract-codex.py --session 019f2e37                   # by uuid (full / prefix / suffix)
+python dev/tools/claude-context-extractor/extract-codex.py --list --all                         # incl. internal subagent sessions
+```
+
+By default `--list` / `--name` show your real chats and hide Codex's internal `guardian` subagent sessions (approval-checkers with no thread name); `--all` includes them. Escape hatches: `--no-open` skips opening in VS Code; `--root <dir>` (or `$CODEX_HOME`) if Codex lives somewhere non-standard; `--transcript <file.jsonl>` renders one rollout directly.
+
+Three things differ from the Claude exporters, by nature of what Codex records on disk:
+- **Reasoning is usually encrypted**, so thinking rarely renders — a reasoning block shows only when Codex stored a plaintext summary. Messages, tool calls, and patches render fully.
+- **Token counts are exact** — Codex logs real per-turn usage, so `--summary` reports the true total, not an estimate.
+- **No model id** is recorded (only the provider + CLI version), so the header shows those.
 
 ## extract-web.py — claude.ai conversations (needs your sessionKey)
 
