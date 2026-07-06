@@ -490,6 +490,29 @@ Files: design/mockup.html, design/behavior.js, design/styles.css, design/DESIGN.
 
 ---
 
+### 2026-07-05 19:30:00 — new: extract-codex.py — import Codex CLI sessions by name
+
+Third sibling to the two Claude extractors: [dev/tools/claude-context-extractor/extract-codex.py](dev/tools/claude-context-extractor/extract-codex.py) exports an **OpenAI Codex CLI** session to Markdown from `~/.codex` (`$CODEX_HOME`), local-disk-only, mirroring [extract-desktop.py](dev/tools/claude-context-extractor/extract-desktop.py)'s UX (`--list` / `--name` / `--session` / `--summary` / `--out` / `--no-open` / `--transcript`, auto-open in VS Code, `codex-<date>-<slug>.md` naming, default out `transcripts/codex/`). **The import-by-name hook** is Codex's `session_index.jsonl` (uuid → thread name), so `--name "Review subagent messaging"` just works; it dedupes the index's stale rename twins (newest wins), and by default lists real chats while hiding internal `guardian` subagent sessions (`--all` includes them). Renders real user/assistant turns + tool calls/outputs (shell, apply_patch), strips the system prompt / `<environment_context>` / permission scaffolding and Codex's redundant event-msg mirror stream, and caps giant tool dumps (a 36 MB / 102-line session rendered to 23 KB in 0.75 s). Codex-specific honesty surfaced in header + docs: reasoning is encrypted on disk (renders only when a plaintext summary exists), token counts are exact (logged per-turn), no model id is recorded (shows provider + cli version). Fixed one bug found by driving it: `--session` matched only `endswith`, but Codex's time-ordered UUIDv7 ids are referenced by prefix — now matches full/prefix/suffix. Live-verified: `--list` (21 chats) + `--list --all` (25, subagents tagged), by-name and by-session-prefix exports, auto-open fired, bogus-name + ambiguous-prefix error paths clean, `py_compile` + Pyright clean. Docs synced: README gains a source-table row + a full Codex section; CLAUDE.md's extractor blurb goes 2→3 and `transcripts/codex/` joins the folder map.
+Files: dev/tools/claude-context-extractor/extract-codex.py (new), dev/tools/claude-context-extractor/README.md, CLAUDE.md, DEVLOG.md
+
+---
+
+### 2026-07-05 21:03:37 — assets: agent-names.json — curated the pool 244 → 179, committed the file
+
+Ran the planned curation weed on `assets/names/agent-names.json`: removed 65 weak / confusable / name-risk names across all three themed wings (cursed-cute, astral-disco, jazz-noir), landing a tighter 179-name cast — the reasoning being that past ~180 the shuffle's value is recognizability, not raw count. Every survivor re-validated by script (lowercase `[a-z]`, 3–5 letters, unique, no human first names — they double as commit-author names). Committed the names file on its own — a clean 244 → 179 (65 deletions, no additions), since the jazz-noir wing turned out to already be committed by an earlier concurrent flush, so this commit is purely the curation weed. This DEVLOG entry is intentionally left uncommitted to flush with the next shared-log commit, since DEVLOG.md currently also carries another session's pending Codex-extractor entry that isn't mine to commit.
+
+Files: assets/names/agent-names.json
+
+---
+
+### 2026-07-05 21:20:00 — archive: retired 7 old ui-spikes → archive/design/ui-spikes-2026-07-05 (self-contained)
+
+Moved the 7 June-created UI proof-of-concept spikes out of `.scratch/ui-spikes/` into a tracked, self-contained folder [archive/design/ui-spikes-2026-07-05/](archive/design/ui-spikes-2026-07-05/) — carries its own `tokens.css` copy + a README, and each file's link was repointed to that local `tokens.css` so they render standalone (matches the `archive/design/<snapshot>` self-contained convention). Archived: agent-card, context-dropdown, messages-card, plans-editor-rail, response-popover, turns-dropdown, user-icon-options. Kept live in `.scratch/ui-spikes/` (recent 07-02→07-05 + active concurrent work): authors-lens, projects-tab, and the newer dash_nav_tabs / library-hub / media-canvas / status-rail / trackers-tab spikes.
+
+Files: archive/design/ui-spikes-2026-07-05/ (new — 7 spikes + tokens.css + README)
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

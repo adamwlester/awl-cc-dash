@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Response popover — design exploration</title>
+
+<!--
+  AWL Dashboard · UI snippet — "ideal" Response settings popover
+  ================================================================
+  A standalone exploration of the Compose-footer Response popover
+  (mockup.html #fmt / #fmt-menu). NOT wired into the mockup; this is a
+  design sketch to react to. Values come from ../tokens.css (single source).
+
+  What changed vs. the current popover, and why:
+   • WIDER — 340px (was 268) so segmented controls have room.
+   • BUTTON GROUPS — two patterns, chosen by semantics (both already used
+     elsewhere in the UI):
+       – Ordered / single-select axes  → .seg segmented control (like Effort/Mode).
+         A connected bar reads as a gradient: pick exactly one.
+       – Independent / multi-select axes → .tog-cell toggle grid (like the
+         Fast-Mode / Thinking-Mode toggles). Independent on/off, any number lit,
+         and it tolerates long labels a 5-up segmented bar can't.
+   • GRADED OPTIONS — binary toggles become real dials
+       Length: Terse·Brief·Standard·Detailed·Exhaustive
+       Altitude: High-level·Balanced·Low-level   Register: Technical·Mixed·Plain
+   • TWO SECTIONS — STYLE (how it reads) vs BEHAVIOR (how it works), so the new
+     behavioral levers don't read as "just another format tweak".
+   • NEW: PACE — push variable deliberation INDEPENDENT of the agent's Effort
+     tier. Effort = how much the model *can* think (token budget, per-agent).
+     Pace = how hard to work on *this* reply (verify / iterate / hedge), injected
+     per-prompt. They compose: High effort + Snap, or Low effort + Deep.
+   • NEW: REASONING SHOWN — what's surfaced in the answer (distinct from Pace).
+   • BADGE counts OVERRIDES (axes changed from default), not raw selections —
+     more meaningful now that graded axes always hold a value.
+-->
+
+<link rel="stylesheet" href="tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh; font-family:'Archivo',sans-serif; font-weight:500;
+    color:var(--foreground); background:var(--background);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    padding:28px 24px 0;
+  }
+
+  /* page chrome (context only — not part of the popover) */
+  .caption{ max-width:560px; text-align:center; margin-bottom:auto; }
+  .caption h1{ font-family:'Archivo'; font-weight:900; font-size:17px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .caption p{ font-size:12px; line-height:1.5; color:var(--muted); margin:0; }
+  .caption code{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--foreground); }
+
+  /* faux compose footer so the popover sits in context (mirrors the real anchor) */
+  .footer-bar{
+    width:100%; max-width:760px; display:flex; align-items:center; gap:10px;
+    padding:10px 12px; margin-bottom:34px;
+    background:var(--surface-3); border:2px solid var(--border);
+    border-radius:var(--radius-base); box-shadow:var(--shadow);
+  }
+  .footer-bar .spacer{ flex:1; }
+  .footer-bar .fake-input{
+    flex:1; height:30px; display:flex; align-items:center; padding:0 10px;
+    background:var(--secondary-background); border:2px solid var(--border);
+    border-radius:var(--radius-base); color:var(--muted-2); font-size:11px;
+  }
+  .footer-bar .send{
+    height:30px; padding:0 13px; display:inline-flex; align-items:center; gap:6px;
+    background:var(--main); color:var(--main-foreground); border:2px solid var(--border);
+    border-radius:var(--radius-base); box-shadow:var(--shadow-sm); font-weight:800; font-size:11px; cursor:pointer;
+  }
+
+  /* ===== Response trigger (from mockup .fmt / .fmt-btn / .fmt-badge) ===== */
+  .fmt{ position:relative; display:inline-flex; }
+  .fmt-btn{ height:30px; display:inline-flex; align-items:center; gap:7px; padding:0 11px; border:2px solid var(--border); border-radius:var(--radius-base); background:var(--surface-btn); color:var(--foreground); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .07s, box-shadow .07s; }
+  .fmt-btn:hover{ transform:translate(2px,2px); box-shadow:none; }
+  .fmt-btn svg.ic{ width:14px; height:14px; } .fmt-btn .fmt-lbl{ font-size:11px; font-weight:800; } .fmt-btn svg.cv{ width:11px; height:11px; }
+  .fmt-badge{ display:none; min-width:16px; height:16px; padding:0 4px; border:2px solid var(--border); border-radius:3px; background:var(--secondary); color:var(--secondary-foreground); font-size:9px; font-weight:800; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; }
+  .fmt-btn.active .fmt-badge{ display:inline-flex; }
+
+  /* ===== Popover ===== */
+  .fmt-menu{ position:absolute; z-index:60; width:340px; max-width:calc(100vw - 24px); background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base); box-shadow:var(--shadow); padding:10px; display:none; }
+  /* right-anchored: grows leftward from the trigger (which sits at the right of the compose footer),
+     so a wider menu stays on-screen even when the Prompt panel is narrow. */
+  .fmt-menu.up{ bottom:calc(100% + 6px); } .fmt-menu.right{ right:0; }
+  .fmt-menu.open{ display:block; }
+
+  /* section bands (Style / Behavior) */
+  .fmt-section + .fmt-section{ margin-top:9px; padding-top:9px; border-top:2px solid var(--border); }
+  .fmt-sh{ display:flex; align-items:center; gap:6px; margin:0 1px 7px; }
+  .fmt-sh .lbl{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:900; color:var(--foreground); }
+  .fmt-sh .sub{ font-size:8px; font-weight:700; color:var(--muted-2); }
+  .fmt-sh svg{ width:12px; height:12px; color:var(--muted); }
+
+  /* one axis */
+  .fmt-group{ padding:4px 1px; }
+  .fmt-gh{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .fmt-gh .nm{ font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em; font-weight:800; color:var(--muted); }
+  .fmt-gh .mode{ font-size:7.5px; font-weight:700; color:var(--muted-2); text-transform:uppercase; }
+
+  /* segmented control (single-select, ordered) — from mockup .seg */
+  .seg{ display:flex; border:2px solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }
+  .seg button{ flex:1; min-width:0; padding:6px 2px; font-size:9.5px; font-weight:700; color:var(--muted);
+    background:transparent; border:none; border-right:2px solid var(--border); cursor:pointer; transition:all .1s;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:inherit; }
+  .seg button:last-child{ border-right:none; }
+  .seg button:hover:not(.active){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+  .seg button.active{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+
+  /* toggle grid (multi-select, independent) — SAME text + sizing as .seg buttons, just not connected
+     (each cell is its own bordered box; no caps, no shadow, matching weight/colour/hover). */
+  .fmt-grid{ display:grid; gap:6px; }
+  .fmt-grid.c2{ grid-template-columns:1fr 1fr; }
+  .fmt-grid.c3{ grid-template-columns:1fr 1fr 1fr; }
+  .tog-cell{ width:100%; padding:6px 6px; font-size:9.5px; font-weight:700; color:var(--muted);
+    background:var(--secondary-background); border:2px solid var(--border); border-radius:var(--radius-base);
+    cursor:pointer; transition:all .1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    text-align:center; font-family:inherit; }
+  .tog-cell:hover:not(.on){ color:var(--foreground); background:rgba(0,24,88,0.05); }
+  .tog-cell.on{ background:var(--secondary); color:var(--secondary-foreground); font-weight:800; }
+
+  /* the Pace note — flags that it's behavioral and independent of Effort */
+  .fmt-note{ margin-top:6px; font-size:8.5px; line-height:1.45; color:var(--muted); }
+  .fmt-note b{ color:var(--foreground); }
+
+  /* footer */
+  .fmt-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:9px; border-top:2px solid var(--border); }
+  .fmt-count{ font-size:9px; font-weight:700; color:var(--muted); }
+  .fmt-reset{ font-size:10px; font-weight:800; color:var(--warning); background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+  .fmt-reset:hover{ color:var(--link-hover); }
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    <h1>Response popover — ideal layout (design sketch)</h1>
+    <p>Standalone exploration for the Compose-footer <code>Response</code> menu. Segmented groups for ordered axes, toggle-grids for multi-select, graded options, a STYLE / BEHAVIOR split, and a new <code>Pace</code> dial independent of Effort. Click the trigger to open. Not wired into <code>mockup.html</code>.</p>
+  </div>
+
+  <div class="footer-bar">
+    <div class="fake-input">Compose a prompt…</div>
+
+    <!-- Response trigger + popover -->
+    <div class="fmt" id="fmt">
+      <button class="fmt-btn active" id="fmt-btn" onclick="toggleFmt()" title="Response settings">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/><circle cx="8" cy="6" r="2.2" fill="var(--secondary-background)"/><circle cx="16" cy="12" r="2.2" fill="var(--secondary-background)"/><circle cx="7" cy="18" r="2.2" fill="var(--secondary-background)"/></svg>
+        <span class="fmt-lbl">Response</span>
+        <span class="fmt-badge" id="fmt-badge">0</span>
+        <svg class="cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="fmt-menu up right open" id="fmt-menu"></div>
+    </div>
+
+    <button class="send">Send
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+
+<script>
+  // icons (inline so the snippet is offline-portable)
+  const ICON_GAUGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>';
+  const ICON_TYPE  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+
+  // axis model — sel holds the live value, def the default (for the override count)
+  const SECTIONS = [
+    { name:'Style', sub:'how it reads', icon:ICON_TYPE, groups:[
+      { nm:'Length',    kind:'seg',  opts:['Terse','Brief','Standard','Detailed','Exhaustive'], def:'Standard', sel:'Standard' },
+      { nm:'Altitude',  kind:'seg',  opts:['High-level','Balanced','Low-level'],                def:'Balanced', sel:'Balanced' },
+      { nm:'Register',  kind:'seg',  opts:['Technical','Mixed','Plain'],                         def:'Mixed',    sel:'Mixed' },
+      { nm:'Structure', kind:'grid', cols:3, opts:['TL;DR','Numbered','Bullets','Tables','Prose'], def:['Bullets'], sel:['Bullets'] },
+      { nm:'Emphasis',  kind:'grid', cols:2, opts:['Lead with answer','Cite sources','Skip hedging','Surface assumptions','Give tradeoffs'], def:[], sel:[] },
+    ]},
+    { name:'Behavior', sub:'how it works', icon:ICON_GAUGE, groups:[
+      { nm:'Pace', kind:'seg', opts:['Snap','Quick','Standard','Careful','Deep'], def:'Standard', sel:'Standard',
+        note:'<b>Independent of the agent’s Effort tier.</b> Effort = how much the model can think; Pace = how hard to work on this reply (verify, iterate, weigh options) before answering.' },
+      { nm:'Reasoning shown', kind:'seg', opts:['Hidden','Key steps','Full'], def:'Hidden', sel:'Hidden' },
+    ]},
+  ];
+
+  const isOverridden = g => g.kind==='seg' ? g.sel!==g.def : JSON.stringify([...g.sel].sort())!==JSON.stringify([...g.def].sort());
+  const overrideCount = () => SECTIONS.reduce((a,s)=>a+s.groups.filter(isOverridden).length,0);
+
+  function groupHTML(g, si, gi){
+    let body;
+    if(g.kind==='seg'){
+      body = '<div class="seg">'+g.opts.map(o=>
+        '<button class="'+(g.sel===o?'active':'')+'" onclick="pickSeg('+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
+    } else {
+      body = '<div class="fmt-grid c'+(g.cols||2)+'">'+g.opts.map(o=>
+        '<button class="tog-cell'+(g.sel.indexOf(o)>=0?' on':'')+'" onclick="toggleCell('+si+','+gi+',this)" data-o="'+o+'">'+o+'</button>').join('')+'</div>';
+    }
+    const mode = g.kind==='seg' ? 'pick one' : 'multi';
+    return '<div class="fmt-group">'
+      + '<div class="fmt-gh"><span class="nm">'+g.nm+'</span><span class="mode">'+mode+'</span></div>'
+      + body
+      + (g.note ? '<div class="fmt-note">'+g.note+'</div>' : '')
+      + '</div>';
+  }
+
+  function render(){
+    const menu = document.getElementById('fmt-menu');
+    menu.innerHTML = SECTIONS.map((s,si)=>
+      '<div class="fmt-section">'
+      + '<div class="fmt-sh">'+s.icon+'<span class="lbl">'+s.name+'</span><span class="sub">'+s.sub+'</span></div>'
+      + s.groups.map((g,gi)=>groupHTML(g,si,gi)).join('')
+      + '</div>'
+    ).join('')
+    + '<div class="fmt-foot"><span class="fmt-count">'+overrideCount()+' changed from default</span><button class="fmt-reset" onclick="resetFmt()">Reset</button></div>';
+    syncBadge();
+  }
+
+  function syncBadge(){
+    const n = overrideCount();
+    document.getElementById('fmt-btn').classList.toggle('active', n>0);
+    document.getElementById('fmt-badge').textContent = n;
+  }
+
+  function pickSeg(si,gi,el){ SECTIONS[si].groups[gi].sel = el.dataset.o; render(); }
+  function toggleCell(si,gi,el){
+    const g = SECTIONS[si].groups[gi], o = el.dataset.o, i = g.sel.indexOf(o);
+    if(i>=0) g.sel.splice(i,1); else g.sel.push(o);
+    render();
+  }
+  function resetFmt(){ SECTIONS.forEach(s=>s.groups.forEach(g=> g.sel = g.kind==='seg' ? g.def : [...g.def] )); render(); }
+
+  function toggleFmt(){ document.getElementById('fmt-menu').classList.toggle('open'); }
+  // keep the popover open when clicking inside; close on outside click
+  document.getElementById('fmt-menu').addEventListener('click', e=>e.stopPropagation());
+  document.getElementById('fmt-btn').addEventListener('click', e=>e.stopPropagation());
+  document.addEventListener('click', ()=>document.getElementById('fmt-menu').classList.remove('open'));
+
+  render();
+</script>
+</body>
+</html>
