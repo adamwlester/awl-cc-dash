@@ -506,7 +506,7 @@ kept in sync on edit via `/rename` — so it surfaces in the VS Code extension's
 `--resume` picker, not only inside the dashboard. Pools are **25 colours and 50 curated icons**, assigned
 round-robin (`colour = n mod 25`, `icon = n mod 50`); past 16 agents the icon becomes the primary
 disambiguator. Icons are recolorable SVGs served from `assets/icons/agents/` via
-`GET /assets/agent-icons/{name}?color=`. A human-name pool for the Create panel's randomize affordance is not yet defined (§10 #35). ⚠ **Today:** the React client ships only 16 colours (design-parity
+`GET /assets/agent-icons/{name}?color=`. A human-name pool for the Create panel's randomize affordance is not yet defined (§10 #35). The Create panel's **role number auto-fills**: the No. field pre-fills the next value in that role's sequence (e.g. a second `researcher` pre-fills `02`) but **stays editable** — runtime behavior with nothing to draw in the static mockup (recorded 2026-07-08 from the design lane's IN-2 note). ⚠ **Today:** the React client ships only 16 colours (design-parity
 lag, §4.4 — not a decision change); identity editing and the `--name`/`/rename` registration are speced but
 not yet wired.
 
@@ -693,7 +693,11 @@ markdown — they live in the per-doc `.meta.json` sidecar (§8.5), so content s
 running agent is never raced. Documents carry the same review treatment as Plans (comments; the footer action
 strip minus Reject/Approve — the design work is queued in the design lane). The Library can also
 browse other repo `.md` files read-only; commenting applies to dashboard-owned files under `.awl-cc-dash/`
-only (§8.5; extendable later if needed).
+only (§8.5; extendable later if needed). **Assets thumbnails (mechanism, decided 2026-07-08):** the Assets
+list's fixed-footprint leading slot shows a real **thumbnail for image files** and a **file-type icon** for
+non-image/unsupported files — built on Electron's `nativeImage.createThumbnailFromPath` (the Windows Shell
+thumbnail provider) with `app.getFileIcon()` as the icon fallback, so no third-party dependency; the UI rule
+lives in `design/DESIGN.md` (Library → Assets).
 
 Plan-approve from the dashboard resumes the agent out of plan mode. ⚠ **Today:** that resume path is
 now **proven** (§10 #6 → ✅, via a `keys()` Enter, not a hook `updatedInput`) but not yet wired; the Library lists plans **non-recursively** from the
@@ -1119,11 +1123,12 @@ deleted.
   shipped model — hook-boundary delivery + the transparent Next/Queue degrade — **is the final model**.
 - **Fallback (now the ceiling):** hook-boundary delivery plus the transparent Next/Queue degrade.
 
-**5. Console rendering fidelity + live-streaming transport** *(→ §7.13)* — ✅ **transport decided: streaming for the focused Console (feasibility proven)** · ◐ fidelity renderer is a frontend build
+**5. Console rendering fidelity + live-streaming transport** *(→ §7.13)* — ✅ **transport decided: streaming** · ✅ **fidelity decided (2026-07-05): full xterm-class renderer, priority HIGH** (frontend build)
 - **Evidence (wiring/fidelity):** **spike passed** (`test_console_mirror_live`, **live**, 2026-07-02) on the *wiring*: keystroke passthrough works and ANSI is recoverable from the pane via `capture-pane -e`. The remaining fidelity gap is pure frontend — a faithful xterm-class renderer — which is a build decision, not an engine feasibility question.
 - **Evidence (streaming transport):** **spike passed** (`test_console_stream_attach_live`, **live**, 2026-07-05, ttyd 1.7.7) — a real *live-streaming* terminal (`ttyd` attached to the agent's tmux session, consumed over a WebSocket) is: **(a)** reachable from Windows over `localhost` with **no hand-rolled port-forwarding** (WSL2's default relay suffices); **(b)** safely coexistent with the sidecar's capture-pane poller — the scraper keeps classifying state correctly under a live viewer, and **`tmux window-size manual`** pins the pane so a viewer cannot perturb the geometry the poller reads (the one real hazard: naive `window-size latest` lets a viewer resize the pane, and the resize **persists** after it detaches); **(c)** far lower latency — a keystroke round-trip of **~11 ms streaming vs ~778 ms polled** (N=1 best case; the polled mirror also degrades ~O(N) with fleet size, per `test_polling_scale_ceiling_live`). A throwaway harness rendered the live stream faithfully in an xterm.js embed (screenshots in the DEVLOG entry). Interception stays on the JSONL transcript regardless — an interactive TUI only ever emits a painted screen.
 - **Decided (2026-07-05) — streaming for the focused Console:** the Console (§7.13, updated) renders the focused agent via the **live streaming attach** (`ttyd`/WebSocket), not polled `capture-pane` snapshots — the "watch Claude live" experience, chosen once coexistence + reachability + latency all came back green. **Polling and the transcript stay** where they belong: the capture-pane/transcript path keeps serving the fleet-wide coordination reads and the many-agent grid overview (§4.3, §6.2) — you never run N live terminals at once. The two are complementary, not competitors. Full context: the embedded-terminal feasibility brief, `dev/notes/research/embedded-terminal-feasibility-brief-2026-07-05.md`.
 - **Desired final behavior:** the Console mirror renders the terminal faithfully, including colors, spinners, and box-drawing.
+- **Decided (2026-07-05, operator — Q8 / §F1): full terminal renderer (xterm-class), priority HIGH.** The operator saw the 2026-07-05 live-streaming spike (ttyd + xterm.js harness; DEVLOG 06:53) and calls it decisively better — so the fidelity choice is **A (faithful colours / spinners / box-drawing)**, not the styled-text or plain-text degrades. It is a frontend build that lands **within the §4.4 renderer rebuild**: the visible renderer is parked-to-rebuild, so "ASAP / high" means first-tier priority *inside* that rebuild, not a carve-out before it. Transport half already proven + decided above.
 - **Current blocker (frontend only):** faithful rendering needs the streamed terminal bytes fed into a terminal-renderer component (xterm.js-class) in the React Console — proven to render faithfully in a throwaway spike harness (2026-07-05); the sidecar/bridge/transport half (the decided streaming attach) is proven.
 - **Research/POC must establish:** n/a — feasibility is proven and the transport choice is **decided** (streaming); the one remaining open call is the frontend build itself — the xterm.js-class renderer + `ttyd`/WebSocket wiring in the (frozen, to-be-rebuilt) React Console.
 - **Fallback if infeasible:** a clean plain-text mirror (ANSI stripped).
@@ -1354,7 +1359,7 @@ capability.
 - **Fallback if infeasible:** show only what a source demonstrably provides (account identity but not a clean
   live-limits API); mark the rest an honest boundary.
 
-**22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🧪 **needs-spike** *(priority: medium; overlaps #13)*
+**22. Subagent creation / management** *(→ §7.17, §10-8, §10-13)* — 🧪 **decided (2026-07-05): parked (revisit after hooks/lineage)** *(priority: low; overlaps #13)*
 - **Evidence:** **research settled** ([`s10-research-22-subagent-management.md`](../dev/notes/research/s10-research-22-subagent-management.md)):
   the surface is mapped. **CREATE** is parent-mediated only — send `@agent-<name> <task>` as literal text to
   the idle parent pane via tmux `send-keys` (no out-of-process spawn API in the non-SDK path). **Observe** —
@@ -1364,6 +1369,7 @@ capability.
   (`Ctrl+X Ctrl+K` kills all background subagents). (Formerly BB4; sole home since 2026-07-03.)
 - **Desired final behavior:** the operator can create and manage (steer / stop) subagents from the dashboard,
   not only observe them.
+- **Decided (2026-07-05, operator — Q10 / §F1):** **parked** — the operator accepts the parent-decides model and notes no scaffolding exists yet; revisit after the hooks / lineage substrate lands (§11 #22, priorities note). Operator sketch for the eventual feature: a Compose-workspace **"add agents"** affordance (button or dropdown, plausibly via the existing template-block machinery) that drops a generic **fan-out instruction block** into the prompt — placeholders for agent count and timing, with custom per-fan-out instructions riding in the same block. Still spike-gated when picked up.
 - **Current blocker (spike-grade):** the load-bearing claims are docs-derived — `send-keys -l` delivering
   `@agent-<name>` as a parsed mention, the subagent transcript-path schema on the local install, and the
   `Ctrl+X Ctrl+K` timing — each needs a live spike before build.
@@ -1378,31 +1384,34 @@ backlog's **(open)** marker — still needing research or a decision before they
 belong in this queue, not §11. Appended as #23 onward per the numbering convention above; they entered
 half-formed, by design (see the cheap-entry rule).
 
-**23. Docs in agent context** *(→ §7.6, §7.7)* — 🔬 **needs-research** *(priority: medium; ex-BB12)*
+**23. Docs in agent context** *(→ §7.6, §7.7)* — ✅ **decided (2026-07-05): scope light → §11 #36** *(priority: medium; ex-BB12)*
 - **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
 - **Desired final behavior:** agents dynamically get relevant, up-to-date documentation in context, and
   agents doing systems-level work always have current docs in context.
-- **Current blocker:** no mechanism chosen — context injection, an MCP docs server, hook-pushed digests, or
-  the existing link/scratchpad channels (§7.6/§7.7) are all candidates; "relevant and current" selection is
-  undefined.
+- **Decided (2026-07-05, operator — Q9 / §F1):** **yes — scope it light.** v1 mechanism: a **curated docs home agents are pointed at (the Library, §7.16)** plus **per-agent doc attachment at launch**; automatic relevance-retrieval stays future. Interface sketch (broad, for the design agents): the **Library is the hub**, reusing the review-panels' nav-rail lens pattern but organized by task / project / subproject (the Outline tab possibly going icon-based to free a slot). Buildable (light) → §11 #36.
+- **Remaining open (post-decision):** only *automatic* relevance-retrieval — how "relevant and current" docs
+  are selected and refreshed per agent role (context injection / MCP docs server / hook-pushed digests remain
+  the candidate mechanisms for that future layer). The v1 curated-Library + per-agent-attach path is decided.
 - **Research/POC must establish:** a delivery mechanism, and how relevant/current docs are selected and
   refreshed per agent role.
 - **Fallback if infeasible:** manual doc references in prompts (status quo).
 
-**24. AI-touched file tracking** *(→ §7.5 attribution, DEVLOG practice)* — 🔬 **needs-research** *(priority: low; ex-BB13)*
+**24. AI-touched file tracking** *(→ §7.5 attribution, DEVLOG practice)* — ✅ **decided (2026-07-05): elevated → §11 #37 (feeds lineage)** *(priority: high; ex-BB13)*
 - **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
 - **Desired final behavior:** what AI has touched is tracked, e.g. a local per-directory index file
   (`index.md`) or equivalent.
-- **Current blocker:** undecided whether per-directory index files, a central ledger, or git-derived
-  attribution is the right shape; product value unvalidated.
+- **Decided (2026-07-05, operator — Q9 / §F1):** **elevated, not parked.** Attribution rides **per-agent git identity** — each agent commits under its own author name + a synthetic per-agent email, so "what did AI touch" becomes a **git query with no maintained ledger**. The operator ALSO wants the **per-folder `index.md` files** pursued (he had begun these himself and values them); git identity is the attribution *backbone* and the index files ride on top of it, with the hand-maintained-inventory drift risk **flagged and accepted**. Pursue **as a priority together with agent commit tracking**; this **feeds the lineage / Agent-Archive substrate** (§11 #18, priorities note). Buildable → §11 #37.
+- **Resolved shape:** git-derived attribution (per-agent identity) is the backbone; per-folder `index.md`
+  files ride on top; a central ledger is rejected. Product value is validated (operator priority).
 - **Research/POC must establish:** the cheapest reliable attribution mechanism, and whether it earns its
   maintenance cost.
 - **Fallback if infeasible:** rely on git history + DEVLOG (status quo).
 
-**25. Special-asset sourcing check** *(→ 🔌 Claude config, §8.1)* — 🔬 **needs-research** *(priority: low; ex-BB14)*
+**25. Special-asset sourcing check** *(→ 🔌 Claude config, §8.1)* — ✅ **decided (2026-07-05): needed but deferred (fold into hooks pass)** *(priority: low; ex-BB14)*
 - **Evidence:** no code, no test; ported from the backlog's open set 2026-07-03. Half-formed by design.
 - **Desired final behavior:** skills and other special Claude Code assets are confirmed to be pulled from
   the ideal source.
+- **Decided (2026-07-05, operator — Q9 / §F1):** **yes — the audit is genuinely needed** (the current setup is suboptimal: ad-hoc, duplicate `AGENTS.md` files), **but deferred** — current churn makes now the wrong moment; **fold it into the hooks setup pass** (distinct from the dashboard's lifecycle-hook *ingestion*, §11 #22 — this is Claude Code asset-sourcing hygiene). Decided-but-deferred; stays queued.
 - **Current blocker:** "ideal source" per asset type (skills, agents, hooks, plugins) is unestablished.
 - **Research/POC must establish:** an inventory of where each special asset currently comes from, and a
   per-type sourcing rule.
@@ -1410,80 +1419,80 @@ half-formed, by design (see the cheap-entry rule).
 
 ### Priority — coverage-audit remainder (2026-07-04)
 
-The Phase-6 homing of the last coverage-audit orphans ([`archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md)): the Tier-2 "moderate" items still unhomed after the Phase-4 harvest, the Tier-3 production-hygiene minors, and the two Tier-4 design-lane items worth elevating. Appended as **#26 onward** (same append-don't-interleave convention as #14/#23, to preserve existing numbering). Each carries a genuine **product/policy decision that is the operator's to make**, so it is homed here **as an open question, deliberately not decided** — the leading candidate (where the audit suggested one) is noted but not adopted. The consolidated call-list lives in the **§F1 decision register** of the workflow tracker ([`dev/notes/scratch/2026-07-03-doc-integration-tracker.md`](../dev/notes/scratch/2026-07-03-doc-integration-tracker.md)) and is presented to the operator as a batch; when the operator rules, each item converts to a body decision or a Decided omission and leaves the queue.
+The Phase-6 homing of the last coverage-audit orphans ([`archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md`](../archive/dev/notes/scratch/2026-07-02-coverage-audit-orphans.md)): the Tier-2 "moderate" items still unhomed after the Phase-4 harvest, the Tier-3 production-hygiene minors, and the two Tier-4 design-lane items worth elevating. Appended as **#26 onward** (same append-don't-interleave convention as #14/#23, to preserve existing numbering). Each carries a genuine **product/policy decision that is the operator's to make**, so it is homed here **as an open question, deliberately not decided** — the leading candidate (where the audit suggested one) is noted but not adopted. The consolidated call-list lives in the **§F1 decision register** of the workflow tracker ([`dev/notes/scratch/2026-07-03-doc-integration-tracker.md`](../dev/notes/scratch/2026-07-03-doc-integration-tracker.md)) and is presented to the operator as a batch; when the operator rules, each item converts to a body decision or a Decided omission and leaves the queue. **Ruled 2026-07-05:** the operator worked through the whole Q1–Q11 batch, so each #26–#37 entry now carries a **Decided** line (the buildable graduates are listed in §11.5). They keep their §10 slot, annotated-decided, until the Phase-9 relocation moves the settled ones into the body.
 
-**26. Turns "by-tool" breakdown + the "Coordinating" slice** *(→ §7.9, §7.10, §10 #9)* — 🧪 **needs-spike** *(priority: medium; sibling of #9)*
+**26. Turns "by-tool" breakdown + the "Coordinating" slice** *(→ §7.9, §7.10, §10 #9)* — 🧪 **decided (2026-07-05): display parked, capability retained** *(priority: low — deprioritized)*
 - **Evidence:** no derivation defined — the Agent→Details Turns accordion expands to a per-tool split (Read/search · Edit · Bash · MCP · Subagent · Web · **Coordinating** · Remaining), but §7.9 covers turn *counting* for caps only, and the cross-agent "Coordinating" bucket has no source. The sibling *context*-by-category is §10 #9. Tracked: §F1.
 - **Desired final behavior:** the Turns accordion shows a trustworthy per-tool breakdown, including a "Coordinating" slice for cross-agent work.
-- **Decision pending (operator's call):** what to display once the spike bounds what's derivable — the full per-tool breakdown + a "Coordinating" slice, only the derivable tool buckets, or just the total turn count. The spike settles what's *achievable*; the operator picks what to ship from it.
+- **Decided (2026-07-05, operator — Q7 / §F1):** **park the rich display** — the total turn count (§7.9) suffices meanwhile; no spike scheduled now. The *underlying capability is retained and valued*: raw per-turn tool data already lives in the JSONL transcripts and the sidecar already parses tool events for the feed, so nothing is lost while this is parked — **transcript retention (§8.6) is the guard**. The only genuinely unproven piece stays the **"Coordinating"** cross-agent attribution. Bucket-vocabulary caveat: at pickup, re-frame the tool-bucket list against the planned reduction of feed block/filter types (some listed blocks may be trimmed or never existed), so the current vocabulary is not settled.
 - **Spike must establish:** whether per-tool turn counts are derivable from the transcript's `tool_use` blocks, and whether a "Coordinating" slice (link / scratch / inbox activity) can be attributed at all — or whether the breakdown is cut to the derivable tools only.
 - **Fallback if infeasible:** show only the derivable tool buckets (or the total turn count alone, §7.9) and drop the "Coordinating" slice.
 
-**27. Voice dictation — speech-to-text pipeline** *(→ §7.14)* — 🔬 **needs-research** *(priority: medium)*
+**27. Voice dictation — speech-to-text pipeline** *(→ §7.14)* — 🧪 **direction decided (2026-07-05); needs a quality spike** *(priority: medium)*
 - **Evidence:** no capture→transcribe→insert path — §7.14 names "a voice mic" on the Compose / Plans / Documents editors, but the STT mechanism is unchosen and unwired. Tracked: §F1.
 - **Desired final behavior:** the per-field mic captures speech and inserts transcribed text into the editor.
-- **Decision pending (operator's call):** client-side **Web Speech API** (free, built-in, no backend) vs. a **sidecar transcription service** (better quality, more work, its own privacy/offline story) — with the browser/Electron speech-API and privacy/offline behavior still to verify (candidates-note #16).
+- **Decided direction (2026-07-05, operator — Q4 / §F1):** dictation must be **genuinely good** — the operator finds OS-level dictation mediocre. The spike compares the browser/Electron built-in speech path against a **high-quality library (Whisper-class local transcription)**: if the built-in is close, it wins on simplicity, but a meaningfully better library is preferred over convenience. Resource caveat: weigh a local model's compute cost against the "stay smooth on a modest laptop" constraint (cf. Q10 #36). Intent is set; the 🔧 spike still settles which path — options were client-side **Web Speech API** (free, built-in) vs. a **sidecar transcription service** (candidates-note #16).
 - **Fallback if infeasible:** the mic stays a visual affordance until the path lands.
 
-**28. Frontend degraded-mode policy + polling backoff** *(→ §4.3)* — 🔬 **needs-research** *(priority: medium)*
+**28. Frontend degraded-mode policy + polling backoff** *(→ §4.3)* — ✅ **behavior decided (2026-07-05) → §11 #34; display consolidation → design-lane** *(priority: medium)*
 - **Evidence:** §4.3 fixes the poll cadences, and SSE reconnect + the "Sidecar offline" chip are homed, but there is **no defined degraded-UI policy when `/health` fails** and **no backoff** on the fixed poll cadences. Distinct from #17's scale-ceiling adaptive cadence — this is failure-mode UX plus a retry policy. Tracked: §F1.
 - **Desired final behavior:** when the sidecar is unreachable, the poll-driven readouts degrade predictably and polling backs off rather than hammering the fixed cadence.
-- **Decision pending (operator's call):** what the panels show on `/health` failure (stale-marked last-known values / frozen panels / a banner) and the backoff curve.
+- **Decided (2026-07-05, operator — Q3 / §F1):** on `/health` failure the poll-driven panels **freeze and show last-known values, visibly marked stale**, while polling **backs off** to a gentle retry until the sidecar returns (the standard calm pattern; no pointless load on a dead endpoint). This *behavior* is buildable → §11 #34. **Open, and routed to the design lane:** the *display* of system-health is one underlying question with §10 #16 (System-fault cards) and the signals scattered across three surfaces today — connector badges (Settings), System Error/Warning inbox cards (§7.8), and the "Sidecar offline" chip (§4.3) — which the operator wants **consolidated into one always-visible system-health indicator in the app chrome** (leading candidate surface: the footer), with a broadened state vocabulary (add *down* + *stale/degraded*) reconciled with §10 #16, popover/drill-in inspection (a sidecar-log tail — §11 #31 — is a candidate drill-in), and reconciliation with the operator's separately-captured title-bar Connected-chip upgrade note. That display work is DESIGN.md's (six-file propagation) and is **not edited in this workflow**.
 - **Fallback if infeasible:** today's single "Sidecar offline" chip with unchanged poll cadences.
 
-**29. Schema versioning / migration of the committed store** *(→ §8.1, §8.2)* — 🔬 **needs-research** *(priority: low)*
+**29. Schema versioning / migration of the committed store** *(→ §8.1, §8.2)* — ✅ **decided (2026-07-05) → §11 #30** *(priority: low)*
 - **Evidence:** only the one-time `.awl`→`.awl-cc-dash` rename (§11.2 #1) is homed; the committed `state/` JSON carries **no `schema_version` stamp or forward-compat policy**. Tracked: §F1.
 - **Desired final behavior:** a future format change can read (or migrate) data written by an older version without silent breakage.
-- **Decision pending (operator's call):** stamp a `schema_version` now (cheap future-proofing) vs. accept "a future format change may break old data."
+- **Decided (2026-07-05, operator — Q1 / §F1):** stamp a `schema_version` into the committed `state/` **now** — cheap insurance so a later format change can still read old data (part of the "pragmatic single-machine v1" posture). Buildable → §11 #30; the §8.7 open-question note is superseded. Migration *machinery* stays deferred (YAGNI until a format actually changes).
 - **Fallback if infeasible:** none needed — the do-nothing path *is* one of the two options.
 
-**30. Sidecar crash-supervision** *(→ §2, §9.9)* — 🔬 **needs-research** *(priority: low)*
+**30. Sidecar crash-supervision** *(→ §2, §9.9)* — ✅ **decided (2026-07-05): manual relaunch is the v1 model** *(priority: low)*
 - **Evidence:** agent recovery is homed (§9.9), but in the **two-process bat-file model** the "who restarts a crashed sidecar" question is only stated conditionally inside the unbuilt one-click-launch item (§10 #10). Tracked: §F1.
 - **Desired final behavior:** a crashed sidecar recovers (or is known to require a manual relaunch) without losing the running agents.
-- **Decision pending (operator's call):** accept **manual relaunch** (agents survive in tmux; state is write-as-it-happens) vs. build **auto-restart** supervision (folds into §10 #10).
+- **Decided (2026-07-05, operator — Q1 / §F1):** accept **manual relaunch** for v1 — agents survive in tmux and state is written as-it-happens, so a dead sidecar loses nothing but the live readouts. Auto-restart supervision is **deferred** (revisit only with unattended / multi-machine operation; it folds into §10 #10 if pursued). No new build item — a recorded posture.
 - **Fallback if infeasible:** manual relaunch is the shipped model.
 
-**31. Git-merge policy on the committed `.awl-cc-dash/` state** *(→ §8.7)* — 🔬 **needs-research** *(priority: low)*
+**31. Git-merge policy on the committed `.awl-cc-dash/` state** *(→ §8.7)* — ✅ **decided (2026-07-05): single-machine, no merge policy** *(priority: low)*
 - **Evidence:** §8.7 covers in-process atomic write-replace only; two branches/machines editing the whole-file JSON state have **no merge policy**. Tracked: §F1.
 - **Desired final behavior:** concurrent edits to the committed project state from two branches/machines have a defined resolution (or a recorded decision that this is out of scope).
-- **Decision pending (operator's call):** accept **single-machine, no merge policy** (the leading candidate — it matches the accepted cross-machine caveat, §9.9) vs. define a merge/reconcile story.
+- **Decided (2026-07-05, operator — Q1 / §F1):** accept **single-machine, no merge policy** — consistent with the cross-machine caveat already accepted at §9.9; a concurrent-edit conflict is a manual git resolution. No build item — a recorded posture. (A merge/reconcile story is revisited only if multi-machine operation is pursued.)
 - **Fallback if infeasible:** the single-machine assumption stands; a conflict is a manual git resolution.
 
-**32. Security on an untrusted network** *(→ §2)* — 🔬 **needs-research** *(priority: low)*
+**32. Security on an untrusted network** *(→ §2)* — ✅ **decided (2026-07-05): OS firewall is the boundary** *(priority: low)*
 - **Evidence:** §2 accepts the no-auth `0.0.0.0:7690` bind for a single-user machine at home, but does **not** address the mutating control API being exposed when the laptop travels onto café / office Wi-Fi. Tracked: §F1.
 - **Desired final behavior:** the exposed control API is safe (or consciously accepted) on an untrusted network.
-- **Decision pending (operator's call):** record **OS-firewall-as-the-boundary** (the audit's leading candidate) as sufficient vs. add a travel bind/auth posture.
+- **Decided (2026-07-05, operator — Q2 / §F1):** **OS-firewall-as-the-boundary** is the accepted posture — the Windows firewall blocks inbound by default, the effective boundary for a personal laptop, and the no-auth `0.0.0.0:7690` bind stays a deliberate, documented choice (§2). A "travel mode" (localhost-only bind or a token on untrusted Wi-Fi) is noted as a **cheap future add** if the operator starts working from public networks — not built for v1.
 - **Fallback if infeasible:** the OS firewall is the boundary; document it as the accepted posture.
 
-**33. Sidecar logging / observability** *(→ §2, §9)* — 🔬 **needs-research** *(priority: low)*
+**33. Sidecar logging / observability** *(→ §2, §9)* — ✅ **decided (2026-07-05) → §11 #31** *(priority: low)*
 - **Evidence:** the sidecar keeps only ad-hoc stdout — **no decided destination or retention** for its own process logs, so a failure leaves little trail. Tracked: §F1 *(newly surfaced 2026-07-04 during Phase-6 homing)*.
 - **Desired final behavior:** the sidecar writes a proper, bounded log to a decided home so a crash/fault is diagnosable.
-- **Decision pending (operator's call):** the log destination (a file under the gitignored `sidecar/runtime/` vs. stdout-only) plus retention/rotation.
+- **Decided (2026-07-05, operator — Q1 / §F1):** the sidecar writes a **small, size-bounded log file** under the gitignored `sidecar/runtime/`, so a crash/fault leaves a trail (not stdout-only). Buildable → §11 #31. Pairs with the health-drill-in tail view sketched under Q3 (a candidate consumer of this log).
 - **Fallback if infeasible:** ad-hoc stdout stands.
 
-**34. Response-format preamble — option-set + apply/persist model** *(→ §7.14)* — 🔬 **needs-research** *(priority: low)*
+**34. Response-format preamble — option-set + apply/persist model** *(→ §7.14)* — ✅ **decided (2026-07-05) → §11 #32** *(priority: low)*
 - **Evidence:** §7.14 ships the response-format preamble control, but its **option set and how the instruction reaches/persists to the agent** are undefined. Tracked: §F1.
 - **Desired final behavior:** the operator picks a response-format from a defined menu, and the choice reaches the agent and persists at the chosen scope.
-- **Decision pending (operator's call):** the option set (e.g., the operator's own TL;DR-table + emoji-status notes) and whether the setting is **per-agent** vs. **per-message**.
+- **Decided (2026-07-05, operator — Q5 / §F1):** a **basic per-agent preset menu** for v1 — a short list of response-formats (including the operator's TL;DR-table + emoji-status style) chosen once per agent and applied to all its replies. A per-message override is a later nicety, not v1. Buildable → §11 #32.
 - **Fallback if infeasible:** a single freeform preamble field with no preset menu.
 
-**35. Agent name pool / "randomize" source** *(→ §7.5)* — 🔬 **needs-research** *(priority: low)*
+**35. Agent name pool / "randomize" source** *(→ §7.5)* — ✅ **decided (2026-07-05) → §11 #33** *(priority: low)*
 - **Evidence:** the Create panel's randomize-name affordance (and any auto-name) has **no defined name pool** (deferred in [`sidecar/identity.py`](../sidecar/identity.py)); §7.5 defines the colour/icon pools but not a name pool. Tracked: §F1.
 - **Desired final behavior:** "shuffle a fresh agent name" draws from a defined source.
-- **Decision pending (operator's call):** a curated human-name pool + randomize vs. names are simply user-typed (fine-as-backlog).
+- **Decided (2026-07-05, operator — Q6 / §F1):** a **curated human-name pool + randomize**, with user-typed names always available. Storage decided in-conversation: a flat JSON array at `assets/names/agent-names.json` (optional theme-grouping later); the operator will have a separate agent generate the pool. Buildable → §11 #33.
 - **Fallback if infeasible:** names are user-typed and the randomize affordance is dropped or disabled.
 
-**36. Rich visual content in Plans/Docs** *(→ DESIGN.md; design-lane)* — 🔬 **needs-research** *(priority: low; pursue-or-park)*
-- **Evidence:** mermaid / charts / diagrams + visual commenting in Plans/Docs live only in [`dev/notes/TODO.md`](../dev/notes/TODO.md) scratch — a recurring ask, genuinely unhomed in DESIGN. Tracked: §F1. **Design-lane item:** the design surface is owned by the live design agent; this workflow does not edit DESIGN.md — this entry is the architecture-side pointer only.
+**36. Rich visual content in Plans/Docs** *(→ DESIGN.md; design-lane)* — ✅ **decided (2026-07-05): pursue → design-lane (not a v1 gate)** *(priority: low)*
+- **Evidence:** mermaid / charts / diagrams + visual commenting in Plans/Docs — a recurring ask, genuinely unhomed in DESIGN. Tracked: §F1. **Design-lane item:** the design surface is owned by the live design agent; this workflow does not edit DESIGN.md — this entry is the architecture-side pointer only.
 - **Desired final behavior:** Plans / Documents can render rich visual content (diagrams / charts) with visual commenting.
-- **Decision pending (operator's call):** pursue (→ route to the design lane for a DESIGN.md home) or leave parked in TODO.
-- **Fallback if infeasible:** stays a TODO backlog idea.
+- **Decided (2026-07-05, operator — Q10 / §F1):** **wanted** — pursue, elevated to the design lane *when it's ready for it* (not a v1 gate). Operator caveat: rich visuals must **stay smooth on a modest laptop**. Routes to the design agent for a DESIGN.md home; not built or design-edited here.
+- **Fallback if deferred:** stays a parked design-lane idea until the design phase picks it up.
 
-**37. Authors / authorship view for Plans & Documents** *(→ §8.5, DESIGN.md; design-lane)* — 🔬 **needs-research** *(priority: low; pursue-or-park)*
-- **Evidence:** provenance *data* is homed (§8.5 sidecar: created-by / when / session), but the *display* — a dedicated nav-rail "Authors" mode — is not; it lives only in TODO scratch. Tracked: §F1. **Design-lane item:** as with #36, the display is the design agent's surface; this workflow does not edit DESIGN.md.
+**37. Authors / authorship view for Plans & Documents** *(→ §8.5, DESIGN.md; design-lane)* — ✅ **rescoped (2026-07-05): display landed in design; provenance wiring → §11 #35** *(priority: low)*
+- **Evidence:** provenance *data* is homed (§8.5 sidecar: created-by / when / session); the *display* — a nav-rail "Authors" lens — **has since landed in the design system** (the [ND] design run; see DESIGN.md's review-panel section). Tracked: §F1.
 - **Desired final behavior:** an Authors view surfaces the authorship/provenance already captured in the doc sidecars.
-- **Decision pending (operator's call):** pursue (→ design lane) or leave parked.
-- **Fallback if infeasible:** provenance stays data-only (§8.5), with no dedicated view.
+- **Resolved (2026-07-05, operator — Q10 / §F1):** **no product decision needed** — the Authors-lens display already landed in the design system, so the remaining scope is **system-side provenance wiring only** (surface §8.5's created-by / when / session into the landed view). Buildable → §11 #35.
+- **Fallback:** n/a — resolved; the provenance data (§8.5) already exists and the view has landed in design.
 
 ### Decided omissions (not open questions)
 
@@ -1614,8 +1623,15 @@ absorbed into §10 #13). **#21–#22 are spike-derived additions** (2026-07-02 b
 16. **Change-log watcher** *(ex-BB6)* — an agent that watches codebase changes and auto-updates change
     logs (or similar).
 17. **System-check agent** *(ex-BB7)* — a system-checking agent that's easy to run.
-18. **Agent archive** *(ex-BB8; value still unclear — confirm with the operator before building)* — a
-    database of past agents with a short summary of each one's work plus timestamps.
+18. **Agent archive** *(ex-BB8; spans §7.12 Retire/Delete + §8.4 roster; **decided build item — Q11, 2026-07-05**)* — a
+    roster / data-table of **per-agent records** with distinct IDs (or one file per agent instantiation — open),
+    archived **by default**: retiring an agent is a **deep-freeze**, not a discard. Records are **light except
+    transcripts** (referenced in place per §8.6, never copied); occasional purge is acceptable; **Delete stays a
+    true delete**. The schema **reserves lineage fields** (parent / fork / handoff) — a separate operator-side
+    agent is exploring lineage tracking + graphical display, tying to the per-agent git-identity attribution
+    (§11.5 #37). The operator states the system "is not useful without it," so it stays a decided §11 item — the
+    ruling that resolved the Phase-9 §10↔§11 placement gate. **HIGH priority** (the lineage/archive substrate,
+    alongside lifecycle-hook ingestion #22).
 19. **Handoff artifacts** *(ex-BB9 → DESIGN.md's explicit deferral; gated on §10 #15)* — generate a
     summary/handoff report on Handoff, rather than the plain context-carry-over (which comes first).
 20. **Native agent-teams messaging** *(ex-BB10; gated on §10 #13 research)* — adopt Claude Code's built-in
@@ -1632,6 +1648,9 @@ absorbed into §10 #13). **#21–#22 are spike-derived additions** (2026-07-02 b
     signal. Where: [`sidecar/hookbus.py`](../sidecar/hookbus.py), [`sidecar/main.py`](../sidecar/main.py),
     [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
 29. **Import external Claude context** *(→ §7.3, §7.16, §8.6; the extractors exist today — [`dev/tools/claude-context-extractor/`](../dev/tools/claude-context-extractor/))* — wrap the two working exporters (`extract-web.py` = claude.ai cloud chats via the sessionKey cookie; `extract-desktop.py` = the desktop app's local-agent-mode sessions, on-disk, no auth) behind a sidecar **import module** (a new coordination-spine feature module beside `library.py` / `scratchpad.py`) plus a thin frontend **Import** control, so an outside Claude session can be pulled into the dashboard by title. One import engine, one selectable destination: **(a) agent-to-agent** — drop the pulled context into an agent's prompt queue / Inbox (§7.3) so one agent can hand another external context [the operator's primary interest]; **(b) operator-facing** — render it in a panel to read/copy, the acute pain today since the desktop app's own export is broken/misplaced; **(c) Library** (§7.16) — park it as a reusable reference doc. Deliberately distinct from §8.6, which governs agents' *own* transcripts — this ingests *external* Claude history. **Open (operator's call, not started, explicitly not critical):** destination order (default (a) first, (b) close behind) and which panel hosts the Import button.
+38. **Prompt/UI-text markdown library (scope-aware)** *(→ §7.14, §8.2, §8.4; operator-decided 2026-07-04)* — one human-editable **markdown prompt library** as the single home for every UI-injected/canned text the dashboard sends on the user's behalf: the post-reviewer-request instructions, the text behind the reviewer-request **Send** and the Library Plans/Documents **Revise** button, Compose **snippets + templates**, the Compose **Revise scope chip** and the **Response (Structure)** options, and the Team Feed **Summarize** action (which may route to a small system-run utility model rather than an agent) — and likely more as they surface. Format: markdown with the `##` group / `###` item convention (JSON kept only where it genuinely eases template placeholder fill-in), organized by purpose (e.g. `responses.md`, `snippets.md`, `actions.md`). **Scope-aware, two scopes** (the operator's settled scope model — "System" = the persistent cross-project store, absorbing the old "User" scope; the lean is `~/.claude` for the shared runtime docs): a **System copy + a Project copy** (`<project>/.awl-cc-dash/`, §8.2). Includes adding these runtime doc types to the **§8.4 master data-type table** (one row per type) — they are not tracked there yet. The design-lane consumers (the Compose Snippets dropdown, the Documents scoped/typed browser) are queued in the design lane.
+39. **Per-turn settings + summary capture** *(→ §7.5 Timeline, §7.14; feeds #21 Rewind/Fork and §11.5 #32)* — capture, per Timeline turn: the agent's **settings at that turn** (model + mode/effort/thinking) and a **concise one-line turn summary**, so the Rewind/Handoff Timeline turn rows can render a settings string + summary per point and the collapsed Team Feed / History cards can show a one-line preview. Where the summary comes from ties to the response-format preamble (§11.5 #32) — the lean is agents leading every reply with a one-liner. The turn-row *display* is the design lane's queued restyle; this item is the capture/storage side.
+40. **Workflow approval routed through the Inbox** *(→ §7.3, §7.11; spike-proven 2026-07-04 — [`tests/workflow_approval_probe/`](../tests/workflow_approval_probe/))* — intercept a Claude Code `Workflow` tool call with a **PreToolUse hook** and surface it as an Inbox **Review** card (the renamed Plans-&-Docs section) with an Approve/Reject round-trip. The spike proved every leg live: the hook **fires** for the `Workflow` tool and carries the **full script preview** in `tool_input.script` (name/description/phases recoverable for the card content), a hook **deny aborts** the workflow and **allow launches** it, the hook verdict **preempts** the built-in "Run a dynamic workflow?" dialog (so the dashboard can be the sole gate), and the on-pane dialog remains a working fallback. Workflow subagents are headless/one-shot (≠ the steerable regular subagents), so the linked future **Subagents tab** in the Agent panel is a read-only *tracking* surface, not a control one (back-burnered); if a workflow ever needs editing or feedback, reuse the Library editor infrastructure rather than duplicating it. The Inbox card *design* is queued in the design lane.
 
 ### 11.4 Spike-surfaced code fixes (2026-07-02)
 
@@ -1656,6 +1675,43 @@ push. Each cites the §10 item that surfaced it.
 28. **Sidecar `Task`→`Agent` parser audit** *(→ §7.17; §10 #13)* — confirm the transcript parser keys on the
     current `Agent` tool name (renamed from `Task` in v2.1.63) and add dual-name compatibility so subagent
     events aren't silently missed. Where: `sidecar` transcript/serialize path.
+
+### 11.5 Operator-decided additions (2026-07-05)
+
+The buildable items graduated from §10 when the operator ruled the Phase-9 decision batch (tracker §F1 / the
+Operator-answers block). Each cites the §10 item and the operator question it resolved. **Priority flags the
+operator voiced in the same pass:** #37 (per-agent git identity → lineage) is **HIGH**, alongside hook
+lifecycle ingestion (§11.3 #22) and the Agent Archive (§11.3 #18); **transcript retention (§11.2 #5) is
+URGENT** — the 30-day `cleanupPeriodDays` default is live *today* (§8.6 ⚠), so it is the one action-now item
+independent of the rest.
+
+30. **Schema-version stamp** *(→ §8.2, §8.7; §10 #29 / Q1)* — write a `schema_version` field into the
+    committed `state/` JSON at write time; readers validate/tolerate it. Migration *machinery* stays deferred.
+    Where: state-store writer ([`sidecar/runtime_store.py`](../sidecar/runtime_store.py), [`sidecar/storage.py`](../sidecar/storage.py)).
+31. **Sidecar log file** *(→ §2, §9; §10 #33 / Q1)* — write a small, size-bounded (rotating) diagnostic log
+    under the gitignored `sidecar/runtime/`, so a crash/fault leaves a trail instead of vanishing to an
+    unattached stdout. Where: app logging config ([`sidecar/main.py`](../sidecar/main.py)).
+32. **Response-format presets (per-agent)** *(→ §7.14; §10 #34 / Q5)* — a small preset menu of reply formats
+    (including the operator's TL;DR-table + emoji-status style), chosen once per agent; the choice reaches and
+    persists to the agent. Per-message override deferred. Where: prompt composition + `state/agents.json`.
+33. **Agent name pool** *(→ §7.5; §10 #35 / Q6)* — ship `assets/names/agent-names.json` (flat array;
+    operator-generated by a separate agent) and wire the Create-panel randomize + auto-name to draw from it,
+    with user-typed names still available. Where: [`sidecar/identity.py`](../sidecar/identity.py), `assets/names/`.
+34. **Frontend degraded-mode + polling backoff** *(→ §4.3; §10 #28 / Q3)* — on `/health` failure, freeze the
+    poll-driven panels showing last-known values **marked stale**, and **back off** the poll cadence to a gentle
+    retry until recovery. (The consolidated always-visible system-health *display* is a separate **design-lane**
+    item — see §10 #28 / #16 — not this build.) Where: `frontend/` renderer transport.
+35. **Authors-view provenance wiring** *(→ §8.5; §10 #37 / Q10)* — surface §8.5's created-by / when / session
+    provenance into the **Authors lens that already landed in the design system**; system-side wiring only.
+    Where: [`sidecar/library.py`](../sidecar/library.py) doc sidecars, `api.ts`, renderer.
+36. **Docs in agent context (light)** *(→ §7.6, §7.16; §10 #23 / Q9)* — a curated docs home agents are
+    pointed at (the **Library**) + **per-agent doc attachment at launch**; automatic relevance-retrieval stays
+    §10 #23's future layer. Where: [`sidecar/library.py`](../sidecar/library.py), prompt composition, `state/agents.json`.
+37. **Per-agent git identity + AI-touched index** *(→ §7.5, DEVLOG practice; §10 #24 / Q9; **HIGH**)* — each
+    agent commits under its own author name + a **synthetic per-agent email**, so "what did AI touch" is a git
+    query with no maintained ledger; per-folder `index.md` files ride on top (drift risk accepted). **Feeds the
+    lineage / Agent-Archive substrate** (§11.3 #18, #22). Where: per-agent git config at bridge launch,
+    [`bridge/bridge.py`](../bridge/bridge.py), `sidecar`.
 
 ---
 
