@@ -24,6 +24,7 @@
     if(g==='doc'&&['plan','documents','assets'].indexOf(t)<0){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     /* remap stale internal tab keys to the user-facing names (requests→inbox, library→templates) */
     if(g==='feed'&&t==='requests')t='inbox';
+    if(g==='feed'&&t==='messages')t='transcript';   /* ND 6a: the Messages tab is renamed Transcript — remap stale stored keys + old callers */
     if(g==='prompt'&&(t==='templates'||t==='library'))t='compose';   /* v10p1 #22: Templates folded into Compose */
     document.querySelectorAll('[data-group="'+g+'"]').forEach(p=>p.classList.add('hidden'));
     const pane=document.getElementById(g+'-'+t); if(pane)pane.classList.remove('hidden');
@@ -42,9 +43,9 @@
     }
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');s[g]=t;localStorage.setItem('awl-v8',JSON.stringify(s));
     if(typeof refreshJumpPills==='function')setTimeout(refreshJumpPills,30);   /* A12/A3: a revealed scroll region needs its pills (re)evaluated once it has a real height */
-    if(g==='feed'){ const ma=document.getElementById('feed-messages-actions'); if(ma)ma.classList.remove('hidden');
-      const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',!(t==='messages'||t==='scratch'||t==='log'));   /* v1.x #7: Summarize available on Messages + Scratch + Log */
-      const stp=document.getElementById('msg-stop-btn'); if(stp)stp.classList.toggle('hidden',t!=='messages');   /* v1.x #6: Stop only on Messages */
+    if(g==='feed'){ const ma=document.getElementById('feed-actions'); if(ma)ma.classList.remove('hidden');
+      const sb=document.getElementById('summary-btn'); if(sb)sb.classList.toggle('hidden',!(t==='transcript'||t==='scratch'||t==='log'));   /* v1.x #7: Summarize available on Transcript + Scratch + Log */
+      const stp=document.getElementById('tx-stop-btn'); if(stp)stp.classList.toggle('hidden',t!=='transcript');   /* v1.x #6: Stop only on the Transcript */
       const sa=document.getElementById('feed-selall-btn'); if(sa)sa.classList.remove('hidden');   /* G2: select/deselect-all on every feed tab */
       const ov=document.getElementById('feed-summary'); if(ov)ov.classList.remove('open'); if(sb)sb.classList.remove('active');   /* close any open summary when switching feed tabs */
       if(typeof eaUpdate==='function')eaUpdate('feed');   /* R-batch items 6a/7: re-gate the feed link-dd + Output Export for the now-active tab's selection */
@@ -101,7 +102,7 @@
   function segPick(b){const g=b.closest('.seg');g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
   function pickOpt(el){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');}
   function pickDecision(el){const c=el.closest('.fcard,.rcard');c.querySelectorAll('.opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');const ap=c.querySelector('.dec-approve');if(ap)ap.disabled=false;}
-  function miniToggle(el){el.classList.toggle('on');applyMsgFilters();}
+  function miniToggle(el){el.classList.toggle('on');applyTxFilters();}
   function toggleSplitMenu(btn){const m=btn.parentElement.querySelector('.split-menu');const open=m.classList.contains('open');closeAllPopups();if(!open)m.classList.add('open');}
   function pickSplit(mi){const menu=mi.closest('.split-menu');menu.querySelectorAll('.split-mi').forEach(x=>x.classList.toggle('sel',x===mi));const l=menu.closest('.split').querySelector('.split-lbl');if(l){const base=mi.dataset.short||mi.querySelector('b').textContent;l.textContent=(l.dataset.prefix||'')+base;}menu.classList.remove('open');}
   function clearField(id){const el=document.getElementById(id);if(el){el.value='';if(el.classList.contains('autosize'))autosize(el);el.focus();}}
@@ -120,7 +121,11 @@
   function selectLibRow(el){el.parentElement.querySelectorAll('.lib-row').forEach(r=>r.classList.remove('on'));el.classList.add('on');}
 
   /* ===== v9p7 (A3) / L1 (ND 1+2): Library — Plan/Doc expand/collapse + two-column nav↔card sync + tab routing ===== */
-  function togglePlan(head){const c=head.closest('.plan-card');if(c){c.classList.toggle('open');syncNavHighlight(c.id);}LU();}   /* L1: opening/closing a card highlights/unhighlights its entry-nav row */
+  /* ND 2c: the entry list is a TRUE SINGLE-OPEN accordion (mirroring the Assets assetSel model) — opening any
+     card closes its siblings and clears their nav highlight, so exactly one nav row reads open at a time. */
+  function closeSiblingEntries(card){const list=card.parentElement;if(!list)return;
+    [...list.querySelectorAll('.plan-card.open')].forEach(c=>{if(c!==card){c.classList.remove('open');syncNavHighlight(c.id);}});}
+  function togglePlan(head){const c=head.closest('.plan-card');if(c){if(!c.classList.contains('open'))closeSiblingEntries(c);c.classList.toggle('open');syncNavHighlight(c.id);}LU();}   /* L1: opening/closing a card highlights/unhighlights its entry-nav row */
   function navRowFor(id){return document.querySelector('.docnav-row[data-navid="'+id+'"]');}
   /* L1: card→nav half of the bidirectional sync — a card's open state drives its nav row's .on */
   function syncNavHighlight(id){const card=document.getElementById(id);const row=navRowFor(id);if(row)row.classList.toggle('on',!!(card&&card.classList.contains('open')));}
@@ -128,6 +133,7 @@
      else Plans), opens/scrolls/flashes the matching card, and highlights its nav row. reviewPlan is a thin call into
      this (the Inbox "Plans & Docs" Review action routes through it — same doc-/plan- id-prefix convention). */
   function openEntry(id){switchTab('doc',id.indexOf('doc-')===0?'documents':'plan');const card=document.getElementById(id);if(!card)return;
+    closeSiblingEntries(card);   /* ND 2c: single-open accordion */
     card.classList.add('open');card.scrollIntoView({block:'nearest',behavior:'smooth'});
     card.classList.remove('plan-flash');void card.offsetWidth;card.classList.add('plan-flash');
     setTimeout(()=>card.classList.remove('plan-flash'),1000);syncNavHighlight(id);LU();}
@@ -149,22 +155,24 @@
       const mode=currentLensMode(id);ed.outerHTML=mdEditorHTML(id,e?e.md:ta.value,mode);   /* fresh view (closed popout, no selection) — same repaint planNavMode uses */
       if(typeof clearSel==='function')clearSel(id);if(typeof refreshJumpPills==='function')refreshJumpPills();
       /* L3-panel fix: a raw-md save can change the checklist — refresh the promoted header steps chip in place
-         (it lives in .plan-row.r1, outside the .doc-ed repaint), incl. appearing/disappearing at the 0 boundary. */
-      if(e){const r1=card.querySelector('.plan-row.r1');
-        if(r1){const dn=e.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
+         (ND 14: it lives at the head of .plan-row.r2 now, in the old filename slot, outside the .doc-ed repaint),
+         incl. appearing/disappearing at the 0 boundary. */
+      if(e){const r2=card.querySelector('.plan-row.r2');
+        if(r2){const dn=e.md.split('\n').filter(l=>/^\s*-\s*\[(x|X)\]/.test(l)).length;
           const sn=e.md.split('\n').filter(l=>/^\s*-\s*\[( |x|X)\]/.test(l)).length;
-          let chip=r1.querySelector('.cnt-chip.c-steps');
+          let chip=r2.querySelector('.cnt-chip.c-steps');
           if(!sn){if(chip)chip.remove();}
-          else{if(!chip){const t=r1.querySelector('.plan-title');if(t){t.insertAdjacentHTML('afterend','<span data-comp="count-chip" class="cnt-chip c-steps"><i data-lucide="list-checks"></i><span class="cn"></span></span>');chip=r1.querySelector('.cnt-chip.c-steps');}}
+          else{if(!chip){r2.insertAdjacentHTML('afterbegin','<span data-comp="count-chip" class="cnt-chip c-steps"><i data-lucide="list-checks"></i><span class="cn"></span></span>');chip=r2.querySelector('.cnt-chip.c-steps');}
             if(chip){chip.classList.toggle('all',dn===sn);chip.title=dn+' of '+sn+' steps done';const cn=chip.querySelector('.cn');if(cn)cn.textContent=dn+'/'+sn+' steps';}}}}
       btn.innerHTML='<i data-lucide="square-pen"></i>';btn.title='Edit';}
     else{ta.value=e?e.md:ta.value;ed.style.display='none';ta.style.display='block';
       btn.innerHTML='<i data-lucide="check"></i>';btn.title='Save';ta.focus();}
     if(typeof syncEditorMics==='function')syncEditorMics();LU();}
   function docAdd(){toast('Add a document — choose a file to add to the Library');}
+  /* (ND 14: planCopy is retired with the Editor-header Copy ghost — the merged Export control's "Copy selected"
+     covers copying; the header runs Comment → Edit → Mic now.) */
   /* plan decision/edit/copy (scripted demo): mutate PLANS state + re-render so the card, badges + count update */
-  function reopenPlan(id){const c=document.getElementById(id);if(c){c.classList.add('open');c.scrollIntoView({block:'nearest'});syncNavHighlight(id);}LU();}
-  function planCopy(id){const p=entryById(id);if(p&&navigator.clipboard)navigator.clipboard.writeText(p.md).catch(()=>{});toast((id.indexOf('doc-')===0?'Doc':'Plan')+' copied to clipboard');}
+  function reopenPlan(id){const c=document.getElementById(id);if(c){closeSiblingEntries(c);c.classList.add('open');c.scrollIntoView({block:'nearest'});syncNavHighlight(id);}LU();}   /* ND 2c: keeps the single-open discipline on programmatic reopens */
   /* decision/edit/copy for BOTH plans and docs (scripted demo): mutate the entry + re-render the right surface so the
      card, badges + tab count update. L1 (ND-6): docs now share the full decision trio (Revise · Reject · Approve). */
   function planAct(a,id){const p=entryById(id)||PLANS.find(x=>x.open)||DOCS.find(x=>x.open);if(!p)return;const own=AG[p.owner]?AG[p.owner].name:p.owner;
@@ -185,7 +193,8 @@
     {id:'mockup-v9',name:'mockup-v9.png',path:'design/mockup-v9.png',meta:'PNG · 1840×1120 · 412 KB',created:'Jun 18 · 6d ago',edited:'Jun 20 · 18h ago',grad:'linear-gradient(135deg,var(--main),var(--secondary))'},
     {id:'palette-ref',name:'palette-ref.png',path:'design/palette-ref.png',meta:'PNG · 1200×800 · 188 KB',created:'Jun 12 · 12d ago',edited:'Jun 12 · 12d ago',grad:'linear-gradient(135deg,var(--ag-violet),var(--ag-azure))'},
     {id:'graph-sketch',name:'graph-sketch.jpg',path:'design/graph-sketch.jpg',meta:'JPG · 1024×768 · 96 KB',created:'Jun 10 · 14d ago',edited:'Jun 10 · 14d ago',grad:'linear-gradient(135deg,var(--ag-amber),var(--ag-gold))'},
-    {id:'inbox-flow',name:'inbox-flow.png',path:'design/inbox-flow.png',meta:'PNG · 1600×900 · 274 KB',created:'Jun 19 · 5d ago',edited:'Jun 19 · 5d ago',grad:'linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))'}
+    {id:'inbox-flow',name:'inbox-flow.png',path:'design/inbox-flow.png',meta:'PNG · 1600×900 · 274 KB',created:'Jun 19 · 5d ago',edited:'Jun 19 · 5d ago',grad:'linear-gradient(135deg,var(--ag-emerald),var(--ag-cyan))'},
+    {id:'flow-spec',name:'flow-spec.pdf',path:'design/flow-spec.pdf',meta:'PDF · 6 pages · 1.1 MB',created:'Jun 21 · 3d ago',edited:'Jun 21 · 3d ago'}   /* ND 10: a non-image asset so the fixed slot's file-type-icon form renders */
   ];
   let assetSel='mockup-v9';
   /* A18: nav rows keep ONLY the Rename (pencil) ghost icon — the Delete (trash) ghost icon is removed (remove still
@@ -195,18 +204,26 @@
   function fileTypeIcon(name){const ext=(name.split('.').pop()||'').toLowerCase();
     if(['png','jpg','jpeg','gif','webp','svg','bmp','tiff'].includes(ext))return 'file-image';
     return 'file-text';}
+  function isImageFile(name){const ext=(name.split('.').pop()||'').toLowerCase();return ['png','jpg','jpeg','gif','webp','svg','bmp','tiff'].includes(ext);}
+  /* ND 10: the Assets leading slot is a FIXED FOOTPRINT — image files show a full-height THUMBNAIL (the seeded
+     gradient stands in for the real thumb; in the app it's Electron nativeImage.createThumbnailFromPath via the
+     Windows Shell provider, app.getFileIcon() the fallback — docs/ARCHITECTURE.md §7.16), non-image / unsupported
+     files a same-size file-type ICON. This reverses the earlier icon-only "A18" call for images. */
+  function assetThumbHTML(a){return isImageFile(a.name)
+    ?'<span data-comp="asset-thumb" data-variants="icon" class="asset-thumb" style="background:'+(a.grad||'var(--surface-3)')+'" title="'+esc(a.name)+'"></span>'
+    :'<span data-comp="asset-thumb" class="asset-thumb asset-thumb--icon" title="'+esc(a.name)+'"><i data-lucide="'+fileTypeIcon(a.name)+'"></i></span>';}
   function addMenuHTML(group){return '<div data-comp="add-menu" class="docnav-addwrap"><button class="docnav-add" onclick="toggleAddMenu(event,this)"><i data-lucide="plus"></i>Add '+(group==='assets'?'asset':'document')+'</button>'
     +'<div class="add-menu"><button class="add-mi" onclick="addDoc(event,\''+group+'\',\'file\')"><b><i data-lucide="folder-open"></i>Add file</b><span class="add-sub">Open the explorer</span></button>'
     +'<button class="add-mi" onclick="addDoc(event,\''+group+'\',\'paste\')"><b><i data-lucide="clipboard"></i>Paste</b><span class="add-sub">From the clipboard, auto-named</span></button></div></div>';}
   function renderAssets(){const nav=document.getElementById('asset-nav'),main=document.getElementById('asset-main');if(!nav||!main)return;
     if(ASSETS.length&&!ASSETS.find(a=>a.id===assetSel))assetSel=ASSETS[0].id;
     nav.innerHTML=ASSETS.map(a=>'<div class="docnav-row assetnav-row'+(a.id===assetSel?' on':'')+'" role="button" tabindex="0" data-asset="'+a.id+'" onclick="assetPick(this)">'
-      +'<i data-lucide="'+fileTypeIcon(a.name)+'" class="docnav-ic"></i>'   /* A18: per-type file icon (image) replaces the gradient thumbnail */
+      +assetThumbHTML(a)   /* ND 10: fixed-footprint leading slot — thumbnail for images, same-size file-type icon otherwise */
       +'<span class="docnav-lab"><span class="docnav-name">'+esc(a.name)+'</span><span class="docnav-path">'+esc(a.meta.split(' · ').pop())+'</span></span>'
       +navActsHTML()+'</div>').join('')+addMenuHTML('assets');
     main.innerHTML=ASSETS.map(a=>'<div data-comp="asset-card" class="assetdoc'+(a.id===assetSel?' on':'')+'" data-asset="'+a.id+'">'
       +'<div class="doc-header"><span class="dh-path">'+esc(a.path)+'</span><span class="dh-dates"><b>Created</b> '+a.created+'&nbsp;&nbsp;<b>Edited</b> '+a.edited+'</span></div>'
-      +'<div class="asset-preview"><span class="ap-img" style="background:'+a.grad+'"><i data-lucide="image"></i></span></div>'
+      +'<div class="asset-preview"><span class="ap-img" style="background:'+(a.grad||'var(--surface-3)')+'"'+(a.grad?'':' data-noimg')+'><i data-lucide="'+(isImageFile(a.name)?'image':fileTypeIcon(a.name))+'"'+(a.grad?'':' style="color:var(--muted)"')+'></i></span></div>'
       +'<div class="doc-foot" data-libfoot="asset-'+a.id+'" data-libkind="asset"></div></div>').join('');
     main.querySelectorAll('[data-libfoot]').forEach(s=>{s.innerHTML=libFootHTML(s.dataset.libfoot,s.dataset.libkind);});
     LU();}
@@ -214,14 +231,15 @@
     const nav=document.getElementById('asset-nav'),main=document.getElementById('asset-main');
     if(nav)nav.querySelectorAll('.assetnav-row').forEach(r=>r.classList.toggle('on',r===row));
     if(main)main.querySelectorAll('.assetdoc').forEach(d=>d.classList.toggle('on',d.dataset.asset===id));LU();}
-  /* P3 (#119): the Library "Editor" header for Plans + Documents — ghost Copy·Edit·Comment, right-aligned,
-     reusing Compose's ghost icon-buttons. Assets gets no header (an image isn't text-editable). */
-  function editHeadHTML(copyClick,editClick,cmtHost,editCls,micField){return '<div data-comp="editor-header" data-variants="rec" class="lib-edit-head"><span class="lib-edit-lab">Editor</span>'
-    +'<button data-comp="ghost-icon-button" class="ghost-ic editor-mic" data-micfield="'+(micField||'')+'" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button>'
+  /* P3 (#119) → ND 14: the Library "Editor" header for Plans + Documents — the entry's FILENAME rides inline
+     after the "Editor" label (moved off the card header's row 2), the Copy ghost is removed, and the icons run
+     Comment → Edit → Mic with the mic right-aligned. Assets gets no header (an image isn't text-editable). */
+  function editHeadHTML(editClick,cmtHost,editCls,micField,fname){return '<div data-comp="editor-header" data-variants="rec" class="lib-edit-head"><span class="lib-edit-lab">Editor</span>'
+    +(fname?'<span class="lib-edit-fname" title="'+esc(fname)+'">'+esc(fname)+'</span>':'')
     +'<span class="flex-1"></span>'
-    +'<button data-comp="ghost-icon-button" class="ghost-ic" onclick="'+copyClick+'" title="Copy"><i data-lucide="copy"></i></button>'
+    +'<button data-comp="ghost-icon-button" class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button>'
     +'<button data-comp="ghost-icon-button" class="ghost-ic '+(editCls||'')+'" onclick="'+editClick+'" title="Edit"><i data-lucide="square-pen"></i></button>'
-    +'<button data-comp="ghost-icon-button" class="ghost-ic cmt-btn is-off" data-cmthost="'+cmtHost+'" data-verdict="approve" onclick="openComposerFromCtl(this)" title="Comment on the selected line / section"><i data-lucide="message-square-plus"></i></button></div>';}
+    +'<button data-comp="ghost-icon-button" class="ghost-ic editor-mic" data-micfield="'+(micField||'')+'" title="Dictate (voice → text)" onclick="toggleMic(this)" onmousedown="event.preventDefault()" disabled><i data-lucide="mic"></i></button></div>';}
   /* L1: libFootHTML now serves ASSETS only — the Documents footer became the FULL planFootHTML (Export · Reviewer chip ·
      Revise·Reject·Approve, same as Plans). Assets keep the plain Export + Remove footer (an image is whole-file, so only
      Attach is enabled on it; no Review chip / Revise). The old doc-footer branch + its docRevise are retired. */
@@ -308,7 +326,7 @@
     const node=badge.closest('.node');
     if(node&&typeof selectNode==='function')selectNode(node);            /* (1) */
     openSubsAudit(id);                                                    /* (2) */
-    if(typeof switchTab==='function')switchTab('feed','messages');        /* (3) */
+    if(typeof switchTab==='function')switchTab('feed','transcript');        /* (3) */
     if(typeof setFeedSubFilter==='function')setFeedSubFilter(node,id);
     const pn=node?(node.querySelector('.text-foreground.truncate')||{}).textContent||'':'';
     toast('Feed scoped → '+(pn?pn.replace(/^\d+\s+/,'').trim()+' › ':'')+id);}
@@ -442,9 +460,9 @@
     +'<button class="exp-mi ea-mi" data-eamode="attach" onclick="eaSend(this)" disabled><i data-lucide="paperclip"></i><span class="lead"><b>Attach as file</b><span class="sub">save it as a doc + add a path chip to the Editor</span></span></button>'
     +'</div></div>';}
   function eaSelKind(host){
-    if(host==='feed'){if(document.querySelector('#msg-list .msgcard.sel'))return 'whole';if(document.querySelector('#msg-list .mrow.bsel'))return 'part';
+    if(host==='feed'){if(document.querySelector('#tx-list .txcard.sel'))return 'whole';if(document.querySelector('#tx-list .mrow.bsel'))return 'part';
       /* A9: Scratch/Log/Inbox whole-card select → Attach (no sub-select, so never 'part') */
-      const list=activeFeedList();if(list&&list.id!=='msg-list'&&list.querySelector('.fcard.sel'))return 'whole';
+      const list=activeFeedList();if(list&&list.id!=='tx-list'&&list.querySelector('.fcard.sel'))return 'whole';
       return null;}
     if(host==='hist'){return document.querySelector('#hist-list .fcard.sel')?'whole':null;}
     if(host.indexOf('asset-')===0)return 'whole';   /* an Asset is always attachable as a file */
@@ -491,15 +509,15 @@
     const cards=[...root.querySelectorAll('.fcard.sel')];if(!cards.length)return;
     cards.forEach(c=>{const txt=cardText(c);if(!txt)return;let src;
       if(host==='hist')src='Prompts → History';
-      else{const o=c.classList.contains('msgcard')?MSGS[+c.dataset.msgi]:null;const a=o?AG[o.ag]:null;src=a?('Team Feed · '+a.role+' '+a.name):'Team Feed';}
-      insertEmbed(src,txt,host==='hist'?"switchTab('prompt','history')":"switchTab('feed','messages')");});}
-  function eaEmbedFeed(){const rows=[...document.querySelectorAll('#msg-list .mrow.bsel')].filter(r=>!r.classList.contains('mrow--title'));if(!rows.length)return;
-    const card=rows[0].closest('.msgcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
+      else{const o=c.classList.contains('txcard')?MSGS[+c.dataset.msgi]:null;const a=o?AG[o.ag]:null;src=a?('Team Feed · '+a.role+' '+a.name):'Team Feed';}
+      insertEmbed(src,txt,host==='hist'?"switchTab('prompt','history')":"switchTab('feed','transcript')");});}
+  function eaEmbedFeed(){const rows=[...document.querySelectorAll('#tx-list .mrow.bsel')].filter(r=>!r.classList.contains('mrow--title'));if(!rows.length)return;
+    const card=rows[0].closest('.txcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
     /* A7: multi-select → embed the combined text of every selected block (in document order) as one quoted block */
     const text=rows.map(r=>((r.querySelector('.mrow-c')||{}).textContent||'').trim()).filter(Boolean).join('\n\n');
     const kinds=rows.map(r=>r.dataset.mblk==='text'?'message':(r.dataset.blk||'block'));
     const label=kinds.length>1?(kinds.length+' blocks'):kinds[0];
-    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+label,text,"switchTab('feed','messages')");}
+    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+label,text,"switchTab('feed','transcript')");}
   function insertEmbed(src,text,srcAction){const f=document.getElementById('compose-field');if(!f)return;
     switchTab('prompt','compose');
     f.insertAdjacentHTML('beforeend',blockHTML('embed',{source:src,body:esc(text),srcAction:srcAction,clamp:text.length>220,kindLabel:'embed'}));
@@ -519,11 +537,11 @@
     else {const p=PLANS.find(x=>x.id===host);if(!p)return;name=p.file;path='~/.claude/plans/'+p.file;type='doc';}
     addAttachment({id:nextAttId(),name:name,path:path,type:type});revealAttachment();toast('Attached '+name+' — path reference in the prompt');}
   /* A9: active feed list (Messages/Scratch/Log/Inbox) — the visible one drives the shared select-to-act strip */
-  function activeFeedList(){const t=currentFeedTab();return document.getElementById({messages:'msg-list',scratch:'scratch-list',log:'log-list',inbox:'inbox-list'}[t]||'msg-list');}
+  function activeFeedList(){const t=currentFeedTab();return document.getElementById({transcript:'tx-list',scratch:'scratch-list',log:'log-list',inbox:'inbox-list'}[t]||'tx-list');}
   function eaAttachFeed(){
     const list=activeFeedList();const tab=currentFeedTab();const cards=list?[...list.querySelectorAll('.fcard.sel')]:[];if(!cards.length)return;
     cards.forEach((card,k)=>{const txt=cardText(card);let base;
-      if(card.classList.contains('msgcard')){const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];base=a.name+'-msg-'+o.time.replace(/:/g,'');}
+      if(card.classList.contains('txcard')){const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];base=a.name+'-msg-'+o.time.replace(/:/g,'');}
       else base=tab+'-'+(k+1);
       const d=createDoc(txt,base+'.md');addAttachment({id:nextAttId(),name:d.name,path:d.path,type:'doc'});});
     revealAttachment();toast('Attached '+cards.length+' '+tab+' card'+(cards.length>1?'s':'')+' → saved to Documents');}
@@ -551,14 +569,14 @@
   const REVIEWERS={};
   function reviewChipHTML(planId){const k=REVIEWERS[planId]||'vega';const a=AG[k];
     return '<div data-comp="review-chip" data-status="planned" class="rev-chip" data-revchip="'+planId+'">'
-      +'<button class="rev-trig" type="button" onclick="toggleRevPop(this)" title="Choose the reviewer">'+badgeHTML(a,false)+'<i data-lucide="chevrons-up-down" class="picker-cv"></i></button>'
+      +'<button class="rev-trig" type="button" onclick="toggleRevPop(this)" title="Choose the reviewer">'+badgeHTML(a)+'<i data-lucide="chevrons-up-down" class="picker-cv"></i></button>'
       +'<div class="src-pop rev-pop"><div class="src-pop-head"><span class="sec-h" style="margin:0">Reviewer</span></div><div class="aglist aglist-scroll" style="max-height:220px">'+AG_ORDER.filter(x=>x!=='user').map(x=>revRowHTML(planId,x,x===k)).join('')+'</div></div>'
       +'<button data-status="planned" class="rev-act" type="button" onclick="sendReview(this)" title="Send this plan for review"><i data-lucide="scan-search"></i></button></div>';}   /* planned: sendReview is toast-only */
   function revRowHTML(planId,k,on){const a=AG[k];return '<button class="agrow'+(on?' on':'')+'" type="button" onclick="pickReviewer(this,\''+planId+'\',\''+k+'\')">'+agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
   function toggleRevPop(btn){const dd=btn.closest('.rev-chip');if(!dd)return;const pop=dd.querySelector('.rev-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open){pop.classList.add('open');const pc=btn.closest('.plan-card');if(pc)pc.classList.add('pop-open');}}   /* R11 item 5: release the enclosing plan-card's overflow clip so the downward dropdown isn't cut at the card edge */
   function pickReviewer(row,planId,k){REVIEWERS[planId]=k;const chip=row.closest('.rev-chip');
     chip.querySelectorAll('.aglist .agrow').forEach(r=>r.classList.remove('on'));row.classList.add('on');
-    const trig=chip.querySelector('.rev-trig');trig.innerHTML=badgeHTML(AG[k],false)+'<i data-lucide="chevrons-up-down" class="picker-cv"></i>';
+    const trig=chip.querySelector('.rev-trig');trig.innerHTML=badgeHTML(AG[k])+'<i data-lucide="chevrons-up-down" class="picker-cv"></i>';
     closeAllPopups();LU();}
   function sendReview(btn){const chip=btn.closest('.rev-chip');if(!chip)return;const k=REVIEWERS[chip.dataset.revchip]||'vega';toast('Sent for review to '+AG[k].name);}
 
@@ -818,15 +836,25 @@
     const btn=document.getElementById('turns-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('turns-bd-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('turns-chev');if(ch)ch.classList.toggle('up',open);});})();
 
   /* ===== HISTORY timeline ===== */
-  /* timeline of the focused agent's run — TOTAL = its Max-turns, current turn matches the Turns readout (34/50) */
+  /* timeline of the focused agent's run — TOTAL = its Max-turns, current turn matches the Turns readout (34/50).
+     ND 15: each turn also carries its SETTINGS at that turn (model + mode/effort/thinking — the agent-card icon
+     pairs) and a one-line SUMMARY (desc, single-line clamp); the build-side capture of both is ARCHITECTURE
+     §11.3 #39. The summary vocabulary is shared with the (queued) Team Feed / History collapsed previews. */
   const TOTAL=50;const TURNS=[
-    {n:27,time:'14:21',ctx:54,desc:'Posted CRITICAL finding to scratchpad'},{n:28,time:'14:28',ctx:58,desc:'Cross-checked with auditor-01 to confirm'},
-    {n:29,time:'14:33',ctx:61,desc:'Demoted rate-limit finding to medium'},{n:30,time:'14:39',ctx:62,desc:'Reviewed coder-01 patch diff'},
-    {n:31,time:'14:44',ctx:62,desc:'Requested regression test for rotation'},{n:32,time:'14:48',ctx:62,desc:'Re-checked expiry path under reuse'},
-    {n:33,time:'14:52',ctx:62,desc:'Approved remediation plan ordering'},{n:34,time:'14:56',ctx:62,desc:'Awaiting deploy gate decision',cur:true}];
+    {n:27,time:'14:21',ctx:54,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Posted CRITICAL finding to scratchpad'},{n:28,time:'14:28',ctx:58,model:'opus 4.8',mode:'auto',effort:'high',think:'off',desc:'Cross-checked with auditor-01 to confirm'},
+    {n:29,time:'14:33',ctx:61,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Demoted rate-limit finding to medium'},{n:30,time:'14:39',ctx:62,model:'opus 4.8',mode:'auto',effort:'max',think:'on',desc:'Reviewed coder-01 patch diff'},
+    {n:31,time:'14:44',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Requested regression test for rotation'},{n:32,time:'14:48',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Re-checked expiry path under reuse'},
+    {n:33,time:'14:52',ctx:62,model:'opus 4.8',mode:'ask',effort:'high',think:'on',desc:'Approved remediation plan ordering'},{n:34,time:'14:56',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Awaiting deploy gate decision',cur:true}];
   function ctxColor(p){return p<50?'var(--success)':(p<=75?'var(--warning)':'var(--danger)');}
-  function renderHist(mode){const panel=document.getElementById('hist-panel');if(!panel)return;const icon=mode==='handoff'?'git-branch':'undo-2';const tip=mode==='handoff'?'Hand off from here':'Rewind to here';
-    panel.innerHTML=TURNS.map(t=>'<div class="tl-row'+(t.cur?' current':'')+'"><div class="tl-main"><div class="tl-top"><span class="tl-turn">Turn '+t.n+'/'+TOTAL+'</span>'+(t.cur?'<span class="tl-now">now</span>':'')+'<span class="tl-time">'+t.time+'</span><span class="tl-ctx" style="color:'+ctxColor(t.ctx)+'">'+t.ctx+'%</span></div><div class="tl-desc">'+t.desc+'</div></div><button class="tl-ic" title="'+tip+'" onclick="confirmPick('+t.n+",'"+mode+"')\"><i data-lucide=\""+icon+'"></i></button></div>').join('');
+  /* ND 15 (confirmed, both modes): each row is BUTTON-LIKE with the whole row as the click target — the row
+     click fires confirmPick (the trailing .tl-ic icon button is retired). Row 1 = count only ("34/50") · now ·
+     ctx % · the settings string · right-aligned timestamp; row 2 = the turn summary. */
+  function tlSetHTML(t){return '<span class="tl-set" title="model · mode · effort · thinking">'+t.model
+    +'<span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>'+t.mode+'</span>'
+    +'<span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>'+t.effort+'</span>'
+    +'<span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>'+t.think+'</span></span>';}
+  function renderHist(mode){const panel=document.getElementById('hist-panel');if(!panel)return;const tip=mode==='handoff'?'Hand off from the end of this turn':'Rewind to the end of this turn';
+    panel.innerHTML=TURNS.map(t=>'<div class="tl-row'+(t.cur?' current':'')+'" role="button" tabindex="0" title="'+tip+'" onclick="confirmPick('+t.n+",'"+mode+"')\"><div class=\"tl-main\"><div class=\"tl-top\"><span class=\"tl-turn\">"+t.n+'/'+TOTAL+'</span>'+(t.cur?'<span class="tl-now">now</span>':'')+'<span class="tl-ctx" style="color:'+ctxColor(t.ctx)+'">'+t.ctx+'%</span>'+tlSetHTML(t)+'<span class="tl-time">'+t.time+'</span></div><div class="tl-desc">'+t.desc+'</div></div></div>').join('');
     LU();const cur=panel.querySelector('.tl-row.current');if(cur)panel.scrollTop=Math.max(0,cur.offsetTop-8);}
   function confirmPick(n,mode){const c=document.getElementById('hist-confirm');if(!c)return;c.style.display='flex';
     c.innerHTML='<span>'+(mode==='handoff'?'Hand off a new agent seeded through Turn '+n+'?':'Rewind this agent to the end of Turn '+n+'?')+'</span>';
@@ -838,7 +866,7 @@
       else{toast('Rewound '+a.name+' to the end of Turn '+n);trimTimeline(n);}};
     c.appendChild(go);LU();}
   function trimTimeline(n){const panel=document.getElementById('hist-panel');if(!panel)return;
-    [...panel.querySelectorAll('.tl-row')].forEach(r=>{const t=r.querySelector('.tl-turn');const m=t&&t.textContent.match(/Turn (\d+)/);if(m&&parseInt(m[1],10)>n)r.style.display='none';});}
+    [...panel.querySelectorAll('.tl-row')].forEach(r=>{const t=r.querySelector('.tl-turn');const m=t&&t.textContent.match(/^(\d+)\//);if(m&&parseInt(m[1],10)>n)r.style.display='none';});}   /* ND 15: the count reads "34/50" (no "Turn" word) */
   /* ===== Create-wizard + Retire handlers (scripted demos) ===== */
   const NAME_POOL=['kai','drew','rowan','vale','wren','sage','nova','ash','juno','remy','sol','bex','indi','koa'];
   function rosterNames(){return new Set([...document.querySelectorAll('#graph-grid .node .text-foreground.truncate')].map(e=>e.textContent.replace(/^\d+\s+/,'').trim()));}
@@ -869,6 +897,23 @@
     const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=restore;
     const go=document.createElement('button');go.className=opts.goClass+' btn-sm';go.innerHTML=opts.goLabel;go.onclick=()=>{restore();opts.onGo();};
     c.appendChild(cancel);c.appendChild(go);foot.appendChild(c);LU();}
+  /* ND 13: "Save" — the first Details action: writes the focused agent's CURRENT config out as an agent.md,
+     with a filename input and a destination pick per the two-scope model — Save to project
+     (<project>/.awl-cc-dash/agents) / Save to system (the persistent cross-project store, ~/.claude/agents).
+     Reuses the inline footer-confirm pattern (scripted demo — the real write is backend work). */
+  function saveAgentMd(btn){const a=AG[FOCUS]||{name:'agent',role:'agent'};const foot=document.getElementById('mid-foot-details');if(!foot||foot.querySelector('.foot-confirm'))return;
+    const btns=[...foot.querySelectorAll(':scope > button')];btns.forEach(b=>b.style.display='none');
+    const c=document.createElement('div');c.className='tl-confirm foot-confirm';c.setAttribute('data-comp','inline-confirm');
+    c.style.cssText='display:flex;width:100%;align-items:center;gap:var(--space-6);flex-wrap:wrap;';
+    c.innerHTML='<span style="flex:0 0 auto">Save config as</span>';
+    const inp=document.createElement('input');inp.className='in';inp.style.cssText='flex:1 1 90px;min-width:70px;height:var(--size-24);padding:0 var(--space-6);';inp.value=(a.role||'agent')+'.md';c.appendChild(inp);
+    const restore=()=>{c.remove();btns.forEach(b=>b.style.display='');};
+    const mk=(cls,label,dest)=>{const b=document.createElement('button');b.className=cls+' btn-sm';b.textContent=label;
+      b.onclick=()=>{const nm=(inp.value.trim()||'agent.md');restore();toast('Saved '+nm+' → '+dest);};return b;};
+    c.appendChild(mk('btn-main','Save to project','<project>/.awl-cc-dash/agents/'));
+    c.appendChild(mk('btn','Save to system','the system store (~/.claude/agents)'));
+    const cancel=document.createElement('button');cancel.className='btn btn-sm';cancel.textContent='Cancel';cancel.onclick=restore;c.appendChild(cancel);
+    foot.appendChild(c);inp.focus();inp.select();LU();}
   function retireAgent(btn){const a=AG[FOCUS]||{name:'this agent',role:''};
     footConfirm({msg:'Retire '+a.role+' · '+a.name+'? This ends the session.',goClass:'btn-danger',goLabel:'<i data-lucide="power" class="w-3.5 h-3.5"></i>Retire',
       onGo:()=>{toast('Retired '+a.name);const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node){node.style.opacity='.4';node.style.filter='grayscale(1)';}}});}
@@ -1015,7 +1060,7 @@
   const JUMP_THRESHOLD=24;   /* px from an edge before the pill appears / hides */
   /* the scroll regions to equip (curated so tiny popovers/menus are skipped); a few share a class, so use a broad set */
   /* contenteditable (.compose-rich) is intentionally EXCLUDED — injecting a non-editable child would corrupt its text */
-  const JUMP_SELECTOR=['#feed-messages','#feed-scratch','#feed-log','#feed-inbox','#prompt-history',
+  const JUMP_SELECTOR=['#feed-transcript','#feed-scratch','#feed-log','#feed-inbox','#prompt-history',
     '.md','.con-feed','.con-cat-list','.asset-grid','.docnav','.set-body','.fb-list','.ol-list','.tl','.aglist-scroll'].join(',');   /* D: `.md` is the REAL Plans+Documents editor-body scroller (.doc-view-host>.doc-ed>.md); the old `.doc-view` selector matched NO element in the live markup */
   function jumpUpdate(el){const pills=el._jumpPills;if(!pills)return;
     const top=pills.querySelector('.jump-top'),bot=pills.querySelector('.jump-bottom');
@@ -1076,17 +1121,22 @@
     toast('Link saved — '+dir+' · '+trig+' · '+rel);toggleDrawer();bumpLinks(1);}
   function linkDelete(){toast('Link removed');toggleDrawer();bumpLinks(-1);}
 
-  /* ===== v8p6: Role combobox — options from user/project agent.md files; create-side prefills from front matter ===== */
+  /* ===== v8p6 → ND 12: Role combobox — the agent.md PRESET LOADER. Its entries group by the settled two-scope
+     model: SYSTEM (the persistent cross-project store, incl. ~/.claude/agents — the old "User" scope folded in)
+     and PROJECT (<project>/.awl-cc-dash/agents). Picking an entry in Create auto-fills every Create field from
+     the file's front matter (prefillFromRole); in Details the Role field is VIEW-ONLY — a running agent's
+     agent.md can't be reassigned (config is create/launch-time — ARCHITECTURE §7.15), so the pencil is gone
+     and the field stays locked after session start. ===== */
   const ROLE_DEFS=[
-    {group:'Project agents (.claude/agents)',items:[
-      {name:'echo',desc:'Session distiller and intent archaeologist. Extracts structured implementation briefs from messy, multi-turn Claude Code sessions.',skills:['distill','session-brief'],tools:['Read','Glob','Grep','Bash','WebSearch','WebFetch']},
-      {name:'vibe-guide',desc:'Builds applications through conversation — turns user vision, references and vibes into working apps while handling the technical complexity.',skills:['ui-ux-pro-max:ui-styling','ui-ux-pro-max:design-system'],tools:['Read','Glob','Grep','Bash','Write','Edit','WebSearch','WebFetch']},
-    ]},
-    {group:'User agents (~/.claude/agents)',items:[
+    {group:'System agents (~/.claude/agents · cross-project)',items:[
       {name:'gsd-debugger',desc:'Investigates bugs using the scientific method; manages debug sessions and checkpoints.',skills:[],tools:['Read','Write','Edit','Bash','Grep','Glob','WebSearch']},
       {name:'gsd-planner',desc:'Creates executable phase plans with task breakdown and dependency analysis.',skills:[],tools:['Read','Grep','Glob','Bash']},
       {name:'gsd-codebase-mapper',desc:'Explores a codebase and writes structured analysis docs (STACK, ARCHITECTURE, …).',skills:[],tools:['Read','Grep','Glob','Bash']},
       {name:'gsd-ui-researcher',desc:'Produces UI-SPEC.md design contracts for frontend phases.',skills:[],tools:['Read','Grep','Glob','WebSearch','WebFetch']},
+    ]},
+    {group:'Project agents (<project>/.awl-cc-dash/agents)',items:[
+      {name:'echo',desc:'Session distiller and intent archaeologist. Extracts structured implementation briefs from messy, multi-turn Claude Code sessions.',skills:['distill','session-brief'],tools:['Read','Glob','Grep','Bash','WebSearch','WebFetch']},
+      {name:'vibe-guide',desc:'Builds applications through conversation — turns user vision, references and vibes into working apps while handling the technical complexity.',skills:['ui-ux-pro-max:ui-styling','ui-ux-pro-max:design-system'],tools:['Read','Glob','Grep','Bash','Write','Edit','WebSearch','WebFetch']},
     ]},
   ];
   function buildCombo(el){const pop=el.querySelector('.combo-pop');if(!pop)return;
@@ -1189,12 +1239,12 @@
       const mine=list.filter(({lk})=>lk.a===key||lk.b===key);
       if(!mine.length||!AG[key])return;const a=AG[key];
       mine.sort((x,y)=>AG_ORDER.indexOf(x.lk.a===key?x.lk.b:x.lk.a)-AG_ORDER.indexOf(y.lk.a===key?y.lk.b:y.lk.a));   /* peer-adjacent */
-      html+='<div data-comp="registry-group-header" class="reg-grp link-grp"><span class="ovl-host">'+badgeHTML(a,true)
+      html+='<div data-comp="registry-group-header" class="reg-grp link-grp"><span class="ovl-host">'+badgeHTML(a)
         +'<span data-comp="corner-count-badge" data-variants="none" class="ovl-count" title="'+mine.length+' link'+(mine.length===1?'':'s')+'">'+mine.length+'</span></span></div>';
       html+=mine.map(({lk,i})=>{const isA=lk.a===key;const other=AG[isA?lk.b:lk.a];if(!other)return '';
         const arrow=linkArrow(lk.dir,isA);const ttl=arrow==='arrow-right'?'to':(arrow==='arrow-left'?'from':'both ways');
         return '<button class="link-row" onclick="linkListPick(this)" data-link="'+i+'" title="Load this link to edit (planned)">'
-          +'<span class="link-arrow" title="'+ttl+'"><i data-lucide="'+arrow+'"></i></span>'+badgeHTML(other,true)
+          +'<span class="link-arrow" title="'+ttl+'"><i data-lucide="'+arrow+'"></i></span>'+badgeHTML(other)
           +'<span class="link-rel">'+relLabel(lk.rel)+'</span></button>';}).join('');});
     return html;}
   function linkSecHTML(lab,items,open){return '<div class="link-sec'+(open?' open':'')+'"><button class="link-sec-head" type="button" onclick="toggleLinkSec(this)">'
@@ -1269,9 +1319,9 @@
       toast('Exported '+n+' prompt'+(n>1?'s':'')+' → Documents · '+fname);}}
 
   /* ===== v8p8: Messages — multi-select cards + footer actions ===== */
-  /* (the old selectMsgCard toggler was removed — the live select paths are msgWholeSel()/msgBlkSelMulti(), which
+  /* (the old selectMsgCard toggler was removed — the live select paths are txWholeSel()/txBlkSelMulti(), which
      re-gate via eaUpdate('feed'); a separate setter that omitted that gate was a latent trap.) */
-  function msgAct(a){const sel=[...document.querySelectorAll('#feed-messages .rcard.sel')];
+  function txAct(a){const sel=[...document.querySelectorAll('#feed-transcript .rcard.sel')];
     if(a==='copy'&&sel.length&&navigator.clipboard){const txt=sel.map(c=>{const b=c.querySelector('.rc-body');return b?b.textContent:'';}).join('\n\n');navigator.clipboard.writeText(txt).catch(()=>{});return;}
     if(a==='stop'){toast('Stopping the active run…');return;}   /* v1.x #6: Stop the agent's run (mock) */
     /* summarize / share — wired to the runtime in the real build (mock here) */}
@@ -1423,8 +1473,14 @@
     :a.system
     ?'<span class="agtile agtile--system"><i data-lucide="settings" class="agtile-luc"></i></span>'   /* item 15: gear on navy — reads as WHO (an identity tile), not the Settings control */
     :'<span class="agtile" style="color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span>';}
-  function badgeHTML(a,sm){return '<span data-comp="identity-badge" data-variants="sub" class="badge badge-c'+(sm?' badge-sm':'')+(a.user?' ag-user-badge':'')+'">'
+  /* ND 5: the identity badge is TWO-TIER now — badgeHTML is the dense default (the old .badge-sm footprint,
+     folded into the .badge base), badgeXsHTML the small tier (the .rcpt recipient footprint — tile + name only,
+     var(--badge-m-h)) used by the review-rail nav cards and the History receiver badges (kept matched with the
+     Transcript recipients). */
+  function badgeHTML(a){return '<span data-comp="identity-badge" data-variants="sub" class="badge badge-c'+(a.user?' ag-user-badge':'')+'">'
     +agtileHTML(a)+'<span class="b-lab"><span class="b-role">'+a.role+'</span><span class="b-name">'+a.name+'</span></span></span>';}
+  function badgeXsHTML(a){return '<span data-comp="identity-badge" data-variants="sub" class="badge-xs" title="'+a.role+' '+a.name+'">'
+    +agtileHTML(a)+'<span class="bx-nm">'+esc(String(a.name).replace(/^\d+\s*/,''))+'</span></span>';}
   function agrowHTML(k,on){const a=AG[k];return '<button class="agrow'+(on?' on':'')+'" onclick="toggleAgRow(this)" data-ag="'+k+'">'
     +agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
   function fillAgLists(){document.querySelectorAll('[data-aglist]').forEach(el=>{el.innerHTML=AG_ORDER.map(k=>agrowHTML(k)).join('');});}
@@ -1482,16 +1538,19 @@
      the neutral users-glyph gutter badge (rd--author) parallels railBadge but opens the author box (openAuthorPop). */
   function getAuthors(host){const e=entryById(host);return e?(e.authors||[]):[];}   /* L1: unified — docs now share the same nav rail + Authors lens as plans (the doc-hosts-return-[] special case is gone) */
   function authorsBySec(list){const m={};list.forEach(f=>{(m[f.sec]=m[f.sec]||[]).push(f);});return m;}
-  function authorBadge(host,sec,list){const n=list.length;
-    return '<span class="rd rd--author" title="Open '+n+' edit'+(n>1?'s':'')+' on '+esc(sec)+' →" onclick="event.stopPropagation();openAuthorPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="users"></i><span class="rd-n">'+n+'</span></span>';}
+  function authorBadge(host,sec,list){const n=list.length;const lab=sec||'the whole document';   /* ND 3b: sec='' = the document-wide group (the title-row gutter badge) */
+    return '<span class="rd rd--author" title="Open '+n+' edit'+(n>1?'s':'')+' on '+esc(lab)+' →" onclick="event.stopPropagation();openAuthorPop(\''+host+'\',\''+esc(sec)+'\')"><i data-lucide="users"></i><span class="rd-n">'+n+'</span></span>';}
   function mdEditorHTML(host,text,mode){mode=mode||'feedback';   /* the gutter is lens-aware: feedback→verdict badges (revise/block only) · authors→neutral author badges · outline→no badges */
     const fb=mode==='feedback'?fbCountsBySec(getFeedback(host)):null;const au=mode==='authors'?authorsBySec(getAuthors(host)):null;
     const rows=text.split('\n').map((ln,i)=>{const n=i+1;const secid='s'+i;
       /* L2 (b): level-generic heading parse — ## .. #### → level = hash count; the title (#) stays whole-doc. */
       const isTitle=/^#\s+/.test(ln);const hm=ln.match(/^(#{2,4})\s+(.*)/);const isHead=!!hm;const level=isHead?hm[1].length:0;const sec=isHead?hm[2]:'';
-      const c=isHead?(fb?fb[sec]:(au?au[sec]:null)):null;
+      /* ND 3b: the DOC-WIDE author badge renders in the rail's TITLE cell too — the `# ` row's gutter now
+         computes the document-wide {sec:null} author group (it used to be computed only for isHead rows,
+         leaving the seeded whole-doc data invisible). */
+      const c=isHead?(fb?fb[sec]:(au?au[sec]:null)):(isTitle&&au?au[null]:null);
       /* L2 (e): the feedback gutter chip renders ONLY for revise/block — an approved section shows none (absence = approved). */
-      const gutter=c?(au?authorBadge(host,sec,c):((c.revise||c.block)?railBadge(host,sec,c):'')):'';
+      const gutter=c?(au?authorBadge(host,isTitle?'':sec,c):((c.revise||c.block)?railBadge(host,sec,c):'')):'';
       /* L2 (b/c): every heading row carries data-secid (unique line index) + data-hlevel; data-sec keeps the
          human name so feedback (keyed by name) still maps to the row. */
       const hAttrs=isHead?' data-secid="'+secid+'" data-hlevel="'+level+'" data-sec="'+esc(sec)+'"':'';
@@ -1543,7 +1602,7 @@
     if(cur&&((cur.kind==='all'&&isTitle)||(cur.kind==='sec'&&isHead&&cur.ref===secid)||(cur.kind==='line'&&cur.ref===n))){clearSel(host);return;}
     ed.querySelectorAll('.md-row.rsel,.md-row.rsel-sec').forEach(r=>r.classList.remove('rsel','rsel-sec'));
     if(isTitle){/* the title selects the whole document */ ed.querySelectorAll('.md-row').forEach(r=>r.classList.add(r.querySelector('.md-h1')?'rsel':'rsel-sec'));
-      SELby[host]={kind:'all',ref:'all',label:'Whole document'};}
+      SELby[host]={kind:'all',ref:'all',label:'Whole doc'};}   /* ND 3d: the doc-wide label reads "Whole doc" */
     else if(isHead){/* L2 (c): nested boundary via sectionRows — spans sub-headings until the next same-or-higher heading */
       const rows=sectionRows(host,secid);rows.forEach((r,i)=>r.classList.add(i===0?'rsel':'rsel-sec'));
       SELby[host]={kind:'sec',ref:secid,sec:row.dataset.sec,label:'§ '+row.dataset.sec};}
@@ -1594,11 +1653,12 @@
   function openCmtPop(host,sec){const list=getFeedback(host);const pop=popFor(host);if(!pop)return;
     dropBoxSel(host);   /* L3-panel fix: the popover content is being replaced — a box selection from the previous section is stale (Export would act on invisible content) */
     const items=list.filter(f=>f.sec===sec);
-    /* L3 (5b): row-1 order is badge · verdict · thumbs · spacer · timestamp (the time pins right). L3 (5c): each
-       row is click-to-select (toggleBoxSel) → the merged Export control can Embed/Copy the picked comment(s). */
+    /* ND 4d: row-1 order is badge · verdict · spacer · timestamp · THUMBS — the thumbs right-align after the
+       right-aligned time (they live ONLY here, never on the nav cards). L3 (5c): each row is click-to-select
+       (toggleBoxSel) → the merged Export control can Embed/Copy the picked comment(s). */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">§ '+esc(sec)+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' comment'+(items.length===1?'':'s')+'</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
-        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+verdictBadgeHTML(f.verdict)+thumbsHTML()+'<span class="flex-1"></span><span class="cph-time">'+(f.time||'')+'</span></div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
+        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a)+verdictBadgeHTML(f.verdict)+'<span class="flex-1"></span><span class="cph-time">'+(f.time||'')+'</span>'+thumbsHTML()+'</div>'+(f.comment?'<div class="cpi-txt">'+esc(f.comment)+'</div>':'<div class="cpi-none">no comment left</div>')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   function closeCmtPop(host){const pop=popFor(host);if(pop){pop.classList.remove('open');pop.innerHTML='';}deselectNavCards(host);clearFbHL(host);
     /* L3 (5c): the popover box selection lives only while the popover is open — drop it + re-gate Export on close */
@@ -1611,15 +1671,15 @@
   /* L3 (5a): each author-box row uses the comment-box layout grammar minus the thumbs — row 1 = agent badge + a
      Drafted/Edited/Revised action badge (a neutral .dbadge variant, .au-act) + the timestamp right-aligned; row 2 =
      the edit summary (wraps). L3 (5c): rows are click-to-select (toggleBoxSel) so an edit can be embedded in a prompt. */
-  function authorActionBadge(action){return '<span data-comp="lifecycle-badge" class="dbadge au-act">'+esc(action||'Edited')+'</span>';}
+  function authorActionBadge(action){return '<span data-comp="contribution-badge" data-variants="drafted edited revised" class="dbadge au-act">'+esc(action||'Edited')+'</span>';}   /* ND 11c: the contribution badge is its own component now (its three action states declared on the element — the retired gallery-specimen leg's replacement) */
   function openAuthorPop(host,sec){const list=getAuthors(host);const pop=popFor(host);if(!pop)return;
     dropBoxSel(host);   /* L3-panel fix: same stale-box drop as openCmtPop */
     /* L3: key ''/null to the ONE document-wide group (L2's {sec:null} draft seed) — navCardClick passes '' for it;
        the header then reads "Whole document" (the title-cell register) rather than an empty "§" badge. */
-    const items=list.filter(f=>(f.sec||'')===(sec||''));const secLab=sec?('§ '+esc(sec)):'Whole document';
+    const items=list.filter(f=>(f.sec||'')===(sec||''));const secLab=sec?('§ '+esc(sec)):'Whole doc';   /* ND 3d */
     pop.innerHTML='<div class="cmt-pop-head"><span class="cph-ic"><i data-lucide="users"></i></span><span class="sel-badge">'+secLab+'</span><span class="cph-time" style="margin-left:auto">'+items.length+' edit'+(items.length===1?'':'s')+'</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
       +'<div class="cmt-pop-body">'+items.map(f=>{const a=AG[f.ag];
-        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a,true)+authorActionBadge(f.action)+'<span class="flex-1"></span><span class="cph-time cph-time--clk"><i data-lucide="clock" class="au-clk"></i>'+(f.time||'')+'</span></div>'+(f.summary?'<div class="cpi-txt">'+esc(f.summary)+'</div>':'')+'</div>';}).join('')+'</div>';
+        return '<div class="cmt-pop-item" role="button" tabindex="0" title="Select to add to a prompt (Export → Embed / Copy)" onclick="toggleBoxSel(this,\''+host+'\')"><div class="cpi-h">'+badgeHTML(a)+authorActionBadge(f.action)+'<span class="flex-1"></span><span class="cph-time cph-time--clk"><i data-lucide="clock" class="au-clk"></i>'+(f.time||'')+'</span></div>'+(f.summary?'<div class="cpi-txt">'+esc(f.summary)+'</div>':'')+'</div>';}).join('')+'</div>';
     pop.classList.add('open');LU();selectMatchingCards(host,sec);highlightFbSection(host,sec);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
   /* v9p14c: a small "Mark as" verdict dropdown lives INSIDE the composer (the Comment control is now a
      plain button); pick a verdict here, then Save commits it */
@@ -1633,7 +1693,7 @@
   function openComposer(host,verdict){const sel=SELby[host];if(!sel||sel.kind==='box'){toast('Select a line or section first');return;}const pop=popFor(host);if(!pop)return;   /* L3 (5c): a popover box selection isn't a line/section to comment on */
     deselectNavCards(host);clearFbHL(host);   /* composing is a separate flow from viewing existing feedback */
     pop.innerHTML='<div class="cmt-pop-head"><span class="sel-badge">'+esc(sel.label)+'</span><span class="cph-lab">New comment</span><span class="flex-1"></span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close" onclick="closeCmtPop(\''+host+'\')"><i data-lucide="x"></i></button></div>'
-      +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user,true)+'<span class="cph-lab" style="margin-left:var(--space-2)">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
+      +'<div class="cmt-pop-body"><div class="cmt-compose"><div class="cpi-h">'+badgeHTML(AG.user)+'<span class="cph-lab" style="margin-left:var(--space-2)">Mark as</span>'+verdictDropdownHTML(verdict)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
       +'<textarea class="in cmt-ta" oninput="syncCommentSave(\''+host+'\')" placeholder="Add a comment or tags…"></textarea>'
       +'<div class="cmt-foot"><span class="cmt-req"></span><span class="flex-1"></span><button data-comp="button" class="btn btn-sm" onclick="closeCmtPop(\''+host+'\')">Cancel</button><button data-comp="button" class="btn-main btn-sm cmt-save" onclick="saveComment(\''+host+'\')"><i data-lucide="check" class="w-3.5 h-3.5"></i>Save</button></div></div></div>';
     pop.classList.add('open');LU();syncCommentSave(host);pop.scrollIntoView({block:'nearest',behavior:'smooth'});}
@@ -1733,7 +1793,7 @@ Reflow the three-pane frame and add the Documentation panel without regressing t
 ## TL;DR
 Reading order becomes Agent · Team Graph · Documentation · Feed · Prompt, with resize intact.`,
      feedback:[],
-     authors:[{sec:null,ag:'lex',action:'Drafted',time:'Jun 20 10:50',summary:'Drafted the dashboard layout-reflow plan.'},{sec:'Context',ag:'lex',action:'Edited',time:'Jun 20 10:50',summary:'Framed the reflow goal without regressing resize.'},{sec:'Steps',ag:'lex',action:'Edited',time:'Jun 20 11:02',summary:'Sketched the audit → reorder → move → insert → verify steps.'}]}
+     authors:[{sec:null,ag:'lex',action:'Drafted',time:'Jun 20 10:50',summary:'Drafted the dashboard layout-reflow plan.'},{sec:'Context',ag:'lex',action:'Edited',time:'Jun 20 10:50',summary:'Framed the reflow goal without regressing resize.'},{sec:'Steps',ag:'lex',action:'Edited',time:'Jun 20 11:02',summary:'Sketched the audit → reorder → move → insert → verify steps.'},{sec:'Steps',ag:'lex',action:'Revised',time:'Jun 20 11:30',summary:'Reordered the steps after the structure audit.'}]}   /* ND 3a: lex now carries all THREE distinct actions (Drafted/Edited/Revised) so the 3-badge overlap stack is exercised in the Authors roster */
   ];
   /* L1 (ND-1): DOCS — the project docs as reviewable-document entries in the SAME shape as PLANS (id doc-*, file,
      status, title, owner, created/edited, md, feedback[], authors[]) so the whole Plans machinery — the 3-row card,
@@ -1824,49 +1884,70 @@ Short-lived notes for the current run — kept brief on purpose.
   function planNavHTML(p,fb,mode){
     /* L2 (b): a level-generic parse — headings ##..#### carry their level; each outline item is anchored to the
        heading's LINE INDEX (data-secid), never its text, so repeated sub-headings can't collide. */
-    const heads=[];p.md.split('\n').forEach((l,i)=>{const m=l.match(/^(#{2,4})\s+(.*)/);if(m)heads.push({level:m[1].length,text:m[2],secid:'s'+i});});
-    const outline=heads.map(h=>{const c=fb[h.text];const worst=c?(c.block?'d-block':(c.revise?'d-revise':'')):'';const cnt=c?(c.approve+c.revise+c.block):0;   /* L2 (e): approve no longer tints the dot — only revise/block survive */
-      return '<button data-comp="outline-item" class="ol-item" style="--hl:'+h.level+'" data-hlevel="'+h.level+'" data-secid="'+h.secid+'" onclick="planJump(\''+p.id+'\',this)"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+esc(h.text)+'</span>'+(cnt?'<span class="ol-c">'+cnt+'</span>':'')+'</button>';}).join('');
-    const auN=(p.authors||[]).length;   /* V1 lens tab strip: Outline keeps its label + takes the first half; Feedback + Authors are icon+count tabs splitting the second half */
+    const heads=[];p.md.split('\n').forEach((l,i)=>{const m=l.match(/^(#{2,4})\s+(.*)/);if(m)heads.push({level:m[1].length,text:m[2],secid:'s'+i,line:i+1});});
+    /* ND 3c: the entry's right-hand number is the heading's LINE NUMBER (the revise/block dot already signals
+       "this section has feedback", so the old feedback count lost no signal). */
+    const outline=heads.map(h=>{const c=fb[h.text];const worst=c?(c.block?'d-block':(c.revise?'d-revise':'')):'';   /* L2 (e): approve no longer tints the dot — only revise/block survive */
+      return '<button data-comp="outline-item" class="ol-item" style="--hl:'+h.level+'" data-hlevel="'+h.level+'" data-secid="'+h.secid+'" onclick="planJump(\''+p.id+'\',this)"><span class="ol-dot '+worst+'"></span><span class="ol-nm">'+esc(h.text)+'</span><span class="ol-c" title="line '+h.line+'">'+h.line+'</span></button>';}).join('');
+    const auN=(p.authors||[]).length;   /* ND 1b: the lens strip's text tab reads "TOC" (its body caption stays "Table of contents"), freeing width so the nav could narrow; Feedback + Authors stay icon+count tabs splitting the second half */
     const tabs='<div class="nav-tabs">'
-      +'<button data-comp="nav-tab" class="nav-tab nav-tab--ol '+(mode==='outline'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'outline\')" title="Outline"><span class="nt-ic"><i data-lucide="list"></i></span><span class="nt-lab">Outline</span></button>'
+      +'<button data-comp="nav-tab" class="nav-tab nav-tab--ol '+(mode==='outline'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'outline\')" title="TOC — table of contents"><span class="nt-ic"><i data-lucide="list"></i></span><span class="nt-lab">TOC</span></button>'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--fb '+(mode==='feedback'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'feedback\')" title="Feedback"><span class="nt-ic"><i data-lucide="message-square"></i></span><span class="nt-lab">Feedback</span>'+(p.feedback.length?'<span class="nav-cnt">'+p.feedback.length+'</span>':'')+'</button>'
       +'<button data-comp="nav-tab" class="nav-tab nav-tab--au '+(mode==='authors'?'on':'')+'" onclick="planNavMode(\''+p.id+'\',\'authors\')" title="Authors"><span class="nt-ic"><i data-lucide="users"></i></span><span class="nt-lab">Authors</span>'+(auN?'<span class="nav-cnt">'+auN+'</span>':'')+'</button>'
       +'</div>';
+    /* ND 1e: in the outline lens the "Table of contents" caption lives INSIDE .ol-scroll, so it scrolls with the
+       content (TOC / Authors / Reviewers each carry their own heading; navy hairlines divide the three groups). */
     const body=mode==='feedback'?('<div class="ol-cap">Feedback</div>'+feedbackListHTML(p.id,p.feedback))
       :mode==='authors'?('<div class="ol-cap">Authors</div>'+authorListHTML(p.id,p.authors||[]))
-      :('<div class="ol-cap">Table of contents</div><div class="ol-scroll"><div class="ol-list">'+outline+'</div>'+outlineRostersHTML(p)+'</div>');
+      :('<div class="ol-scroll"><div class="ol-cap">Table of contents</div><div class="ol-list">'+outline+'</div>'+outlineRostersHTML(p)+'</div>');
     return tabs+body;}
   /* L2 (d): the two Outline rosters — distinct Authors, then distinct Reviewers, stacked under the TOC. A reviewer
      row trails its WORST revise/block verdict (block>revise), or a lone Approve for an approve-only reviewer —
      encoding the two-level model (reviewer verdicts are distinct from the document's own lifecycle badge / footer Approve). */
   function rosterAgents(list){const seen=[];(list||[]).forEach(f=>{if(f.ag&&seen.indexOf(f.ag)<0)seen.push(f.ag);});return seen;}
   function worstVerdict(list,ag){let w='approve';(list||[]).forEach(f=>{if(f.ag===ag){if(f.verdict==='block')w='block';else if(f.verdict==='revise'&&w!=='block')w='revise';}});return w;}
+  /* ND 3a: an Authors-roster row carries its agent's CONTRIBUTION badge(s) — deduped to distinct action TYPES
+     (Drafted / Edited / Revised, at most 3, in that order) and stacked as count-aware overlapping text badges
+     (2 overlap a little, 3 more; hover fans the stack out — the .au-stack CSS). */
+  function authorActions(list,ag){const order=['Drafted','Edited','Revised'];const acts=[];(list||[]).forEach(f=>{if(f.ag===ag&&f.action&&acts.indexOf(f.action)<0)acts.push(f.action);});return order.filter(x=>acts.indexOf(x)>=0);}
+  function actionStackHTML(acts){if(!acts.length)return '';
+    return '<span data-comp="contribution-badge-stack" data-variants="n2 n3" class="au-stack n'+acts.length+'" title="'+acts.join(' · ')+'">'+acts.map(a=>authorActionBadge(a)).join('')+'</span>';}
   function rosterBlockHTML(cls,label,rows){return '<div data-comp="outline-roster" class="ol-roster '+cls+'"><div class="ol-rhead"><span class="ol-rlab">'+label+'</span><span class="nav-cnt">'+rows.length+'</span></div>'
     +(rows.length?'<div class="ol-rlist">'+rows.join('')+'</div>':'<div class="ol-rempty">None yet</div>')+'</div>';}
   function outlineRostersHTML(p){
-    const au=rosterAgents(p.authors).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k],true)+'</div>');
-    const rev=rosterAgents(p.feedback).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k],true)+verdictBadgeHTML(worstVerdict(p.feedback,k))+'</div>');
+    const au=rosterAgents(p.authors).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k])+actionStackHTML(authorActions(p.authors,k))+'</div>');
+    const rev=rosterAgents(p.feedback).map(k=>'<div class="ol-rrow">'+badgeHTML(AG[k])+verdictBadgeHTML(worstVerdict(p.feedback,k))+'</div>');
     return rosterBlockHTML('ol-roster--au','Authors',au)+rosterBlockHTML('ol-roster--rev','Reviewers',rev);}
-  /* nav feedback cards (A17): row 1 = agent badge + thumbs · row 2 = verdict badge + section badge · then the comment */
-  function feedbackListHTML(host,list){if(!list.length)return '<div class="fb-empty">No feedback yet —<br>send for review below.</div>';
-    return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
-      /* v9p13: fb-card is a DIV (not a button) — it contains the thumb-toggle buttons, and a <button> can't legally nest buttons (the parser was closing the card early, spilling the thumbs / verdict / comment OUT of the card) · v9p14b: selectable (teal) + highlights its section · v9p14c: data-fbsec/verdict let openCmtPop sync the matching card(s) */
-      return '<div data-comp="feedback-card" class="fb-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" data-fbverdict="'+f.verdict+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\')" title="Open all comments on this section →">'
-        +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span>'+thumbsHTML()+'</div>'
-        +'<div class="fb-mid">'+verdictBadgeHTML(f.verdict)+'<span class="sel-badge">§ '+f.sec+'</span></div>'
-        +(f.comment?'<div class="fb-cmt">'+esc(f.comment)+'</div>':'')+'</div>';}).join('')+'</div>';}
-  /* AUTHORS rail cards — reuse the .fb-card shell (+ au-card) and set data-fbsec so selectMatchingCards /
-     highlightFbSection sync unchanged; row 1 = agent badge + section chip · row 2 = the edit timestamp (no
-     verdict / thumbs / comment). One card per author entry, like Feedback. */
+  /* ND 2a: SECTION-GROUPED feedback cards — ONE card per section (1:1 with the rail's gutter badges), which
+     kills the old "clicking one nav card selects every card in that section" defect at the model level (the
+     per-entry cards shared a data-fbsec; now the section IS the card) and closes the feedback↔rail mapping
+     drift in the same move. Row 1 = the § section badge; then, per contributing REVISE/BLOCK agent, a
+     right-aligned timestamp row over an (agent badge + verdict badge) row. No thumbs (they live only in the
+     badge popover) and no comment preview (uniform card height). APPROVE verdicts emit NO card — approval is
+     implied by absence and surfaces only in the Reviewers roster; a section with nothing but approvals gets
+     no feedback card. */
+  function feedbackListHTML(host,list){
+    const secs=[];list.forEach(f=>{if((f.verdict==='revise'||f.verdict==='block')&&f.sec&&secs.indexOf(f.sec)<0)secs.push(f.sec);});
+    if(!secs.length)return '<div class="fb-empty">No revise/block feedback —<br>approvals read from the Reviewers roster.</div>';
+    return '<div class="fb-list">'+secs.map(sec=>{
+      const rows=list.filter(f=>f.sec===sec&&(f.verdict==='revise'||f.verdict==='block'));
+      return '<div data-comp="feedback-card" class="fb-card" role="button" tabindex="0" data-fbsec="'+esc(sec)+'" onclick="navCardClick(this,\''+host+'\',\''+esc(sec)+'\')" title="Open all comments on this section →">'
+        +'<div class="fb-top"><span class="sel-badge">§ '+esc(sec)+'</span></div>'
+        +rows.map(f=>'<div class="fbs-time"><i data-lucide="clock" class="au-clk"></i><span>'+(f.time||'')+'</span></div>'
+          +'<div class="fbs-row">'+badgeXsHTML(AG[f.ag])+verdictBadgeHTML(f.verdict)+'</div>').join('')
+        +'</div>';}).join('')+'</div>';}
+  /* ND 2b: AUTHORSHIP cards take the same section-grouped shape — one card per section (the document-wide
+     {sec:null} entries group under a "Whole doc" card), each per-agent row carrying the CONTRIBUTION badge
+     (Drafted / Edited / Revised) instead of a verdict. Supersedes the earlier per-entry "N2" author-card layout. */
   function authorListHTML(host,list){if(!list.length)return '<div class="fb-empty">No authorship recorded yet.</div>';
-    return '<div class="fb-list">'+list.map(f=>{const a=AG[f.ag];
-      /* L3: a document-wide author entry (L2's {sec:null} seed) reads as "Whole document" — the whole-doc register
-         the title cell / rosters use — never an empty "§ null" badge; navCardClick passes '' for it (openAuthorPop
-         keys '' / null to the same document-wide group). */
-      return '<div data-comp="author-card" class="fb-card au-card" role="button" tabindex="0" data-fbsec="'+esc(f.sec)+'" onclick="navCardClick(this,\''+host+'\',\''+esc(f.sec)+'\')" title="Open all edits on this section →">'
-        +'<div class="fb-top">'+badgeHTML(a,false)+'<span class="flex-1"></span><span class="sel-badge">'+(f.sec?'§ '+esc(f.sec):'Whole document')+'</span></div>'
-        +'<div class="au-line"><i data-lucide="clock" class="au-clk"></i><span>'+(f.time||'')+'</span></div></div>';}).join('')+'</div>';}
+    const secs=[];list.forEach(f=>{const k=f.sec||'';if(secs.indexOf(k)<0)secs.push(k);});
+    return '<div class="fb-list">'+secs.map(sec=>{
+      const rows=list.filter(f=>(f.sec||'')===sec);
+      return '<div data-comp="author-card" class="fb-card au-card" role="button" tabindex="0" data-fbsec="'+esc(sec)+'" onclick="navCardClick(this,\''+host+'\',\''+esc(sec)+'\')" title="Open all edits on this section →">'
+        +'<div class="fb-top"><span class="sel-badge">'+(sec?'§ '+esc(sec):'Whole doc')+'</span></div>'
+        +rows.map(f=>'<div class="fbs-time"><i data-lucide="clock" class="au-clk"></i><span>'+(f.time||'')+'</span></div>'
+          +'<div class="fbs-row">'+badgeXsHTML(AG[f.ag])+authorActionBadge(f.action)+'</div>').join('')
+        +'</div>';}).join('')+'</div>';}
   /* R-batch item 10: the Plans footer leads with the merged Export control, then the single-agent Review chip (both
      left-aligned); the right action group is just the decision trio (Revise · Reject · Approve). The right group
      wraps (Approve drops to its own line, still right-aligned) so nothing clips at narrow widths. */
@@ -1888,13 +1969,16 @@ Short-lived notes for the current run — kept brief on purpose.
        stepN===0, which is naturally Plans-only (docs carry no checklist so the checkbox regex yields 0). */
     const steps=stepN?'<span data-comp="count-chip" class="cnt-chip c-steps'+(done===stepN?' all':'')+'" title="'+done+' of '+stepN+' steps done"><i data-lucide="list-checks"></i><span class="cn">'+done+'/'+stepN+' steps</span></span>':'';
     /* L3 (5d): plan AND doc cards both get the raw-markdown edit toggle (host-generic entryEdit) + the hidden
-       textarea + a mic bound to it; planAct stays for approve/reject/revise only (its 'edit' branch is now dead). */
-    const editHead=editHeadHTML("planCopy('"+p.id+"')","entryEdit(this,'"+p.id+"')",p.id,'',p.id+'-ta');
+       textarea + a mic bound to it; planAct stays for approve/reject/revise only (its 'edit' branch is now dead).
+       ND 14: the filename moves into the shared Editor header (after the "Editor" label) and the steps chip
+       takes its old row-2 slot, right under the owner badge; hidden on a collapsed card is acceptable — the
+       name still shows in the entry nav. */
+    const editHead=editHeadHTML("entryEdit(this,'"+p.id+"')",p.id,'',p.id+'-ta',p.file);
     const rawTa='<textarea class="entry-edit" id="'+p.id+'-ta" style="display:none">'+esc(p.md)+'</textarea>';
     return '<div data-comp="plan-card" data-variants="flash" class="plan-card'+(p.open?' open':'')+'" id="'+p.id+'">'
       +'<button class="plan-head" onclick="togglePlan(this)"><div class="plan-head-main">'
-      +'<div class="plan-row r1">'+badgeHTML(a,false)+'<span class="plan-title">'+p.title+'</span>'+steps+'<span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" data-variants="sent au-act" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
-      +'<div class="plan-row r2"><span class="plan-fname">'+p.file+'</span><span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
+      +'<div class="plan-row r1">'+badgeHTML(a)+'<span class="plan-title">'+p.title+'</span><span class="flex-1"></span><span class="cnt-strip">'+fbadges+'</span><span data-comp="lifecycle-badge" data-variants="sent" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div>'
+      +'<div class="plan-row r2">'+steps+'<span class="flex-1"></span><span class="plan-dates"><b>Created</b> '+p.created+' · '+p.createdAgo+' ago&nbsp;&nbsp;<b>Edited</b> '+p.edited+' · '+p.editedAgo+' ago</span></div>'
       +'</div><i data-lucide="chevron-right" class="plan-chev"></i></button>'
       +'<div class="plan-body">'   /* A4 bullet 1: editHeadHTML moved INSIDE .plan-main (below) so the Editor header sits over the editor box only; the Outline/Feedback/Authors nav rail rises full-height (Documents-style) */
       +'<div class="plan-rev"><div class="plan-nav" data-plannav="'+p.id+'">'+planNavHTML(p,fb,'outline')+'</div>'
@@ -1904,13 +1988,14 @@ Short-lived notes for the current run — kept brief on purpose.
      (+ a path line for docs — they need it to disambiguate same-named files); row 2 = the lifecycle .dbadge. A row
      click opens/scrolls/flashes its card (navPick→openEntry); docs keep the rename ghost, plans list by title. */
   function entryNavRowHTML(e,kind){const bb=PLAN_BADGE[e.status];const on=e.open?' on':'';
-    let ic,name,path='',acts='';
+    /* ND 4c: the leading icon is gone — a generic file-text / clipboard glyph conveyed no type for these lists
+       (Assets keep their leading slot: it carries a real thumbnail / file-type split there, ND 10). */
+    let name,path='',acts='';
     if(kind==='doc'){const fn=e.path.split('/').pop();const dir=e.path.slice(0,e.path.length-fn.length);
-      ic='<i data-lucide="'+fileTypeIcon(fn)+'" class="docnav-ic"></i>';
       name='<span class="docnav-name">'+esc(fn)+'</span>';path='<span class="docnav-path">'+esc(dir)+'</span>';acts=navActsHTML();}
-    else{ic='<i data-lucide="clipboard-list" class="docnav-ic"></i>';name='<span class="docnav-name">'+esc(e.title)+'</span>';}
+    else{name='<span class="docnav-name">'+esc(e.title)+'</span>';}
     return '<div class="docnav-row navcard'+on+'" role="button" tabindex="0" data-navid="'+e.id+'" onclick="navPick(this)">'
-      +'<div class="docnav-top">'+ic+'<span class="docnav-lab">'+name+path+'</span>'+acts+'</div>'
+      +'<div class="docnav-top"><span class="docnav-lab">'+name+path+'</span>'+acts+'</div>'
       +'<div class="docnav-life"><span data-comp="lifecycle-badge" class="dbadge '+bb[0]+'">'+bb[1]+'</span></div></div>';}
   /* L1: fill an entry-nav column from a list; Documents also gets the Add-document affordance at the foot */
   function renderEntryNav(navId,entries,kind){const nav=document.getElementById(navId);if(!nav)return;
@@ -1943,7 +2028,8 @@ Short-lived notes for the current run — kept brief on purpose.
       railClick({stopPropagation(){}}, id, parseInt(row.dataset.line,10));}}
 
   /* FEED + HISTORY — expandable cards (Plan-style) with two-line agent badges; checkbox = multi-select */
-  function dirTag(d){return d==='out'?'<span data-comp="dir-tag" class="dir-tag dir-out">sent</span>':'<span data-comp="dir-tag" class="dir-tag dir-in">recv</span>';}
+  /* (ND 6d: dirTag — the Sent/Recv direction badges — is DELETED everywhere: direction reads from the
+     sender → recipient arrow in the card header; the Sent/Received filters still gate on each entry's dir.) */
   /* recipient mini-badge — every message carries a typed recipients[] (user | <agent-id> | scratch, default
      [user]). It's ADDRESSED-TO / routing (drives the From/To filter + Sent/Received direction), NOT visibility —
      every message still shows regardless. Rendered as a deliberately-SMALLER identity badge (the recipient-badge
@@ -1959,7 +2045,6 @@ Short-lived notes for the current run — kept brief on purpose.
     const more=r.length>CAP?'<span class="rcpt-more" title="'+esc(r.slice(CAP).join(', '))+'">+'+(r.length-CAP)+'</span>':'';
     return '<span class="rcpt-to" title="addressed to"><i data-lucide="arrow-right"></i></span>'+shown+more;}
   /* typed message content blocks — rendered in the expanded card; the Include toggles show/hide them by kind */
-  const MSG_KIND_LBL={think:'thinking',read:'read',write:'write',bash:'bash',diff:'diff',meta:'meta'};
   /* A7: the block TYPE is now shown by the rail tag (3-char, in the rail box), so the block CONTENT carries NO inline
      label. (The old .msg-blk-lbl "BASH"/"DIFF" content labels are gone.) */
   function msgBlockHTML(b){
@@ -1967,74 +2052,97 @@ Short-lived notes for the current run — kept brief on purpose.
       return '<div data-comp="msg-block" class="msg-blk blk-diff" data-blk="diff">'+lines+'</div>';}
     return '<div data-comp="msg-block" class="msg-blk blk-'+b.k+'" data-blk="'+b.k+'">'+esc(b.t)+'</div>';}
   function msgBlocksHTML(o){return (o.blocks&&o.blocks.length)?'<div class="msg-blocks">'+o.blocks.map(msgBlockHTML).join('')+'</div>':'';}
-  /* A7 (+ next-up item 4): tight rail-tag abbreviations shown INSIDE the rail box. Title row = no tag. 'text' = the
-     agent's primary prose — Claude Code's `text` content block — tagged "txt" and toggleable like any block via the
-     Content filter's leading Text toggle (default on). */
-  const RAIL_TAG={text:'txt',think:'tht',read:'rd',write:'wrt',bash:'bsh',diff:'dif',meta:'mta'};
-  function railTag(k){return '<span class="rail-tag">'+(RAIL_TAG[k]||k)+'</span>';}
-  /* apply the Messages minibar: Sent/Received hide whole cards by direction; Include hides blocks by kind.
-     Next-up item 4: Text (first in the Content row, default on) toggles the main reply text — the `text`
-     content-block row (data-mblk="text") — like any tool block. */
-  function applyMsgFilters(){const bar=document.querySelector('#feed-messages .minibar');if(!bar)return;
+  /* ND 6b: the rail marker is the block-type ICON — the same icon its content filter carries — replacing the
+     old 3-char text abbreviations. Kind → filter mapping: text→Messages · think→Thinking · read/write/edit/
+     file/diff→Files · bash/shell→Shell · search→Search · workflow→Workflow; meta rows keep a small info glyph
+     (they have no filter and always show). Title row = no marker. */
+  const RAIL_ICON={text:'message-square',think:'brain',read:'file-text',write:'file-text',edit:'file-text',file:'file-text',diff:'file-text',bash:'terminal',shell:'terminal',search:'search',workflow:'workflow',meta:'info'};
+  function railTag(k){return '<span class="rail-tag" title="'+k+'"><i data-lucide="'+(RAIL_ICON[k]||'file-text')+'"></i></span>';}
+  /* apply the Transcript minibar: Sent/Received hide whole cards by direction; the content filters hide block
+     rows by kind-set; the far-end Subagent toggle (ND 6c) hides the nested subagent entries. */
+  function applyTxFilters(){const bar=document.querySelector('#feed-transcript .minibar');if(!bar)return;
     const tog=lbl=>{const b=[...bar.querySelectorAll('.minitog')].find(x=>x.textContent.trim()===lbl);return b?b.classList.contains('on'):true;};
     const dirOn={out:tog('Sent'),in:tog('Received')};
-    const km={Text:'text',Thoughts:'think',Read:'read',Write:'write',Bash:'bash',Diffs:'diff',Meta:'meta'};const kind={};Object.keys(km).forEach(l=>kind[km[l]]=tog(l));
-    document.querySelectorAll('#msg-list .msgcard').forEach(c=>{const o=MSGS[+c.dataset.msgi];if(o&&o.dir)c.style.display=dirOn[o.dir]?'':'none';});
+    /* ND 6b: Messages · Thinking · Files (Read/Write/Edit) · Shell (Bash/PowerShell) · Search (Grep) · Workflow
+       — Diff and Meta are dropped as filters (a diff files under Files; meta rows always show). */
+    const km={Messages:['text'],Thinking:['think'],Files:['read','write','edit','file','diff'],Shell:['bash','shell'],Search:['search'],Workflow:['workflow']};
+    const kind={};Object.keys(km).forEach(l=>{const on=tog(l);km[l].forEach(k=>{kind[k]=on;});});
+    const subsOn=tog('Subagent');
+    document.querySelectorAll('#tx-list .txcard').forEach(c=>{const o=MSGS[+c.dataset.msgi];if(o&&o.dir)c.style.display=dirOn[o.dir]?'':'none';});
+    document.querySelectorAll('#tx-list .tx-sub').forEach(s=>{s.style.display=subsOn?'':'none';});
     /* P1b: hide whole block ROWS (rail + content) so only currently-visible blocks are selectable; a hidden block can't stay selected */
-    document.querySelectorAll('#msg-list .mrow[data-blk],#msg-list .mrow[data-mblk="text"]').forEach(r=>{const k=r.dataset.blk||r.dataset.mblk;const vis=kind[k]!==false;r.style.display=vis?'':'none';if(!vis)r.classList.remove('bsel');});}
-  /* P1b: a Messages card uses the shared select-to-act model — click the header to select the WHOLE card
-     (pink, multi + select-all), a per-block rail to select one block (teal), the chevron to expand
-     (select ≠ expand). Scratch still uses fcardHTML (checkbox). */
-  function msgCardHTML(o,i){const a=AG[o.ag];return '<div data-comp="message-card" data-variants="reply-flash" class="fcard msgcard'+(o.sub?' msgcard--sub':'')+'" data-selcard data-msgi="'+i+'">'
+    document.querySelectorAll('#tx-list .mrow[data-blk],#tx-list .mrow[data-mblk="text"]').forEach(r=>{const k=r.dataset.blk||r.dataset.mblk;const vis=kind[k]!==false;r.style.display=vis?'':'none';if(!vis)r.classList.remove('bsel');});}
+  /* P1b: a Transcript card uses the shared select-to-act model — click the header to select the WHOLE card
+     (teal, multi + select-all), a per-block rail to select one block, the chevron to expand (select ≠ expand).
+     Scratch still uses fcardHTML. ND 6d: the Sent/Recv direction tags are DELETED — direction reads from the
+     sender → recipient arrow in the header — and the STATE badge moves right (after the preview text, before
+     the right-aligned timestamp) on every transcript card. ND 6c: `subs` = the indices of this parent's nested
+     subagent entries, appended inside the card body in communication order. */
+  function txCardHTML(o,i,subs){const a=AG[o.ag];return '<div data-comp="message-card" data-variants="reply-flash" class="fcard txcard" data-selcard data-msgi="'+i+'">'
     +'<div class="fcard-head">'
-    +'<button class="fcard-exp msel-head" onclick="msgWholeSel(event,this)" title="Select this whole message (Attach)">'
-    +badgeHTML(a,false)   /* A7: agent badge LEADS, at the full reviewer-chip size (the standard) */
-    +(o.sub?'<span data-comp="subagent-badge" class="sbadge '+(o.substate||'sb-active')+' msg-subbadge" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — nested under '+a.role+' '+a.name+'">'+o.sub+'</span>':'')   /* subagent events nest under their parent — the sub-id badge after the parent identity */
-    +recipientsHTML(o)   /* → recipient mini-badge(s) — who it's addressed to (routing) */
-    +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')   /* then the status badge (Active/Complete/Failed) */
-    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')   /* then Sent/Recv dir — order agent → recipient → status → dir */
-    +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
+    +'<button class="fcard-exp msel-head" onclick="txWholeSel(event,this)" title="Select this whole message (Attach)">'
+    +badgeHTML(a)   /* A7: agent badge LEADS, at the dense-default size */
+    +recipientsHTML(o)   /* → recipient mini-badge(s) — who it's addressed to (routing = the direction signal) */
+    +'<span class="fcard-prev">'+o.body+'</span>'
+    +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
+    +'<span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
-    +'<div class="fcard-body">'+msgRailHTML(o)+'</div></div>';}
+    +'<div class="fcard-body">'+txRailHTML(o)+((subs&&subs.length)?subs.map(j=>txSubEntryHTML(MSGS[j],j)).join(''):'')+'</div></div>';}
+  /* ND 6c: a NESTED subagent entry — a compact (~half-height) expandable trigger spanning the full rail width
+     (the "overlay the rail cell" form — the cell isn't needed, and full-width signals the subagent is its own
+     thing yet part of the agent), over the subagent's own rail body. The parent-id badge is gone (nesting
+     conveys parentage); the sub-id badge leads, the state badge sits right of the preview (ND 6d), and the
+     chevron keeps a square hit cell. */
+  function txSubEntryHTML(o,j){const st=o.substate||'sb-active';
+    return '<div data-comp="transcript-subentry" class="tx-sub" data-msgi="'+j+'">'
+      +'<button class="tx-sub-trig" onclick="txSubToggle(event,this)" title="subagent '+o.sub+(o.subtype?' · '+o.subtype:'')+' — expand / collapse">'
+      +'<span data-comp="subagent-badge" class="sbadge '+st+'">'+o.sub+'</span>'
+      +'<span class="tx-sub-type">'+esc(o.subtype||'subagent')+'</span>'
+      +'<span class="tx-sub-prev">'+o.body+'</span>'
+      +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
+      +'<span class="fcard-time">'+o.time+'</span>'
+      +'<span class="tx-sub-chev"><i data-lucide="chevron-right" class="fcard-chev"></i></span></button>'
+      +'<div class="tx-sub-body">'+txRailHTML(o)+'</div></div>';}
+  function txSubToggle(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const s=btn.closest('.tx-sub');if(s)s.classList.toggle('open');LU();}
   /* A7: contiguous rail panel. Top TITLE row holds the turn number (doc-title style) in its CONTENT; its rail box is
      EMPTY (no tag) and select-alls the whole message (mirrors Library's title rail). Then the primary prose ("txt"),
      then each typed block (think/read/…), each rail box carrying its 3-char type tag. */
-  function msgRailHTML(o){
-    let rows='<div data-comp="message-rail-row" class="mrow mrow--title" data-mblk="title"><button class="mrail mrail--title" onclick="msgWholeSel(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select the whole message"></button>'
+  function txRailHTML(o){
+    let rows='<div data-comp="message-rail-row" class="mrow mrow--title" data-mblk="title"><button class="mrail mrail--title" onclick="txWholeSel(event,this)" onmouseenter="txRailHover(this)" onmouseleave="txRailHoverOut(this)" title="Select the whole message"></button>'
       +'<div class="mrow-c"><div class="fcard-full"><span class="msg-turn">Turn '+(o.turn!=null?o.turn:'')+'</span></div></div></div>';
-    rows+='<div data-comp="message-rail-row" class="mrow" data-mblk="text"><button class="mrail" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag('text')+'</button>'
+    rows+='<div data-comp="message-rail-row" class="mrow" data-mblk="text"><button class="mrail" onclick="txBlkSelMulti(event,this)" onmouseenter="txRailHover(this)" onmouseleave="txRailHoverOut(this)" title="Select this block (multi)">'+railTag('text')+'</button>'
       +'<div class="mrow-c"><div class="fcard-full">'+(o.full||o.body)+'</div></div></div>';
-    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div data-comp="message-rail-row" class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="msgBlkSelMulti(event,this)" onmouseenter="msgRailHover(this)" onmouseleave="msgRailHoverOut(this)" title="Select this block (multi)">'+railTag(b.k)+'</button>'
+    if(o.blocks&&o.blocks.length){rows+=o.blocks.map(b=>'<div data-comp="message-rail-row" class="mrow" data-blk="'+b.k+'"><button class="mrail" onclick="txBlkSelMulti(event,this)" onmouseenter="txRailHover(this)" onmouseleave="txRailHoverOut(this)" title="Select this block (multi)">'+railTag(b.k)+'</button>'
       +'<div class="mrow-c">'+msgBlockHTML(b)+'</div></div>').join('');}
     return '<div class="mrail-wrap">'+rows+'</div>';}
-  function clearMsgBlkSel(){document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
-  function clearMsgCardSel(){document.querySelectorAll('#msg-list .msgcard.sel').forEach(c=>c.classList.remove('sel'));}
+  function clearTxBlkSel(){document.querySelectorAll('#tx-list .mrow.bsel').forEach(r=>r.classList.remove('bsel'));}
+  function clearTxCardSel(){document.querySelectorAll('#tx-list .txcard.sel').forEach(c=>c.classList.remove('sel'));}
   /* A7 hover preview (mirrors Library railHover): a block rail lights its own row cream; the EMPTY title rail lights
      EVERY row cream (it select-alls). */
-  function msgRailHover(btn){const card=btn.closest('.msgcard');if(!card)return;
+  function txRailHover(btn){const card=btn.closest('.txcard');if(!card)return;
     if(btn.classList.contains('mrail--title')){card.querySelectorAll('.mrow').forEach(r=>r.classList.add('hl'));}
     else{const row=btn.closest('.mrow');if(row)row.classList.add('hl');}}
-  function msgRailHoverOut(btn){const card=btn.closest('.msgcard');if(card)card.querySelectorAll('.mrow.hl').forEach(r=>r.classList.remove('hl'));}
+  function txRailHoverOut(btn){const card=btn.closest('.txcard');if(card)card.querySelectorAll('.mrow.hl').forEach(r=>r.classList.remove('hl'));}
   /* A7 multi-select WITHIN a card (toggle); ONE card at a time → selecting a block clears other cards' selection AND
      the whole-card flag (a single block ≠ whole card). The .mrow.bsel set drives Embed/Attach. */
-  function msgBlkSelMulti(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const card=row.closest('.msgcard');
+  function txBlkSelMulti(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const row=btn.closest('.mrow');if(!row)return;const card=row.closest('.txcard');
     if(card){card.classList.remove('sel');const t=card.querySelector('.mrow--title');if(t)t.classList.remove('bsel');}
-    document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
+    document.querySelectorAll('#tx-list .mrow.bsel').forEach(r=>{if(r.closest('.txcard')!==card)r.classList.remove('bsel');});
     row.classList.toggle('bsel');eaUpdate('feed');}
   /* A7 whole-message select via the header OR the top title rail: toggle EVERY visible row in this card teal + flag the
      card .sel (→ Attach); ONE card at a time → clear other cards. */
-  function msgWholeSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const card=btn.closest('.msgcard');if(!card)return;
-    document.querySelectorAll('#msg-list .mrow.bsel').forEach(r=>{if(r.closest('.msgcard')!==card)r.classList.remove('bsel');});
-    clearMsgCardSel();
-    const rows=[...card.querySelectorAll('.mrow')].filter(r=>r.style.display!=='none');
+  function txWholeSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const card=btn.closest('.txcard');if(!card)return;
+    document.querySelectorAll('#tx-list .mrow.bsel').forEach(r=>{if(r.closest('.txcard')!==card)r.classList.remove('bsel');});
+    clearTxCardSel();
+    const rows=[...card.querySelectorAll('.mrow')].filter(r=>r.style.display!=='none'&&!r.closest('.tx-sub'));   /* ND 6c: whole-message select = the parent message; nested subagent rows select individually */
     const all=rows.length&&rows.every(r=>r.classList.contains('bsel'));
     rows.forEach(r=>r.classList.toggle('bsel',!all));
     card.classList.toggle('sel',!all);
     eaUpdate('feed');}
   /* G2: generic select/deselect-all for the active feed tab (Messages whole-card+blocks · Scratch/Log/Inbox whole-card). */
   function feedSelectAll(btn){const tab=currentFeedTab();
-    if(tab==='messages'){clearMsgBlkSel();const cards=[...document.querySelectorAll('#msg-list .msgcard')].filter(c=>c.style.display!=='none');const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));
+    if(tab==='transcript'){clearTxBlkSel();const cards=[...document.querySelectorAll('#tx-list .txcard')].filter(c=>c.style.display!=='none');const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));
       cards.forEach(c=>{c.classList.toggle('sel',!allOn);const rows=[...c.querySelectorAll('.mrow')].filter(r=>r.style.display!=='none');rows.forEach(r=>r.classList.toggle('bsel',!allOn));});eaUpdate('feed');return;}
     const list=activeFeedList();if(!list)return;const cards=[...list.querySelectorAll('.fcard')].filter(c=>c.style.display!=='none');
     const allOn=cards.length&&cards.every(c=>c.classList.contains('sel'));cards.forEach(c=>c.classList.toggle('sel',!allOn));eaUpdate('feed');}
@@ -2045,29 +2153,28 @@ Short-lived notes for the current run — kept brief on purpose.
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'
     +(o.status?'<span data-comp="lifecycle-badge" class="dbadge db-'+o.status+'">'+({active:'Active',complete:'Complete',error:'Error'}[o.status]||'Complete')+'</span>':'')
-    +badgeHTML(a,false)
-    +(o.dir?'<span class="fcard-dir">'+dirTag(o.dir)+'</span>':'')
+    +badgeHTML(a)
     +'<span class="fcard-prev">'+o.body+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
     +'<div class="fcard-body"><div class="fcard-full">'+(o.full||o.body)+'</div>'+msgBlocksHTML(o)+'</div></div>';}
   function logCardHTML(o){const a=AG[o.ag]||AG.user;return '<div data-comp="log-line" class="fcard" data-selcard>'
     +'<div class="fcard-head">'
-    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'+badgeHTML(a,false)
+    +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this card (Attach)">'+badgeHTML(a)
     +'<span class="fcard-prev fcard-log"'+(o.warn?' style="color:var(--warning)"':'')+'>'+o.txt+'</span><span class="fcard-time">'+o.time+'</span></button>'
     +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
     +'</div>'
     +'<div class="fcard-body"><div class="fcard-full fcard-log">'+a.name+' · '+o.txt+(o.warn?' · awaiting your input':'')+'</div></div></div>';}
   /* A9: whole-card select (teal) for Scratch/Log/Inbox — multi-select, drives the shared Copy + Embed/Attach strip */
   function fcardSel(e,btn){if(e&&e.stopPropagation)e.stopPropagation();const c=btn.closest('.fcard');if(c)c.classList.toggle('sel');eaUpdate(c&&c.closest('#hist-list')?'hist':'feed');}
-  function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeHTML(AG[k],true)).join('');if(keys.length>cap)h+='<span data-comp="overflow-badge" class="badge-more" style="height:var(--size-26)">+'+(keys.length-cap)+'</span>';return h;}
+  function miniBadges(keys,cap){cap=cap||2;let h=keys.slice(0,cap).map(k=>badgeXsHTML(AG[k])).join('');if(keys.length>cap)h+='<span class="rcpt-more" title="'+esc(keys.slice(cap).join(', '))+'">+'+(keys.length-cap)+'</span>';return h;}   /* ND 5c: the History receiver badges take the SMALL tier (+N overflow in the recipient form), matched with the Transcript recipients */
   /* I1/I2/I3: History adopts the feed-card model — header-click selects (light-teal), a separate flush chevron expands;
      EDIT is a header ghost button (after the attach tags, before the timestamp). The select region (.fcard-exp) holds
      only NON-interactive content; Edit/time/chevron are SIBLINGS in .fcard-head (a <button> can't nest in a <button>). */
   function histCardHTML(o,i){const a=AG[o.from];return '<div data-comp="history-card" class="fcard'+(o.sel?' sel open':'')+'" data-histcard'+(typeof i==='number'?' data-hidx="'+i+'"':'')+'>'
     +'<div class="fcard-head">'
     +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this prompt">'
-    +'<span data-comp="lifecycle-badge" class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a,false)
+    +'<span data-comp="lifecycle-badge" class="dbadge '+o.badge+'">'+o.status+'</span>'+badgeHTML(a)
     +'<i data-lucide="arrow-right" style="width:var(--size-12);height:var(--size-12);color:var(--muted);flex:0 0 auto"></i>'+miniBadges(o.to,2)
     +'<span class="flex-1"></span>'+attTrigHTML(o)+'</button>'
     +'<button data-comp="ghost-icon-button" class="ghost-ic" onclick="event.stopPropagation();histAct(\'edit\')" title="Edit in Compose"><i data-lucide="square-pen"></i></button>'
@@ -2098,31 +2205,24 @@ Short-lived notes for the current run — kept brief on purpose.
      blocks:[
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
-       {k:'bash',t:'● Bash  grep -rn "refreshToken" src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
-    /* Multi-subagent stream, demo 1 of 2 — researcher-01-sandy's full run-A fan-out (A1–A6, matching sandy's Team-Graph roster: 3 Explore active · 1 general-purpose done · 1 code-reviewer active · 1 general-purpose error). The full multi-subagent stream is split across TWO different agents (sandy here, fen below), not two runs on one agent, so each fits the timespan of its example card. */
+       {k:'search',t:'● Grep  "refreshToken" in src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
+    /* Multi-subagent stream, demo 1 of 2 — researcher-01-sandy's full run-A fan-out (A1–A6, matching sandy's Team-Graph roster: 3 Explore active · 1 general-purpose done · 1 code-reviewer active · 1 general-purpose error). The full multi-subagent stream is split across TWO different agents (sandy here, fen below), not two runs on one agent, so each fits the timespan of its example card. ND 6c: these entries render NESTED inside their parent's card — the old "subagent of …" meta blocks are gone (nesting conveys parentage). */
     {ag:'sandy',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`JWT middleware mapped — 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check.`,
      blocks:[
-       {k:'read',t:'● Read  src/auth/middleware/jwt.ts (164 lines)'},
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+       {k:'read',t:'● Read  src/auth/middleware/jwt.ts (164 lines)'}]},
     {ag:'sandy',sub:'A2',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Session store swept — the refresh handler reissues the cookie without re-checking expiry, so a held refresh token renews indefinitely.`,
      blocks:[
-       {k:'bash',t:'● Bash  grep -rn "refresh" src/auth/session.ts\n  ⎿ 4 matches (reissue path at :88)'},
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+       {k:'search',t:'● Grep  "refresh" in src/auth/session.ts\n  ⎿ 4 matches (reissue path at :88)'}]},
     {ag:'sandy',sub:'A3',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Token-rotation path traced — no sliding window on the refresh secret; rotation reuses the same signing key across sessions.`,
      blocks:[
-       {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'},
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
-    {ag:'sandy',sub:'A4',subtype:'general-purpose',substate:'sb-idle',dir:'in',status:'complete',turn:8,time:'14:41',body:`Cross-checked the three findings against the OWASP JWT cheatsheet — all map to known weaknesses; handing the summary back to sandy.`,
-     blocks:[
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+       {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'}]},
+    {ag:'sandy',sub:'A4',subtype:'general-purpose',substate:'sb-idle',dir:'in',status:'complete',turn:8,time:'14:41',body:`Cross-checked the three findings against the OWASP JWT cheatsheet — all map to known weaknesses; handing the summary back to sandy.`},
     {ag:'sandy',sub:'A5',subtype:'code-reviewer',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`Reviewing the exp-enforcement approach — the fix belongs inside validateToken() itself, not the caller, or the bypass reopens on the next refresh path.`,
      blocks:[
-       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts'},
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40'}]},
+       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts'}]},
     {ag:'sandy',sub:'A6',subtype:'general-purpose',substate:'sb-error',dir:'in',status:'error',turn:8,time:'14:41',body:`Run failed — couldn't reach the staging auth service to confirm the bypass live (ECONNREFUSED). The static findings still stand.`,
      blocks:[
-       {k:'bash',t:'● Bash  curl -s https://staging.internal/auth/health\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
-       {k:'meta',t:'subagent of researcher-01-sandy · run A · spawned 14:40 · errored 14:41'}]},
+       {k:'bash',t:'● Bash  curl -s https://staging.internal/auth/health\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'}]},
     {ag:'user',dir:'out',recipients:['sandy','drew'],turn:9,time:'14:42',body:`Confirm the expiry bypass with auditor-01 and draft a remediation plan to the scratchpad.`},   /* a user send carries its To/Target selection as recipients[] (multi) — drives the → recipient mini-badges; the rest default to [user] */
     {ag:'drew',dir:'in',status:'complete',turn:11,time:'14:43',body:`Confirmed 2 of 3 vulns. Expiry bypass is critical — tokens refresh indefinitely. Demoted "no rate limiting" to medium; it's behind the gateway throttle.`,
      blocks:[
@@ -2140,29 +2240,25 @@ Short-lived notes for the current run — kept brief on purpose.
     /* Multi-subagent stream, demo 2 of 2 — scribe-01-fen's run-B helpers (B1–B3, matching fen's Team-Graph roster: code-reviewer done · Explore active · general-purpose error). fen's card also carries an A and a C run; only run B is streamed here so the example fits one card's timespan (the companion 6-subagent fan-out is demo 1 on sandy, above). */
     {ag:'fen',dir:'in',status:'active',turn:6,time:'14:46',body:`Compiling the auth-fix changelog — dispatched a review + exploration pass over the rotation patch so the writeup cites the exact call-sites and carries the reviewer's verdict.`,
      blocks:[
+       {k:'workflow',t:'▸ Workflow changelog-sweep — phase Verify · 2/3 agents complete · review + call-site pass over the rotation patch'},
        {k:'write',t:'● Write  docs/CHANGELOG.md (+12 −0)'},
        {k:'read',t:'● Read  src/auth/tokens.ts (88 lines)'}]},
-    {ag:'fen',sub:'B1',subtype:'code-reviewer',substate:'sb-idle',dir:'in',status:'complete',turn:6,time:'14:46',body:`Reviewed the rotation patch for the changelog — the exp check now gates every refresh; verdict Approve with one note on the flaky timing test.`,
-     blocks:[
-       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45'}]},
+    {ag:'fen',sub:'B1',subtype:'code-reviewer',substate:'sb-idle',dir:'in',status:'complete',turn:6,time:'14:46',body:`Reviewed the rotation patch for the changelog — the exp check now gates every refresh; verdict Approve with one note on the flaky timing test.`},
     {ag:'fen',sub:'B2',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:6,time:'14:46',body:`Pulling the exact call-sites for the writeup — validateToken() is touched in three files; session.ts:142 is the line the fix closes.`,
      blocks:[
-       {k:'read',t:'● Read  src/auth/session.ts · middleware/jwt.ts'},
-       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45'}]},
+       {k:'read',t:'● Read  src/auth/session.ts · middleware/jwt.ts'}]},
     {ag:'fen',sub:'B3',subtype:'general-purpose',substate:'sb-error',dir:'in',status:'error',turn:6,time:'14:46',body:`Run failed — tried to render the changelog diff against the staging docs but the docs service timed out. Retrying once it's reachable.`,
      blocks:[
-       {k:'bash',t:'● Bash  make docs-preview\n  ⎿ Error: gateway timeout after 30s · exit 1'},
-       {k:'meta',t:'subagent of scribe-01-fen · run B · spawned 14:45 · errored 14:46'}]},
+       {k:'bash',t:'● Bash  make docs-preview\n  ⎿ Error: gateway timeout after 30s · exit 1'}]},
     {ag:'max',dir:'in',status:'active',turn:17,time:'14:47',body:`Patched validateToken() to enforce exp and added refresh-token rotation. Vitest suite green except one flaky timing case I'm isolating.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm vitest run auth\n  ⎿ 41 passed · 1 flaky (rotation timing)'},
        {k:'diff',t:'+ rotateRefresh(token, { window: 30_000 })'},
        {k:'write',t:'● Write  src/auth/tokens.ts (+24 −6)'}]},
-    /* subagent events stream nested/indented UNDER their parent (here, coder-01-max). Always Received (helpers never receive operator sends); sub = the group+member id, subtype = the agent type. */
+    /* subagent events nest INSIDE their parent's card (here, coder-01-max) — ND 6c. Always Received (helpers only ever talk to their parent, never the user); sub = the group+member id, subtype = the agent type. */
     {ag:'max',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:17,time:'14:47',body:`Mapped 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check — that's the bypass max is patching.`,
      blocks:[
-       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts · middleware/jwt.ts'},
-       {k:'meta',t:'subagent of coder-01-max · run A · spawned 14:46'}]},
+       {k:'read',t:'● Read  src/auth/session.ts · tokens.ts · middleware/jwt.ts'}]},
     {ag:'drew',dir:'in',status:'error',turn:18,time:'14:48',body:`Run failed — the staging smoke test errored before the expiry assertion: the rotation branch can't reach the auth service (ECONNREFUSED). Re-run once staging is back up.`,
      blocks:[
        {k:'bash',t:'● Bash  pnpm test:smoke --env staging\n  ⎿ Error: connect ECONNREFUSED 10.0.3.12:8443 · exit 1'},
@@ -2193,7 +2289,13 @@ Short-lived notes for the current run — kept brief on purpose.
     {badge:'db-complete',status:'Complete',from:'kai',to:['max'],time:'14:30',att:[{name:'auth-token-rotation-shimmering-falcon.md',type:'doc'}],body:`Relay: apply the sliding-window rotation in validateToken() and keep the change behind a feature flag.`}
   ];
   function renderFeed(){
-    const m=document.getElementById('msg-list');if(m){m.innerHTML=MSGS.map(msgCardHTML).join('');applyMsgFilters();}
+    /* ND 6c: subagent entries no longer render as top-level cards — each parent card collects the contiguous
+       run of `sub` entries that follow it in MSGS (communication order) and nests them inside its body. */
+    const m=document.getElementById('tx-list');if(m){let html='';
+      for(let i=0;i<MSGS.length;i++){const o=MSGS[i];if(o.sub)continue;
+        const subs=[];let j=i+1;while(j<MSGS.length&&MSGS[j].sub&&MSGS[j].ag===o.ag){subs.push(j);j++;}
+        html+=txCardHTML(o,i,subs);}
+      m.innerHTML=html;applyTxFilters();}
     const s=document.getElementById('scratch-list');if(s)s.innerHTML=SCRATCH.map(fcardHTML).join('');
     const l=document.getElementById('log-list');if(l)l.innerHTML=LOG.map(logCardHTML).join('');
     const h=document.getElementById('hist-list');if(h){h.innerHTML=HIST.map(histCardHTML).join('');if(typeof applyHistFilters==='function')applyHistFilters();}   /* item 9: re-apply the History-From filter on re-render */
@@ -2209,7 +2311,7 @@ Short-lived notes for the current run — kept brief on purpose.
     /* a Messages card's body is the contiguous rail (title + message + blocks), so gather every row's content —
        grabbing only the first .fcard-full would capture just the "Turn N" title. Other feed/history cards have a
        single body block. (Used by Copy selected + Embed/Attach + the Export selected → file content.) */
-    if(c.classList.contains('msgcard')){const rows=[...c.querySelectorAll('.mrow-c')].map(r=>r.textContent.trim()).filter(Boolean);if(rows.length)return rows.join('\n');}
+    if(c.classList.contains('txcard')){const rows=[...c.querySelectorAll('.mrow-c')].filter(r=>!r.closest('.tx-sub')).map(r=>r.textContent.trim()).filter(Boolean);if(rows.length)return rows.join('\n');}   /* ND 6c: a parent card's text excludes its nested subagent entries */
     const b=c.querySelector('.fcard-full,.inbox-detail,.rc-body');return b?b.textContent.trim():'';}
   function toggleExport(btn){if(btn.disabled)return;const wrap=btn.closest('.exp');if(!wrap)return;const open=wrap.classList.contains('open');closeAllPopups();if(!open){wrap.classList.add('open');const pc=btn.closest('.plan-card');if(pc)pc.classList.add('pop-open');}}   /* R11 item 5: in a plan footer, release the plan-card clip too (harmless elsewhere — closest('.plan-card') is null in feed/hist/doc) */
   /* (R-batch item 6: the separate expGate() that gated #feed-exp / #hist-exp is gone — the merged control's single
@@ -2226,11 +2328,11 @@ Short-lived notes for the current run — kept brief on purpose.
       toast('Exported '+n+' '+tab+' card'+(n>1?'s':'')+' → Documents · '+fname);return;}}
   /* v1.x #7: the summary overlay is shared by Messages · Scratch · Log — each tab gets its own mock summary,
      title and count. The Messages body is captured once from its static HTML so it stays single-sourced. */
-  let MSG_SUMMARY_BODY='';
+  let TX_SUMMARY_BODY='';
   const FEED_SUMMARIES={
-    messages:{title:'Conversation summary',
-      sub:()=>{const sel=document.querySelectorAll('#msg-list .fcard.sel').length;return sel?sel+' selected messages':'all '+MSGS.length+' messages';},
-      body:()=>MSG_SUMMARY_BODY},
+    transcript:{title:'Conversation summary',
+      sub:()=>{const sel=document.querySelectorAll('#tx-list .fcard.sel').length;return sel?sel+' selected messages':'all '+MSGS.length+' messages';},
+      body:()=>TX_SUMMARY_BODY},
     scratch:{title:'Scratchpad summary',
       sub:()=>'all '+SCRATCH.length+' scratch posts',
       body:()=>`<h4>Shared scratchpad — auth remediation</h4>
@@ -2256,11 +2358,11 @@ Short-lived notes for the current run — kept brief on purpose.
         </ul>
         <p class="fo-sub">Generated from all 9 log entries · mock summary</p>`}
   };
-  function currentFeedTab(){const b=document.querySelector('[data-tab-group="feed"].tab-btn.active');return b?b.dataset.tab:'messages';}
+  function currentFeedTab(){const b=document.querySelector('[data-tab-group="feed"].tab-btn.active');return b?b.dataset.tab:'transcript';}
   function toggleSummary(){const ov=document.getElementById('feed-summary');if(!ov)return;
-    if(!MSG_SUMMARY_BODY){MSG_SUMMARY_BODY=(document.getElementById('fo-body')||{}).innerHTML||'';}   /* grab the static Messages summary once, before any injection */
+    if(!TX_SUMMARY_BODY){TX_SUMMARY_BODY=(document.getElementById('fo-body')||{}).innerHTML||'';}   /* grab the static Messages summary once, before any injection */
     const open=ov.classList.toggle('open');const btn=document.getElementById('summary-btn');if(btn)btn.classList.toggle('active',open);
-    if(open){const s=FEED_SUMMARIES[currentFeedTab()]||FEED_SUMMARIES.messages;
+    if(open){const s=FEED_SUMMARIES[currentFeedTab()]||FEED_SUMMARIES.transcript;
       const ti=document.querySelector('#feed-summary .fo-title');if(ti)ti.innerHTML='<i data-lucide="sparkles"></i>'+s.title;
       const c=document.getElementById('fo-count');if(c)c.textContent=s.sub();
       const bd=document.getElementById('fo-body');if(bd)bd.innerHTML=s.body();}
@@ -2286,7 +2388,7 @@ Short-lived notes for the current run — kept brief on purpose.
     {type:'error',lab:'Error'},
     {type:'warning',lab:'Warning'},
     {type:'permission',lab:'Permission'},
-    {type:'plan',lab:'Plans & Docs'},   /* one unified card type — plans AND doc-review hand-offs (doc-* ids route to the Documents tab) */
+    {type:'plan',lab:'Review'},   /* ND 16: renamed from "Plans & Docs" — one review section covering plans, doc hand-offs (doc-* ids route to the Documents tab), AND workflow approvals (entries carrying a wf payload) */
     {type:'decision',lab:'Decision'},
     {type:'response',lab:'Response'}
   ];
@@ -2295,6 +2397,7 @@ Short-lived notes for the current run — kept brief on purpose.
     {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'},
     {ag:'sandy',type:'plan',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
     {ag:'wren',type:'plan',time:'14:45',title:'Review README.md edits before commit',body:'Docs edit: README.md · +37 −12 · refreshed the Quick-start and the driver-seam overview to match the sidecar rename — ready for a look before it lands.',plan:'doc-readme'},   /* doc-review flow (Lane I): SAME unified plan card, plan id is doc-* so Review routes to Library → Documents (the doc card lands after the Lane-L Plans+Documents merge; graceful no-op until then) */
+    {ag:'lex',type:'plan',time:'14:53',title:'Run workflow: design-verify-sweep',wf:{name:'design-verify-sweep',desc:'Drive every touched design component headed — one verifier per panel, findings adversarially checked before they report.',phases:['Scan','Verify','Report'],script:"export const meta = {\n  name: 'design-verify-sweep',\n  description: 'Verify the touched design components headed',\n  phases: [\n    { title: 'Scan',   detail: 'list the touched components' },\n    { title: 'Verify', detail: 'one headed verifier per panel' },\n    { title: 'Report', detail: 'adversarial check, then summarize' },\n  ],\n}\nphase('Scan')\nconst targets = await agent('List the design components this diff touches.', {schema: LIST})\nphase('Verify')\nconst runs = await parallel(targets.map(t => () =>\n  agent('Drive ' + t + ' headed at both width extremes; screenshot each state.', {schema: RUN})))\nphase('Report')\nreturn await agent('Adversarially verify the findings, then summarize.', {schema: REPORT})"}},   /* ND 16: a /workflows approval routed through the Inbox — the PreToolUse interception is spike-proven (ARCHITECTURE §11.3 #40); same action strip as the plan/doc cards, the preview in the card content */
     {ag:'sandy',type:'permission',time:'14:42',title:'Edit settings.json',cmd:'apply patch → .claude/settings.json (add rotation-hook allow rule)'},
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
@@ -2309,9 +2412,17 @@ Short-lived notes for the current run — kept brief on purpose.
   function inboxCardHTML(o,i){const a=AG[o.ag];let detail,acts;
     if(o.type==='permission'){detail='<div class="rc-body" style="font-family:var(--font-mono)">'+esc(o.cmd)+'</div>';
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
-    else if(o.type==='plan'){detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* Plans & Docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
-      const isDoc=o.plan&&o.plan.indexOf('doc-')===0;
-      acts='<button data-comp="button" class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+    else if(o.type==='plan'){
+      /* ND 16: the Review section covers plans, doc hand-offs, AND workflow approvals — a wf entry renders the
+         workflow preview (name / description / phase chips / full script) in the card content and keeps the SAME
+         action strip (Review + Reply); a workflow's Review will reuse the Library editor infrastructure (planned). */
+      if(o.wf){detail='<div class="wf-prev"><div class="rc-body"><b>'+esc(o.wf.name)+'</b></div><div class="wf-desc">'+esc(o.wf.desc)+'</div>'
+          +'<div class="wf-phases">'+(o.wf.phases||[]).map(p=>'<span data-comp="workflow-phase-chip" class="wf-phase">'+esc(p)+'</span>').join('')+'</div>'
+          +'<pre class="wf-script">'+esc(o.wf.script||'')+'</pre></div>';
+        acts='<button data-comp="button" data-status="planned" class="btn btn-sm" onclick="toast(\'Open the workflow in the Library editor — planned\')" title="Review the workflow in the Library editor (planned — reuses the shared editor)"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+      else{detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* plans + docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
+        const isDoc=o.plan&&o.plan.indexOf('doc-')===0;
+        acts='<button data-comp="button" class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}}
     else if(o.type==='decision'){detail='<div class="space-y-1.5">'+(o.options||[]).map(op=>'<button data-comp="option-card" class="opt" onclick="pickDecision(this)"><span class="opt-nm">'+esc(op.nm)+'</span><span class="opt-desc">'+esc(op.desc)+'</span></button>').join('')+'</div>';
       acts='<button data-comp="button" class="btn-main btn-sm dec-approve" disabled title="Select an option first" onclick="inboxDecision(this)">Approve</button>'+inboxReplyHTML();}
     else if(o.type==='warning'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
@@ -2334,10 +2445,10 @@ Short-lived notes for the current run — kept brief on purpose.
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML(!!a.system);}
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
     const runs=(o.type==='response'&&o.runs>1)?'<span data-comp="inbox-runs-chip" class="inbox-runs" title="'+o.runs+' unseen runs coalesced — a new unseen run updates this card, never stacks">×'+o.runs+' runs</span>':'';   /* item 14: the coalesce marker */
-    const _inboxComp={error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card';
+    const _inboxComp=o.wf?'workflow-inbox-card':({error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card');   /* ND 16: the workflow card is its own component */
     return '<div data-comp="'+_inboxComp+'" data-variants="reply-flash" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
       +'<div class="fcard-head">'
-      +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a,false)+sub+runs
+      +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a)+sub+runs
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
       +'<span class="fcard-time">'+o.time+'</span></button>'
       +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button>'
@@ -2370,14 +2481,14 @@ Short-lived notes for the current run — kept brief on purpose.
      plan-flash jump pattern (scroll + select-free flash, via the shared .reply-flash). Viewing COMPLETES the
      item (the deliberate seen/unseen model without read-tracking: reading Messages organically leaves it open). */
   function inboxView(btn){const card=btn.closest('.fcard');if(!card)return;const key=card.dataset.agent;
-    if(typeof switchTab==='function')switchTab('feed','messages');
+    if(typeof switchTab==='function')switchTab('feed','transcript');
     const fil=document.getElementById('feed-filter');
     if(fil){fil.querySelectorAll('.agrow.on').forEach(r=>r.classList.remove('on'));   /* scope the shared filter to just this agent (+ its subtree) */
       const row=[...fil.querySelectorAll('.agrow[data-ag]')].find(r=>r.dataset.ag===key);
       if(row){row.classList.add('on');
         if(row.classList.contains('agrow--parent')){const subs=row.nextElementSibling;if(subs&&subs.classList.contains('agrow-subs'))subs.querySelectorAll('.agrow--sub').forEach(s=>s.classList.add('on'));}}
       agSync(fil);updateAgBadges(fil);updateSubCounts(fil);}
-    const cards=[...document.querySelectorAll('#msg-list .msgcard')].filter(c=>{const m=MSGS[+c.dataset.msgi];return m&&m.ag===key&&!m.sub;});
+    const cards=[...document.querySelectorAll('#tx-list .txcard')].filter(c=>{const m=MSGS[+c.dataset.msgi];return m&&m.ag===key&&!m.sub;});
     const last=cards[cards.length-1];
     if(last){last.scrollIntoView({block:'nearest',behavior:'smooth'});
       last.classList.remove('reply-flash');void last.offsetWidth;last.classList.add('reply-flash');setTimeout(()=>last.classList.remove('reply-flash'),1000);}
@@ -2547,9 +2658,9 @@ Short-lived notes for the current run — kept brief on purpose.
     'Agent':"The selected agent — its identity, config, and live run state. Details (config + Context/Turns + Rewind/Handoff timeline) · Create (new-agent wizard) · Console (raw CLI feed + slash-command runner).",
     'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending/error), a subagent strip, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
     'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
-    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Messages (team traffic; Type = direction, Content = reply text + tool detail; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Error · Warning · Permission · Plan · Decision sections, plus the non-blocking Response section for run output you haven't reviewed; its badge is the fleet total).",
+    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Transcript (team traffic; Sent/Received filter by direction, the content filters by block kind — Messages · Thinking · Files · Shell · Search · Workflow — and the Subagent toggle hides the entries nested inside each parent's card; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Error · Warning · Permission · Review (plans, docs & workflow approvals) · Decision sections, plus the non-blocking Response section for run output you haven't reviewed; its badge is the fleet total).",
     'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. On Compose, From (single) sets who it's sent as; on History, From becomes a multi-select filter (the To list minus Scratch — your own prompts always show). To (multi, led by the Scratch row) sets who receives it and persists across both tabs.",
-    'Link Config':"Forwards context from one agent to another. The agent pair is two single-select dropdowns (the graph selection prepopulates them). Direction A→B / B→A / A↔B (default: both). Relationship (what flows — ONE per link; wanting both = two links): Direct messaging is a reply-to conversation · Shared context is passive awareness of selected content (Text/Thoughts/Read/Write/Bash/Diffs/Meta — the Messages Content taxonomy), optionally backfilled once. Trigger (when it delivers — a dropdown): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue joins the prompt queue (the Direct-messaging default) · Hold stages for your approval · Piggyback never initiates — it rides the next message the target receives from any source (the Shared-context default; an actively-delivered share costs the target a turn to ingest). End After bounds this exchange in Exchanges/Tokens (on a one-way link each fire counts as an exchange) — distinct from an agent's own Lifecycle limits."
+    'Link Config':"Forwards context from one agent to another. The agent pair is two single-select dropdowns (the graph selection prepopulates them). Direction A→B / B→A / A↔B (default: both). Relationship (what flows — ONE per link; wanting both = two links): Direct messaging is a reply-to conversation · Shared context is passive awareness of selected content (Messages/Thinking/Files/Shell/Search/Workflow — the Transcript content taxonomy), optionally backfilled once. Trigger (when it delivers — a dropdown): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue joins the prompt queue (the Direct-messaging default) · Hold stages for your approval · Piggyback never initiates — it rides the next message the target receives from any source (the Shared-context default; an actively-delivered share costs the target a turn to ingest). End After bounds this exchange in Exchanges/Tokens (on a one-way link each fire counts as an exchange) — distinct from an agent's own Lifecycle limits."
   };
   function seedHoverCards(){document.querySelectorAll('.pcard-head h3').forEach(h=>{const k=h.textContent.trim();const d=HC[k];if(!d)return;
     if(h.parentElement.querySelector('.hc-glyph'))return;

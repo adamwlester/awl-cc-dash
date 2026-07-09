@@ -486,7 +486,8 @@
       <span data-comp="chip" class="chip" id="clock" style="font-family:var(--font-mono)"></span>
       <span data-comp="chip" class="chip">WSL2</span>
       <span data-comp="chip" class="chip">tmux</span>
-      <span data-comp="chip" class="chip" style="gap:var(--space-6)"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>Connected</span>
+      <!-- ND 18: the one-off Connected chip became the shared connector-health badge — the title-bar SIDECAR-LINK state: Connected (green) · Reconnecting (amber — feed dropped, auto-retrying) · Offline (red — sidecar unreachable, panels stale) · Connecting (slate — startup pre-handshake) -->
+      <span data-comp="connector-health-badge" data-variants="hb-reconnecting hb-offline hb-connecting" class="hbadge hb-conn" title="Sidecar link — Connected"><span class="hd" style="background:var(--success)"></span>Connected</span>
       <button data-comp="settings-gear" class="topbar-gear" id="settings-gear" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
     </div>
   </header>
@@ -509,7 +510,9 @@
 
           <!-- ===== DETAILS ===== -->
           <div id="mid-details" data-group="mid" class="p-3 space-y-3 flex flex-col min-h-full">
-            <div class="flex items-center gap-2.5">
+            <!-- ND 8d: the identity header is a full-bleed --surface-3 HEADING BAND closed by a lighter-pink
+                 (--main-soft) divider; the panel's other internal group dividers are removed. -->
+            <div data-comp="agent-panel-head" class="agent-head">
               <span data-comp="agent-tile" data-variants="system me" class="agtile" id="det-tile" style="width:var(--size-40);height:var(--size-40);color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span>
               <div class="min-w-0 flex-1"><div class="text-[9px] text-muted font-bold uppercase tracking-wide truncate" id="det-role">researcher</div><div class="text-[15px] font-heading text-foreground leading-tight truncate" style="font-weight:900" id="det-name">01 sandy</div></div>
               <div class="flex flex-col items-end justify-between flex-1 min-w-0 h-10">
@@ -518,12 +521,13 @@
               </div>
             </div>
 
-            <div class="grp-div"></div>
-
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div class="field">
-                <div class="flex items-center justify-between mb-1"><label class="lbl">Role</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-                <div data-comp="role-combobox" class="lockable combo" data-rolecombo>
+                <!-- ND 12: the Role pencil is GONE — Role is editable in Create only; once a session has started
+                     the field is view-only (a running agent's agent.md can't be reassigned — ARCHITECTURE §7.15;
+                     the field's .lockable grey is the locked state, permanently). -->
+                <div class="flex items-center justify-between mb-1"><label class="lbl">Role</label></div>
+                <div data-comp="role-combobox" class="lockable combo" data-rolecombo title="Role is set at create — a running agent's agent.md can't be reassigned">
                   <div class="combo-trig"><input class="combo-in" value="researcher" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Choose from agent.md files"><i data-lucide="chevrons-up-down"></i></button></div>
                   <div class="combo-pop"></div>
                 </div>
@@ -613,9 +617,7 @@
               </div>
             </div>
 
-            <div class="grp-div"></div>
-
-            <!-- MODEL -->
+            <!-- MODEL (ND 8d: the group divider above is removed — spacing alone separates the bands) -->
             <div>
               <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="model-current">opus 4.8</span></div>
               <div data-comp="model-selector" class="model-tabs" id="model-tabs">
@@ -644,20 +646,17 @@
               <div data-comp="segmented-control" class="seg" id="effort-seg"><button onclick="segPick(this)">Low</button><button onclick="segPick(this)">Med</button><button class="active" onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div>
             </div>
 
-            <!-- LIFECYCLE -->
+            <!-- LIFECYCLE (ND 8c: the "Lifecycle — auto-stop conditions" label is gone — Max turns / Max Context % read fine alone) -->
             <div>
-              <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
               <div class="grid grid-cols-2 gap-2.5">
                 <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="50" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
-                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="80" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="80" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
               </div>
             </div>
 
-            <div class="grp-div"></div>
-
-            <!-- CONTEXT -->
+            <!-- CONTEXT (ND 8b: Compact sits right after the label; the token count pushes right. ND 8d: the group divider above is removed) -->
             <div>
-              <div class="ro-head"><span class="ro-label">Context</span><button data-comp="text-button" id="ctx-compact" class="link-act ml-auto">Compact</button><span class="ml-2 text-[10px] font-bold text-muted font-mono">399.1k / 1.0M</span></div>
+              <div class="ro-head"><span class="ro-label">Context</span><button data-comp="text-button" id="ctx-compact" class="link-act ml-2">Compact</button><span class="ml-auto text-[10px] font-bold text-muted font-mono">399.1k / 1.0M</span></div>
               <button class="ctx-trigger" id="ctx-btn" type="button">
                 <div class="summary-row"><div data-comp="progress-bar" data-variants="danger" class="ctxbar" id="ctx-bar"></div><span class="text-[10px] font-bold text-muted font-mono" id="det-ctx-pct">40%</span><i data-lucide="chevron-down" class="chev" id="ctx-chev"></i></div>
               </button>
@@ -731,14 +730,16 @@
 
           <!-- ===== CREATE ===== -->
           <div id="mid-create" data-group="mid" class="hidden p-3 space-y-3">
-            <div class="flex items-center gap-2.5">
+            <!-- ND 8d: the Create header takes the same full-bleed heading band as Details -->
+            <div class="agent-head">
               <span class="agtile agtile--user" style="width:var(--size-40);height:var(--size-40);border-style:dashed"><i data-lucide="user" class="agtile-luc"></i></span>
               <div class="min-w-0 flex-1"><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">New agent</div><div class="text-[10px] text-muted font-semibold">configure, then create</div></div>
             </div>
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div><label class="lbl mb-1">Role</label>
+                <!-- ND 12: the Role combobox IS the agent.md preset loader — entries grouped System / Project (the two-scope model); picking one auto-fills every Create field from the file's front matter -->
                 <div data-comp="role-combobox" class="combo" data-rolecombo data-create>
-                  <div class="combo-trig"><input class="combo-in" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Choose from agent.md files — prefills fields"><i data-lucide="chevrons-up-down"></i></button></div>
+                  <div class="combo-trig"><input class="combo-in" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Load an agent.md preset (System / Project) — auto-fills every field below"><i data-lucide="chevrons-up-down"></i></button></div>
                   <div class="combo-pop"></div>
                 </div>
               </div>
@@ -803,7 +804,7 @@
                 </div>
               </div>
             </div>
-            <div class="grp-div"></div>
+            <!-- (ND 8d: the group divider above Model is removed) -->
             <div>
               <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold model-cur">inherit ← parent</span></div>
               <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
@@ -812,10 +813,10 @@
             <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
             <div><label class="ro-label block mb-1.5">Effort</label><div data-comp="segmented-control" class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
-              <label class="ro-label block mb-1.5">Lifecycle <span class="normal-case font-semibold text-muted-2">— auto-stop conditions</span></label>
+              <!-- ND 8c: the "Lifecycle — auto-stop conditions" label is gone; "Context %" reads "Max Context %" -->
               <div class="grid grid-cols-2 gap-2.5">
                 <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="40" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
-                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
+                <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
               </div>
             </div>
           </div>
@@ -838,7 +839,7 @@
         </div><!-- /pcard-body -->
 
         <div class="pcard-foot px-2 py-2.5">
-          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button data-comp="button" class="btn-danger flex-1" onclick="retireAgent(this)"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire agent</button><button data-comp="button" class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete agent</button></div>   <!-- R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm) -->
+          <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button data-comp="button" class="btn flex-1" onclick="saveAgentMd(this)" title="Save this agent's current config as an agent.md — name it and pick Save to project / Save to system"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save</button><button data-comp="button" class="btn-danger flex-1" onclick="retireAgent(this)" title="Retire this agent — ends the session"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire</button><button data-comp="button" class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button></div>   <!-- ND 13: Save leads (writes the config out as an agent.md — filename + Save to project / Save to system); R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm), labels shortened (no "agent") -->
 
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button data-comp="button" class="btn-main" onclick="createAgent()">Create agent</button><button data-comp="button" class="btn px-3" onclick="resetCreate()">Reset</button><button data-comp="button" class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
@@ -868,8 +869,8 @@
 
                   <div data-comp="agent-node-card" id="node-1" data-agent="researcher-01-sandy" class="node selected" onclick="selectNode(this)" style="--nc:var(--ag-emerald)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-wizard"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 14:30 · 2h12m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">01 sandy</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt" title="Fast mode: ON (opus only)"></i></div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-emerald)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">01 sandy</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">opus 4.8<i data-lucide="zap" class="node-bolt" title="Fast mode: ON (opus only)"></i></span><span class="node-age" title="Created · elapsed">06-26 14:30 · 2h12m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-meta">opus 4.8 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -895,8 +896,8 @@
 
                   <div data-comp="agent-node-card" id="node-2" data-agent="synthesizer-01-kai" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cobalt)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-golem"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-25 09:12 · 1d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="node-idblk"><div class="node-role">synthesizer</div><div class="node-name">01 kai</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-cobalt)"><svg class="ag-svg"><use href="#ag-golem"/></svg></span><div class="node-idblk"><div class="node-role">synthesizer</div><div class="node-name">01 kai</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">sonnet 4.6</span><span class="node-age" title="Created · elapsed">06-25 09:12 · 1d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-meta">sonnet 4.6 · edit · med · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -918,8 +919,8 @@
 
                   <div data-comp="agent-node-card" id="node-3" data-agent="auditor-01-drew" class="node" onclick="selectNode(this)" style="--nc:var(--ag-fern)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-gasmask"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button data-comp="status-badge" class="node-badge nb-error" onclick="event.stopPropagation();statusJump('error',this)" title="Error — run failed · open Inbox">Error</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="node-idblk"><div class="node-role">auditor</div><div class="node-name">01 drew</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-fern)"><svg class="ag-svg"><use href="#ag-gasmask"/></svg></span><div class="node-idblk"><div class="node-role">auditor</div><div class="node-name">01 drew</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">haiku 4.5</span><span class="node-age" title="Created · elapsed">06-26 15:48 · 54m</span><button data-comp="status-badge" class="node-badge nb-error" onclick="event.stopPropagation();statusJump('error',this)" title="Error — run failed · open Inbox">Error</button></div>
                     <div class="node-meta">haiku 4.5 · plan · low · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -945,8 +946,8 @@
 
                   <div data-comp="agent-node-card" id="node-4" data-agent="coder-01-max" class="node" onclick="selectNode(this)" style="--nc:var(--ag-amber)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-robot"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 13:05 · 3h37m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="node-idblk"><div class="node-role">coder</div><div class="node-name">01 max</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-amber)"><svg class="ag-svg"><use href="#ag-robot"/></svg></span><div class="node-idblk"><div class="node-role">coder</div><div class="node-name">01 max</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">sonnet 4.6</span><span class="node-age" title="Created · elapsed">06-26 13:05 · 3h37m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-meta">sonnet 4.6 · auto · high · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -972,8 +973,8 @@
 
                   <div data-comp="agent-node-card" id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)" style="--nc:var(--ag-crimson)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-fox"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 11:20 · 5h22m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">02 rowan</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-crimson)"><svg class="ag-svg"><use href="#ag-fox"/></svg></span><div class="node-idblk"><div class="node-role">researcher</div><div class="node-name">02 rowan</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></span><span class="node-age" title="Created · elapsed">06-26 11:20 · 5h22m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-meta">opus 4.8 · auto · max · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -998,8 +999,8 @@
 
                   <div data-comp="agent-node-card" id="node-6" data-agent="tester-01-nova" class="node" onclick="selectNode(this)" style="--nc:var(--ag-violet)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-spider"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-24 16:40 · 2d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="node-idblk"><div class="node-role">tester</div><div class="node-name">01 nova</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-violet)"><svg class="ag-svg"><use href="#ag-spider"/></svg></span><div class="node-idblk"><div class="node-role">tester</div><div class="node-name">01 nova</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">haiku 4.5</span><span class="node-age" title="Created · elapsed">06-24 16:40 · 2d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-meta">haiku 4.5 · ask · med · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1021,8 +1022,8 @@
 
                   <div data-comp="agent-node-card" id="node-7" data-agent="reviewer-01-vega" class="node" onclick="selectNode(this)" style="--nc:var(--ag-cyan)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-eagle"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:02 · 40m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="node-idblk"><div class="node-role">reviewer</div><div class="node-name">01 vega</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-cyan)"><svg class="ag-svg"><use href="#ag-eagle"/></svg></span><div class="node-idblk"><div class="node-role">reviewer</div><div class="node-name">01 vega</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">sonnet 4.6</span><span class="node-age" title="Created · elapsed">06-26 16:02 · 40m</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1047,8 +1048,8 @@
 
                   <div data-comp="agent-node-card" id="node-8" data-agent="planner-01-quinn" class="node" onclick="selectNode(this)" style="--nc:var(--ag-vermilion)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-centurion"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-23 08:15 · 3d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="node-idblk"><div class="node-role">planner</div><div class="node-name">01 quinn</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-vermilion)"><svg class="ag-svg"><use href="#ag-centurion"/></svg></span><div class="node-idblk"><div class="node-role">planner</div><div class="node-name">01 quinn</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></span><span class="node-age" title="Created · elapsed">06-23 08:15 · 3d</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-meta">opus 4.8 · plan · extra · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1070,8 +1071,8 @@
 
                   <div data-comp="agent-node-card" id="node-9" data-agent="docs-01-wren" class="node" onclick="selectNode(this)" style="--nc:var(--ag-citron)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-parrot"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 10:05 · 6h37m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="node-idblk"><div class="node-role">docs</div><div class="node-name">01 wren</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-citron)"><svg class="ag-svg"><use href="#ag-parrot"/></svg></span><div class="node-idblk"><div class="node-role">docs</div><div class="node-name">01 wren</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">haiku 4.5</span><span class="node-age" title="Created · elapsed">06-26 10:05 · 6h37m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-meta">haiku 4.5 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1097,8 +1098,8 @@
 
                   <div data-comp="agent-node-card" id="node-10" data-agent="designer-01-lex" class="node" onclick="selectNode(this)" style="--nc:var(--ag-magenta)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-tribal"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 15:10 · 1h32m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="node-idblk"><div class="node-role">designer</div><div class="node-name">01 lex</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-magenta)"><svg class="ag-svg"><use href="#ag-tribal"/></svg></span><div class="node-idblk"><div class="node-role">designer</div><div class="node-name">01 lex</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">sonnet 4.6</span><span class="node-age" title="Created · elapsed">06-26 15:10 · 1h32m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-meta">sonnet 4.6 · edit · high · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1123,8 +1124,8 @@
 
                   <div data-comp="agent-node-card" id="node-11" data-agent="ops-01-sage" class="node" onclick="selectNode(this)" style="--nc:var(--ag-teal)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-astronaut"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-22 14:00 · 4d</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="node-idblk"><div class="node-role">ops</div><div class="node-name">01 sage</div></div><div class="node-model">haiku 4.5</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-teal)"><svg class="ag-svg"><use href="#ag-astronaut"/></svg></span><div class="node-idblk"><div class="node-role">ops</div><div class="node-name">01 sage</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">haiku 4.5</span><span class="node-age" title="Created · elapsed">06-22 14:00 · 4d</span><button data-comp="status-badge" class="node-badge nb-pending" onclick="event.stopPropagation();statusJump('pending',this)" title="Pending — awaiting your input · open Inbox">Pending</button></div>
                     <div class="node-meta">haiku 4.5 · auto · med · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1149,8 +1150,8 @@
 
                   <div data-comp="agent-node-card" id="node-12" data-agent="analyst-01-io" class="node" onclick="selectNode(this)" style="--nc:var(--ag-indigo)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-thirdeye"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 16:25 · 17m</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="node-idblk"><div class="node-role">analyst</div><div class="node-name">01 io</div></div><div class="node-model">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-indigo)"><svg class="ag-svg"><use href="#ag-thirdeye"/></svg></span><div class="node-idblk"><div class="node-role">analyst</div><div class="node-name">01 io</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">opus 4.8<i data-lucide="zap" class="node-bolt off" title="Fast mode: OFF (opus only)"></i></span><span class="node-age" title="Created · elapsed">06-26 16:25 · 17m</span><button data-comp="status-badge" class="node-badge nb-idle" onclick="event.stopPropagation();statusJump('idle',this)" title="Idle — open Prompts → Compose">Idle</button></div>
                     <div class="node-meta">opus 4.8 · ask · high · <span class="node-think">think off</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1172,8 +1173,8 @@
 
                   <div data-comp="agent-node-card" id="node-13" data-agent="scribe-01-fen" class="node" onclick="selectNode(this)" style="--nc:var(--ag-gold)">
                     <svg class="node-bg" aria-hidden="true"><use href="#ag-cowled"/></svg>
-                    <div class="node-meta-strip"><span class="node-age" title="Created · elapsed">06-26 12:48 · 3h54m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
-                    <div class="node-id"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="node-idblk"><div class="node-role">scribe</div><div class="node-name">01 fen</div></div><div class="node-model">sonnet 4.6</div></div>
+                    <div class="node-id"><span class="agtile" style="color:var(--ag-gold)"><svg class="ag-svg"><use href="#ag-cowled"/></svg></span><div class="node-idblk"><div class="node-role">scribe</div><div class="node-name">01 fen</div></div></div>
+                    <div class="node-mrow"><span class="node-model-badge">sonnet 4.6</span><span class="node-age" title="Created · elapsed">06-26 12:48 · 3h54m</span><button data-comp="status-badge" class="node-badge nb-active" onclick="event.stopPropagation();statusJump('active',this)" title="Active — open Prompts → History">Active</button></div>
                     <div class="node-meta">sonnet 4.6 · auto · low · <span class="node-think">think on</span></div>
                     <div class="node-div"></div>
                     <div class="node-settings">
@@ -1234,7 +1235,7 @@
               <!-- DOCUMENTS — L1 (ND 1-6): every project doc is a reviewable-document card (same component as Plans),
                    rendered from DOCS by renderDocs(). Two-column: the shared entry-nav (#doc-nav — icon · name · path,
                    path disambiguates project vs user CLAUDE.md, + the Add-document affordance) beside the right card
-                   list (#doc-list). Each card carries the 3-row header, the Outline/Feedback/Authors rail, a working
+                   list (#doc-list). Each card carries the 2-row header, the TOC/Feedback/Authors rail, a working
                    raw-markdown edit toggle, and the full decision footer. The per-doc .docdoc panes are retired. -->
               <div id="doc-documents" data-group="doc" class="hidden flex-1 min-h-0 flex p-2.5 gap-2.5">
                 <nav data-comp="entry-nav" class="docnav" id="doc-nav"></nav>
@@ -1307,14 +1308,13 @@
               <div class="link-shared hidden">
                 <label class="lbl mb-1.5">Shared content <span class="text-muted-2 font-semibold normal-case">— what rides along</span></label>
                 <div class="flex flex-wrap gap-1.5">
-                  <!-- Next-up item 4: Text mirrored here from the Messages Content filter (the two deliberately share one taxonomy) — without it a share never carries what the agent actually said -->
-                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
-                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)">Thoughts</button>
-                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Read</button>
-                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Write</button>
-                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Bash</button>
-                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Diffs</button>
-                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Meta</button>
+                  <!-- ND 6b: mirrors the Transcript content taxonomy (the two surfaces deliberately share one set) — Messages · Thinking · Files (Read/Write/Edit) · Shell · Search · Workflow -->
+                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)" title="The reply text — Claude Code's `text` content block">Messages</button>
+                  <button data-comp="mini-toggle" class="minitog on" onclick="linkRel(this)">Thinking</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)" title="File activity — Read / Write / Edit">Files</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)" title="Shell activity — Bash / PowerShell">Shell</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)" title="Search activity — Grep">Search</button>
+                  <button data-comp="mini-toggle" class="minitog" onclick="linkRel(this)">Workflow</button>
                 </div>
                 <div class="flex items-center gap-2 mt-2">
                   <button data-comp="switch" class="swh" onclick="linkSwitch(this)" title="Off — incremental updates only"></button>
@@ -1359,7 +1359,7 @@
         <div class="pcard-head">
           <h3>Team Feed</h3>
           <div data-comp="tab-bar" class="tabset">
-            <button data-tab-group="feed" data-tab="messages" onclick="switchTab('feed','messages')" class="tab-btn active">Messages</button>
+            <button data-tab-group="feed" data-tab="transcript" onclick="switchTab('feed','transcript')" class="tab-btn active">Transcript</button><!-- ND 6a: renamed from "Messages" — the tab is the container; "Message" survives as the entry TYPE (the Messages content filter below) -->
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
             <button data-tab-group="feed" data-tab="log" onclick="switchTab('feed','log')" class="tab-btn">Log</button>
             <button data-tab-group="feed" data-tab="inbox" onclick="switchTab('feed','inbox')" class="tab-btn">Inbox<span data-comp="count-square" class="req-badge ml-1" id="inbox-badge">9</span></button>
@@ -1369,7 +1369,7 @@
 
           <!-- v9p9: agent filter moved into a header sub-bar (multi w/ identity badges) -->
           <div class="subbar">
-            <span class="subbar-lab">From/To</span>
+            <!-- ND 6b: the "From/To" caption is gone — the badge-filled trigger reads for itself. -->
             <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team Graph cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
             <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
               <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" data-variants="empty" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
@@ -1383,24 +1383,27 @@
           <!-- feed content -->
           <div class="flex-1 min-w-0 flex flex-col overflow-hidden feed-body-wrap">
 
-            <!-- MESSAGES -->
-            <div id="feed-messages" data-group="feed" class="flex-1 overflow-y-auto px-3 pt-1 pb-3" style="background:var(--background)">
+            <!-- TRANSCRIPT (ND 6a: renamed from Messages) -->
+            <div id="feed-transcript" data-group="feed" class="flex-1 overflow-y-auto px-3 pt-1 pb-3" style="background:var(--background)">
+              <!-- ND 6b: the "Type"/"Content" caption labels are gone (the divider stays); the content set is
+                   Messages · Thinking · Files (Read/Write/Edit) · Shell (Bash/PowerShell) · Search (Grep) ·
+                   Workflow — Diff + Meta dropped — each filter carrying the same badge icon its rail cells use;
+                   a far-end Subagent visibility toggle sits behind its own divider (it hides the entries nested
+                   inside each parent card — ND 6c). -->
               <div class="minibar sticky top-0 z-10" style="background:var(--background);border-bottom:var(--border-width) solid var(--border)">
-                <span class="mini-cap">Type</span>
                 <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Messages you sent to the team"><i data-lucide="arrow-up-right"></i>Sent</button>
                 <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Messages received from agents"><i data-lucide="arrow-down-left"></i>Received</button>
                 <span class="mini-div"></span>
-                <span class="mini-cap">Content</span>
-                <!-- Next-up item 4: Text leads the Content row (default on) — the main reply text, Claude Code's `text` content block (rail tag "txt"); toggleable like any tool block -->
-                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="The main reply text — Claude Code's `text` content block">Text</button>
-                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)">Thoughts</button>
-                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Read</button>
-                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Write</button>
-                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Bash</button>
-                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Diffs</button>
-                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)">Meta</button>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="The reply text — Claude Code's `text` content block"><i data-lucide="message-square"></i>Messages</button>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Extended-thinking blocks"><i data-lucide="brain"></i>Thinking</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)" title="File activity — Read / Write / Edit (diffs file here)"><i data-lucide="file-text"></i>Files</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)" title="Shell activity — Bash / PowerShell"><i data-lucide="terminal"></i>Shell</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)" title="Search activity — Grep"><i data-lucide="search"></i>Search</button>
+                <button data-comp="mini-toggle" class="minitog" onclick="miniToggle(this)" title="Workflow runs"><i data-lucide="workflow"></i>Workflow</button>
+                <span class="mini-div"></span>
+                <button data-comp="mini-toggle" class="minitog on" onclick="miniToggle(this)" title="Show / hide the subagent entries nested in each parent card"><i data-lucide="git-branch"></i>Subagent</button>
               </div>
-              <div id="msg-list" class="flex flex-col gap-2 mt-2"></div>
+              <div id="tx-list" class="flex flex-col gap-2 mt-2"></div>
                         </div>
 
             <!-- INBOX (approvals you owe — its badge is the fleet total) -->
@@ -1453,16 +1456,16 @@
           </div>
         </div>
 
-        <!-- SHARED FEED ACTION STRIP (acts on selected cards across Messages/Scratch/Log/Inbox) -->
-        <div class="pcard-foot px-2 py-2.5" id="feed-messages-actions">
+        <!-- SHARED FEED ACTION STRIP (acts on selected cards across Transcript/Scratch/Log/Inbox) -->
+        <div class="pcard-foot px-2 py-2.5" id="feed-actions">
           <div class="flex items-center gap-2 flex-wrap">   <!-- P4a: wraps at narrow so the wider Embed/Attach control never overflows -->
             <button data-comp="icon-button" data-variants="is-off" class="icon-btn" id="feed-selall-btn" title="Select / deselect all cards in this tab" onclick="feedSelectAll(this)"><i data-lucide="list-checks"></i></button>   <!-- G2: select/deselect-all on every feed tab -->
             <!-- R-batch items 6-10: ONE merged Export control (Export: Copy · Export→file · Add to prompt: Embed · Attach), mounted from expMenuHTML('feed') on boot — replaces the separate Output Export + Embed/Attach dropdowns -->
             <span data-expmount="feed"></span>
             <button data-comp="button" data-variants="ghost" class="btn" id="summary-btn" title="Summarize the conversation" onclick="toggleSummary()"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i>Summarize</button>
             <div class="flex-1"></div>
-            <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Messages tab. Next-up item 10: solid --danger fill + white square icon -->
-            <button data-comp="icon-button" class="icon-btn icon-btn--danger-solid" id="msg-stop-btn" title="Stop this run" onclick="msgAct('stop')"><i data-lucide="square"></i></button>
+            <!-- v1.x #6: Stop the agent's run — icon-only danger, rightmost; shown only on the Transcript tab. Next-up item 10: solid --danger fill + white square icon -->
+            <button data-comp="icon-button" class="icon-btn icon-btn--danger-solid" id="tx-stop-btn" title="Stop this run" onclick="txAct('stop')"><i data-lucide="square"></i></button>
           </div>
         </div>
       </section>
@@ -1480,9 +1483,10 @@
             </div>
             <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
 
-              <!-- v9p9: Source/Target moved into a header sub-bar (From single · To multi w/ identity badges) -->
+              <!-- v9p9: Source/Target moved into a header sub-bar (From single · To multi w/ identity badges).
+                   ND 7: the "From"/"To" caption labels are gone — the route reads as [agent] → [agent], the
+                   same arrow-right vocabulary as the transcript-card header. -->
               <div class="subbar">
-                <span class="subbar-lab">From</span>
                 <!-- Next-up items 6+8: Compose's single-select From SOURCE — an in-flow accordion selector whose list renders from the shared roster (User + every agent; nova/quinn/io/fen were missing from the old hand-authored copy). -->
                 <div data-comp="source-dropdown" class="src-dd dd single dd--acc" id="source-dd">
                     <button class="dd-trig" type="button" onclick="toggleSrcPop(this)">
@@ -1502,7 +1506,7 @@
                     <div data-comp="agent-list" class="aglist aglist-scroll" data-agroster="agents" style="max-height:264px"></div>
                   </div>
                 </div>
-                <span class="subbar-lab">To</span>
+                <span class="subbar-route" title="to"><i data-lucide="arrow-right"></i></span>
                 <!-- Next-up items 6+8: the To multi-select — an in-flow accordion selector; the Scratch-led target list renders from the shared roster (all 13 agents — nova/io/fen were missing from the old hand-authored copy). data-on = the demo selection. -->
                 <div data-comp="source-dropdown" id="prompt-targets" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
                   <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
@@ -1610,9 +1614,10 @@
       <span><b class="text-foreground">17</b> subagents</span><span class="opacity-40">·</span><!-- Next-up item 6: subagent total = the graph-card roster (sandy 6 + max 1 + lex 2 + fen 8) -->
 
       <span><b class="text-foreground">6</b> links</span><span class="opacity-40">·</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>5 active</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--muted-2);border:var(--border-width) solid var(--border)"></span>4 idle</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warning);border:var(--border-width) solid var(--border)"></span>4 pending</span>
+      <!-- ND 17f: the status dots enlarged 8→12px (w-2→w-3) — at 8px inside a 2px navy border the colour was barely visible -->
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:var(--success);border:var(--border-width) solid var(--border)"></span>5 active</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:var(--muted-2);border:var(--border-width) solid var(--border)"></span>4 idle</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:var(--warning);border:var(--border-width) solid var(--border)"></span>4 pending</span>
     </div>
     </div><!-- /A13 left group (mic + counts) -->
     <div class="flex items-center gap-2">

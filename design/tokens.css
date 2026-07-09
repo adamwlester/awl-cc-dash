@@ -30,6 +30,7 @@
      chip = light teal, each staying in its action's hue family. */
   --main-dim:#f9b9d2;          /* Send chip — light pink  */
   --secondary-dim:#bfe6ec;     /* Revise chip — light teal */
+  --main-soft:#f9c8da;         /* lighter pink — the PANEL-level divider tier (panel header/subheader/footer strips on --surface-3); the window frame (topbar/footbar bounds + pane splitters) stays --main (ND 17) */
 
   /* ---- Surfaces — deliberately just 3 warm surfaces + button + hairline ---- */
   --background:#fef6e4;            /* canvas — app background + Team Graph scroll-well */
@@ -119,8 +120,8 @@
      watermark glyph (the "icon-fill" card treatment). The per-card agent COLOUR
      itself is the inline --nc binding (per-instance — deliberately NOT a token,
      since it binds one of the --ag-* palette to a single agent). */
-  --node-tint:22%;            /* base card field tint of the agent colour */
-  --node-tint-selected:33%;   /* stronger field tint for the selected card */
+  --node-tint:50%;            /* base card field tint of the agent colour — ND 8a: a ~50%-white mask over the identity colour (was 22%); tune on review */
+  --node-tint-selected:62%;   /* stronger field tint for the selected card */
   --node-icon-pct:5%;         /* watermark glyph tint (near-white over the field) */
 
   /* ---- Agent identity palette — the "Jewel" family ----------------------- */
