@@ -473,6 +473,61 @@ class TmuxBridge:
         if session_id:
             self._session_uuids[name] = session_id
 
+    def reresolve_session_id(self, name, timeout=5.0, interval=0.5):
+        """Re-resolve a session's claude session id after an in-place rotation.
+
+        A Console ``/clear`` starts a FRESH conversation inside the SAME live
+        claude process: the process keeps the ``--session-id`` argv it launched
+        with, but new turns are written to a NEW ``<new-id>.jsonl`` in the same
+        ``~/.claude/projects`` dir (live-proven,
+        ``test_console_clear_transcript_live``) — so the pinned id goes stale and
+        ``find_transcript`` / ``read_log`` orphan every post-``/clear`` turn.
+        ``/compact`` annotates the SAME file and needs no re-resolve.
+
+        This looks for the newest ``*.jsonl`` in the session's project dir whose
+        id differs from the currently-pinned one; when found, it re-registers
+        that id (so ``find_transcript`` follows the rotation) and returns it.
+        The rotated file may not exist until the first post-``/clear`` turn, so
+        this polls up to ``timeout`` seconds (a single immediate check when
+        ``timeout <= 0``) and returns None when no rotated file has appeared —
+        callers keep a pending flag and retry until it lands.
+
+        Newest-file is a heuristic scoped to this deliberate, per-agent moment:
+        in a shared-cwd project dir a co-located sibling's brand-new transcript
+        could in principle win the mtime race, the same exposure the legacy
+        unknown-id fallback in ``find_transcript`` carries.
+        """
+        from .transcript import _resolve_project_dir
+        try:
+            cwd = self._tmux(
+                f"display-message -t '{name}' -p '#{{pane_current_path}}'"
+            ).strip()
+        except Exception:
+            cwd = ""
+        if not cwd:
+            return None
+        project_dir = _resolve_project_dir(self, cwd)
+        if not project_dir:
+            return None
+        pinned = self._session_uuids.get(name)
+        deadline = time.time() + max(0.0, timeout)
+        while True:
+            try:
+                newest = self._run(
+                    f"ls -t '{project_dir}'/*.jsonl 2>/dev/null | head -1",
+                    timeout=15,
+                ).strip()
+            except Exception:
+                newest = ""
+            if newest.endswith(".jsonl"):
+                new_id = newest.rsplit("/", 1)[-1][: -len(".jsonl")]
+                if new_id and new_id != pinned:
+                    self._session_uuids[name] = new_id
+                    return new_id
+            if time.time() >= deadline:
+                return None
+            time.sleep(interval)
+
     def _clear_startup_gates(self, name, timeout=45, interval=0.5):
         """Clear the folder-trust and bypass-mode gates, then wait for idle.
 

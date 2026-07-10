@@ -454,6 +454,12 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
+        # Post-/clear transcript-rotation re-resolve (§7.13, §11 #35): set when a
+        # Console /clear rotated the JSONL but the NEW <id>.jsonl hasn't appeared
+        # yet (it may only be created on the first post-/clear turn). While
+        # pending, events() stops reading the orphaned old file and retries the
+        # re-resolve each poll until the rotated file lands.
+        self._rotation_pending = False
         # The resolved WSL transcript path, persisted in the roster record (§8.6
         # #2: resolution is verified, not trusted — and the verified result is
         # remembered so the mapping survives restarts and scheme drift).
@@ -685,11 +691,81 @@ class BridgeDriver(AgentDriver):
             except Exception as e:  # pragma: no cover - best effort
                 logger.warning("could not refresh runtime record: %s", e)
 
+    def _apply_rotation(self, new_id: str) -> None:
+        """Adopt a rotated claude session id (post-/clear, §7.13/§11 #35).
+
+        A ``/clear`` starts a NEW conversation, so the fresh transcript is
+        replayed from 0 — every entry in the rotated ``<new-id>.jsonl`` is a new
+        event (their uuids are new, so the sidecar's deterministic-id dedup
+        can't drop them). The persisted runtime record is refreshed so a
+        restarted sidecar resolves the rotated file, and ``_transcript_path`` is
+        cleared so the next successful read re-resolves + re-persists the
+        verified path (the existing ``events()`` lazy-resolve).
+        """
+        self._claude_session_id = new_id
+        self._seen = 0
+        self._transcript_path = None
+        self._rotation_pending = False
+        if self._record is not None:
+            self._record["claude_session_id"] = new_id
+            self._record["transcript_path"] = None
+            try:
+                _save_record(self._record)
+            except Exception as e:  # pragma: no cover - best effort
+                logger.warning("could not refresh runtime record after rotation: %s", e)
+
+    async def handle_transcript_rotation(self) -> dict[str, Any]:
+        """Re-resolve the transcript after a Console ``/clear`` (§7.13, §11 #35).
+
+        A ``/clear`` rotates the agent's JSONL to a new ``<new-id>.jsonl`` while
+        the live process keeps its original ``--session-id`` argv, orphaning the
+        pinned resolution (live-proven, ``test_console_clear_transcript_live``).
+        Called by the console-run path when it detects a ``/clear``; asks the
+        bridge to re-resolve (newest-``.jsonl``-in-project-dir, since nothing
+        else names the rotated id) and re-register the id, then adopts it via
+        ``_apply_rotation``. When the rotated file hasn't appeared yet (some
+        builds only create it on the first post-/clear turn), a pending flag is
+        left so ``events()`` retries every poll until it lands — post-/clear
+        turns are never lost either way.
+        """
+        try:
+            new_id = await asyncio.to_thread(
+                self._bridge.reresolve_session_id, self._name
+            )
+        except Exception as e:  # pragma: no cover - environment dependent
+            logger.warning("post-/clear re-resolve failed for %s: %s", self._name, e)
+            new_id = None
+        if new_id:
+            self._apply_rotation(new_id)
+            logger.info("transcript rotated for %s -> %s", self._name, new_id)
+            return {"rotated": True, "claude_session_id": new_id, "pending": False}
+        self._rotation_pending = True
+        return {"rotated": False, "claude_session_id": self._claude_session_id,
+                "pending": True}
+
     async def events(self) -> AsyncIterator[dict[str, Any]]:
         while not self._closed:
+            # 0) Pending post-/clear rotation: the rotated <id>.jsonl hadn't
+            # appeared yet — retry the re-resolve (single immediate check) and
+            # skip the orphaned old file until it lands.
+            if self._rotation_pending:
+                try:
+                    new_id = await asyncio.to_thread(
+                        self._bridge.reresolve_session_id, self._name, 0.0
+                    )
+                except Exception:  # pragma: no cover - environment dependent
+                    new_id = None
+                if new_id:
+                    self._apply_rotation(new_id)
+                    logger.info("transcript rotated for %s -> %s (deferred)",
+                                self._name, new_id)
+
             # 1) New transcript entries -> assistant/user events.
             try:
-                entries = await asyncio.to_thread(self._bridge.read_log, self._name)
+                if self._rotation_pending:
+                    entries = []  # old file is orphaned — don't read it
+                else:
+                    entries = await asyncio.to_thread(self._bridge.read_log, self._name)
             except Exception:
                 entries = []  # transcript may not exist until the first turn
             if entries and self._transcript_path is None:
