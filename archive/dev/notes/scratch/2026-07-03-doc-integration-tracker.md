@@ -18,7 +18,7 @@
         #13, #22); §10 de-referenced; TODO.md cut down; CLAUDE.md synced.
         [✓] 3a. DEVLOG · [✓] 3c. correction pass: [BH] un-ported (§11.4 deleted, TODO restored);
         ALL inbound TODO.md refs stripped (ARCHITECTURE + CLAUDE.md grep-clean).
-        [ ] 3b. commit — pending user go.
+        [✓] 3b. committed 40decbf + pushed to origin/main (see Running todo); the earlier "pending" mark was stale.
 [✓] 4.  Harvest → docs:
         [✓] 4a. Reviewed the 5 research reports (Sonnet subagents, 2026-07-03). All settled: #12/#13/#22
                 → 🧪 needs-spike; #14 → ◐; #15 → ✅ (spike-passed).
@@ -47,9 +47,18 @@
         new ⚠-Today markers. Fixed on the spot: #26 Decision-pending field; §8.7 heading Two→Three; §7.11
         permission-hooks deferred note; §6.2 ledger wording. Accepted LOW: link-drawer wiring (candidate
         #13) subsumed by the §4.4 renderer-rebuild scope. Could NOT machine-verify: prose quality/tone.
-[ ] 9.  Feature-refactor §10/§11 (certainty stays the section split; group by feature within) with an
-        old→new mapping table; strip ex-BB scaffolding; re-verify zero inbound TODO.md refs repo-wide;
-        archive this tracker.
+[✓] 9.  Split into the port (done 2026-07-05) + the structural regroup (done 2026-07-09):
+        [✓] 9a. Q1–Q11 ported → ARCHITECTURE §10 (annotated-decided) + new §11.5 (buildable graduates #30–#37);
+                §11.3 #18 Agent Archive reshaped (Q11); §F1 register all [✓]; Operator-answers marked settled;
+                zero inbound TODO.md refs re-verified in the major docs (fixed the §10 #36/#37 regression). (2026-07-05)
+        [✓] 9b. STRUCTURAL — executed 2026-07-09 (map in §H below): every ✅-proven §10 item + the #4/#7
+                tails relocated into the body / Decided-omissions with inline evidence citations (new body
+                subsections §7.18 context-sources + §7.19 Rewind/Handoff); §10 slimmed to 8 genuinely-open /
+                parked items; §11 feature-regrouped + renumbered 1–49 (storage set #1–11 unchanged; new items
+                added for mode-wiring, bypass gating, identity editing, links fixes, Projects surface, console
+                attach, context/statusLine/cost wiring, renderer rebuild); ex-BB scaffolding stripped; ~30
+                body cross-refs repointed; stale pointers fixed in tests/README.md + design/DESIGN.md;
+                adversarial multi-agent verification pass run; tracker archived.
 ```
 
 ## Standing rules (locked in-conversation — do not re-litigate)
@@ -138,31 +147,31 @@ stream/permissions API, electron architecture, plugin ecosystem — already cite
 
 > **Handoff rule — do not drop.** This is where product/policy decisions this workflow surfaces live so they survive session boundaries. Every subsequent session MUST (a) add to and edit this list as orphans get homed and new decisions appear, and (b) **check each open decision WITH the user before treating it as settled** — never silently adopt the audit's suggested resolution as "decided." Homing an orphan as an explicit §10 open-question is an agent's job; *deciding* it is the user's. Mark each `[ ]` open / `[✓]` decided (with date + where applied), mirroring §E.
 
-Surfaced 2026-07-04 (Phase-6 prep). **All homed as open §10 entries on 2026-07-04 (Phase 6)** — homing gives each orphan a doc entry; it does **not** decide it. Each stays `[ ]` open until the operator rules; the `→ homed §10 #N` note is *where* it was homed, not a resolution.
+Surfaced 2026-07-04 (Phase-6 prep). **All homed as open §10 entries on 2026-07-04 (Phase 6)** — homing gives each orphan a doc entry; it does **not** decide it. Each stays `[ ]` open until the operator rules; the `→ homed §10 #N` note is *where* it was homed, not a resolution. **All decided 2026-07-05** — the operator ruled the whole Q1–Q11 batch, the coherence pass ran clean (no contradictions; strong convergence on the lineage/provenance/archive substrate), and the decisions are ported into ARCHITECTURE §10 (annotated-decided) + §11.5 (buildable graduates). Every box below is now `[✓]` with its resolution + where-applied.
 
 Higher-stakes — leave genuinely open, user decides:
-- [ ] **Security on an untrusted network** — no-auth `0.0.0.0` bind; audit suggests OS-firewall-as-boundary. (Tier-3) → homed §10 #32.
-- [ ] **Frontend degraded-mode UX** — what the poll-driven panels show when `/health` fails. (Tier-2) → homed §10 #28.
-- [ ] **Voice dictation** — client-side Web Speech API vs. a sidecar transcription service. (Tier-2) → homed §10 #27.
-- [ ] **Response-format preamble** — the option set + per-agent-vs-per-turn persistence. (Tier-3) → homed §10 #34.
-- [ ] **Tier-4 "elevate if pursued" trio** — rich visual content in Plans/Docs · Authors/authorship view · subagent create/manage UI: pursue (→ DESIGN / §10) or leave parked. Design-lane items route through the design agent, not edited here. → homed §10 #36 (rich visual) + #37 (Authors view); subagent create/manage was already §10 #22.
+- [✓] **Security on an untrusted network** — no-auth `0.0.0.0` bind. (Tier-3) → homed §10 #32. — **Decided 2026-07-05 (Q2 → A):** OS firewall is the boundary; travel-mode noted as a cheap future add. Applied: ARCHITECTURE §10 #32.
+- [✓] **Frontend degraded-mode UX** — what the poll-driven panels show when `/health` fails. (Tier-2) → homed §10 #28. — **Decided 2026-07-05 (Q3 → A):** freeze + mark-stale + poll-backoff (behavior → §11.5 #34). The *consolidated system-health display* is a separate **design-lane** follow-up (ties §10 #16 ↔ #28). Applied: ARCHITECTURE §10 #28 / §11.5 #34.
+- [✓] **Voice dictation** — Web Speech API vs. a sidecar transcription service. (Tier-2) → homed §10 #27. — **Direction decided 2026-07-05 (Q4):** quality-first — spike browser/Electron built-in vs. a Whisper-class local library; better quality beats convenience. Still 🔧 spike-gated. Applied: ARCHITECTURE §10 #27.
+- [✓] **Response-format preamble** — the option set + per-agent-vs-per-turn persistence. (Tier-3) → homed §10 #34. — **Decided 2026-07-05 (Q5 → A):** per-agent preset menu for v1. Applied: ARCHITECTURE §10 #34 / §11.5 #32.
+- [✓] **Tier-4 "elevate if pursued" trio** — rich visual content · Authors view · subagent create/manage. → homed §10 #36/#37/#22. — **Decided 2026-07-05 (Q10 → mixed):** #36 rich visuals *wanted, elevate to design-lane when ready* (not a v1 gate; laptop-smoothness caveat); #37 Authors *rescoped — display already landed in design; provenance wiring → §11.5 #35*; #22 subagent create/manage *parked* (revisit after hooks/lineage). Applied: ARCHITECTURE §10 #36/#37/#22 / §11.5 #35.
 
 Lower-stakes — pre-fill the audit's recommendation for confirm/override:
-- [ ] **Schema versioning / migration** of the committed store. (Tier-3) → homed §10 #29.
-- [ ] **Sidecar crash-supervision** — manual relaunch (agents survive in tmux) vs. auto-restart. (Tier-3) → homed §10 #30.
-- [ ] **Git-merge policy** on the committed `.awl-cc-dash/` state. (Tier-3) → homed §10 #31.
-- [ ] **Agent name source** — curated pool + randomize vs. user-typed. (Tier-3) → homed §10 #35.
-- [ ] **Turns-by-tool + "Coordinating" derivation** — confirm derivable (spike) vs. cut the feature. (Tier-2) → homed §10 #26.
-- [ ] **Sidecar logging / observability** — log destination + retention/rotation (a file under `sidecar/runtime/` vs. stdout-only). (Tier-3; newly surfaced 2026-07-04 during Phase-6 homing) → homed §10 #33.
+- [✓] **Schema versioning / migration** of the committed store. (Tier-3) → homed §10 #29. — **Decided 2026-07-05 (Q1 → A):** stamp `schema_version` now; migration machinery deferred. Applied: ARCHITECTURE §10 #29 / §11.5 #30.
+- [✓] **Sidecar crash-supervision** — manual relaunch vs. auto-restart. (Tier-3) → homed §10 #30. — **Decided 2026-07-05 (Q1 → A):** manual relaunch is the v1 model (agents survive in tmux); auto-restart deferred. Applied: ARCHITECTURE §10 #30.
+- [✓] **Git-merge policy** on the committed `.awl-cc-dash/` state. (Tier-3) → homed §10 #31. — **Decided 2026-07-05 (Q1 → A):** single-machine, no merge policy. Applied: ARCHITECTURE §10 #31.
+- [✓] **Agent name source** — curated pool + randomize vs. user-typed. (Tier-3) → homed §10 #35. — **Decided 2026-07-05 (Q6 → A):** curated pool at `assets/names/agent-names.json` + randomize; user-typed stays. Applied: ARCHITECTURE §10 #35 / §11.5 #33.
+- [✓] **Turns-by-tool + "Coordinating" derivation** — confirm derivable vs. cut. (Tier-2) → homed §10 #26. — **Decided 2026-07-05 (Q7):** display parked (total-count suffices); underlying per-turn parsing retained + valued (guard = transcript retention); "Coordinating" attribution stays the unproven piece. Applied: ARCHITECTURE §10 #26.
+- [✓] **Sidecar logging / observability** — destination + retention/rotation. (Tier-3) → homed §10 #33. — **Decided 2026-07-05 (Q1 → A):** small size-bounded log file under `sidecar/runtime/`. Applied: ARCHITECTURE §10 #33 / §11.5 #31.
 
 Blocks the Phase-9 restructure (also under Running todo):
-- [ ] **"Agent Archive"** (§11.3 #18) → demote to §10? *(Not a coverage-audit orphan — a §11 placement call; stays in §11.3 until the operator rules, then handled in the Phase-9 restructure.)*
+- [✓] **"Agent Archive"** (§11.3 #18) → demote to §10? — **Decided 2026-07-05 (Q11 → B, reshaped):** NO demotion — stays a decided §11 build item, reshaped (archive-by-default / roster table / lineage fields reserved / Delete = true delete). This resolved the one hard Phase-9 placement gate. Applied: ARCHITECTURE §11.3 #18.
 
 ### G. Scratch docs to archive when their content is fully homed
 
 - [✓] `2026-07-02-coverage-audit-orphans.md` — **archived 2026-07-04 (Phase 7)** → `archive/dev/notes/scratch/` (content homed Phases 5–6; ARCHITECTURE §10 citations repointed to the archive path).
 - [✓] `2026-07-02-unverified-behavior-candidates.md` — **archived 2026-07-04 (Phase 7)** → `archive/dev/notes/scratch/` (verified integrated: all 22 candidate items homed or correctly parked; the one still-open item — voice dictation, candidate #16 — is now §10 #27).
-- [ ] this tracker (last — Phase 9)
+- [✓] this tracker — **archived 2026-07-09** (Phase 9b complete) → `archive/dev/notes/scratch/`
 
 ## Running todo / open decisions
 
@@ -292,9 +301,9 @@ Blocks the Phase-9 restructure (also under Running todo):
 
 **My recommendation: A** — it matches your own "value still unclear" note, keeps §11 to genuinely-decided work, and unblocks the refactor cleanly. Answering just this one lets Phase 9 proceed; the other ten make the refactored map complete.
 
-## Operator answers — TENTATIVE (pending end-of-block coherence review)
+## Operator answers — SETTLED 2026-07-05 (coherence pass clean; ported)
 
-> **Status: LIVE / INCOMPLETE — do not treat any answer here as settled.** The operator is answering the questions above in chunks and has asked that **every answer be held tentative**. When the operator signals the block is complete, run **one coherence pass** over the whole set — do the answers hang together for clean development? does any combination create contradictory or awkward build work? — then flag anything worth reconsidering (with rationale) and get sign-off. **Only after that pass does anything port into `docs/ARCHITECTURE.md` §10/§11 or convert a §F1 box.** An answer may need revisiting in light of another, by the operator's explicit instruction.
+> **Status: RESOLVED 2026-07-05 — all answers ported.** The operator completed the Q1–Q11 block and signalled "push it all through." The **coherence pass ran** over the whole set: verdict **clean** — no contradictions, and the answers converge (git-identity attribution Q9 #24, the Agent-Archive lineage fields Q11, and the HIGH-priority lineage / hook-ingestion note all point at one substrate). Two threads were flagged and handled: (1) Q3's *display* of system-health is one question with §10 #16 + #28 → routed to the **design lane**, only the *behavior* ported here; (2) **transcript retention** (§8.6 ⚠ Today — the 30-day default is live now) is load-bearing under Q7 / Q9 / Q11 and flagged **URGENT** independent of this workflow. All 11 answers are now ported into `docs/ARCHITECTURE.md` §10 (annotated-decided) + §11.5 (buildable graduates #30–#37); every §F1 box is `[✓]`. The answers below are kept **as the settled record** (no longer tentative).
 
 - **Q1 — backend robustness posture → A** *(tentative)* — pragmatic single-machine v1 (schema stamp now · manual sidecar relaunch · single-machine no-merge · bounded log file).
 - **Q2 — security on untrusted network → A** *(tentative)* — OS firewall is the boundary; document + accept.
@@ -309,3 +318,86 @@ Blocks the Phase-9 restructure (also under Running todo):
 - **Q10 — elevate-or-park trio → mixed** *(tentative)* — **#36 rich visuals: wanted, elevate when the design lane is ready for it** (not a v1 gate; operator caveat: must stay smooth on a modest laptop). **#22 subagent create/manage: park** — the operator accepts the parent-decides model and notes no scaffolding exists yet; revisit after hooks/lineage land. Operator sketch for the eventual feature (2026-07-05): a Compose-workspace "add agents" affordance (a button or dropdown, plausibly via the existing template-block machinery) that drops a generic fan-out instruction block into the prompt with placeholders for agent count and timing; custom per-fan-out instructions ride in the same block. **#37: rescoped, no decision needed** — the Authors-lens display already landed in the design system (the [ND] design run; see DESIGN.md's review-panel section), so remaining scope is system-side provenance wiring only.
 - *Operator priorities voiced in the same pass (2026-07-05): lifecycle-hook ingestion and the lineage/agent-archive substrate are HIGH priority (the stated pain: agent origins, spawns, handoffs, and timestamps are untraceable today); transcript retention is an URGENT action item — the 30-day `cleanupPeriodDays` default is live right now (ARCHITECTURE §8.6 marks it ⚠ Today; the §11.4 "Pin transcript retention" build item covers the per-agent side, and user-level settings need it too); transcripts are referenced in place, never copied.*
 - *Process note from the operator (2026-07-05): several of these summaries carried too little context to answer from — write decision questions so they stand alone for someone without the source docs open.*
+
+
+## H. Phase-9b old→new numbering map (2026-07-09)
+
+The lossless-port record for the Phase-9b structural refactor of `docs/ARCHITECTURE.md` §10/§11. Every pre-refactor item is accounted for below; "body" = relocated into the settled body with its evidence citation.
+
+### §10 old → new
+
+| Old §10 | Fate |
+|---|---|
+| #1 mid-run permission mode | body §6.2 + §7.11; build §11 #12 |
+| #2 thinking toggle | body §6.2; build §11 #12 |
+| #3 fast toggle | body §6.2; build §11 #12 |
+| #4 mid-turn Inject | §10 Decided omissions; final model stated in §7.3 |
+| #5 console fidelity/transport | body §7.13 + §4.3; build §11 #29 |
+| #6 plan/decision hooks | body §7.4 + §7.16; build §11 #22 |
+| #7 run-strip % | §10 Decided omissions; final model stated in §7.10 |
+| #8 subagent pending-vs-active | body §7.17; build §11 #21 |
+| #9 context breakdown/compact | body §7.18 (new); build §11 #30 |
+| #10 one-click launch | body §2 + §4.1; build §11 #20 |
+| #11 per-agent cost | body §7.15; build §11 #32 |
+| #12 attachment/citation paths | **§10 #1** (with in-build decision ladder) |
+| #13 native coordination primitives | **§10 #2** (absorbs old §11 #20 agent-teams messaging) |
+| #14 hook event stream | body §7.4; build §11 #21 |
+| #15 rewind/handoff | body §7.19 (new); build §11 #15 |
+| #16 system fault harvest | body §7.2; build §11 #27 |
+| #17 polling scale ceiling | body §6.2 ⚠Today(scale); build §11 #34 |
+| #18 statusLine context | body §7.18 (new); build §11 #31 |
+| #19 /clear orphaning | body §7.13 bullet; build §11 #35 |
+| #20 bypass/auto preconditions | body §7.11; build §11 #13 |
+| #21 usage/limits sources | body §7.15; build §11 #33 |
+| #22 subagent create/manage | **§10 #3** (parked) |
+| #23 docs in agent context | **§10 #6** (auto layer); v1 build §11 #44 |
+| #24 AI-touched tracking | build §11 #19 (decision carried in the item) |
+| #25 special-asset sourcing | **§10 #7** (decided-deferred) |
+| #26 turns by-tool | **§10 #5** (parked) |
+| #27 voice dictation | **§10 #4** (quality spike) |
+| #28 degraded mode + backoff | body §4.3; build §11 #38 (display → design lane) |
+| #29 schema versioning | body §8.7; build §11 #42 |
+| #30 crash supervision | body §2 (recorded posture) |
+| #31 git-merge policy | body §8.7 (recorded posture) |
+| #32 untrusted-network security | body §2 (recorded posture) |
+| #33 sidecar logging | body §2; build §11 #43 |
+| #34 response-format preamble | body §7.14; build §11 #39 |
+| #35 agent name pool | body §7.5; build §11 #40 |
+| #36 rich visuals | **§10 #8** (design-lane pointer) |
+| #37 authors view | build §11 #41 |
+
+### §11 old → new
+
+| Old §11 | New |
+|---|---|
+| #1–#11 storage set | #1–#11 (unchanged; ex-BB15–BB25 markers stripped) |
+| #12 load past agents | #17 |
+| #13 plans action loop | #22 |
+| #14 queue awareness | #24 |
+| #15 git automation | #47 |
+| #16 change-log watcher | #48 |
+| #17 system-check agent | #49 |
+| #18 agent archive | #18 (unchanged) |
+| #19 handoff artifacts | #16 |
+| #20 native agent-teams messaging | folded into §10 #2 |
+| #21 rewind/fork | #15 |
+| #22 hook lifecycle ingestion | #21 |
+| #23 /clear re-resolve | #35 |
+| #24 usage-cap matcher | folded into #27 (system-fault cards) |
+| #25 polling rework | #34 |
+| #26 account split-source reader | #33 |
+| #27 Electron-main lifecycle POC | #20 |
+| #28 Task→Agent parser audit | #36 |
+| #29 import external context | #28 |
+| #30 schema stamp | #42 |
+| #31 sidecar log | #43 |
+| #32 response presets | #39 |
+| #33 name pool | #40 |
+| #34 degraded mode + backoff | #38 |
+| #35 authors wiring | #41 |
+| #36 docs-in-context light | #44 |
+| #37 per-agent git identity | #19 |
+| #38 prompt/UI-text library | #45 |
+| #39 per-turn settings+summary | #46 |
+| #40 workflow approval via Inbox | #23 |
+| — (new) | #12 mode/thinking/fast wiring · #13 bypass/auto gating · #14 identity editing + name registration · #25 links model fixes · #26 Projects surface (system) · #29 console streaming attach + xterm · #30 context breakdown · #31 per-turn statusLine · #32 per-agent cost · #37 renderer rebuild |
