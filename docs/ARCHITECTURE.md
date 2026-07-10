@@ -385,9 +385,10 @@ scrollback, watch, wait_idle, export, mcp_sync, plus `set_cwd`/`set_model` and i
 - **Detached creation.** `create()` runs `tmux new-session -d -s <name> … 'claude --session-id <uuid> …'`.
   The `-d` means **no window** — sessions are always **tab-less**. A Windows Terminal tab opens **only** on
   an explicit `show=True` / `show()` — a deliberate human attach — never as a side effect of programmatic
-  creation. `create()` pins a `--session-id` uuid so each agent's JSONL transcript is collision-proof, and
-  auto-clears the folder-trust / bypass-mode startup gates. A closed tab does not kill the session;
-  `show()` reconnects.
+  creation. `create()` pins a `--session-id` uuid so each agent's JSONL transcript is collision-proof (a
+  §9.9 cold-restore instead passes `resume_session_id`, launching `claude --resume <id>` — the same
+  conversation, continuing on the same id and `<id>.jsonl`), and auto-clears the folder-trust /
+  bypass-mode startup gates. A closed tab does not kill the session; `show()` reconnects.
 - **Two-channel observation.** The bridge **samples, it does not stream.** `status()` classifies the screen
   from `capture-pane` into `idle | generating | permission_prompt | unknown`;
   [`transcript.py`](../bridge/transcript.py) resolves `cwd → project-hash → <session-id>.jsonl` and parses
@@ -1019,15 +1020,7 @@ intentionally empty. The **agent half** has two cases:
   `reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py) rebuilds `SessionState` from the
   persisted record and re-attaches the driver; agents keep running across a sidecar bounce because tmux
   held them.
-- **Cold** (reboot / WSL shutdown; tmux gone): relaunch the agent with
-  `claude --resume <claude_session_id>` in its cwd — the same conversation, rebuilt from the transcript.
-  Graceful-degrade fallback if cold-restore proves hard in practice: restore all *data* and let agents be
-  re-resumed manually. ⚠ **Today:** a dead-tmux record is **pruned** — deleted, the agent forgotten
-  (`reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py)) — and nothing invokes
-  `claude --resume`: the bridge's `resume()` in [`bridge/bridge.py`](../bridge/bridge.py) only rebinds live
-  tmux and, if the session is gone, falls through to `create()` with a *fresh* session id — a brand-new
-  conversation. Also today, transcript replay only happens through a live/rebound session's driver poll, so
-  a pruned agent's transcript is never replayed.
+- **Cold** (reboot / WSL shutdown; tmux gone): relaunch the agent with `claude --resume <claude_session_id>` in its cwd — the same conversation, rebuilt from the transcript, continuing on the **same** session id and the same `<id>.jsonl` (plain `--resume` never forks; a fork takes the explicit `--fork-session` flag — live-proven on CC 2.1.202 in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py)). The bridge half exists: `create(resume_session_id=…)` launches `--resume <id>` with no `--session-id`, and `resume()` falls through to it when the tmux session is dead ([`bridge/bridge.py`](../bridge/bridge.py)). Graceful-degrade fallback if cold-restore proves hard in practice: restore all *data* and let agents be re-resumed manually. ⚠ **Today:** a dead-tmux record is still **pruned** — deleted, the agent forgotten (`reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py)) — nothing on the sidecar's startup path invokes the bridge's cold-restore. Also today, transcript replay only happens through a live/rebound session's driver poll, so a pruned agent's transcript is never replayed.
 
 **Cross-machine caveat (accepted):** cloning a project to another machine brings all 📁 state, but
 transcripts and live processes stay in the original machine's WSL — agents re-launch fresh there. No
@@ -1141,7 +1134,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §8.5 | Central `plan-reviews.json` keyed by filename (rename orphans reviews); Documents have no comment store; no `plansDirectory` in materialized settings | #6, #7 |
 | §8.6 | Transcript path recomputed every read, never persisted | #4 |
 | §8.7 | No `schema_version` stamp written | #42 |
-| §9.9 | Dead-tmux records pruned instead of cold-restored; nothing invokes `claude --resume` | #8 |
+| §9.9 | Dead-tmux records pruned on startup — the bridge resume-launch path exists; the sidecar doesn't call it yet | #8 |
 
 ### 11.2 Storage & persistence set (#1–11)
 
@@ -1154,7 +1147,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 5. *(built 2026-07-09 — transcript retention pinned; see DEVLOG)*
 6. **Per-doc metadata sidecars** *(→ §8.5)* — `<doc>.meta.json` read/write (verdict, comments, quote-anchors, provenance), replacing `plan-reviews.json`; Documents comment endpoints; dashboard-mediated rename of the doc + sidecar pair; orphan detection/re-link. Where: [`sidecar/library.py`](../sidecar/library.py), [`sidecar/storage.py`](../sidecar/storage.py).
 7. **Absolute `plansDirectory`** *(→ §8.5; depends on #2)* — set `plansDirectory` to the absolute WSL path `<canonical-root>/.awl-cc-dash/plans` in the materialized per-agent settings (a relative `./` resolves against raw cwd and breaks subfolder launches). Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
-8. **Cold-restore on startup** *(→ §9.9; enables #17)* — on startup, dead-tmux records **resume** (`claude --resume <claude_session_id>`, correct cwd) instead of prune. Needs a bridge resume-launch path (today a passed `session_id` only pins `--session-id` — still a NEW conversation — and `resume()`'s dead-session fall-through calls `create()` with no id). Graceful degrade = restore data, manual re-resume. *(Mechanism proven feasible by the one-click-launch + rewind/handoff live spikes.)* Where: [`sidecar/main.py`](../sidecar/main.py), [`bridge/bridge.py`](../bridge/bridge.py).
+8. **Cold-restore on startup** *(→ §9.9; enables #17)* — on startup, dead-tmux records **resume** (`claude --resume <claude_session_id>`, correct cwd) instead of prune. *(Bridge half built 2026-07-09: `create(resume_session_id=…)` launches `--resume <id>` — same conversation, same id and `<id>.jsonl`, live-proven in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py) — and `resume()` falls through to it for a dead session; see DEVLOG.)* Remaining: the sidecar startup half. Graceful degrade = restore data, manual re-resume. Where: [`sidecar/main.py`](../sidecar/main.py).
 9. *(built 2026-07-09 — WSL launch-config dir renamed; see DEVLOG)*
 10. **Dogfood the committed store** *(→ §8.2 self-dogfooding; depends on #1)* — commit this repo's `.awl-cc-dash/`; add a CLAUDE.md note (runtime data, deliberate commits); confirm tests stay on temp dirs. Where: `.gitignore`, `CLAUDE.md`.
 11. **Delete → project state files** *(→ §9.10, §7.12; depends on #3)* — extend the delete/tombstone flow to the project `state/` files — the roster entry plus inbox/links/routing/bookmarks rows — not just the runtime record + transcripts. Where: [`sidecar/deletion.py`](../sidecar/deletion.py), [`sidecar/main.py`](../sidecar/main.py).

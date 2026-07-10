@@ -65,6 +65,7 @@ it encodes — read that docstring first; it is the spec.
 |------|-----------|:-----:|
 | `test_tmux_bridge.py` | The `bridge` package control surface end-to-end: create/send/keys/read/list/rename/resume/status/batch/broadcast/interrupt/scrollback/watch/wait_idle/export/show/set_cwd/set_model/mcp_sync/read_log | ~29 |
 | `test_bridge_finisher_live.py` | The bridge **driver** behaviors the product leans on: **permission approve/deny**, **resume-after-restart**, **model + effort take** | ~4 |
+| `test_cold_restore_live.py` | The §9.9 **cold-restore** contract: `create(resume_session_id=…)` relaunches a DEAD agent's conversation via `claude --resume` — same session id, same `<id>.jsonl`, memory retained (same-id-vs-fork verdict recorded in `log/cold_restore_findings_latest.txt`) | ~1 |
 
 ### Feasibility spikes (opt-in, live) — engine-capability evidence
 
@@ -116,7 +117,7 @@ INFEASIBLE tails live in §10's Decided omissions.
 |------|---------|
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) + per-run timestamped DEBUG log setup. Adds the repo root to `sys.path`. |
 | `run.ps1` | Convenience runner — resolves the local `.venv` and passes all args through to pytest. |
-| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. |
+| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. The cold-restore test writes `cold_restore_findings_*.txt` (+ `_latest`) — its same-id-vs-fork verdict. |
 
 ---
 
