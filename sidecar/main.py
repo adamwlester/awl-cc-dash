@@ -55,6 +55,38 @@ import subagents_naming
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
 
+
+def _install_file_log() -> None:
+    """§11 #43 (§2 operational posture): a small, size-bounded rotating
+    diagnostic log under the gitignored ``sidecar/runtime/`` so a crash or
+    fault leaves a trail — 1 MB × 3 rotations, INFO+, attached to the root
+    logger (all `awl-sidecar.*` families + uvicorn errors flow through).
+    Best-effort: a read-only disk must never block startup."""
+    try:
+        import logging.handlers
+        import runtime_store
+        log_dir = runtime_store.runtime_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(
+            log_dir / "sidecar.log", maxBytes=1_000_000, backupCount=3,
+            encoding="utf-8")
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        root = logging.getLogger()
+        # Idempotent across reloads: never stack duplicate handlers.
+        if not any(isinstance(h, logging.handlers.RotatingFileHandler)
+                   and getattr(h, "baseFilename", "").endswith("sidecar.log")
+                   for h in root.handlers):
+            root.addHandler(handler)
+            if root.level > logging.INFO or root.level == logging.NOTSET:
+                root.setLevel(logging.INFO)
+    except Exception:  # pragma: no cover - the log must never block startup
+        pass
+
+
+_install_file_log()
+
 # Monotonic counter driving the round-robin agent identity (color/icon/number).
 # Reset on restart, but reconnected sessions keep their PERSISTED identity, and
 # reconnect advances this past their numbers so new agents don't reuse them.
