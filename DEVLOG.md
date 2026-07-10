@@ -569,6 +569,14 @@ Files: dev/prompts/2026-07-09-build-sprint-run.md (new), DEVLOG.md
 
 ---
 
+### 2026-07-09 22:45:00 — build sprint stage 0: §11 #5 transcript retention pinned (URGENT)
+
+First increment of the build-sprint run. Every materialized per-agent `--settings` payload now carries `cleanupPeriodDays: 3650` (the new `TRANSCRIPT_RETENTION_DAYS` constant in [sidecar/drivers/bridge.py](sidecar/drivers/bridge.py)) — Claude Code's 30-day transcript auto-delete no longer applies to any dashboard agent launched from now on. `_build_settings()` consequently never returns None (a settings file is written for every agent, even config-bare ones) — its contract + docstring updated, and the unit spec updated to match (`test_retention_pin_always_present` replaces `test_no_per_agent_settings_returns_none` in [tests/test_bridge_unit.py](tests/test_bridge_unit.py)). Hermetic tier 395/395 green. ARCHITECTURE synced: §8.6 #3 Today-marker cleared, §8.4 transcripts row → pinned, §11.1 §8.6 row trimmed, §11.2 #5 row replaced with a built-tombstone (kept as a numbered stub rather than deleted so the literal #6–#11 numbering and every cross-reference stay stable — ⚠ assumed: tombstone-over-delete is the numbering-safe reading of the "remove the row" exit rule). Note: retention applies at launch — agents already running tonight pick it up only on a future relaunch/cold-restore.
+
+Files: sidecar/drivers/bridge.py, tests/test_bridge_unit.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

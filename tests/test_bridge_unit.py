@@ -1046,8 +1046,20 @@ class TestBuildLaunchConfig:
         assert s["permissions"] == {"deny": ["Bash"], "ask": ["Read(/etc/**)"]}
         assert s["enabledPlugins"] == {"superpowers@superpowers-marketplace": True}
 
-    def test_no_per_agent_settings_returns_none(self):
-        assert _driver()._build_settings() is None
+    def test_retention_pin_always_present(self):
+        # ARCHITECTURE §8.6: EVERY materialized per-agent settings payload pins
+        # cleanupPeriodDays (transcripts are the master record; Claude Code's
+        # 30-day auto-delete default must never apply to dashboard agents). This
+        # also means a settings file is always written — even a bare agent with
+        # no other per-agent config gets the pin.
+        from sidecar.drivers.bridge import TRANSCRIPT_RETENTION_DAYS
+        assert TRANSCRIPT_RETENTION_DAYS == 3650
+        bare = _driver()._build_settings()
+        assert bare == {"cleanupPeriodDays": 3650}
+        configured = _driver(
+            permission_rules={"deny": ["Bash"]},
+        )._build_settings()
+        assert configured["cleanupPeriodDays"] == 3650
 
     def test_mcp_none_inherits_global(self):
         # mcp_servers unset -> None -> no --mcp-config (inherit the global registry).

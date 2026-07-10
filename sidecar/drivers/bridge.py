@@ -32,6 +32,14 @@ if _REPO_ROOT not in sys.path:
 
 logger = logging.getLogger("awl-sidecar.bridge")
 
+# Transcript retention pin (ARCHITECTURE §8.6): Claude Code auto-deletes sessions
+# inactive longer than `cleanupPeriodDays` (default 30 days) — unacceptable for
+# long-term-referenced transcripts, which are the dashboard's master record. Every
+# materialized per-agent settings payload pins this (10 years — effectively never;
+# one constant to adjust), guaranteeing retention for dashboard agents without
+# touching global Claude config.
+TRANSCRIPT_RETENTION_DAYS = 3650
+
 _STATE_TO_STATUS = {
     "generating": "running",
     "idle": "idle",
@@ -501,16 +509,21 @@ class BridgeDriver(AgentDriver):
             }
         }
 
-    def _build_settings(self) -> dict | None:
-        """Per-agent --settings payload: permission rules + plugins + hooks.
+    def _build_settings(self) -> dict:
+        """Per-agent --settings payload: retention pin + permission rules + plugins + hooks.
 
-        ``permission_rules`` {allow,deny,ask} -> ``permissions`` (deny is the
-        reliable hard-block in all modes); ``enabled_plugins`` {"id": bool} ->
-        ``enabledPlugins`` (per-agent plugin enable/disable — live-verified); plus
-        the hook-channel ``hooks`` block (the inject channel). Returns None when nothing
-        is set (no --settings file is written).
+        Always carries ``cleanupPeriodDays`` (= ``TRANSCRIPT_RETENTION_DAYS``) — the
+        §8.6 transcript-retention pin, so a settings file is written for EVERY agent
+        (Claude Code's 30-day auto-delete default must never apply to dashboard
+        agents). On top of that: ``permission_rules`` {allow,deny,ask} ->
+        ``permissions`` (deny is the reliable hard-block in all modes);
+        ``enabled_plugins`` {"id": bool} -> ``enabledPlugins`` (per-agent plugin
+        enable/disable — live-verified); plus the hook-channel ``hooks`` block (the
+        inject channel).
         """
-        settings: dict[str, Any] = {}
+        settings: dict[str, Any] = {
+            "cleanupPeriodDays": TRANSCRIPT_RETENTION_DAYS,
+        }
         rules = self.config.permission_rules or {}
         perms = {k: list(rules[k]) for k in ("allow", "deny", "ask") if rules.get(k)}
         if perms:
@@ -520,7 +533,7 @@ class BridgeDriver(AgentDriver):
         hooks = self._build_hook_settings()
         if hooks:
             settings.update(hooks)
-        return settings or None
+        return settings
 
     def _build_mcp_config(self) -> dict | None:
         """Per-agent --mcp-config payload for a chosen server subset.

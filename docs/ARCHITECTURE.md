@@ -873,7 +873,7 @@ The single lookup tying **home ↔ path ↔ UI ↔ restart behavior**. UI anchor
 | Read-bookmarks | 📁 | `state/bookmarks.json` | (invisible — drives delta reads) | ⚡ (§8.3) |
 | Unsent prompt queue / Hold | ⚡ | — (drops on close, by design) | Prompt→Compose (send-timing) | matches target |
 | Message feed / cap metrics / console / subagents / run-strip / marquee | ⚡ | — (derived, §8.3) | Feed / Team Graph / Agent→Console | matches target |
-| Session transcripts (full history, incl. subagents) | 📜 | `~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl` (WSL) | Feed/History (replayed) | exists; **retention unpinned** — the 30-day default auto-delete applies (§8.6) |
+| Session transcripts (full history, incl. subagents) | 📜 | `~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl` (WSL) | Feed/History (replayed) | retention pinned (`cleanupPeriodDays: 3650` in every materialized per-agent settings); path persistence rides #4 |
 | Per-agent launch files (`settings.json`, `mcp.json`) | 🛠 | `~/.awl-cc-dash-agents/<name>/` | — | `~/.awl-agents/<name>/` (`WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py)) |
 | Claude Code config (MCP/plugins/settings) | 🔌 | `~/.claude`, `<project>/.claude` | Settings (step-in) · `settings-row`, `registry-row` | matches target — surfaced, not owned |
 
@@ -934,8 +934,8 @@ transcript; the dashboard persists only thin semantic overlays on top.
 3. **Retention is pinned.** Claude Code auto-deletes sessions inactive longer than `cleanupPeriodDays`
    (default 30 days) — unacceptable for long-term-referenced transcripts. The per-agent settings the bridge
    materializes at launch carry `cleanupPeriodDays: 3650` (10 years — effectively never; one constant to
-   adjust), guaranteeing retention for dashboard agents without touching global Claude config.
-   ⚠ **Today:** `cleanupPeriodDays` is not set anywhere, so the 30-day default applies.
+   adjust — `TRANSCRIPT_RETENTION_DAYS` in [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)),
+   guaranteeing retention for dashboard agents without touching global Claude config.
 4. **No backup copies.** Pinned retention plus persisted paths **are** the durability model — transcript
    copies are never archived. The one trigger for revisiting is durability proving shaky in practice.
 5. **Session prompts are not separately saved** — they are already in the transcript; anything durable a
@@ -1108,7 +1108,7 @@ The single home for **decided, buildable** work — the *know-how, queued to bui
 
 *Phase-9 note (2026-07-09):* the queue was regrouped **by feature** and renumbered 1–49 (the storage set #1–11 kept its numbers); ex-BB traceability IDs are stripped. The old→new map lives in the archived doc-integration tracker ([`archive/dev/notes/scratch/2026-07-03-doc-integration-tracker.md`](../archive/dev/notes/scratch/2026-07-03-doc-integration-tracker.md)).
 
-**Operator priorities (2026-07-05):** **URGENT — #5 transcript retention** (the 30-day `cleanupPeriodDays` default is live *today*, §8.6 — the one action-now item independent of everything else). **HIGH — #21 hook lifecycle ingestion, #18 Agent archive, #19 per-agent git identity** (the lineage/archive substrate), and **#29 Console streaming** (first-tier priority *inside* the renderer rebuild #37).
+**Operator priorities (2026-07-05):** ~~URGENT — #5 transcript retention~~ *(built 2026-07-09)*. **HIGH — #21 hook lifecycle ingestion, #18 Agent archive, #19 per-agent git identity** (the lineage/archive substrate), and **#29 Console streaming** (first-tier priority *inside* the renderer rebuild #37).
 
 ### 11.1 ⚠ Today index — build debt by body section
 
@@ -1141,7 +1141,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §8.2 | Only `scratchpad.md` + `plan-reviews.json` exist; roster lives app-level in `sessions.json` | #1, #3 |
 | §8.3, §8.4 | Every Persist row still in-memory or app-level (see the tables' ⚠ Today columns) | #3, #4, #11 |
 | §8.5 | Central `plan-reviews.json` keyed by filename (rename orphans reviews); Documents have no comment store; no `plansDirectory` in materialized settings | #6, #7 |
-| §8.6 | Transcript path recomputed every read, never persisted; **retention unpinned — the 30-day default applies (URGENT)** | #4, #5 |
+| §8.6 | Transcript path recomputed every read, never persisted | #4 |
 | §8.7 | No `schema_version` stamp written | #42 |
 | §9.9 | Dead-tmux records pruned instead of cold-restored; nothing invokes `claude --resume` | #8 |
 
@@ -1153,7 +1153,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 2. **Canonical project root** *(→ §8.1 "`<project>` defined")* — derive one canonical `<project>` from `cwd` (git top-level; symlink + `/mnt`-alias normalization) and use it everywhere a cwd key scopes, including the scratch project key. Where: `storage.project_root()` ([`sidecar/storage.py`](../sidecar/storage.py)), [`sidecar/main.py`](../sidecar/main.py).
 3. **Per-project state store** *(→ §8.2, §8.3)* — build the `state/` persistence layer (atomic write-replace; append for `.jsonl`; `schema_version` stamped per #42); move the roster out of `sessions.json` → `state/agents.json`; persist inbox (open type set, **including the new Response coalesced card type**, §7.8), links, routing overlay, bookmarks, and retired numbers; reload the scratchpad board from its `.md` on load. Load lazily on the first session whose canonical root resolves to the project, cache per root, write-through thereafter. Where: `sidecar` modules (`runtime_store` / `inbox` / `links` / `watermark` / `scratchpad`).
 4. **Persist session id + transcript path** *(→ §8.4, §8.6)* — persist `claude_session_id` + the resolved transcript path per agent in `state/agents.json`; refresh on resolve. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), [`bridge/transcript.py`](../bridge/transcript.py).
-5. **Pin transcript retention — URGENT** *(→ §8.6)* — pin `cleanupPeriodDays: 3650` in the materialized per-agent settings; the 30-day auto-delete default is live today. Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
+5. *(built 2026-07-09 — transcript retention pinned; see DEVLOG)*
 6. **Per-doc metadata sidecars** *(→ §8.5)* — `<doc>.meta.json` read/write (verdict, comments, quote-anchors, provenance), replacing `plan-reviews.json`; Documents comment endpoints; dashboard-mediated rename of the doc + sidecar pair; orphan detection/re-link. Where: [`sidecar/library.py`](../sidecar/library.py), [`sidecar/storage.py`](../sidecar/storage.py).
 7. **Absolute `plansDirectory`** *(→ §8.5; depends on #2)* — set `plansDirectory` to the absolute WSL path `<canonical-root>/.awl-cc-dash/plans` in the materialized per-agent settings (a relative `./` resolves against raw cwd and breaks subfolder launches). Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
 8. **Cold-restore on startup** *(→ §9.9; enables #17)* — on startup, dead-tmux records **resume** (`claude --resume <claude_session_id>`, correct cwd) instead of prune. Needs a bridge resume-launch path (today a passed `session_id` only pins `--session-id` — still a NEW conversation — and `resume()`'s dead-session fall-through calls `create()` with no id). Graceful degrade = restore data, manual re-resume. *(Mechanism proven feasible by the one-click-launch + rewind/handoff live spikes.)* Where: [`sidecar/main.py`](../sidecar/main.py), [`bridge/bridge.py`](../bridge/bridge.py).
