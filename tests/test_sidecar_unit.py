@@ -738,6 +738,116 @@ class TestSharedContextFire:
             main.sessions.pop("B", None)
 
 
+# ---------------------------------------------------------------------------
+# Identity editing + name registration (§7.5 / §11 #14)
+# ---------------------------------------------------------------------------
+
+import deletion  # noqa: E402
+import runtime_store  # noqa: E402
+from drivers.base import DriverConfig  # noqa: E402
+
+
+class _FakeIdentityDriver(_FakeDriver):
+    """A fake driver shaped like the bridge driver's identity surface: holds the
+    persisted roster ``_record``, a ``config`` (whose identity the endpoint
+    keeps in sync), and a capability-gated ``set_display_name``."""
+
+    def __init__(self, identity=None):
+        super().__init__()
+        self.renames: list[str] = []
+        self.config = DriverConfig(identity=identity)
+        self._record = {"session_id": "s1", "tmux_name": "awl-x",
+                        "driver": "bridge", "identity": identity}
+
+    def supports(self, cap):
+        return cap == "set_display_name"
+
+    async def set_display_name(self, name):
+        self.renames.append(name)
+
+
+class TestIdentityEndpoint:
+    def _wire(self, monkeypatch, identity=None):
+        ident = identity or assign_identity({"name": "ivy"}, 0)
+        s = _session()
+        s.identity = dict(ident)
+        drv = _FakeIdentityDriver(identity=dict(ident))
+        s.driver = drv
+        main.sessions["s1"] = s
+        saved: list[dict] = []
+        monkeypatch.setattr(runtime_store, "save_record",
+                            lambda rec: saved.append(dict(rec)))
+        return s, drv, saved
+
+    def test_merge_updates_persists_and_returns(self, monkeypatch):
+        s, drv, saved = self._wire(monkeypatch)
+        try:
+            out = asyncio.run(main.update_identity("s1", main.IdentityUpdateRequest(
+                role="Reviewer", color="#123456")))
+            assert out["identity"]["role"] == "Reviewer"
+            assert out["identity"]["color"] == "#123456"
+            assert out["identity"]["name"] == "ivy"     # untouched fields survive
+            assert s.identity == out["identity"]
+            # persisted through the roster record (what reconnect reads back)
+            assert saved and saved[-1]["identity"]["role"] == "Reviewer"
+            assert drv._record["identity"]["role"] == "Reviewer"
+            assert drv.config.identity["role"] == "Reviewer"
+            assert drv.renames == []                    # no name change -> no /rename
+        finally:
+            main.sessions.pop("s1", None)
+
+    def test_name_edit_drives_rename(self, monkeypatch):
+        s, drv, _ = self._wire(monkeypatch)
+        try:
+            out = asyncio.run(main.update_identity(
+                "s1", main.IdentityUpdateRequest(name="rex")))
+            assert out["identity"]["name"] == "rex"
+            assert drv.renames == ["rex"]               # /rename on the live session
+            # same-name edit is a no-op rename
+            asyncio.run(main.update_identity(
+                "s1", main.IdentityUpdateRequest(name="rex")))
+            assert drv.renames == ["rex"]
+        finally:
+            main.sessions.pop("s1", None)
+
+    def test_rename_capability_gated(self, monkeypatch):
+        # A driver without set_display_name (e.g. the sdk driver) still merges +
+        # persists — the rename is simply skipped, never an error.
+        s, drv, _ = self._wire(monkeypatch)
+        s.driver = _FakeDriver()                        # supports() -> False
+        try:
+            out = asyncio.run(main.update_identity(
+                "s1", main.IdentityUpdateRequest(name="rex")))
+            assert out["identity"]["name"] == "rex"
+            assert s.identity["name"] == "rex"
+        finally:
+            main.sessions.pop("s1", None)
+
+    def test_retired_number_refused_400(self, monkeypatch):
+        s, drv, saved = self._wire(monkeypatch)
+        deletion.retire_number(7)
+        try:
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(main.update_identity(
+                    "s1", main.IdentityUpdateRequest(number=7)))
+            assert exc.value.status_code == 400
+            assert s.identity["number"] != 7            # nothing merged
+            assert saved == []                          # nothing persisted
+            # a non-retired number is accepted
+            out = asyncio.run(main.update_identity(
+                "s1", main.IdentityUpdateRequest(number=8)))
+            assert out["identity"]["number"] == 8
+        finally:
+            main.sessions.pop("s1", None)
+            deletion.reset()
+
+    def test_unknown_session_404(self):
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(main.update_identity(
+                "nope", main.IdentityUpdateRequest(role="x")))
+        assert exc.value.status_code == 404
+
+
 class TestHookDrainEndpoints:
     def test_post_tool_use_drains_and_acks(self):
         s = _session(); main.sessions["s1"] = s

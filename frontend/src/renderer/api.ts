@@ -330,6 +330,10 @@ export const api = {
   setMode: (id: string, mode: string) => postJSON(`/sessions/${id}/mode`, { mode }),
   setEffort: (id: string, effort: string) => postJSON(`/sessions/${id}/effort`, { effort }),
   answerPermission: (id: string, approve: boolean) => postJSON(`/sessions/${id}/permission`, { approve }),
+  // Post-create identity edit (§7.5): merge any subset of the five fields.
+  // 400 on a retired number; a name change also /rename's the live session.
+  updateIdentity: (id: string, patch: Partial<Identity>) =>
+    postJSON<{ status: string; session_id: string; identity: Identity }>(`/sessions/${id}/identity`, patch),
 
   // ---- per-agent readouts --------------------------------------------------
   context: (id: string) => getJSON<ContextUsage>(`/sessions/${id}/context`),

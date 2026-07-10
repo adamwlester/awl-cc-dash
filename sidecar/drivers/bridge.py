@@ -421,7 +421,7 @@ class BridgeDriver(AgentDriver):
     # were not wired (see set_* methods for the live findings).
     CAPABILITIES = {
         "interrupt", "context", "permission", "resume",
-        "set_model", "set_effort", "subagents",
+        "set_model", "set_effort", "subagents", "set_display_name",
     }
 
     def __init__(
@@ -584,6 +584,9 @@ class BridgeDriver(AgentDriver):
         kwargs: dict[str, Any] = {}
         if self._cold_restore:
             kwargs["resume_session_id"] = self._claude_session_id
+        # Name registration (§7.5): the dashboard identity NAME doubles as the
+        # Claude Code session display name, set at launch via `claude --name`.
+        display_name = (self.config.identity or {}).get("name") or None
         info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
@@ -593,6 +596,7 @@ class BridgeDriver(AgentDriver):
             disallowed_tools=self.config.disallowed_tools,
             settings=self._build_settings(),
             mcp_config=self._build_mcp_config(),
+            display_name=display_name,
             **kwargs,
         )
         # Remember the launched claude session id so it can be persisted for
@@ -811,6 +815,20 @@ class BridgeDriver(AgentDriver):
     async def set_thinking(self, on: bool) -> None:
         # No /thinking command exists in this Claude Code build. Left a no-op.
         return None
+
+    async def set_display_name(self, name: str) -> None:
+        """Register ``name`` as the LIVE session's Claude Code display name (§7.5).
+
+        Drives the ``/rename <name>`` slash command over ``send()`` — the
+        console-run path proves slash commands land on a live TUI. The
+        launch-time counterpart is the ``claude --name`` flag (present on CC
+        2.1.202), which ``_create_session`` passes from ``config.identity``.
+        Best-effort: the TUI acks on-screen; there is no structured read-back
+        (the registered name lands in ``~/.claude/sessions/<pid>.json``).
+        """
+        if not name:
+            return
+        await asyncio.to_thread(self._bridge.send, self._name, f"/rename {name}")
 
     async def close(self) -> None:
         self._closed = True

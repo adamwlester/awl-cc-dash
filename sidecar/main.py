@@ -1909,6 +1909,79 @@ async def set_mode(session_id: str, req: SetModeRequest):
     return {"status": "ok", "mode": req.mode}
 
 
+class IdentityUpdateRequest(BaseModel):
+    """Post-create identity edit (§7.5) — any subset of the five fields; an
+    omitted field is left untouched (merge, not replace)."""
+    role: str | None = None
+    number: int | None = None
+    name: str | None = None
+    color: str | None = None
+    icon: str | None = None
+
+
+@app.post("/sessions/{session_id}/identity")
+async def update_identity(session_id: str, req: IdentityUpdateRequest):
+    """Edit a session's dashboard-owned identity (§7.5) — all five fields are
+    editable after create.
+
+    Merges any subset of {role, number, name, color, icon} into
+    ``session.identity`` and persists the merged identity through the roster
+    record (the driver's ``_record`` → ``runtime_store.save_record``), which is
+    exactly what ``reconnect_sessions`` reads back (``rec["identity"]``) — so an
+    edit survives a sidecar restart. Routing, links, hooks, and the inbox all
+    key on the session id, so an edit can't break a reference.
+
+    Two §7.5 specifics: **retired numbers are never reused** (§7.12) — a number
+    edit to a retired number is refused with a 400; and the **name doubles as
+    the Claude Code session display name** — a changed, non-empty name drives
+    ``/rename`` on the live session (capability-gated ``set_display_name``;
+    a no-op on drivers without a display-name surface, e.g. the sdk driver).
+    Returns the updated identity.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    patch = {k: v for k, v in req.model_dump().items() if v is not None}
+    if "number" in patch and deletion.is_retired(patch["number"]):
+        raise HTTPException(
+            status_code=400,
+            detail=f"identity number {patch['number']} is retired and is never "
+                   "reused (§7.12)")
+    identity = dict(session.identity or {})
+    old_name = identity.get("name") or ""
+    identity.update(patch)
+    session.identity = identity
+
+    drv = session.driver
+    # Keep the driver's config copy in sync — it is what the bridge driver
+    # writes into any roster record it persists later.
+    if drv is not None and getattr(drv, "config", None) is not None:
+        drv.config.identity = identity
+    # Persist through the roster record (§8.2) so a restarted sidecar
+    # reconnects with the EDITED identity, not the create-time one.
+    rec = getattr(drv, "_record", None)
+    if isinstance(rec, dict):
+        rec["identity"] = identity
+        try:
+            import runtime_store
+            runtime_store.save_record(rec)
+        except Exception as e:  # pragma: no cover - persistence is best-effort
+            logger.warning("identity persist failed for %s: %s", session_id, e)
+
+    # Name registration (§7.5): a changed, non-empty name renames the live
+    # Claude Code session (`/rename` — the launch-time counterpart is the
+    # `claude --name` flag the bridge driver passes at create).
+    new_name = identity.get("name") or ""
+    if "name" in patch and new_name and new_name != old_name \
+            and drv is not None and drv.supports("set_display_name"):
+        try:
+            await drv.set_display_name(new_name)
+        except Exception as e:  # pragma: no cover - rename is best-effort
+            logger.warning("display-name rename failed for %s: %s", session_id, e)
+
+    return {"status": "ok", "session_id": session_id, "identity": identity}
+
+
 @app.post("/sessions/{session_id}/permission")
 async def answer_permission(session_id: str, req: AnswerPermissionRequest):
     """Answer a pending tool-permission prompt (approve = Yes, deny = No)."""
