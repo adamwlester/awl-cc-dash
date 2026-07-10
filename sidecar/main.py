@@ -548,13 +548,17 @@ async def _listen(session: SessionState):
 
 
 async def reconnect_sessions():
-    """Rebind to bridge sessions that outlived a previous sidecar process.
+    """Restore bridge sessions that outlived a previous sidecar process (§9.9).
 
-    Bridge sessions run as real Claude Code TUIs in tmux/WSL2 and survive a
-    sidecar restart. On startup we read the runtime records, and for each whose
-    tmux session is still alive we rebuild the session state and a resumed driver
-    bound to that tmux name, then resume event pumping (the transcript replay
-    restores history). Records whose tmux session is gone are pruned.
+    Two cases per persisted record:
+
+    * **Warm** (tmux still alive): rebuild the session state and a resumed
+      driver bound to that tmux name, then resume event pumping (the transcript
+      replay restores history).
+    * **Cold** (tmux gone — reboot / WSL shutdown): relaunch the agent with
+      ``claude --resume <claude_session_id>`` in its cwd — the same
+      conversation, rebuilt from the transcript. Only records with no
+      ``claude_session_id`` (no way back to the conversation) are pruned.
     """
     global _identity_ordinal
     try:
@@ -581,8 +585,11 @@ async def reconnect_sessions():
         tmux_name = rec.get("tmux_name")
         if not sid or not tmux_name:
             continue
-        if tmux_name not in alive:
-            logger.info("Pruning dead session record %s (tmux %s gone)", sid, tmux_name)
+        cold = tmux_name not in alive
+        if cold and not rec.get("claude_session_id"):
+            # No conversation id to resume — nothing to restore. Prune.
+            logger.info("Pruning dead session record %s (tmux %s gone, no claude id)",
+                        sid, tmux_name)
             runtime_store.remove_record(sid)
             continue
         if sid in sessions:
@@ -631,14 +638,19 @@ async def reconnect_sessions():
                 config, session.handle_event,
                 resume_name=tmux_name, session_id=sid,
                 claude_session_id=rec.get("claude_session_id"),
+                cold_restore=cold,
             )
             session.driver = driver
-            await driver.start()  # resume() path — rebinds, doesn't recreate
+            # Warm: resume() rebinds the live tmux session. Cold: a fresh
+            # create with `claude --resume <id>` rebuilds the conversation.
+            await driver.start()
             session.status = "idle"
             session.listen_task = asyncio.create_task(_listen(session))
-            logger.info("Reconnected session %s to live tmux session %s", sid, tmux_name)
+            logger.info("%s session %s (tmux %s)",
+                        "Cold-restored" if cold else "Reconnected", sid, tmux_name)
         except Exception as e:
-            logger.error("Reconnect failed for %s: %s", sid, e)
+            logger.error("%s failed for %s: %s",
+                         "Cold-restore" if cold else "Reconnect", sid, e)
             session.status = "error"
 
 

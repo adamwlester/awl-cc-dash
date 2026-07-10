@@ -432,6 +432,7 @@ class BridgeDriver(AgentDriver):
         resume_name: str | None = None,
         session_id: str | None = None,
         claude_session_id: str | None = None,
+        cold_restore: bool = False,
     ) -> None:
         super().__init__(config, on_event)
         from bridge import TmuxBridge  # type: ignore[import-not-found]
@@ -439,7 +440,12 @@ class BridgeDriver(AgentDriver):
         # When resuming, bind to the existing tmux session by name instead of
         # generating a fresh one and creating.
         self._name = resume_name or f"awl-{uuid.uuid4().hex[:8]}"
-        self._resuming = resume_name is not None
+        self._resuming = resume_name is not None and not cold_restore
+        # Cold-restore (§9.9): the tmux session is GONE (reboot/WSL shutdown) —
+        # relaunch `claude --resume <claude_session_id>` in the same cwd so the
+        # same conversation rebuilds from its transcript. A full create: launch
+        # config, hooks, and the retention pin all apply.
+        self._cold_restore = cold_restore and claude_session_id is not None
         self._session_id = session_id
         # The claude --session-id (uuid) that names this agent's transcript file.
         # Set by create() (read back from the bridge) or, on resume, passed in
@@ -571,8 +577,13 @@ class BridgeDriver(AgentDriver):
         """Sync: build the per-agent launch config and spawn the tmux session.
 
         All blocking work (MCP registry read + tmux create) runs here so
-        ``start()`` can offload it to a thread in one hop.
+        ``start()`` can offload it to a thread in one hop. A cold-restore passes
+        ``resume_session_id`` so the launch is ``claude --resume <id>`` — the
+        same conversation, rebuilt from its transcript (§9.9).
         """
+        kwargs: dict[str, Any] = {}
+        if self._cold_restore:
+            kwargs["resume_session_id"] = self._claude_session_id
         info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
@@ -582,11 +593,12 @@ class BridgeDriver(AgentDriver):
             disallowed_tools=self.config.disallowed_tools,
             settings=self._build_settings(),
             mcp_config=self._build_mcp_config(),
+            **kwargs,
         )
         # Remember the launched claude session id so it can be persisted for
         # restart-survival (resume re-registers it so transcript resolution holds).
         self._claude_session_id = (info or {}).get("session_id") or \
-            self._bridge.session_id_for(self._name)
+            self._bridge.session_id_for(self._name) or self._claude_session_id
 
     async def start(self) -> None:
         if self._resuming:
