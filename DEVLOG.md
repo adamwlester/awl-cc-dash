@@ -553,6 +553,14 @@ Files: docs/ARCHITECTURE.md, tests/README.md, design/DESIGN.md, archive/dev/note
 
 ---
 
+### 2026-07-09 21:35:00 — housekeeping: committed another session's design-v13p1 archive snapshot (operator-requested flush)
+
+At the operator's request to commit and push everything outstanding, committed the untracked [archive/design/design-v13p1/](archive/design/design-v13p1/) left by a concurrent session — a self-contained snapshot of the eight design files (mockup.html, tokens.css, styles.css, behavior.js, DESIGN.md, states.html, mockup-toolkit.js, label-overlay.js; ~1.1 MB), matching the `archive/design/<snapshot>` convention. That session left no DEVLOG entry of its own, so this entry records the flush. The Phase-9b refactor was committed separately just before (`a580743`).
+
+Files: archive/design/design-v13p1/ (new, 8 files), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

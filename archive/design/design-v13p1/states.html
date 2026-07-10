@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWL Dashboard — Component States (auto-generated)</title>
+  <!--
+    states.html — DEV-ONLY component-states page for the AWL dashboard design system.
+
+    Renders every declared `data-variants` state side by side, next to each component's
+    default look. EVERYTHING on this page is derived at load time from the live tags:
+      1. mockup.html boots in an off-screen iframe; the live DOM is walked for every
+         [data-comp] root and its data-variants declaration (the label-overlay
+         completeness property — however the slug is emitted, the booted DOM has it);
+      2. behavior.js is additionally fetched as TEXT and scanned for declaration
+         emissions whose builders never run at boot (lazy singletons like toast, or
+         interaction-built components like the verdict dropdown) — still the authored
+         tags, never a hand-maintained list.
+    There is NO per-component content in this file: no slug list, no specimen markup,
+    no variant inventory. A component renamed, added, or re-declared in the design
+    files shows up here on the next reload; this page structurally cannot go stale
+    the way the retired gallery did.
+
+    How a state name becomes a rendered specimen — generic rules, tried in order,
+    every specimen captioned with the mapping used (see mapState()):
+      M1 harvest    — find a real element in the booted DOM that matches the slug's
+                      root classes and carries the state's class token (on the root or
+                      a descendant) — a faithful, live-authored specimen;
+      R2 swap       — swap a same-prefix family modifier on the clone (db-active→db-sent);
+      R1 compound   — add the state class when the stylesheet compounds it with one of
+                      the clone's own classes (.icon-btn.is-off);
+      R3 extend     — add <rootclass>-<state> / <rootclass>--<state> when the stylesheet
+                      defines it (btn-main, fill-btn--go);
+      R1b bare      — add the bare state class when it exists standalone (reply-flash);
+                      marked APPROXIMATE when nothing ties it to this root's family;
+      R4 disabled   — the native disabled attribute;
+      R5 empty      — clear the value of an input/textarea;
+      R6 health     — the ONE minimal family recipe (commented; allowed by the run
+                      prompt): success/warning/danger swap the inline var(--…) health
+                      token that the ctxColor()-style builders set on bar fills.
+    A state no rule can render fails LOUDLY as a red UNRENDERED placeholder — never a
+    silent omission. The full result (rendered / approximate / unrendered per state) is
+    exposed on window.__statesReport for the variant lint to consume, so the lint and
+    this page share one renderability truth.
+
+    DEV TOOLING, NOT DESIGN SYSTEM: same class as mockup-toolkit.js / label-overlay.js —
+    outside the five-file design system, exempt from the propagation rule, no tokens.css
+    obligations for its own chrome (the deliberately plain grey shell below never reads
+    as product UI). Linking the real tokens.css/styles.css to render the specimens
+    faithfully is expected and fine. Serve the design/ folder over localhost (ui-verify)
+    to view: the iframe needs same-origin access, so file:// will not work.
+  -->
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Page chrome: deliberately plain dev-tool grey (not the product palette). */
+    html{ background:#23252e; }
+    body{ margin:0; font-family:"JetBrains Mono",Consolas,monospace; color:#d8dae2; background:#23252e; font-weight:400; }
+    .st-header{ padding:18px 22px 14px; border-bottom:1px solid #3a3d4a; }
+    .st-h1{ margin:0 0 6px; font:800 20px Archivo,sans-serif; color:#fff; }
+    .st-sub{ font-size:11px; color:#9a9dac; line-height:1.6; max-width:1100px; }
+    .st-counts{ margin-top:8px; font-size:11px; }
+    .st-counts b{ color:#fff; }
+    .st-counts .ok{ color:#7ed491; } .st-counts .ap{ color:#e8c268; } .st-counts .bad{ color:#ff7d7d; }
+    .st-gaps{ margin:10px 22px 0; padding:10px 12px; border:1px dashed #a4514f; background:#3a2626; border-radius:4px; font-size:11px; color:#ffb3b3; display:none; }
+    .st-gaps b{ color:#ff8f8f; }
+    .st-grid{ padding:16px 22px 60px; display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:14px; align-items:start; }
+    .st-card{ background:#2b2d38; border:1px solid #3a3d4a; border-radius:6px; padding:12px 14px 14px; }
+    .st-card-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+    .st-slug{ font:700 13px "JetBrains Mono",monospace; color:#8bd3dd; }
+    .st-src{ font-size:9.5px; color:#8a8da0; }
+    .st-decl{ font-size:10px; color:#9a9dac; margin-bottom:10px; }
+    .st-decl code{ color:#e8c268; }
+    .st-specs{ display:flex; flex-wrap:wrap; gap:10px; }
+    .st-spec{ display:flex; flex-direction:column; gap:4px; min-width:120px; max-width:100%; }
+    .st-spec-label{ font-size:10px; font-weight:600; color:#c9ccd8; }
+    .st-spec-label .st-state{ color:#8bd3dd; }
+    .st-spec-map{ font-size:9px; color:#8a8da0; max-width:260px; }
+    .st-spec-map.approx{ color:#e8c268; }
+    .st-host{ background:var(--background,#faf4eb); border:1px solid #3a3d4a; border-radius:4px; padding:12px; max-width:420px; overflow:auto; font-family:var(--font-sans,Archivo,sans-serif); font-weight:var(--font-weight-base,500); color:var(--foreground,#001858); }
+    .st-host > *{ pointer-events:none; }
+    .st-unrendered{ background:#3a2626; border:1px dashed #a4514f; border-radius:4px; padding:12px; font-size:10px; color:#ffb3b3; max-width:260px; }
+    .st-unrendered b{ color:#ff8f8f; display:block; margin-bottom:4px; font-size:11px; }
+    .st-replay{ align-self:flex-start; margin-top:2px; font:600 9px "JetBrains Mono",monospace; color:#8bd3dd; background:none; border:1px solid #3a5b62; border-radius:3px; padding:1px 7px; cursor:pointer; }
+    .st-replay:hover{ background:#32424a; }
+    #mock-frame{ position:fixed; left:-9999px; top:0; width:2300px; height:1240px; border:0; visibility:hidden; }
+    .st-loading{ padding:40px 22px; font-size:13px; color:#9a9dac; }
+  </style>
+</head>
+<body>
+  <header class="st-header">
+    <h1 class="st-h1">Component States <span style="font-weight:400;font-size:12px;color:#9a9dac">— auto-generated from the live <code>data-comp</code>/<code>data-variants</code> tags</span></h1>
+    <div class="st-sub">Each card shows one component's <b>default</b> specimen beside every state its <code>data-variants</code> declaration names. Specimens are cloned from the booted mockup (or harvested from a live twin that already renders the state); the caption under each label says exactly which mechanical mapping produced it. A red box is a state this page cannot render mechanically — that honest gap list feeds the variant lint. Reload = full regeneration; nothing here is hand-maintained.</div>
+    <div class="st-counts" id="counts">booting the mockup…</div>
+  </header>
+  <div class="st-gaps" id="gaps"></div>
+  <div class="st-grid" id="grid"><div class="st-loading">Loading mockup.html in the background iframe…</div></div>
+  <iframe id="mock-frame" src="mockup.html"></iframe>
+
+  <script>
+  (function(){
+    'use strict';
+    const frame = document.getElementById('mock-frame');
+    const grid = document.getElementById('grid');
+    const report = { generatedFrom: 'mockup.html live DOM + behavior.js source scan', slugs: [], gaps: [], approx: [], counts: {} };
+    window.__statesReport = null;   // set when generation completes
+
+    /* ---- stylesheet class-token index (from this page's real styles.css) ---- */
+    let allClassTokens = null, compoundIndex = null, classToSelectors = null;
+    function buildCssIndex(){
+      allClassTokens = new Set(); compoundIndex = []; classToSelectors = new Map();
+      for (const sheet of document.styleSheets){
+        let rules; try { rules = sheet.cssRules; } catch(e){ continue; }   // CORS sheets (fonts) skipped
+        if (!rules) continue;
+        for (const r of rules){
+          if (!r.selectorText) continue;
+          for (const sel of r.selectorText.split(',')){
+            const classes = (sel.match(/\.[A-Za-z0-9_-]+/g) || []).map(c => c.slice(1));
+            classes.forEach(c => {
+              allClassTokens.add(c);
+              let l = classToSelectors.get(c); if (!l){ l = []; classToSelectors.set(c, l); }
+              l.push(sel.trim());
+            });
+            /* record compound groups: classes glued directly together (.a.b) */
+            for (const m of sel.matchAll(/((?:\.[A-Za-z0-9_-]+){2,})/g)){
+              compoundIndex.push(m[1].split('.').filter(Boolean));
+            }
+          }
+        }
+      }
+    }
+    const cssHas = c => allClassTokens.has(c);
+    const compoundWith = (cand, rootClasses) => compoundIndex.some(g => g.includes(cand) && g.some(c => rootClasses.includes(c)));
+    /* Effectiveness check: a class mapping only counts as a render if at least one
+       stylesheet rule mentioning that class actually MATCHES the mapped clone (root or
+       a descendant). Without this, adding a child-scoped hook (.rseg.cur.cur-error) to
+       a root would show a specimen silently identical to the default — a dishonest
+       render. Pseudo-elements are stripped for matching; :hover-style pseudo-classes
+       simply fail to match, which is correct (a base rule must exist for a delta). */
+    function effectiveOn(el, cls){
+      const sels = classToSelectors.get(cls) || [];
+      for (let sel of sels){
+        sel = sel.replace(/::[a-zA-Z-]+(\([^)]*\))?/g, '');
+        if (!sel) continue;
+        try {
+          if (el.matches(sel)) return true;
+          for (const d of el.querySelectorAll('*')) if (d.matches(sel)) return true;
+        } catch(e){ /* unparseable selector — skip */ }
+      }
+      return false;
+    }
+
+    /* ---- generic state → render mapping (see header comment for the rule list) ---- */
+    function tokenMatches(cls, state){
+      return cls === state || cls.endsWith('-' + state) || cls.endsWith('--' + state);
+    }
+    function findHarvest(doc, rootClasses, slug, state){
+      /* a real element that shares the slug's identity classes and renders the state —
+         on itself or a descendant. Root-class overlap keeps it in the same family. */
+      for (const rc of rootClasses){
+        for (const el of doc.querySelectorAll('.' + CSS.escape(rc))){
+          const own = [...el.classList].some(c => c !== rc && tokenMatches(c, state));
+          const desc = !own && [...el.querySelectorAll('[class]')].some(d => [...d.classList].some(c => tokenMatches(c, state)));
+          if (own || desc) return el;
+        }
+      }
+      return null;
+    }
+    function mapState(doc, srcEl, state){
+      /* returns {el, map, approx} or null (unrenderable) */
+      const rootClasses = srcEl ? [...srcEl.classList] : [];
+      if (srcEl){
+        const harvested = findHarvest(doc, rootClasses, null, state);
+        if (harvested) return { el: harvested, map: 'harvested live twin (.' + [...harvested.classList].join('.') + ')', approx: false };
+      }
+      if (!srcEl) return null;                       // no live instance to clone at all
+      const clone = () => srcEl.cloneNode(true);
+      /* R2 swap: same-prefix family modifier (only if a rule actually matches the result) */
+      for (const rc of rootClasses){
+        for (const sep of ['--', '-']){
+          const i = rc.lastIndexOf(sep);
+          if (i > 0){
+            const cand = rc.slice(0, i) + sep + state;
+            if (cand !== rc && cssHas(cand)){
+              let el = clone(); el.classList.remove(rc); el.classList.add(cand);
+              if (effectiveOn(el, cand)) return { el, map: 'swap .' + rc + ' → .' + cand, approx: false };
+              /* R2b: same family sibling but ADDITIVE (rules like .att-card.att-flash
+                 compound the modifier WITH the base — swapping destroys the match) */
+              el = clone(); el.classList.add(cand);
+              if (effectiveOn(el, cand)) return { el, map: '+ .' + cand + ' (family modifier, additive)', approx: false };
+            }
+          }
+        }
+      }
+      /* R1 compound-evidenced bare class */
+      if (cssHas(state) && compoundWith(state, rootClasses)){
+        const el = clone(); el.classList.add(state);
+        if (effectiveOn(el, state)) return { el, map: '+ .' + state + ' (compound-evidenced)', approx: false };
+      }
+      /* R3 base-extend */
+      for (const rc of rootClasses){
+        for (const sep of ['--', '-']){
+          const cand = rc + sep + state;
+          if (cssHas(cand)){
+            const el = clone(); el.classList.add(cand);
+            if (effectiveOn(el, cand)) return { el, map: '+ .' + cand, approx: !compoundWith(cand, rootClasses) && !cand.startsWith(rootClasses[0]) ? true : false };
+          }
+        }
+      }
+      /* R1b standalone bare class — approximate unless compounded somewhere with this family */
+      if (cssHas(state)){
+        const el = clone(); el.classList.add(state);
+        if (effectiveOn(el, state)) return { el, map: '+ .' + state + ' (standalone class)', approx: true };
+      }
+      /* R4 native disabled */
+      if (state === 'disabled'){
+        const el = clone(); el.setAttribute('disabled', '');
+        el.querySelectorAll('input,button,select,textarea').forEach(n => n.setAttribute('disabled',''));
+        return { el, map: 'disabled attribute', approx: false };
+      }
+      /* R5 empty on form fields */
+      if (state === 'empty' && (srcEl.matches('input,textarea'))){
+        const el = clone(); el.value = ''; el.setAttribute('value','');
+        return { el, map: 'value cleared', approx: false };
+      }
+      /* R6 the one allowed minimal family recipe: health-token swap on bar fills.
+         The ctxColor()-style builders paint success/warning/danger as an inline
+         background var() — swap that token for the declared health state. */
+      if (['success','warning','danger'].includes(state)){
+        const el = clone();
+        let hit = false;
+        [el, ...el.querySelectorAll('[style]')].forEach(n => {
+          const s = n.getAttribute && n.getAttribute('style');
+          if (s && /var\(--(success|warning|danger)\)/.test(s)){
+            n.setAttribute('style', s.replace(/var\(--(success|warning|danger)\)/g, 'var(--' + state + ')'));
+            hit = true;
+          }
+        });
+        if (hit) return { el, map: 'inline health token → var(--' + state + ')', approx: false };
+      }
+      return null;
+    }
+
+    /* ---- specimen sanitizing: inert, id-free clones ---- */
+    function sanitize(el){
+      const c = el.cloneNode(true);
+      [c, ...c.querySelectorAll('*')].forEach(n => {
+        n.removeAttribute && n.removeAttribute('id');
+        if (n.getAttributeNames) n.getAttributeNames().filter(a => a.startsWith('on')).forEach(a => n.removeAttribute(a));
+        if (n.classList && n.classList.contains('hidden')) n.classList.remove('hidden');
+        if (n.style && n.style.display === 'none') n.style.display = '';
+      });
+      return c;
+    }
+
+    /* ---- behavior.js source scan: declarations whose builders never ran at boot ---- */
+    async function sourceDeclarations(){
+      const out = new Map();
+      try {
+        const txt = await (await fetch('behavior.js')).text();
+        for (const m of txt.matchAll(/data-comp="([a-z0-9-]+)" data-variants="([^"]+)"/g)) out.set(m[1], m[2]);
+        for (const m of txt.matchAll(/setAttribute\('data-comp','([a-z0-9-]+)'\);[^\n]*?setAttribute\('data-variants','([^']+)'\)/g)) out.set(m[1], m[2]);
+      } catch(e){ console.warn('behavior.js source scan failed', e); }
+      return out;
+    }
+
+    async function generate(){
+      const doc = frame.contentDocument;
+      buildCssIndex();
+      /* import the mockup's icon sprite so cloned <use href="#ag-*"> glyphs resolve here */
+      doc.querySelectorAll('svg[style*="display:none"], svg[aria-hidden="true"]').forEach(s => {
+        if (s.querySelector('symbol')) document.body.appendChild(s.cloneNode(true));
+      });
+
+      /* 1. live-DOM enumeration: group [data-comp] by slug */
+      const live = new Map();
+      doc.querySelectorAll('[data-comp]').forEach(el => {
+        const slug = el.getAttribute('data-comp'); if (!slug) return;
+        let g = live.get(slug); if (!g){ g = { instances: [], declared: null, declaredEl: null }; live.set(slug, g); }
+        g.instances.push(el);
+        const dv = el.getAttribute('data-variants');
+        if (dv && !g.declared){ g.declared = dv; g.declaredEl = el; }
+      });
+      /* 2. source-scan supplement for boot-absent builders */
+      const src = await sourceDeclarations();
+      for (const [slug, dv] of src) if (!live.has(slug)) live.set(slug, { instances: [], declared: dv, declaredEl: null, builderOnly: true });
+
+      const declaredSlugs = [...live.entries()].filter(([, g]) => g.declared).sort((a, b) => a[0].localeCompare(b[0]));
+      grid.textContent = '';
+      let nStates = 0, nRendered = 0, nApprox = 0, nGaps = 0;
+
+      for (const [slug, g] of declaredSlugs){
+        const states = g.declared.trim().split(/\s+/);
+        const srcEl = g.declaredEl || g.instances[0] || null;
+        const card = document.createElement('div'); card.className = 'st-card';
+        const src2 = g.builderOnly ? 'builder-emitted — no live instance at boot (declaration read from behavior.js source)' : g.instances.length + ' live instance' + (g.instances.length === 1 ? '' : 's');
+        card.innerHTML = '<div class="st-card-head"><span class="st-slug">' + slug + '</span><span class="st-src">' + src2 + '</span></div>' +
+          '<div class="st-decl">data-variants = <code>"' + g.declared + '"</code></div>';
+        const strip = document.createElement('div'); strip.className = 'st-specs'; card.appendChild(strip);
+        const slugReport = { slug, declared: states, builderOnly: !!g.builderOnly, states: {} };
+
+        const addSpec = (label, mapNote, el, approx) => {
+          const spec = document.createElement('div'); spec.className = 'st-spec';
+          spec.innerHTML = '<span class="st-spec-label">' + label + '</span>';
+          const host = document.createElement('div'); host.className = 'st-host';
+          host.appendChild(el); spec.appendChild(host);
+          if (mapNote){ const m = document.createElement('span'); m.className = 'st-spec-map' + (approx ? ' approx' : ''); m.textContent = mapNote + (approx ? ' — APPROXIMATE (hook may be child-scoped)' : ''); spec.appendChild(m); }
+          /* transient states (one-shot animations) get a replay control */
+          const target = el;
+          requestAnimationFrame(() => {
+            try {
+              const anim = getComputedStyle(target).animationName;
+              if (anim && anim !== 'none' && !/infinite/.test(getComputedStyle(target).animationIterationCount === 'infinite' ? 'infinite' : getComputedStyle(target).animation)){
+                const b = document.createElement('button'); b.className = 'st-replay'; b.textContent = '↻ replay';
+                b.onclick = () => { const cs = [...target.classList]; target.classList.remove(...cs); void target.offsetWidth; target.classList.add(...cs); };
+                spec.appendChild(b);
+              }
+            } catch(e){}
+          });
+          strip.appendChild(spec);
+        };
+        const addGap = (state, why) => {
+          const spec = document.createElement('div'); spec.className = 'st-spec';
+          spec.innerHTML = '<span class="st-spec-label"><span class="st-state">' + state + '</span></span>' +
+            '<div class="st-unrendered"><b>UNRENDERED</b>' + slug + ':' + state + ' — ' + why + '</div>';
+          strip.appendChild(spec);
+          report.gaps.push({ slug, state, why });
+          slugReport.states[state] = 'unrendered';
+          nGaps++;
+        };
+
+        /* default specimen */
+        if (srcEl) addSpec('default', null, sanitize(srcEl), false);
+        else { const d = document.createElement('div'); d.className = 'st-unrendered'; d.innerHTML = '<b>NO LIVE DEFAULT</b>builder never runs at boot — nothing to clone'; const spec = document.createElement('div'); spec.className = 'st-spec'; spec.innerHTML = '<span class="st-spec-label">default</span>'; spec.appendChild(d); strip.appendChild(spec); }
+
+        for (const state of states){
+          nStates++;
+          if (!srcEl){ addGap(state, 'no live instance exists at boot to clone or restyle'); continue; }
+          const r = mapState(doc, srcEl, state);
+          if (!r){ addGap(state, 'no mechanical mapping — no class/attr/token hook whose rules match from this root (a child-composed or builder-content state)'); continue; }
+          addSpec('<span class="st-state">' + state + '</span>', r.map, sanitize(r.el), r.approx);
+          slugReport.states[state] = r.approx ? 'approximate' : 'rendered';
+          if (r.approx){ report.approx.push({ slug, state, map: r.map }); nApprox++; } else nRendered++;
+        }
+        report.slugs.push(slugReport);
+        grid.appendChild(card);
+      }
+
+      report.counts = { declaredSlugs: declaredSlugs.length, states: nStates, rendered: nRendered, approximate: nApprox, unrendered: nGaps };
+      document.getElementById('counts').innerHTML =
+        '<b>' + declaredSlugs.length + '</b> declared components · <b>' + nStates + '</b> declared states → ' +
+        '<span class="ok">' + nRendered + ' rendered</span> · <span class="ap">' + nApprox + ' approximate</span> · <span class="bad">' + nGaps + ' unrendered</span>';
+      if (report.gaps.length){
+        const gv = document.getElementById('gaps');
+        gv.style.display = 'block';
+        gv.innerHTML = '<b>Honest gap list (' + report.gaps.length + ') — states this page cannot render mechanically; the variant lint consumes this:</b><br>' +
+          report.gaps.map(x => x.slug + ':' + x.state).join(' · ');
+      }
+      window.__statesReport = report;
+    }
+
+    frame.addEventListener('load', () => setTimeout(() => { generate().catch(e => {
+      grid.innerHTML = '<div class="st-loading">Generation failed: ' + e.message + ' — serve design/ over localhost (the iframe needs same-origin access; file:// will not work).</div>';
+      console.error(e);
+    }); }, 1200));
+  })();
+  </script>
+</body>
+</html>
