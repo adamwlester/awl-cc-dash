@@ -17,13 +17,15 @@ screen-poll:
     lock; per-field updates are last-write-wins in ingest order, and an exact
     duplicate delivery (same event name + prompt_id + tool_use_id + tool) within
     the same prompt is dropped. (The live companion,
-    `test_runstate_arbiter_live.py`, verifies real-payload field presence;
-    the hermetic tier hammers the lock with threads.)
+    `test_hook_ingest_live.py`, verifies real-payload field presence and
+    concurrent-load coherence; the hermetic tier hammers the lock with threads.)
 
 It also owns the **subagent registry** fed by `SubagentStart` / `SubagentStop`
-hooks (`agent_id`, `agent_type`, `transcript_path` — the roster's
-active-vs-quiet signal, §7.17), which `GET /sessions/{id}/subagents` blends over
-the transcript-derived list.
+hooks (`agent_id`, `agent_type`, and the subagent's own transcript via
+`agent_transcript_path` — the payload's plain `transcript_path` is the PARENT
+session's, live-mapped on CC 2.1.206 — the roster's active-vs-quiet signal,
+§7.17), which `GET /sessions/{id}/subagents` blends over the
+transcript-derived list.
 
 Process-local and hermetically testable (mirrors ``eventbus``); ``reset()``
 clears it.
@@ -129,6 +131,8 @@ def ingest(agent_id: str, event: str, payload: dict[str, Any] | None = None) -> 
                 "tool_use_id": payload.get("tool_use_id")
                 or payload.get("toolUseId"),
                 "prompt_id": payload.get("prompt_id"),
+                "transcript_path": payload.get("transcript_path"),
+                "agent_transcript_path": payload.get("agent_transcript_path"),
                 "payload_keys": sorted(payload.keys()),
             })
             del dbg[:-_DEBUG_MAX]
@@ -200,7 +204,13 @@ def ingest_subagent(agent_id: str, event: str, payload: dict[str, Any] | None = 
             "last_assistant_message": None,
         })
         rec["type"] = payload.get("agent_type") or payload.get("agentType") or rec["type"]
-        tp = payload.get("transcript_path") or payload.get("transcriptPath")
+        # The subagent's OWN transcript rides the agent-specific key. Live-mapped
+        # on CC 2.1.206 (test_hook_ingest_live, 2026-07-10): every hook payload's
+        # plain `transcript_path` is the PARENT session's transcript — SubagentStop
+        # carries BOTH, with the subagent's own file under `agent_transcript_path`
+        # — so the plain key is deliberately NOT read here (it would pin the
+        # parent's file onto the subagent record).
+        tp = payload.get("agent_transcript_path") or payload.get("agentTranscriptPath")
         if tp:
             rec["transcript_path"] = tp
         now = time.time()

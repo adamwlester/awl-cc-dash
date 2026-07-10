@@ -188,18 +188,29 @@ class TestSubagents:
     def test_start_stop_registry(self):
         runstate.ingest_subagent("parent", "SubagentStart", {
             "agent_id": "sub-1", "agent_type": "Explore",
-            "transcript_path": "/home/u/.claude/projects/x/sub-1.jsonl",
         })
         live = runstate.subagents_live("parent")
         assert live[0]["status"] == "running"
         assert live[0]["type"] == "Explore"
         runstate.ingest_subagent("parent", "SubagentStop", {
             "agent_id": "sub-1", "last_assistant_message": "done!",
+            "agent_transcript_path":
+                "/home/u/.claude/projects/x/p-uuid/subagents/agent-sub-1.jsonl",
         })
         live = runstate.subagents_live("parent")
         assert live[0]["status"] == "stopped"
         assert live[0]["last_assistant_message"] == "done!"
-        assert live[0]["transcript_path"].endswith("sub-1.jsonl")
+        assert live[0]["transcript_path"].endswith("agent-sub-1.jsonl")
+
+    def test_parent_transcript_path_never_pins_the_subagent(self):
+        # Live-mapped (CC 2.1.206): every payload's plain `transcript_path` is
+        # the PARENT session's transcript; only `agent_transcript_path` names
+        # the subagent's own file. The plain key must never land on the record.
+        runstate.ingest_subagent("parent", "SubagentStart", {
+            "agent_id": "sub-1",
+            "transcript_path": "/home/u/.claude/projects/x/parent-uuid.jsonl",
+        })
+        assert runstate.subagents_live("parent")[0]["transcript_path"] is None
 
     def test_subagent_push_counts_as_parent_freshness(self):
         runstate.ingest_subagent("parent", "SubagentStart", {"agent_id": "s"})
