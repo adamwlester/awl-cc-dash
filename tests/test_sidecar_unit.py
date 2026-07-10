@@ -809,3 +809,50 @@ class TestLibraryCommentEndpoints:
             asyncio.run(main.library_resolve_comment(main.CommentResolveRequest(
                 cwd=str(proj), path=str(outside), comment_id="c1")))
         assert ei.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Scratchpad endpoints — lazy project load (§7.7/§8.3): touching a project's
+# board through the API must first load its persisted state, so a POST into a
+# not-yet-loaded project appends to the persisted board (never clobbers it)
+# and a GET surfaces it with no session ever created.
+# ---------------------------------------------------------------------------
+
+import scratchpad  # noqa: E402
+import state_store  # noqa: E402
+import storage  # noqa: E402
+import watermark  # noqa: E402
+
+
+class TestScratchEndpointsLazyLoad:
+    @pytest.fixture(autouse=True)
+    def _isolated(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        scratchpad.reset(); watermark.reset(); state_store.reset()
+        yield
+        scratchpad.reset(); watermark.reset(); state_store.reset()
+
+    def _board(self, tmp_path, lines):
+        proj = tmp_path / "proj"
+        (proj / ".git").mkdir(parents=True)
+        sp = storage.scratchpad_path(str(proj))
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text("# Shared scratchpad\n\n" + "\n".join(lines) + "\n",
+                      encoding="utf-8")
+        return proj, sp
+
+    def test_post_to_unloaded_project_never_clobbers_persisted_board(self, tmp_path):
+        proj, sp = self._board(
+            tmp_path, ["- **ada** (2026-07-01T00:00:00): prior post"])
+        out = asyncio.run(main.post_scratch(main.ScratchPostRequest(
+            cwd=str(proj), author="bee", text="new post")))
+        assert out["post"]["seq"] == 2          # appended AFTER the loaded post
+        content = sp.read_text(encoding="utf-8")
+        assert "prior post" in content and "new post" in content
+        got = asyncio.run(main.get_scratch(str(proj)))
+        assert [p["text"] for p in got["posts"]] == ["prior post", "new post"]
+
+    def test_get_surfaces_a_persisted_board_without_any_session(self, tmp_path):
+        proj, _sp = self._board(tmp_path, ["- **ada** (t): hello"])
+        got = asyncio.run(main.get_scratch(str(proj)))
+        assert [p["text"] for p in got["posts"]] == ["hello"]

@@ -34,10 +34,14 @@ board from its ``docs/scratchpad.md`` (the ``.md`` is the board's persistence �
 §8.3). Thereafter the modules' persist hooks write straight through here.
 
 The scratchpad ``.md`` round-trip: posts are mirrored as
-``- **author** (ts): text`` lines; on reload each matching line becomes a post
-(seq = line order, 1..N — stable because the board is append-only and rewritten
-whole), and continuation lines (a post whose text contained newlines) re-attach
-to the preceding post.
+``- **author** (ts): text`` lines with every continuation line (a post whose
+text contained newlines) indented two spaces; on reload each UNINDENTED
+matching line becomes a post (seq = line order, 1..N — stable because the board
+is append-only and rewritten whole) and indented lines re-attach to the
+preceding post with the prefix stripped, so text that itself looks like a post
+line never splits into a phantom post. On load, the project's persisted
+``scratch:{key}:*`` read-watermarks clamp to the reloaded board length (legacy
+global-seq marks could exceed it and would swallow new posts forever).
 """
 
 from __future__ import annotations
@@ -411,14 +415,19 @@ _POST_RE = re.compile(r"^- \*\*(?P<author>.+?)\*\* \((?P<ts>[^)]+)\): (?P<text>.
 def parse_scratchpad_md(text: str) -> list[dict[str, Any]]:
     """Parse the mirrored board back into posts (seq = line order, 1..N).
 
-    Lines matching the mirror format start a post; other non-heading lines are
-    continuations of the previous post's text (a post whose text contained
-    newlines). The leading ``# Shared scratchpad`` heading and blanks between
-    the heading and the first post are skipped.
+    Only an UNINDENTED line matching the mirror format starts a post. Indented
+    lines (the mirror writes every continuation line with a two-space prefix)
+    are continuations of the previous post's text with that prefix stripped —
+    so post text that itself contains a ``- **x** (t): y`` line round-trips
+    verbatim instead of splitting into a phantom post. Unindented non-heading
+    lines that don't match still attach as continuations (pre-indent legacy
+    mirrors). The leading ``# Shared scratchpad`` heading and blanks between
+    posts are skipped.
     """
     posts: list[dict[str, Any]] = []
     for line in text.splitlines():
-        m = _POST_RE.match(line)
+        indented = line.startswith("  ")
+        m = None if indented else _POST_RE.match(line)
         if m:
             posts.append({
                 "seq": len(posts) + 1,
@@ -426,8 +435,10 @@ def parse_scratchpad_md(text: str) -> list[dict[str, Any]]:
                 "text": m.group("text"),
                 "ts": m.group("ts"),
             })
+        elif posts and indented:
+            posts[-1]["text"] += "\n" + line[2:]
         elif posts and line.strip() and not line.startswith("#"):
-            posts[-1]["text"] += "\n" + line
+            posts[-1]["text"] += "\n" + line   # legacy unindented continuation
     return posts
 
 
@@ -469,27 +480,38 @@ def load_project(cwd: str | None) -> bool:
         if isinstance(rows, list):
             links.restore(rows)
 
-    # Read-watermarks.
-    p = bookmarks_path(key)
-    if p is not None:
-        marks = _read_json(p).get("marks")
-        if isinstance(marks, dict):
-            watermark.restore({k: int(v) for k, v in marks.items()
-                               if isinstance(v, (int, float))})
-
-    # Retired identity numbers.
-    for n in load_retired_numbers(key):
-        deletion.retire_number(n)
-
-    # The scratchpad board reloads from its .md (§8.3 — the .md IS the store).
+    # The scratchpad board reloads from its .md (§8.3 — the .md IS the store)
+    # BEFORE the watermarks, so the board length is known for clamping.
+    board_len = 0
     sp = storage.scratchpad_path(key)
     if sp is not None and sp.is_file():
         try:
             posts = parse_scratchpad_md(sp.read_text(encoding="utf-8"))
             if posts:
                 scratchpad.restore(key, posts)
+            board_len = len(posts)
         except Exception:  # pragma: no cover - a corrupt board must not block open
             logger.warning("scratchpad reload failed for %s", key, exc_info=True)
+
+    # Read-watermarks. This project's scratch marks clamp to the reloaded board
+    # length: the reloaded seqs run 1..N, but a persisted mark can exceed N
+    # (legacy marks recorded the old module-GLOBAL post seqs) — restored as-is
+    # it would sit past the whole board and silently swallow new posts forever.
+    p = bookmarks_path(key)
+    if p is not None:
+        marks = _read_json(p).get("marks")
+        if isinstance(marks, dict):
+            marks = {k: int(v) for k, v in marks.items()
+                     if isinstance(v, (int, float))}
+            scratch_prefix = f"scratch:{key}:"
+            for k in marks:
+                if k.startswith(scratch_prefix) and marks[k] > board_len:
+                    marks[k] = board_len
+            watermark.restore(marks)
+
+    # Retired identity numbers.
+    for n in load_retired_numbers(key):
+        deletion.retire_number(n)
 
     touch_projects_index(key)
     logger.info("Loaded project state for %s", key)

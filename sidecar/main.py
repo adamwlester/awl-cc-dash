@@ -1863,6 +1863,9 @@ class ScratchPostRequest(BaseModel):
 
 @app.get("/scratch")
 async def get_scratch(cwd: str):
+    # Lazy-load (idempotent): a GET against a not-yet-loaded project must
+    # surface its persisted board, not an empty in-memory one.
+    state_store.load_project(cwd)
     # Boards are keyed by the CANONICAL project root, so any cwd spelling the
     # client passes resolves to the same board an agent in that project uses.
     key = storage.project_key(cwd) or cwd
@@ -1874,6 +1877,10 @@ async def post_scratch(req: ScratchPostRequest):
     """Append a post; feed it (recipients:[scratch]); and push each RUNNING agent
     in the same project its unread delta mid-run via the hook channel (idle agents
     catch up at their next run's first tool boundary)."""
+    # Lazy-load (idempotent) BEFORE posting: a post into a not-yet-loaded
+    # project must append to the persisted board, never clobber it with a
+    # one-post mirror rewrite.
+    state_store.load_project(req.cwd)
     key = storage.project_key(req.cwd) or req.cwd
     persist = None
     try:

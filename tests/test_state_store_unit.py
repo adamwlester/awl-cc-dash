@@ -399,6 +399,41 @@ class TestScratchpadRoundTrip:
         assert p["seq"] == 3
         assert [q["seq"] for q in scratchpad.all_posts(key)] == [1, 2, 3]
 
+    def test_round_trip_with_post_pattern_inside_text(self, tmp_path):
+        """A text line that itself matches the mirror's post pattern must NOT
+        split into a phantom post on reload — the mirror indents continuation
+        lines and the parser only starts a post on an unindented match."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        sp = storage.scratchpad_path(cwd)
+        evil = "look at this mirror line:\n- **x** (t): y\nend of my post"
+        scratchpad.post(key, "ada", evil, persist_path=str(sp))
+        scratchpad.post(key, "bee", "second", persist_path=str(sp))
+        posts = state_store.parse_scratchpad_md(sp.read_text(encoding="utf-8"))
+        assert [p["author"] for p in posts] == ["ada", "bee"]
+        assert posts[0]["text"] == evil          # verbatim, no phantom split
+        assert posts[1]["seq"] == 2
+
+    def test_load_project_clamps_scratch_watermarks_to_board_length(self, tmp_path):
+        """A persisted scratch mark past the reloaded board's 1..N seqs (legacy
+        global-seq marks) clamps to N on load — it must not swallow new posts."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.register_agent("ag1", cwd)
+        sp = storage.scratchpad_path(cwd)
+        scratchpad.post(key, "ada", "one", persist_path=str(sp))
+        scratchpad.post(key, "ada", "two", persist_path=str(sp))
+        # A legacy global-counter mark, beyond the board's 2 posts.
+        watermark.set(f"scratch:{key}:ag1", 7)
+        # Fresh process: clear in-memory state, reload from disk.
+        inbox.reset(); links.reset(); watermark.reset()
+        scratchpad.reset(); deletion.reset(); state_store.reset()
+        state_store.register_agent("ag1", cwd)
+        assert state_store.load_project(cwd) is True
+        assert watermark.get(f"scratch:{key}:ag1") == 2   # clamped to N
+        scratchpad.post(key, "bee", "three", persist_path=str(sp))
+        assert [p["text"] for p in scratchpad.unread("ag1", key)] == ["three"]
+
 
 # ---------------------------------------------------------------------------
 # load_project — lazy, idempotent, seeds every module
@@ -412,10 +447,12 @@ class TestLoadProject:
         state_store.register_agent("ag1", cwd)
         inbox.raise_item("ag1", "decision", {"q": "?"})
         links.add_link(a="ag1", b="ag1b", link_id="lnk7")
-        watermark.set(f"scratch:{key}:ag1", 4)
         state_store.persist_retired_number(key, 9)
         sp = storage.scratchpad_path(cwd)
         scratchpad.post(key, "ada", "hello", persist_path=str(sp))
+        # A mark within the board's 1..N seqs restores as-is (marks beyond N
+        # clamp — see test_load_project_clamps_scratch_watermarks_to_board_length).
+        watermark.set(f"scratch:{key}:ag1", 1)
         # Simulate a fresh process: clear all in-memory state.
         inbox.reset(); links.reset(); watermark.reset()
         scratchpad.reset(); deletion.reset()
@@ -424,7 +461,7 @@ class TestLoadProject:
         assert state_store.load_project(cwd) is True
         assert inbox.items_for("ag1")[0]["type"] == "decision"
         assert links.get_link("lnk7") is not None
-        assert watermark.get(f"scratch:{key}:ag1") == 4
+        assert watermark.get(f"scratch:{key}:ag1") == 1
         assert deletion.is_retired(9) is True
         assert scratchpad.all_posts(key)[0]["text"] == "hello"
         # Idempotent: second load is a no-op.

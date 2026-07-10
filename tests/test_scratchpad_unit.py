@@ -31,6 +31,25 @@ def test_post_assigns_monotonic_seq():
     assert [p["seq"] for p in scratchpad.all_posts("proj")] == [1, 2]
 
 
+def test_seq_is_per_board_contiguous():
+    # Seqs are PER-BOARD (1..N, = board length + 1), never a module-global
+    # counter — so live seqs always match what a reload re-derives from the
+    # .md mirror (line order) and persisted watermarks stay valid.
+    a = scratchpad.post("A", "x", "one")
+    b = scratchpad.post("B", "y", "first on B")
+    assert a["seq"] == 1
+    assert b["seq"] == 1          # a global counter would have given 2
+    assert scratchpad.post("A", "x", "two")["seq"] == 2
+
+
+def test_mirror_indents_continuation_lines(tmp_path):
+    md = tmp_path / "scratchpad.md"
+    scratchpad.post("proj", "ada", "first\nsecond line", persist_path=str(md))
+    lines = md.read_text(encoding="utf-8").splitlines()
+    assert lines[-2].startswith("- **ada**") and lines[-2].endswith(": first")
+    assert lines[-1] == "  second line"   # continuation carries the 2-space prefix
+
+
 def test_projects_are_isolated():
     scratchpad.post("projA", "x", "a")
     scratchpad.post("projB", "y", "b")
