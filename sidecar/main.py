@@ -344,6 +344,9 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
+            # SDK-driver turns end HERE (a `result`, never a was-running idle
+            # status_change), so the §7.8 Response card raises on this path too.
+            _raise_response_card(self)
             # Reply-to relay, then flush of the next queued prompt.
             _maybe_relay_reply(self)
             _schedule_flush(self)
@@ -776,6 +779,11 @@ async def reconnect_sessions(project_key: str | None = None):
                 resume_name=tmux_name, session_id=sid,
                 claude_session_id=rec.get("claude_session_id"),
                 cold_restore=cold,
+                # The persisted transcript path skips a pointless re-resolve;
+                # the full record seeds the driver's record base so refreshes
+                # never drop fields another writer persisted.
+                transcript_path=rec.get("transcript_path"),
+                persisted_record=rec,
             )
             session.driver = driver
             # Warm: resume() rebinds the live tmux session. Cold: a fresh

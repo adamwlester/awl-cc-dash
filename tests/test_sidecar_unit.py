@@ -123,6 +123,25 @@ def test_response_card_coalesces_per_agent():
         inbox.reset()
 
 
+def test_result_event_raises_response_card():
+    """SDK-driver turns end via the `result` event — never a status_change-idle
+    with `_was_running` — so the §7.8 Response card must raise on the result
+    path too, not only on the bridge's idle transition."""
+    import inbox
+    inbox.reset()
+    try:
+        s = _session()
+        s.handle_event({"type": "status_change", "status": "running"})
+        s.handle_event({"type": "result",
+                        "data": {"total_cost_usd": 0.01, "num_turns": 1}})
+        cards = [i for i in inbox.items_for("s1") if i["type"] == "response"]
+        assert len(cards) == 1
+        assert cards[0]["data"]["runs"] == 1
+        assert s.status == "idle" and s.total_turns == 1
+    finally:
+        inbox.reset()
+
+
 # ---------------------------------------------------------------------------
 # Default driver selection
 #

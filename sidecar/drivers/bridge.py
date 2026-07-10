@@ -433,6 +433,8 @@ class BridgeDriver(AgentDriver):
         session_id: str | None = None,
         claude_session_id: str | None = None,
         cold_restore: bool = False,
+        transcript_path: str | None = None,
+        persisted_record: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(config, on_event)
         from bridge import TmuxBridge  # type: ignore[import-not-found]
@@ -456,12 +458,17 @@ class BridgeDriver(AgentDriver):
         self._last_state: str | None = None
         # The resolved WSL transcript path, persisted in the roster record (§8.6
         # #2: resolution is verified, not trusted — and the verified result is
-        # remembered so the mapping survives restarts and scheme drift).
-        self._transcript_path: str | None = None
+        # remembered so the mapping survives restarts and scheme drift). On
+        # resume it is seeded from the persisted record, so a known path is
+        # never pointlessly re-resolved.
+        self._transcript_path: str | None = transcript_path
         # The last-persisted runtime/roster record, kept so later refreshes
         # (e.g. the transcript path resolving after the first turn) re-save the
-        # full record rather than a fragment.
-        self._record: dict[str, Any] | None = None
+        # full record rather than a fragment. On resume paths it is seeded from
+        # the FULL persisted record, so a record refresh never drops fields
+        # another writer persisted.
+        self._record: dict[str, Any] | None = \
+            dict(persisted_record) if persisted_record else None
 
     def bind_session_id(self, session_id: str) -> None:
         """Associate the sidecar session id (used for the runtime record)."""
@@ -608,9 +615,17 @@ class BridgeDriver(AgentDriver):
             # the original launch — resume does not relaunch claude. Re-register
             # the persisted claude session id so find_transcript resolves THIS
             # session's own <id>.jsonl (a fresh bridge has no in-memory map).
+            # cwd/model/resume_session_id ride along so the fall-through — the
+            # tmux session died in the race window since the alive-check —
+            # cold-restores the SAME conversation in the right cwd instead of
+            # creating a blank session (§9.9).
             if self._claude_session_id:
                 self._bridge.register_session_id(self._name, self._claude_session_id)
-            await asyncio.to_thread(self._bridge.resume, self._name)
+            await asyncio.to_thread(
+                self._bridge.resume, self._name,
+                cwd=self.config.cwd, model=self.config.model,
+                resume_session_id=self._claude_session_id,
+            )
         else:
             # Apply ALL per-agent launch config (permission mode + tool gates +
             # permission rules + plugin enablement + MCP scope) via the claude
@@ -625,9 +640,12 @@ class BridgeDriver(AgentDriver):
             logger.warning("wait_idle failed for %s: %s", self._name, e)
 
         # Persist a minimal record so a restarted sidecar can rebind to this
-        # still-alive tmux session (or cold-restore a dead one, §9.9).
+        # still-alive tmux session (or cold-restore a dead one, §9.9). On
+        # resume paths the persisted record (seeded in __init__) is the BASE —
+        # fields another writer persisted are carried forward, never dropped.
         if self._session_id:
-            self._record = {
+            record = dict(self._record) if self._record else {}
+            record.update({
                 "session_id": self._session_id,
                 "tmux_name": self._name,
                 "driver": "bridge",
@@ -637,8 +655,9 @@ class BridgeDriver(AgentDriver):
                 # The claude --session-id naming this agent's transcript, so a
                 # restarted sidecar resolves the right <id>.jsonl on resume.
                 "claude_session_id": self._claude_session_id,
-                # The verified transcript path (§8.6 #2) — resolved lazily once
-                # the transcript exists (see events()) and refreshed on resolve.
+                # The verified transcript path (§8.6 #2) — seeded from the
+                # persisted record when known, else resolved lazily once the
+                # transcript exists (see events()) and refreshed on resolve.
                 "transcript_path": self._transcript_path,
                 # Applied per-agent launch config — kept for readback after a
                 # sidecar restart (reconnect rebinds, it does not relaunch).
@@ -649,7 +668,8 @@ class BridgeDriver(AgentDriver):
                 "mcp_servers": self.config.mcp_servers,
                 # Dashboard-owned identity, persisted so it survives restart.
                 "identity": self.config.identity,
-            }
+            })
+            self._record = record
             try:
                 _save_record(self._record)
             except Exception as e:  # pragma: no cover - best effort
