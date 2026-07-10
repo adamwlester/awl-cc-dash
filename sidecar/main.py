@@ -45,6 +45,7 @@ import storage
 import state_store
 import scratchpad
 import watermark
+import runstate
 import marquee
 import console_catalog
 import settings_io
@@ -159,6 +160,10 @@ class SessionState:
             # Dashboard-owned identity (role/number/name/color/icon) — the UI
             # renders agent cards and the Agent panel from this everywhere.
             "identity": self.identity,
+            # The arbitrated run-state (§7.4): hook-pushed fields when fresh
+            # (source="push"), the screen-poll floor otherwise. Additive —
+            # `status` above stays the poll-driven enum.
+            "run_state": runstate.effective(self.session_id, self.status),
             # The applied per-agent launch config, so a UI can read back what an
             # agent was scoped with. NOTE: under bypassPermissions the
             # `allowed_tools` allow-list is ignored by claude (a known bug) —
@@ -1005,6 +1010,7 @@ async def close_session(session_id: str, hard: bool = False):
             if (key.startswith("scratch:") and parts[-1] == session_id) or \
                     (key.startswith("shared:") and session_id in parts[1:3]):
                 watermark.drop(key)
+        runstate.drop_agent(session_id)
         state_store.unregister_agent(session_id)
         session.status = "closed"
         del sessions[session_id]
@@ -1209,15 +1215,20 @@ def _surface_delivered_injects(agent_id: str, injects: list[dict[str, Any]]) -> 
 
 
 @app.post("/internal/hooks/post-tool-use/{agent}")
-async def hook_post_tool_use(agent: str):
+async def hook_post_tool_use(agent: str, body: dict[str, Any] | None = None):
     """PostToolUse drain: hand back ALL pending injects (active + passive) as one
     `additionalContext` block so a running agent receives them mid-turn at the
     next tool boundary. Empty -> `{}` (a 2xx no-op).
+
+    Also ingests the payload's run-state fields (permission_mode / tool /
+    prompt_id) into the arbiter (§7.4) — the drain and the push channel ride
+    the same delivery.
 
     ``agent`` is a PATH param (the sidecar session id the bridge baked into the
     hook URL) — claude's http-hook client does not reliably forward a query
     string, so the id rides the path.
     """
+    runstate.ingest(agent, "PostToolUse", body)
     injects = hookbus.drain(agent)
     if injects:
         logger.info("hook drain post-tool-use agent=%s delivered=%d", agent, len(injects))
@@ -1226,15 +1237,40 @@ async def hook_post_tool_use(agent: str):
 
 
 @app.post("/internal/hooks/stop/{agent}")
-async def hook_stop(agent: str):
+async def hook_stop(agent: str, body: dict[str, Any] | None = None):
     """Stop backstop: for the no-tool-call turn, surface only ACTIVE injects via
     `decision:"block"` so a pure-text turn still catches them at turn-end. Passive
-    `context` injects are left pending (blocking Stop would force a continuation)."""
+    `context` injects are left pending (blocking Stop would force a continuation).
+    Ingests the payload's run-state (phase → idle) into the arbiter (§7.4)."""
+    runstate.ingest(agent, "Stop", body)
     injects = hookbus.drain(agent, kinds={"inject"})
     if injects:
         logger.info("hook drain stop agent=%s delivered=%d", agent, len(injects))
     _surface_delivered_injects(agent, injects)
     return hookbus.stop_output(injects)
+
+
+@app.post("/internal/hooks/run-state/{agent}")
+async def hook_run_state(agent: str, body: dict[str, Any] | None = None):
+    """Run-state push channel (§7.4): PreToolUse catch-all / UserPromptSubmit /
+    Notification POST here. The event name rides the payload's
+    `hook_event_name`; `permission_mode` is event-specific (Notification lacks
+    it) and the arbiter keys per event. Always returns `{}` (never gates)."""
+    event = (body or {}).get("hook_event_name") or \
+            (body or {}).get("hookEventName") or "Notification"
+    runstate.ingest(agent, str(event), body)
+    return {}
+
+
+@app.post("/internal/hooks/subagent/{agent}")
+async def hook_subagent(agent: str, body: dict[str, Any] | None = None):
+    """SubagentStart/SubagentStop → the subagent registry (§7.17): agent_id /
+    agent_type / transcript_path become the roster's authoritative
+    active-vs-quiet signal, blended over the transcript-derived list."""
+    event = (body or {}).get("hook_event_name") or \
+            (body or {}).get("hookEventName") or "SubagentStart"
+    runstate.ingest_subagent(agent, str(event), body)
+    return {}
 
 
 # --- Plan/Decision detection via the PreToolUse hook channel ---
@@ -1856,6 +1892,35 @@ async def get_subagents(session_id: str):
         subs = result.get("subagents") or []
         if subs:
             result["subagents"] = subagents_naming.assign_names([subs])
+        # Blend the hook-fed registry over the transcript-derived list (§7.17):
+        # SubagentStart/Stop pushes are the authoritative active-vs-quiet signal
+        # — matched by the subagent's engine agent_id; unmatched hook records
+        # (start seen before the transcript catches up) are appended.
+        live = runstate.subagents_live(session_id)
+        if live:
+            by_id = {s.get("agent_id"): s for s in result.get("subagents", [])
+                     if s.get("agent_id")}
+            extra = []
+            for rec in live:
+                target = by_id.get(rec["agent_id"])
+                if target is not None:
+                    target["live_status"] = rec["status"]
+                    target["transcript_path"] = rec.get("transcript_path")
+                    if rec.get("type") and not target.get("type"):
+                        target["type"] = rec["type"]
+                else:
+                    extra.append({
+                        "id": None, "tool_use_id": None,
+                        "agent_id": rec["agent_id"], "type": rec.get("type"),
+                        "description": None, "prompt": None,
+                        "status": "running" if rec["status"] == "running" else "done",
+                        "live_status": rec["status"],
+                        "transcript_path": rec.get("transcript_path"),
+                        "usage": None,
+                    })
+            if extra:
+                result["subagents"] = list(result.get("subagents", [])) + extra
+                result["count"] = len(result["subagents"])
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

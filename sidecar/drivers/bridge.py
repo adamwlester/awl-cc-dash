@@ -493,33 +493,34 @@ class BridgeDriver(AgentDriver):
         agent = self._session_id
         # agent id rides the PATH (claude's http-hook client doesn't reliably
         # forward a query string — verified in the hook-channel spike).
+        def _http(url_suffix: str) -> dict:
+            return {"type": "http",
+                    "url": f"{base}/internal/hooks/{url_suffix}/{agent}",
+                    "timeout": 5}
         return {
             "hooks": {
-                "PostToolUse": [{"matcher": "", "hooks": [{
-                    "type": "http",
-                    "url": f"{base}/internal/hooks/post-tool-use/{agent}",
-                    "timeout": 5,
-                }]}],
-                "Stop": [{"matcher": "", "hooks": [{
-                    "type": "http",
-                    "url": f"{base}/internal/hooks/stop/{agent}",
-                    "timeout": 5,
-                }]}],
+                "PostToolUse": [{"matcher": "", "hooks": [_http("post-tool-use")]}],
+                "Stop": [{"matcher": "", "hooks": [_http("stop")]}],
                 # Inbox detection: surface the agent's own Plan (ExitPlanMode) and Decision
                 # (AskUserQuestion) tool calls as typed Inbox cards — these are
                 # screen-blind but hook-visible. Returns allow (detect-and-surface).
+                # The "" catch-all rides alongside for the run-state channel
+                # (§7.4) — all matching PreToolUse hooks fire, so plan/decision
+                # detection and run-state ingestion coexist.
                 "PreToolUse": [
-                    {"matcher": "ExitPlanMode", "hooks": [{
-                        "type": "http",
-                        "url": f"{base}/internal/hooks/plan/{agent}",
-                        "timeout": 5,
-                    }]},
-                    {"matcher": "AskUserQuestion", "hooks": [{
-                        "type": "http",
-                        "url": f"{base}/internal/hooks/decision/{agent}",
-                        "timeout": 5,
-                    }]},
+                    {"matcher": "ExitPlanMode", "hooks": [_http("plan")]},
+                    {"matcher": "AskUserQuestion", "hooks": [_http("decision")]},
+                    {"matcher": "", "hooks": [_http("run-state")]},
                 ],
+                # Run-state push channel (§7.4, Option C hybrid): lifecycle events
+                # POST run-state (permission_mode, tool, prompt_id) — authoritative
+                # -when-fresh over the screen poll. Notification carries NO
+                # permission_mode (spike caveat); the arbiter keys per event.
+                "UserPromptSubmit": [{"matcher": "", "hooks": [_http("run-state")]}],
+                "Notification": [{"matcher": "", "hooks": [_http("run-state")]}],
+                # Subagent lifecycle → the roster's active-vs-quiet signal (§7.17).
+                "SubagentStart": [{"matcher": "", "hooks": [_http("subagent")]}],
+                "SubagentStop": [{"matcher": "", "hooks": [_http("subagent")]}],
             }
         }
 
