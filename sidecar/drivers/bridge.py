@@ -415,13 +415,14 @@ def _remove_record(session_id: str) -> None:
 
 class BridgeDriver(AgentDriver):
     name = "bridge"
-    # interrupt/context/permission/resume are proven. Of the session-control
-    # commands, only model and effort drive a live session cleanly (confirmed via
-    # the "Set model to …"/"Set effort level to …" messages); fast/thinking/mode
-    # were not wired (see set_* methods for the live findings).
+    # interrupt/context/permission/resume are proven; model + effort drive a live
+    # session via typed slash commands; mode/fast/thinking drive it via the
+    # proven keys() levers — Shift+Tab ring / Meta+T modal / Meta+O + Space (see
+    # the findings block at "Session-control commands" below).
     CAPABILITIES = {
         "interrupt", "context", "permission", "resume",
-        "set_model", "set_effort", "subagents",
+        "set_model", "set_effort", "set_mode", "set_fast", "set_thinking",
+        "subagents",
     }
 
     def __init__(
@@ -779,16 +780,42 @@ class BridgeDriver(AgentDriver):
 
     # --- Session-control commands ---------------------------------------------
     #
-    # Findings from live discovery on Claude Code 2.1.187 (see the DEVLOG entry):
-    #   * /model <name>  + Enter  → sets directly ("Set model to …"). WIRED.
-    #   * /effort <level> + Enter → sets directly ("Set effort level to …"). WIRED.
-    #   * /fast          → opens an interactive panel (Tab to toggle, Enter to
-    #                      confirm); a reliable toggle-to-target could not be
-    #                      confirmed via screen scraping. NOT wired — reported.
-    #   * /thinking      → "No commands match" — no such command. NOT wired.
-    #   * permission mode → cycles via Shift+Tab only (relative, no absolute
-    #                      set); no clean way to jump to a specific mode. NOT wired.
-    # Only the two confirmed-clean controls are advertised via CAPABILITIES below.
+    # Live findings — all five controls now drive a real running TUI. (The first
+    # 2.1.187 discovery pass left mode/fast/thinking as no-ops; the levers were
+    # then proven live and are wired per §11 #12.)
+    #   * /model <name>  + Enter  → sets directly ("Set model to …"). WIRED (send).
+    #   * /effort <level> + Enter → sets directly ("Set effort level to …"). WIRED (send).
+    #   * permission mode → NO absolute set exists on the TUI (no slash command,
+    #     no hot-applied setting — confirmed at every layer by the mode-control
+    #     research), but the Shift+Tab ring cycles deterministically at a
+    #     known-idle screen with the resulting mode read back from the status
+    #     line — proven live incl. behavior, not just the indicator
+    #     (test_permission_mode_cycle_live, 2026-07-02). WIRED via
+    #     bridge.set_permission_mode (bounded cycle). Bypass/Auto are
+    #     LAUNCH-GATED (§7.11): an un-armed segment is SILENTLY ABSENT from the
+    #     ring (test_bypass_auto_preconditions_live), so the bridge's honest
+    #     {ok: False, reason: "unreachable"} — surfaced here as a RuntimeError —
+    #     IS the un-armed signal the UI needs (§11 #13's backend half). The
+    #     pre-arm is a launch choice and already works through create():
+    #     DriverConfig.permission_mode → --permission-mode, with the
+    #     startup-gate clearer accepting the bypass warning.
+    #   * thinking → no /thinking command exists, but `Meta+T` opens a modal
+    #     that both SHOWS the current state (✔ on the active option) and sets it
+    #     absolutely — proven live (test_thinking_toggle_live, 2026-07-02).
+    #     WIRED via bridge.set_thinking (open → read first → toggle only if
+    #     needed → read back).
+    #   * fast → `Meta+O` opens the Fast panel; `Space` is the toggle lever
+    #     (Enter/Escape only close it) and the panel's "Fast mode OFF/ON" line
+    #     is a plain-text scrape — proven live (test_fast_mode_toggle_live,
+    #     2026-07-04). A credit-gated account reports "requires usage credits"
+    #     and no keystroke can enable Fast → the honest degrade is
+    #     RuntimeError("credit_gated"), never a faked toggle. WIRED via
+    #     bridge.set_fast.
+    # Contract: each wired set_* returns the READ-BACK state (never an echo of
+    # the value sent) and raises RuntimeError(<reason>) on {ok: False} — reasons
+    # "busy" (screen not idle, retryable), "unreachable" (mode not in the armed
+    # ring), "credit_gated" (Fast without credits), "unreadable" (panel/status
+    # scrape failed) — so the endpoint maps them to honest 409/400s.
 
     async def set_model(self, model: str) -> None:
         # Fully-typed `/model <name>` + Enter sets directly (autocomplete does
@@ -798,19 +825,39 @@ class BridgeDriver(AgentDriver):
     async def set_effort(self, effort: str) -> None:
         await asyncio.to_thread(self._bridge.send, self._name, f"/effort {effort}")
 
-    async def set_mode(self, mode: str) -> None:
-        # Permission mode cycles with Shift+Tab in the TUI; there is no reliable
-        # absolute-set form. Left a no-op rather than force a fragile cycle.
-        return None
+    async def set_mode(self, mode: str) -> str:
+        """Cycle the live TUI to `mode` (bounded Shift+Tab ring, idle-gated).
 
-    async def set_fast(self, on: bool) -> None:
-        # /fast opens an interactive panel; a reliable scrape-driven toggle could
-        # not be confirmed. Left a no-op (not advertised) rather than fake it.
-        return None
+        Returns the read-back mode; raises RuntimeError("busy"/"unreachable")
+        on the honest failures (see the findings block above).
+        """
+        result = await asyncio.to_thread(
+            self._bridge.set_permission_mode, self._name, mode)
+        if not result.get("ok"):
+            raise RuntimeError(result.get("reason") or "failed")
+        return result["mode"]
 
-    async def set_thinking(self, on: bool) -> None:
-        # No /thinking command exists in this Claude Code build. Left a no-op.
-        return None
+    async def set_fast(self, on: bool) -> bool:
+        """Set Fast mode via the Meta+O panel (Space toggle, read-first).
+
+        Returns the read-back state; raises RuntimeError("busy"/"credit_gated"/
+        "unreadable") on the honest failures.
+        """
+        result = await asyncio.to_thread(self._bridge.set_fast, self._name, on)
+        if not result.get("ok"):
+            raise RuntimeError(result.get("reason") or "failed")
+        return bool(result["on"])
+
+    async def set_thinking(self, on: bool) -> bool:
+        """Set extended thinking via the Meta+T modal (read-first, absolute).
+
+        Returns the read-back state; raises RuntimeError("busy"/"unreadable")
+        on the honest failures.
+        """
+        result = await asyncio.to_thread(self._bridge.set_thinking, self._name, on)
+        if not result.get("ok"):
+            raise RuntimeError(result.get("reason") or "failed")
+        return bool(result["on"])
 
     async def close(self) -> None:
         self._closed = True

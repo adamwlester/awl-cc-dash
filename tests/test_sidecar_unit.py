@@ -17,7 +17,11 @@ functions are called directly via ``asyncio.run``). Proves:
     the sidecar; document create (409 on exists) / delete / rename and the
     comment add/resolve endpoints, including the 400 guards that scope every
     write to ``<project>/.awl-cc-dash/``; and the ``subdir=plans|docs`` store
-    listing with its legacy ``<root>/<subdir>`` fallback.
+    listing with its legacy ``<root>/<subdir>`` fallback;
+  * **the live mode/fast/thinking control endpoints (§11 #12)** — POST
+    ``/sessions/{id}/{mode,fast,thinking}`` return the driver's READ-BACK state
+    and map the honest RuntimeError reasons to 409 (``busy``) / 400
+    (``unreachable`` / ``credit_gated``).
 
 These carry neither the ``integration`` nor the ``slow`` mark.
 """
@@ -809,3 +813,139 @@ class TestLibraryCommentEndpoints:
             asyncio.run(main.library_resolve_comment(main.CommentResolveRequest(
                 cwd=str(proj), path=str(outside), comment_id="c1")))
         assert ei.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Live mode/thinking/fast control endpoints (§11 #12) — POST /sessions/{id}/
+# {mode,fast,thinking} call the driver's wired levers and return the READ-BACK
+# state (never an echo of the request); driver RuntimeError reasons map to an
+# honest 409 ("busy" — retryable) / 400 ("unreachable" = un-armed mode segment
+# §7.11, "credit_gated" = Fast without credits) with the reason in the detail.
+# ---------------------------------------------------------------------------
+
+class _LeverDriver(_FakeDriver):
+    """Fake bridge-like driver exposing the wired mode/fast/thinking levers.
+
+    Returns canned READ-BACK values (which may deliberately differ from the
+    request, to prove the endpoint echoes the read-back) or raises
+    RuntimeError(reason) like the real BridgeDriver.
+    """
+
+    def __init__(self, mode="acceptEdits", fast=True, thinking=False, error=None):
+        super().__init__()
+        self._mode, self._fast, self._thinking = mode, fast, thinking
+        self._error = error
+        self.calls = []
+
+    def supports(self, cap):
+        return cap in {"set_mode", "set_fast", "set_thinking"}
+
+    async def set_mode(self, mode):
+        self.calls.append(("set_mode", mode))
+        if self._error:
+            raise RuntimeError(self._error)
+        return self._mode
+
+    async def set_fast(self, on):
+        self.calls.append(("set_fast", on))
+        if self._error:
+            raise RuntimeError(self._error)
+        return self._fast
+
+    async def set_thinking(self, on):
+        self.calls.append(("set_thinking", on))
+        if self._error:
+            raise RuntimeError(self._error)
+        return self._thinking
+
+
+class TestLiveControlEndpoints:
+    def _register(self, driver):
+        s = _session()
+        s.driver = driver
+        main.sessions["s1"] = s
+        return s
+
+    def teardown_method(self):
+        main.sessions.pop("s1", None)
+
+    def test_mode_returns_read_back_and_updates_session(self):
+        s = self._register(_LeverDriver(mode="acceptEdits"))
+        out = asyncio.run(main.set_mode(
+            "s1", main.SetModeRequest(mode="acceptEdits")))
+        assert out == {"status": "ok", "mode": "acceptEdits"}
+        assert s.permission_mode == "acceptEdits"
+        assert s.driver.calls == [("set_mode", "acceptEdits")]
+
+    def test_mode_none_result_falls_back_to_request(self):
+        # The sdk driver's set_mode returns None (it applies the requested mode
+        # directly) — the endpoint then reports the requested value.
+        class _NoneModeDriver(_LeverDriver):
+            async def set_mode(self, mode):
+                return None
+        s = self._register(_NoneModeDriver())
+        out = asyncio.run(main.set_mode("s1", main.SetModeRequest(mode="plan")))
+        assert out == {"status": "ok", "mode": "plan"}
+        assert s.permission_mode == "plan"
+
+    def test_mode_busy_is_409(self):
+        s = self._register(_LeverDriver(error="busy"))
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_mode("s1", main.SetModeRequest(mode="plan")))
+        assert ei.value.status_code == 409
+        assert "busy" in ei.value.detail
+        assert s.permission_mode == "default"   # untouched on failure
+
+    def test_mode_unreachable_is_400(self):
+        # §7.11: an un-armed Bypass segment is silently absent from the ring —
+        # the honest signal is a 400, never a fake success.
+        self._register(_LeverDriver(error="unreachable"))
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_mode(
+                "s1", main.SetModeRequest(mode="bypassPermissions")))
+        assert ei.value.status_code == 400
+        assert "unreachable" in ei.value.detail
+
+    def test_mode_400_without_capability(self):
+        self._register(_FakeDriver())   # supports() -> False for everything
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_mode("s1", main.SetModeRequest(mode="plan")))
+        assert ei.value.status_code == 400
+        assert "no mode control" in ei.value.detail
+
+    def test_fast_returns_read_back(self):
+        self._register(_LeverDriver(fast=True))
+        out = asyncio.run(main.set_fast("s1", main.SetFastRequest(on=True)))
+        assert out == {"status": "ok", "fast": True}
+
+    def test_fast_credit_gated_is_400(self):
+        self._register(_LeverDriver(error="credit_gated"))
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_fast("s1", main.SetFastRequest(on=True)))
+        assert ei.value.status_code == 400
+        assert "credit_gated" in ei.value.detail
+
+    def test_fast_busy_is_409(self):
+        self._register(_LeverDriver(error="busy"))
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_fast("s1", main.SetFastRequest(on=True)))
+        assert ei.value.status_code == 409
+
+    def test_thinking_returns_read_back(self):
+        self._register(_LeverDriver(thinking=False))
+        out = asyncio.run(main.set_thinking(
+            "s1", main.SetThinkingRequest(on=False)))
+        assert out == {"status": "ok", "thinking": False}
+
+    def test_thinking_busy_is_409(self):
+        self._register(_LeverDriver(error="busy"))
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_thinking(
+                "s1", main.SetThinkingRequest(on=True)))
+        assert ei.value.status_code == 409
+        assert "busy" in ei.value.detail
+
+    def test_unknown_session_is_404(self):
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.set_mode("ghost", main.SetModeRequest(mode="plan")))
+        assert ei.value.status_code == 404
