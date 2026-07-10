@@ -63,6 +63,20 @@ class TestCanonicalRoot:
         b = storage.project_key(r"C:\Users\lester\proj")
         assert a == b
 
+    def test_wsl_internal_posix_and_unc_spellings_share_one_key(self):
+        # /home/… (a true WSL-internal cwd) and its \\wsl.localhost UNC
+        # spelling are the SAME project — one canonical key.
+        a = storage.project_key("/home/awl-test-user/proj")
+        b = storage.project_key(r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
+        assert a == b
+
+    def test_wsl_internal_root_never_anchors_to_a_windows_drive(self):
+        # The old behavior resolved /home/… against the Windows current drive
+        # (C:\home\…), corrupting the key. It must map to the UNC form.
+        key = storage.project_key("/home/awl-test-user/proj")
+        assert key.lower().startswith("\\\\wsl.localhost\\")
+        assert ":" not in key    # no drive letter crept in
+
     def test_project_key_matches_root(self, tmp_path):
         proj = tmp_path / "p"
         proj.mkdir()
@@ -205,6 +219,17 @@ class TestWslReachable:
         # §8.5: plansDirectory = the ABSOLUTE WSL path of the project's plans/.
         wsl = storage.plans_dir_wsl("C:/Users/lester/proj")
         assert wsl == "/mnt/c/Users/lester/proj/.awl-cc-dash/plans"
+
+    def test_wsl_internal_root_yields_home_rooted_wsl_paths(self):
+        # A WSL-internal project's WSL-reachable accessors are /home/…-rooted —
+        # NEVER a /mnt/c/home/… mistranslation of a corrupted drive anchor.
+        wsl = storage.plans_dir_wsl("/home/awl-test-user/proj")
+        assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/plans"
+
+    def test_wsl_unc_root_translates_back_inside_wsl(self):
+        wsl = storage.scratchpad_path_wsl(
+            r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
+        assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/docs/scratchpad.md"
 
     def test_none_cwd_has_no_wsl_path(self):
         assert storage.project_awl_dir_wsl(None) is None
