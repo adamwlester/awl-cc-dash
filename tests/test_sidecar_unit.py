@@ -79,6 +79,35 @@ def test_status_enum_untouched_by_permission_events():
     assert s.status == "running"
 
 
+def test_response_card_coalesces_per_agent():
+    """Response card (§7.8): every completed turn raises/updates ONE coalesced
+    per-agent card ("a run ended with output the operator has not reviewed"),
+    counting unreviewed runs — never a second open card."""
+    import inbox
+    inbox.reset()
+    try:
+        s = _session()
+        s.handle_event({"type": "status_change", "status": "running"})
+        s.handle_event({"type": "status_change", "status": "idle"})
+        cards = [i for i in inbox.items_for("s1") if i["type"] == "response"]
+        assert len(cards) == 1
+        assert cards[0]["data"]["runs"] == 1
+        # A second completed turn updates the SAME card (coalesced), runs=2.
+        s.handle_event({"type": "status_change", "status": "running"})
+        s.handle_event({"type": "status_change", "status": "idle"})
+        cards = [i for i in inbox.items_for("s1") if i["type"] == "response"]
+        assert len(cards) == 1
+        assert cards[0]["data"]["runs"] == 2
+        # Completable via the standard resolve; the next turn opens a fresh card.
+        inbox.resolve_item("s1", cards[0]["id"])
+        s.handle_event({"type": "status_change", "status": "running"})
+        s.handle_event({"type": "status_change", "status": "idle"})
+        cards = [i for i in inbox.items_for("s1") if i["type"] == "response"]
+        assert len(cards) == 1 and cards[0]["data"]["runs"] == 1
+    finally:
+        inbox.reset()
+
+
 # ---------------------------------------------------------------------------
 # Default driver selection
 #

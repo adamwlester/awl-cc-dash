@@ -20,6 +20,7 @@ The repo separates two layers: the **product** (the dashboard itself) lives in f
 | `assets/` | Icon sets — `icons/agents/` (recolorable game-icons.net tiles) and `icons/ui/` (Lucide). |
 | `tests/` | The pytest suite — a hermetic per-module unit tier, plus live integration, feasibility-spike, and browser-driven UI tiers that exercise the real bridge/sidecar. Layout + conventions: [tests/README.md](tests/README.md) and **TESTING** below. |
 | `docs/` | Committed, curated product reference docs — home of [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), the system/structure reference (see **KEY FILES**). |
+| `.awl-cc-dash/` | **The dashboard's own project store for THIS repo** (self-dogfooding, ARCHITECTURE §8.2) — created when the dashboard runs against awl-cc-dash: `plans/` · `docs/` · `assets/` · `state/`, written by the running product. Treat it as **runtime data, not product source**: committed deliberately (project state travels with the repo), never as a side effect of unrelated commits, and never hand-edited by dev agents. Tests never touch it (they run on `AWL_SIDECAR_RUNTIME` + per-test temp cwds). |
 
 **Build workflow & config:**
 

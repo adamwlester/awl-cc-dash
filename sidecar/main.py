@@ -252,6 +252,7 @@ class SessionState:
                 if self._was_running:        # one completed turn (feeds the cap loop)
                     self.turn_count += 1
                     self._was_running = False
+                    _raise_response_card(self)
                 # Reply-to: relay this finished turn back to a linked peer FIRST (uses
                 # this turn's output before a queued prompt starts a new turn), then
                 # flush the next queued prompt.
@@ -461,6 +462,25 @@ def _maybe_relay_reply(session: "SessionState",
             pass
         return
     _schedule_flush(target)
+
+
+def _raise_response_card(session: "SessionState") -> None:
+    """Response card (§7.8): non-blocking — "a run ended with output the operator
+    has not reviewed." ONE coalesced card per agent (the dedup key updates the
+    open card in place, counting unreviewed runs), completable via the standard
+    resolve endpoint (View / Reply); no dismiss and no read-tracking."""
+    try:
+        runs = 1
+        for it in inbox.items_for(session.session_id):
+            if it["type"] == "response":
+                runs = int(it["data"].get("runs", 0)) + 1
+                break
+        inbox.raise_item(
+            session.session_id, "response",
+            {"runs": runs, "last_turn_at": datetime.now().isoformat()},
+            dedup_key=f"response:{session.session_id}")
+    except Exception:  # pragma: no cover - a card must never break the turn loop
+        pass
 
 
 def _scratch_key(session: "SessionState") -> str:
