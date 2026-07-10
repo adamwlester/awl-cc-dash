@@ -560,13 +560,10 @@ The scratchpad is an **always-current, auto-read** channel: agents do not have t
   does not trigger a turn** — an early-collision signal. **Idle** agents catch up at start-of-run.
 - Stored at `<project>/.awl-cc-dash/docs/scratchpad.md` (§8.2); posts carry `recipients:[scratch]`.
   `POST /scratch` appends and pushes the delta. The scratchpad is deliberately **not** on a frontend poll —
-  it is read on demand.
-
-⚠ **Today:** the board lives at `.awl/scratchpad.md` (`storage.scratchpad_path()` in
-[`sidecar/storage.py`](../sidecar/storage.py)), and both the working board (`scratchpad._LOG` in
-[`sidecar/scratchpad.py`](../sidecar/scratchpad.py)) and the watermarks (`watermark._marks` in
-[`sidecar/watermark.py`](../sidecar/watermark.py)) are memory-only — the `.md` mirror is write-only and
-never loaded back, so a restart wipes the live board (§8.3).
+  it is read on demand. The `.md` mirror **is** the board's persistence: the board reloads from it on
+  project load (`state_store.load_project()` / `parse_scratchpad_md()` in
+  [`sidecar/state_store.py`](../sidecar/state_store.py)), and the read-watermarks persist to
+  `state/bookmarks.json` write-through (§8.3).
 
 ### 7.8 Inbox
 
@@ -583,10 +580,12 @@ The type set is **open-ended, not a closed enum** — `type` is stored as a stri
 - **Plan** — notify-only; verdicts live in Library → Plans, not the inbox.
 - **Decision** — the agent's `AskUserQuestion`, answerable from the card.
 - **Response** — non-blocking: *"a run ended with output the operator has not reviewed."* One **coalesced
-  card per agent**; completable (**View / Reply**), with **no dismiss and no read-tracking**. ⚠ **Today:**
-  no Response type exists; the in-memory inbox (`inbox._INBOX` in [`sidecar/inbox.py`](../sidecar/inbox.py))
-  raises error/warning/plan/decision, with the pending permission merged in as a synthetic card (the
-  Response type + inbox persistence ride §11 #3).
+  card per agent** (every completed turn updates the open card's unreviewed-runs count —
+  `_raise_response_card()` in [`sidecar/main.py`](../sidecar/main.py)); completable (**View / Reply**),
+  with **no dismiss and no read-tracking**.
+
+Items persist write-through to the project's `state/inbox.json` (§8.3); the pending permission stays a
+derived synthetic card.
 
 Visual detail for all cards stays with DESIGN.md.
 
@@ -636,10 +635,10 @@ under one rule: **wipe the private footprint, tombstone everything shared.**
   marked inactive.
 
 Delete works from any agent state (interrupt + close first) behind a plain confirm dialog. The agent's
-**number is permanently retired** — never recycled. Wired as `DELETE /sessions/{id}?hard=true`.
-⚠ **Today:** the delete flow covers the runtime record + tmux + transcripts, but the project `state/`
-files don't exist yet (§8.3), and retired numbers live only in memory (`deletion._RETIRED` in
-[`sidecar/deletion.py`](../sidecar/deletion.py)) — lost on restart.
+**number is permanently retired** — never recycled (persisted per project in `state/agents.json`;
+auto-assigned numbers skip retired ones). Wired as `DELETE /sessions/{id}?hard=true`, covering the
+runtime/roster record, the tmux session, the transcripts, and the agent's rows in the project `state/`
+files — inbox items and read-bookmarks dropped; `routing.jsonl` is append-only history and is kept.
 
 ### 7.13 Console
 
@@ -701,11 +700,10 @@ lives in `design/DESIGN.md` (Library → Assets).
 
 Plan-approve from the dashboard resumes the agent out of plan mode. ⚠ **Today:** that resume path is
 proven (`test_plan_decision_hooks_live` — a `keys()` Enter, not a hook `updatedInput`) but not yet wired
-(§11 #22); the Library lists plans **non-recursively** from the
-top of `cwd` (or one named subdir — nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)),
-single-doc reads are path-explicit rather than cwd-scoped (the `/library/document` handler in
-[`sidecar/main.py`](../sidecar/main.py)), reviews live in one central `plan-reviews.json` keyed by filename,
-Documents are read-only with no comment store, no create/delete endpoint exists yet, and no Assets surface exists.
+(§11 #22); listing is still **non-recursive** (the store's `plans/`/`docs/` dirs list first with a legacy
+`<root>/<subdir>` fallback; nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)),
+and no Assets surface exists yet (§10 #1 / design lane). Reviews, comments, create/delete/rename, and the
+Documents comment store all live on the per-doc `.meta.json` sidecars now (§8.5, §5.2).
 
 ### 7.17 Subagents
 
@@ -771,13 +769,13 @@ one project at a time (§3.7).
 agent's `cwd` — git top-level, with symlink and `C:\…`/`/mnt/c/…` path aliases resolved to one canonical
 form — so a subfolder launch or a path alias still lands on the same `.awl-cc-dash/` folder. Code keys off
 each agent's `cwd`, never a fixed path, so a project can physically move with no rearchitecting.
-⚠ **Today:** `storage.project_root()` in [`sidecar/storage.py`](../sidecar/storage.py) returns the raw
-`Path(cwd)` unchanged — no canonicalization.
+(`storage.project_root()` / `project_key()` in [`sidecar/storage.py`](../sidecar/storage.py) — git
+top-level walk-up, symlink resolution, `/mnt`-alias folding.)
 
 **Git status:** `<project>/.awl-cc-dash/` is **committed** (state travels with the repo);
-`sidecar/runtime/` stays **gitignored** (live app-operational state). ⚠ **Today:** the project folder is
-named `.awl/` and holds only two files at its root (`scratchpad.md`, `plan-reviews.json`) — the
-`_AWL_DIRNAME` constant and path accessors in [`sidecar/storage.py`](../sidecar/storage.py).
+`sidecar/runtime/` stays **gitignored** (live app-operational state). A pre-rename `.awl/` store migrates
+into `.awl-cc-dash/` one-time on first touch (`storage.migrate_legacy_store()` — never overwriting an
+existing target).
 
 ### 8.2 The project folder — `<project>/.awl-cc-dash/`
 
@@ -810,10 +808,6 @@ named `.awl/` and holds only two files at its root (`scratchpad.md`, `plan-revie
 - Giving Assets the `assets/` home is what makes the Library's Assets tab buildable — media has a place to
   live with the project.
 
-⚠ **Today:** only `scratchpad.md` and `plan-reviews.json` exist, at the `.awl/` root; the roster lives
-app-level in `sidecar/runtime/sessions.json` ([`sidecar/runtime_store.py`](../sidecar/runtime_store.py));
-everything under `state/` except the roster is in-memory only (§8.3).
-
 **Self-dogfooding:** the awl-cc-dash repo itself gets its own committed `.awl-cc-dash/` when the dashboard
 runs against it — that is the product working correctly, not a special case. Dev agents treat it as
 **runtime data, not product source** (the creating code is [`sidecar/storage.py`](../sidecar/storage.py));
@@ -833,11 +827,11 @@ restart-cheap by construction. This contract is what makes the two-option close 
 
 | On-screen thing | Contract | Home | ⚠ Today |
 |---|---|---|---|
-| Inbox items (open-ended type set, §7.8 — `type` stored as a string, never a hardcoded enum) | **Persist** | 📁 `state/inbox.json` | ⚡ `inbox._INBOX` in [`sidecar/inbox.py`](../sidecar/inbox.py) — lost on restart |
+| Inbox items (open-ended type set, §7.8 — `type` stored as a string, never a hardcoded enum) | **Persist** | 📁 `state/inbox.json` | matches target — write-through via the inbox persist hook ([`sidecar/state_store.py`](../sidecar/state_store.py)) |
 | Pending **permission** prompt | **Derive** (meaningless after a restart — the live agent re-raises it) | ⚡ | `SessionState.pending_permission` in [`sidecar/main.py`](../sidecar/main.py), merged into `GET /inbox` as a synthetic card — matches target |
-| Agent-to-agent links | **Persist** | 📁 `state/links.json` | ⚡ `links._LINKS` in [`sidecar/links.py`](../sidecar/links.py) — lost on restart |
-| Message from/to routing (source, recipients) | **Persist** — non-default only, as a thin overlay (§8.6) | 📁 `state/routing.jsonl` | ⚡ lives only on ring events; lost with the ring |
-| Read-bookmarks (watermarks — scratchpad per agent; link shared-context per source→target pair) | **Persist** — rides the shared state store, no bespoke system | 📁 `state/bookmarks.json` | ⚡ `watermark._marks` in [`sidecar/watermark.py`](../sidecar/watermark.py); the working board is ⚡ too (`scratchpad._LOG`) — the `.md` mirror is write-only, never loaded back, so a restart wipes the live board; the target reloads the board from its `.md` on start |
+| Agent-to-agent links | **Persist** | 📁 `state/links.json` | matches target — write-through (add/remove/`touched()` counter mutations) |
+| Message from/to routing (source, recipients) | **Persist** — non-default only, as a thin overlay (§8.6) | 📁 `state/routing.jsonl` | matches target — appended at the `push_event` stamp point for non-default routing |
+| Read-bookmarks (watermarks — scratchpad per agent; link shared-context per source→target pair) | **Persist** — rides the shared state store, no bespoke system | 📁 `state/bookmarks.json` | matches target — write-through on advance/drop; the board reloads from its `.md` on project load |
 | Typed-but-unsent prompt queue / Hold | **Derive** — **drops on close** by design, no carry-over | ⚡ | `SessionState.prompt_queue` / `held` in [`sidecar/main.py`](../sidecar/main.py) — matches target |
 | Message feed / history | **Derive** — replay 📜 transcripts into the ring | ⚡ ring (~5000, `AWL_EVENT_RING_MAX`) | [`sidecar/eventbus.py`](../sidecar/eventbus.py) — matches target |
 | Cap warnings / lifecycle metrics | **Derive** — recomputed from events | ⚡ | matches target |
@@ -854,26 +848,26 @@ The single lookup tying **home ↔ path ↔ UI ↔ restart behavior**. UI anchor
 
 | Data type | Home | Path | UI (pane · `data-comp`) | ⚠ Today |
 |-----------|:----:|------|--------------------------|---------|
-| Agent roster (which agents exist, per project) | 📁 | `state/agents.json` | Team Graph · `agent-node-card`; Agent→Create/Details | 🏠 `sidecar/runtime/sessions.json`, keyed by session id ([`sidecar/runtime_store.py`](../sidecar/runtime_store.py)) |
-| Identity (role/number/name/color/icon) | 📁 | inside `state/agents.json` | everywhere · `identity-badge`, `agent-tile` | the `identity` field inside `sessions.json`, written by the bridge driver ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)) |
-| Retired identity numbers (never reused) | 📁 | inside `state/agents.json` | — | ⚡ `deletion._RETIRED` ([`sidecar/deletion.py`](../sidecar/deletion.py)) — lost on restart |
-| Per-agent launch config (tools/plugins/MCP/permission rules) | 📁 | inside `state/agents.json` | Agent→Details/Create | inside `sessions.json` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)) |
-| Transcript reference (`claude_session_id` + **resolved path**) | 📁 | inside `state/agents.json` | — (drives Feed/History replay + resume) | id persisted; the path is recomputed on every call and never stored (`find_transcript()` in [`bridge/transcript.py`](../bridge/transcript.py)) |
-| Projects index | 🏠 | `sidecar/runtime/projects.json` | Settings→Projects · picker list (§3.5) | does not exist yet |
+| Agent roster (which agents exist, per project) | 📁 | `state/agents.json` | Team Graph · `agent-node-card`; Agent→Create/Details | matches target — `runtime_store.save_record` routes project-homed records there; cwd-less records fall back to 🏠 `sessions.json` |
+| Identity (role/number/name/color/icon) | 📁 | inside `state/agents.json` | everywhere · `identity-badge`, `agent-tile` | matches target |
+| Retired identity numbers (never reused) | 📁 | inside `state/agents.json` | — | matches target — persisted on delete; auto-assignment skips them |
+| Per-agent launch config (tools/plugins/MCP/permission rules) | 📁 | inside `state/agents.json` | Agent→Details/Create | matches target |
+| Transcript reference (`claude_session_id` + **resolved path**) | 📁 | inside `state/agents.json` | — (drives Feed/History replay + resume) | matches target — the verified path persists once resolvable and refreshes on resolve |
+| Projects index | 🏠 | `sidecar/runtime/projects.json` | Settings→Projects · picker list (§3.5) | exists (runtime-maintained roots index); the picker/open/close surface rides #26 |
 | Setups (reusable team rosters) | 🏠 | `sidecar/runtime/setups.json` | Settings→Setups · `registry-row` | matches target |
 | Prompt templates | 🏠 | `sidecar/runtime/templates.json` | Prompt→Compose · `template-select` | matches target — project-agnostic by design (§7.14) |
-| Plans (content) | 📁 | `plans/*.md` | Work→Library Plans · `plan-card`, `doc-editor` | listed non-recursively from the top of `cwd`; plan-mode output goes to Claude's default plans dir (§8.5) |
-| Dashboard documents (content) | 📁 | `docs/*.md` | Work→Library Documents · `doc-editor` | only the scratchpad exists |
-| Doc/plan metadata (verdict, comments, anchors, provenance) | 📁 | `<doc>.meta.json` sidecar, next to its doc (§8.5) | `verdict-badge`, `feedback-card`, `comment-popover`, `review-chip` | central `plan-reviews.json` keyed by filename ([`sidecar/library.py`](../sidecar/library.py)); Documents have none |
-| Shared scratchpad | 📁 | `docs/scratchpad.md` | Feed→Scratch · `scratch-post`; Prompt Target=Scratch | `.awl/scratchpad.md`; working log ⚡ (§7.7) |
+| Plans (content) | 📁 | `plans/*.md` | Work→Library Plans · `plan-card`, `doc-editor` | plan-mode output redirects there (`plansDirectory` in every materialized settings, §8.5); listing is store-first with a legacy `<root>/<subdir>` fallback, still non-recursive |
+| Dashboard documents (content) | 📁 | `docs/*.md` | Work→Library Documents · `doc-editor` | matches target — create/delete/rename via `/library/document*` (§5.2) |
+| Doc/plan metadata (verdict, comments, anchors, provenance) | 📁 | `<doc>.meta.json` sidecar, next to its doc (§8.5) | `verdict-badge`, `feedback-card`, `comment-popover`, `review-chip` | matches target — the legacy central `plan-reviews.json` migrates on first read |
+| Shared scratchpad | 📁 | `docs/scratchpad.md` | Feed→Scratch · `scratch-post`; Prompt Target=Scratch | matches target — the `.md` is the store; the board reloads from it on project load |
 | Library Assets (media) | 📁 | `assets/` | Work→Library Assets · `asset-card` | no Assets surface exists yet |
-| Inbox items | 📁 | `state/inbox.json` | Feed→Inbox · `*-inbox-card` | ⚡ (§8.3) |
-| Links | 📁 | `state/links.json` | Work→Links + Graph drawer · `link-drawer`, `link-list`, `link-edges` | ⚡ (§8.3) |
-| Routing overlay | 📁 | `state/routing.jsonl` | Feed · `recipient-badge`, From/To filter | ⚡ (§8.3) |
-| Read-bookmarks | 📁 | `state/bookmarks.json` | (invisible — drives delta reads) | ⚡ (§8.3) |
+| Inbox items | 📁 | `state/inbox.json` | Feed→Inbox · `*-inbox-card` | matches target (§8.3) |
+| Links | 📁 | `state/links.json` | Work→Links + Graph drawer · `link-drawer`, `link-list`, `link-edges` | matches target (§8.3) |
+| Routing overlay | 📁 | `state/routing.jsonl` | Feed · `recipient-badge`, From/To filter | matches target (§8.3) |
+| Read-bookmarks | 📁 | `state/bookmarks.json` | (invisible — drives delta reads) | matches target (§8.3) |
 | Unsent prompt queue / Hold | ⚡ | — (drops on close, by design) | Prompt→Compose (send-timing) | matches target |
 | Message feed / cap metrics / console / subagents / run-strip / marquee | ⚡ | — (derived, §8.3) | Feed / Team Graph / Agent→Console | matches target |
-| Session transcripts (full history, incl. subagents) | 📜 | `~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl` (WSL) | Feed/History (replayed) | retention pinned (`cleanupPeriodDays: 3650` in every materialized per-agent settings); path persistence rides #4 |
+| Session transcripts (full history, incl. subagents) | 📜 | `~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl` (WSL) | Feed/History (replayed) | matches target — retention pinned (`cleanupPeriodDays: 3650`); resolved path persisted per agent |
 | Per-agent launch files (`settings.json`, `mcp.json`) | 🛠 | `~/.awl-cc-dash-agents/<name>/` | — | matches target — `WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py) |
 | Claude Code config (MCP/plugins/settings) | 🔌 | `~/.claude`, `<project>/.claude` | Settings (step-in) · `settings-row`, `registry-row` | matches target — surfaced, not owned |
 
@@ -895,14 +889,16 @@ per-agent hooks).
 2. **Anchoring without citations.** A comment targeting specific text stores the *quoted snippet* plus the
    nearest heading; the UI matches and highlights it live. If the text is later edited beyond recognition,
    the comment degrades gracefully to a doc-level comment. The content file stays pristine.
-3. **Renames are dashboard-mediated.** The dashboard renames both files of the pair together; an orphaned
-   `.meta.json` (no matching `.md`) is detectable and offered for re-link. If agent-driven renames ever
-   bite in practice, an embedded stable id can be added *then* — additive, nothing to unwind.
-   ⚠ **Today:** reviews live in one central `plan-reviews.json` keyed by the plan's filename
-   ([`sidecar/library.py`](../sidecar/library.py)), so a rename silently orphans the review.
+3. **Renames are dashboard-mediated.** The dashboard renames both files of the pair together
+   (`POST /library/document/rename`); an orphaned `.meta.json` (no matching `.md`) is detectable and
+   offered for re-link (`find_orphan_metas` / `relink_meta` in
+   [`sidecar/library.py`](../sidecar/library.py)). If agent-driven renames ever bite in practice, an
+   embedded stable id can be added *then* — additive, nothing to unwind. The legacy central
+   `plan-reviews.json` migrates into per-doc sidecars on first project read (then renames to
+   `.migrated` so it never re-runs).
 4. **Documents get comments like Plans** — the editor-header Comment control plus the Plans-style footer
-   action strip minus Reject/Approve (the design work is queued in the design lane).
-   ⚠ **Today:** Documents are read-only with no comment store.
+   action strip minus Reject/Approve (the design work is queued in the design lane); the store side is the
+   same sidecar comment threads (`POST /library/comments`).
 5. **Commenting scope:** dashboard-owned files under `.awl-cc-dash/` only; the Library can still browse
    other repo `.md` files read-only. Extendable later if needed.
 6. **Plan mode is kept and redirected.** Claude Code's built-in plan mode stays — its enforced
@@ -911,9 +907,8 @@ per-agent hooks).
    agent's materialized launch settings. The value is the **absolute WSL path**
    `<canonical project root>/.awl-cc-dash/plans`, computed via the cwd canonicalizer — a relative `./`
    would resolve against the agent's raw cwd and break the same-folder invariant for subfolder launches.
-   ⚠ **Today:** the materialized per-agent settings carry only permissions/plugins/hooks
-   (`_build_settings()` in [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)) — no
-   `plansDirectory`, so plan-mode output goes to Claude's default plans dir.
+   (`_build_settings()` in [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py) sets it for every
+   agent launched with a cwd.)
 
 ### 8.6 Transcripts — the master-record policy
 
@@ -929,8 +924,8 @@ transcript; the dashboard persists only thin semantic overlays on top.
    non-alphanumeric character becomes `-`), so the bridge verifies against the real directory listing and
    resolves the exact file by session id (`find_transcript()` in
    [`bridge/transcript.py`](../bridge/transcript.py)). The resolved path is persisted per agent in
-   `state/agents.json` alongside the session id, so the mapping survives restarts and scheme drift.
-   ⚠ **Today:** the path is recomputed on every read and never persisted.
+   `state/agents.json` alongside the session id — resolved lazily once the transcript exists and
+   refreshed on resolve — so the mapping survives restarts and scheme drift.
 3. **Retention is pinned.** Claude Code auto-deletes sessions inactive longer than `cleanupPeriodDays`
    (default 30 days) — unacceptable for long-term-referenced transcripts. The per-agent settings the bridge
    materializes at launch carry `cleanupPeriodDays: 3650` (10 years — effectively never; one constant to
@@ -956,7 +951,7 @@ transcript; the dashboard persists only thin semantic overlays on top.
 2. **Concurrent writers on one project.** Two agents in the same project share one `state/` directory —
    fine for append-only files (`routing.jsonl`) and keyed writes, but the state-store implementation must
    do **atomic write-replace per file** to avoid torn JSON. Cross-branch/machine merge of the committed `state/` JSON is **decided (2026-07-05): single-machine, no merge policy** — a concurrent-edit conflict is a manual git resolution, consistent with the cross-machine caveat accepted at §9.9; a merge/reconcile story is revisited only if multi-machine operation is pursued.
-3. **Schema evolution of the committed store — decided (2026-07-05).** A `schema_version` stamp is written into the committed `state/` JSON at write time — cheap insurance so a later format change can still read old data (queued, §11 #42); migration *machinery* stays deferred until a format actually changes. ⚠ **Today:** no stamp is written.
+3. **Schema evolution of the committed store — decided (2026-07-05).** A `schema_version` stamp is written into the committed `state/` JSON at write time (`SCHEMA_VERSION` in [`sidecar/state_store.py`](../sidecar/state_store.py)) — cheap insurance so a later format change can still read old data; migration *machinery* stays deferred until a format actually changes.
 
 ---
 
@@ -995,7 +990,7 @@ A post via Prompt with Target = Scratch hits `POST /scratch` → the sidecar app
 **and** rewrites the full board to `docs/scratchpad.md` → other agents receive only the posts past their
 bookmark — mid-run as passive context through the hook channel, or at start-of-run catch-up — and the
 bookmark advances in `state/bookmarks.json` → the board reloads from its `.md` on start → the post renders
-in Feed→Scratch carrying `recipients:[scratch]`. (⚠ Today-markers: §7.7.)
+in Feed→Scratch carrying `recipients:[scratch]`.
 
 ### 9.7 A plan, reviewed
 An agent in plan mode writes `plans/refactor.md` (plan-mode output redirected there, §8.5) → the
@@ -1020,7 +1015,7 @@ intentionally empty. The **agent half** has two cases:
   `reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py) rebuilds `SessionState` from the
   persisted record and re-attaches the driver; agents keep running across a sidecar bounce because tmux
   held them.
-- **Cold** (reboot / WSL shutdown; tmux gone): relaunch the agent with `claude --resume <claude_session_id>` in its cwd — the same conversation, rebuilt from the transcript, continuing on the **same** session id and the same `<id>.jsonl` (plain `--resume` never forks; a fork takes the explicit `--fork-session` flag — live-proven on CC 2.1.202 in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py)). The bridge half exists: `create(resume_session_id=…)` launches `--resume <id>` with no `--session-id`, and `resume()` falls through to it when the tmux session is dead ([`bridge/bridge.py`](../bridge/bridge.py)). Graceful-degrade fallback if cold-restore proves hard in practice: restore all *data* and let agents be re-resumed manually. ⚠ **Today:** a dead-tmux record is still **pruned** — deleted, the agent forgotten (`reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py)) — nothing on the sidecar's startup path invokes the bridge's cold-restore. Also today, transcript replay only happens through a live/rebound session's driver poll, so a pruned agent's transcript is never replayed.
+- **Cold** (reboot / WSL shutdown; tmux gone): relaunch the agent with `claude --resume <claude_session_id>` in its cwd — the same conversation, rebuilt from the transcript, continuing on the **same** session id and the same `<id>.jsonl` (plain `--resume` never forks; a fork takes the explicit `--fork-session` flag — live-proven on CC 2.1.202 in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py)). The path is wired end to end: `create(resume_session_id=…)` launches `--resume <id>` with no `--session-id` ([`bridge/bridge.py`](../bridge/bridge.py)), and `reconnect_sessions()` in [`sidecar/main.py`](../sidecar/main.py) cold-restores every dead-tmux record that carries a `claude_session_id` (a full create — launch config, hooks, retention pin all apply; the resumed transcript replays into the feed via the driver poll). Only a record with **no** claude id (no way back to the conversation) is pruned. Graceful-degrade fallback if cold-restore proves shaky in practice: restore all *data* and let agents be re-resumed manually.
 
 **Cross-machine caveat (accepted):** cloning a project to another machine brings all 📁 state, but
 transcripts and live processes stay in the original machine's WSL — agents re-launch fresh there. No
@@ -1118,39 +1113,29 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §7.4 | Run-state push channel + arbiter unbuilt (only inject / plan / decision hooks registered) | #21 |
 | §7.5 | Identity editing + `--name`/`/rename` registration unwired; randomize not drawing from the shipped pool | #14, #40 |
 | §7.6 | Multi-select relationship list; no Piggyback trigger value; exchanges counted as pairs | #25 |
-| §7.7 | Scratchpad at `.awl/scratchpad.md`; board + watermarks memory-only, `.md` never loaded back | #1, #3 |
-| §7.8 | No Response card type; inbox in-memory | #3 |
 | §7.11 | Mid-run mode cycling + Bypass/Auto launch-gating unwired | #12, #13 |
-| §7.12 | Delete misses the project `state/` files; retired numbers memory-only | #11, #3 |
 | §7.13 | Streaming attach + xterm renderer unbuilt; React Console stubbed; post-`/clear` re-resolve missing | #29, #35 |
 | §7.15 | Per-agent cost unsurfaced; account split-source reader unfixed | #32, #33 |
-| §7.16 | Approve→resume unwired; plans listed non-recursively; central `plan-reviews.json`; Documents read-only; no create/delete endpoint; no Assets surface | #22, #6, §10 #1 |
+| §7.16 | Approve→resume unwired; listing non-recursive; no Assets surface | #22, §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
 | §7.18 | No `/context` breakdown, compact history, or per-turn statusLine capture wired | #30, #31 |
 | §7.19 | No rewind/fork endpoint or Timeline wiring | #15 |
-| §8.1 | `project_root()` returns raw cwd (no canonicalization); project folder still `.awl/` | #1, #2 |
-| §8.2 | Only `scratchpad.md` + `plan-reviews.json` exist; roster lives app-level in `sessions.json` | #1, #3 |
-| §8.3, §8.4 | Every Persist row still in-memory or app-level (see the tables' ⚠ Today columns) | #3, #4, #11 |
-| §8.5 | Central `plan-reviews.json` keyed by filename (rename orphans reviews); Documents have no comment store; no `plansDirectory` in materialized settings | #6, #7 |
-| §8.6 | Transcript path recomputed every read, never persisted | #4 |
-| §8.7 | No `schema_version` stamp written | #42 |
-| §9.9 | Dead-tmux records pruned on startup — the bridge resume-launch path exists; the sidecar doesn't call it yet | #8 |
 
 ### 11.2 Storage & persistence set (#1–11)
 
 Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the detail; read them first.**
 
-1. **Storage rename + subdir taxonomy** *(→ §8.1, §8.2)* — rename `.awl/` → `.awl-cc-dash/`; add path accessors for `plans/`, `docs/`, `assets/`, `state/`; one-time migration of existing `.awl/` contents; scratchpad moves to `docs/scratchpad.md`. Where: `_AWL_DIRNAME` + accessors in [`sidecar/storage.py`](../sidecar/storage.py).
-2. **Canonical project root** *(→ §8.1 "`<project>` defined")* — derive one canonical `<project>` from `cwd` (git top-level; symlink + `/mnt`-alias normalization) and use it everywhere a cwd key scopes, including the scratch project key. Where: `storage.project_root()` ([`sidecar/storage.py`](../sidecar/storage.py)), [`sidecar/main.py`](../sidecar/main.py).
-3. **Per-project state store** *(→ §8.2, §8.3)* — build the `state/` persistence layer (atomic write-replace; append for `.jsonl`; `schema_version` stamped per #42); move the roster out of `sessions.json` → `state/agents.json`; persist inbox (open type set, **including the new Response coalesced card type**, §7.8), links, routing overlay, bookmarks, and retired numbers; reload the scratchpad board from its `.md` on load. Load lazily on the first session whose canonical root resolves to the project, cache per root, write-through thereafter. Where: `sidecar` modules (`runtime_store` / `inbox` / `links` / `watermark` / `scratchpad`).
-4. **Persist session id + transcript path** *(→ §8.4, §8.6)* — persist `claude_session_id` + the resolved transcript path per agent in `state/agents.json`; refresh on resolve. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), [`bridge/transcript.py`](../bridge/transcript.py).
+1. *(built 2026-07-10 — storage rename + subdir taxonomy + legacy migration; see DEVLOG)*
+2. *(built 2026-07-10 — canonical project root + `project_key()` scoping; see DEVLOG)*
+3. *(built 2026-07-10 — per-project state store, write-through hooks, Response card, board reload; see DEVLOG)*
+4. *(built 2026-07-10 — session id + verified transcript path persisted per agent; see DEVLOG)*
 5. *(built 2026-07-09 — transcript retention pinned; see DEVLOG)*
-6. **Per-doc metadata sidecars** *(→ §8.5)* — `<doc>.meta.json` read/write (verdict, comments, quote-anchors, provenance), replacing `plan-reviews.json`; Documents comment endpoints; dashboard-mediated rename of the doc + sidecar pair; orphan detection/re-link. Where: [`sidecar/library.py`](../sidecar/library.py), [`sidecar/storage.py`](../sidecar/storage.py).
-7. **Absolute `plansDirectory`** *(→ §8.5; depends on #2)* — set `plansDirectory` to the absolute WSL path `<canonical-root>/.awl-cc-dash/plans` in the materialized per-agent settings (a relative `./` resolves against raw cwd and breaks subfolder launches). Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
-8. **Cold-restore on startup** *(→ §9.9; enables #17)* — on startup, dead-tmux records **resume** (`claude --resume <claude_session_id>`, correct cwd) instead of prune. *(Bridge half built 2026-07-09: `create(resume_session_id=…)` launches `--resume <id>` — same conversation, same id and `<id>.jsonl`, live-proven in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py) — and `resume()` falls through to it for a dead session; see DEVLOG.)* Remaining: the sidecar startup half. Graceful degrade = restore data, manual re-resume. Where: [`sidecar/main.py`](../sidecar/main.py).
+6. *(built 2026-07-10 — per-doc `.meta.json` sidecars + Library doc CRUD/comment endpoints + legacy migration; see DEVLOG)*
+7. *(built 2026-07-10 — absolute-WSL `plansDirectory` in every materialized settings; see DEVLOG)*
+8. *(built 2026-07-10 — cold-restore end to end: bridge `create(resume_session_id=…)` live-proven same-id in [`tests/test_cold_restore_live.py`](../tests/test_cold_restore_live.py); sidecar startup cold-restores dead records with a claude id; see DEVLOG. The full sidecar-path live drive rides the e2e proof.)*
 9. *(built 2026-07-09 — WSL launch-config dir renamed; see DEVLOG)*
-10. **Dogfood the committed store** *(→ §8.2 self-dogfooding; depends on #1)* — commit this repo's `.awl-cc-dash/`; add a CLAUDE.md note (runtime data, deliberate commits); confirm tests stay on temp dirs. Where: `.gitignore`, `CLAUDE.md`.
-11. **Delete → project state files** *(→ §9.10, §7.12; depends on #3)* — extend the delete/tombstone flow to the project `state/` files — the roster entry plus inbox/links/routing/bookmarks rows — not just the runtime record + transcripts. Where: [`sidecar/deletion.py`](../sidecar/deletion.py), [`sidecar/main.py`](../sidecar/main.py).
+10. **Dogfood the committed store** *(→ §8.2 self-dogfooding; depends on #1)* — commit this repo's `.awl-cc-dash/` once the dashboard's first real run against this repo creates it (the CLAUDE.md runtime-data note landed 2026-07-10; tests confirmed on temp dirs). Where: the e2e proof run.
+11. *(built 2026-07-10 — hard delete clears the agent's project `state/` rows + persists the retired number; see DEVLOG)*
 
 ### 11.3 Agent control & lifecycle (#12–20)
 
@@ -1196,7 +1181,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 ### 11.7 Platform, hygiene & support (#42–49)
 
-42. **Schema-version stamp** *(→ §8.2, §8.7)* — write a `schema_version` field into the committed `state/` JSON at write time; readers validate/tolerate it. Migration machinery stays deferred. Where: state-store writer ([`sidecar/runtime_store.py`](../sidecar/runtime_store.py), [`sidecar/storage.py`](../sidecar/storage.py)).
+42. *(built 2026-07-10 — `schema_version` stamped by the state-store writer; see DEVLOG)*
 43. **Sidecar log file** *(→ §2)* — a small, size-bounded rotating diagnostic log under the gitignored `sidecar/runtime/`, so a crash/fault leaves a trail. A candidate drill-in for the design-lane system-health indicator. Where: app logging config ([`sidecar/main.py`](../sidecar/main.py)).
 44. **Docs in agent context (light)** *(→ §7.16, §10 #6)* — a curated docs home agents are pointed at (the **Library**) + **per-agent doc attachment at launch**; automatic relevance-retrieval stays §10 #6. Operator interface sketch (kept broad, for the design agents): the **Library is the hub**, reusing the review-panels' nav-rail lens pattern but organized by task / project / subproject (the Outline tab possibly going icon-based to free a slot). Where: [`sidecar/library.py`](../sidecar/library.py), prompt composition, `state/agents.json`.
 45. **Prompt/UI-text markdown library (scope-aware)** *(→ §7.14, §8.2, §8.4)* — one human-editable **markdown prompt library** as the single home for every UI-injected/canned text the dashboard sends on the user's behalf: the post-reviewer-request instructions, the reviewer-request **Send** and Library **Revise** texts, Compose **snippets + templates**, the **Revise scope chip** and **Response (Structure)** options, and the Team Feed **Summarize** action (which may route to a small system-run utility model) — plus more as they surface. Format: markdown with the `##` group / `###` item convention (JSON only where placeholder fill-in genuinely needs it), organized by purpose (`responses.md`, `snippets.md`, `actions.md`). **Two scopes:** a **System copy** (the persistent cross-project store, absorbing the old "User" scope; the lean is `~/.claude` for shared runtime docs) + a **Project copy** (`<project>/.awl-cc-dash/`, §8.2). Includes adding these doc types to the **§8.4 master table**. Design-lane consumers (Compose Snippets dropdown, the Documents scoped/typed browser) are queued in the design lane.
