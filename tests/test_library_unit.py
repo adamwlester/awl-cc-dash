@@ -234,8 +234,8 @@ class TestCwdWrappers:
         proj.mkdir()
         cwd = str(proj)
         library.set_review_for_cwd(cwd, "phase-1.md", owner="agent-7", state="pending")
-        # The side-store landed at <project>/.awl/plan-reviews.json.
-        assert (proj / ".awl" / "plan-reviews.json").is_file()
+        # The legacy side-store lands at <project>/.awl-cc-dash/plan-reviews.json.
+        assert (proj / ".awl-cc-dash" / "plan-reviews.json").is_file()
         got = library.get_review_for_cwd(cwd, "phase-1.md")
         assert got["owner"] == "agent-7"
         assert got["state"] == "pending"

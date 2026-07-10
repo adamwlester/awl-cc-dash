@@ -451,8 +451,12 @@ def _maybe_relay_reply(session: "SessionState",
 
 
 def _scratch_key(session: "SessionState") -> str:
-    """The scratchpad project key — co-located agents (same cwd) share one board."""
-    return session.cwd or session.session_id
+    """The scratchpad project key — co-located agents share one board.
+
+    Keyed by the CANONICAL project root (§8.1), never the raw cwd, so a
+    subfolder launch or a `/mnt`-alias spelling still lands on the same board.
+    """
+    return storage.project_key(session.cwd) or session.session_id
 
 
 def _deliver_scratch_delta(session: "SessionState") -> None:
@@ -1300,7 +1304,10 @@ class ScratchPostRequest(BaseModel):
 
 @app.get("/scratch")
 async def get_scratch(cwd: str):
-    return {"posts": scratchpad.all_posts(cwd)}
+    # Boards are keyed by the CANONICAL project root, so any cwd spelling the
+    # client passes resolves to the same board an agent in that project uses.
+    key = storage.project_key(cwd) or cwd
+    return {"posts": scratchpad.all_posts(key)}
 
 
 @app.post("/scratch")
@@ -1308,16 +1315,17 @@ async def post_scratch(req: ScratchPostRequest):
     """Append a post; feed it (recipients:[scratch]); and push each RUNNING agent
     in the same project its unread delta mid-run via the hook channel (idle agents
     catch up at their next run's first tool boundary)."""
+    key = storage.project_key(req.cwd) or req.cwd
     persist = None
     try:
         sp = storage.scratchpad_path(req.cwd)
         persist = str(sp) if sp else None
     except Exception:
         persist = None
-    post = scratchpad.post(req.cwd, req.author, req.text, persist_path=persist)
-    # live mid-run push to running co-located agents
+    post = scratchpad.post(key, req.author, req.text, persist_path=persist)
+    # live mid-run push to running co-located agents (canonical-key match)
     for s in sessions.values():
-        if s.status == "running" and (s.cwd or s.session_id) == req.cwd:
+        if s.status == "running" and _scratch_key(s) == key:
             _deliver_scratch_delta(s)
     return {"status": "posted", "post": post}
 
