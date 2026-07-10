@@ -813,6 +813,20 @@ class BridgeDriver(AgentDriver):
         # No /thinking command exists in this Claude Code build. Left a no-op.
         return None
 
+    async def stop(self) -> None:
+        """End the tmux session gracefully but KEEP the persisted record.
+
+        The §3.4 "Close & stop agents" path: the process ends, the transcript
+        persists, and the roster record survives so a later project open can
+        cold-restore the same conversation (§9.9). Contrast ``close()``, the
+        retire path, which also removes the record.
+        """
+        self._closed = True
+        try:
+            await asyncio.to_thread(self._bridge.close, self._name)
+        except Exception:  # pragma: no cover - best effort
+            pass
+
     async def close(self) -> None:
         self._closed = True
         if self._session_id:

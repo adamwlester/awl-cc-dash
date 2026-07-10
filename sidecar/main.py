@@ -288,6 +288,11 @@ class SessionState:
             cls = inbox.classify_error(msg) or {"subtype": "error", "message": str(msg)[:500]}
             inbox.raise_item(self.session_id, "error", cls, sticky=True,
                              dedup_key=f"error:{cls['subtype']}")
+            # Account/fleet-level subtypes (rate/usage caps, auth expiry) ALSO
+            # coalesce into ONE System-sourced fleet-wide card (§7.2, §11 #27).
+            if cls["subtype"] in inbox.SYSTEM_WIDE_SUBTYPES:
+                _raise_system_card(cls["subtype"], cls.get("message", ""),
+                                   seen_on=self.session_id)
             self.push_event(event)
             return
 
@@ -469,6 +474,75 @@ def _maybe_relay_reply(session: "SessionState",
     _schedule_flush(target)
 
 
+# ============================================================================
+# The reserved System identity (§7.2, §11 #27) — filter-only, never addressable.
+# It appears as the sender on fleet-wide Error cards (infrastructure faults,
+# account-level events, shared-service failures) and Log lines; it is excluded
+# from Compose To/From and Reply is disabled on its cards (UI contract).
+# ============================================================================
+
+SYSTEM_AGENT = "system"
+_system_emitted_ids: set[str] = set()
+
+
+def _push_system_event(event: dict[str, Any]) -> None:
+    """Stamp + publish a System-sourced event onto the merged bus (no session)."""
+    try:
+        stamped = eventbus.stamp(event, agent_id=SYSTEM_AGENT,
+                                 emitted_ids=_system_emitted_ids,
+                                 source=SYSTEM_AGENT, recipients=["user"])
+        if stamped is not None:
+            eventbus.publish_global(stamped)
+    except Exception:  # pragma: no cover - system events are best-effort
+        pass
+
+
+def _raise_system_card(subtype: str, message: str, *, seen_on: str | None = None) -> None:
+    """Raise/refresh the ONE coalesced fleet-wide System Error card per subtype."""
+    data = {"subtype": subtype, "message": str(message)[:500]}
+    if seen_on:
+        data["seen_on"] = seen_on
+    item = inbox.raise_item(SYSTEM_AGENT, "error", data, sticky=True,
+                            dedup_key=f"system:{subtype}")
+    if not item.get("_system_event_pushed"):
+        item["_system_event_pushed"] = True
+        _push_system_event({
+            "type": "error", "error": data["message"], "subtype": subtype,
+            "timestamp": datetime.now().isoformat(),
+        })
+
+
+def _resolve_system_card(subtype: str) -> None:
+    """Auto-clear the coalesced System card when its probe recovers."""
+    for it in inbox.items_for(SYSTEM_AGENT):
+        if it.get("dedup_key") == f"system:{subtype}":
+            inbox.resolve_item(SYSTEM_AGENT, it["id"], answer="recovered")
+
+
+SYSTEM_PROBE_INTERVAL = 10.0  # seconds
+
+
+async def _system_probe_loop():
+    """Deterministic infrastructure probes (§7.2/§11 #27): every ~10 s, verify
+    the WSL2/tmux backbone answers (one `tmux ls` through the shared registry
+    bridge). A failure raises the coalesced System `infra` Error card; recovery
+    auto-resolves it. (Sidecar-down needs no probe — a dead sidecar can't raise
+    cards; the frontend's /health failure covers it, §4.3/#38.)"""
+    while True:
+        try:
+            await asyncio.sleep(SYSTEM_PROBE_INTERVAL)
+            try:
+                bridge = _get_registry_bridge()
+                await asyncio.to_thread(bridge.list)
+                _resolve_system_card("infra")
+            except Exception as e:
+                _raise_system_card("infra", f"tmux/WSL2 unreachable: {e}")
+        except asyncio.CancelledError:  # pragma: no cover
+            return
+        except Exception as e:  # pragma: no cover - keep the loop alive
+            logger.error("system probe loop error: %s", e)
+
+
 def _raise_response_card(session: "SessionState") -> None:
     """Response card (§7.8): non-blocking — "a run ended with output the operator
     has not reviewed." ONE coalesced card per agent (the dedup key updates the
@@ -572,8 +646,11 @@ async def _listen(session: SessionState):
         })
 
 
-async def reconnect_sessions():
+async def reconnect_sessions(project_key: str | None = None):
     """Restore bridge sessions that outlived a previous sidecar process (§9.9).
+
+    With ``project_key`` set, only that project's records restore (the §9.1
+    open flow); without it, every persisted record restores (startup).
 
     Two cases per persisted record:
 
@@ -609,6 +686,9 @@ async def reconnect_sessions():
         sid = rec.get("session_id")
         tmux_name = rec.get("tmux_name")
         if not sid or not tmux_name:
+            continue
+        if project_key is not None and \
+                storage.project_key(rec.get("cwd")) != project_key:
             continue
         cold = tmux_name not in alive
         if cold and not rec.get("claude_session_id"):
@@ -679,6 +759,29 @@ async def reconnect_sessions():
             session.status = "error"
 
 
+# ============================================================================
+# Projects — the one-project-at-a-time surface (§3, §9.1, §9.8; §11 #26)
+# ============================================================================
+
+# The canonical root of the project the dashboard currently has open, or None
+# (the empty state). One sidecar serves whichever project is open (§2); agents
+# of unopened projects keep running detached in tmux — the dashboard simply is
+# not looking at them (§3.7).
+_open_project: str | None = None
+
+
+def _project_entry(key: str, meta: dict[str, Any]) -> dict[str, Any]:
+    """One Projects-picker row: name, path, last-opened, agent count, open flag."""
+    roster = state_store.load_roster(key)
+    return {
+        "path": key,
+        "name": Path(key).name,
+        "last_used": meta.get("last_used"),
+        "agent_count": len(roster),
+        "open": key == _open_project,
+    }
+
+
 CAP_POLL_INTERVAL = 3.0  # seconds
 
 
@@ -724,6 +827,7 @@ async def _on_startup():
     state_store.install_hooks()   # write-through persistence (§8.3)
     await reconnect_sessions()
     asyncio.create_task(_cap_poll_loop())
+    asyncio.create_task(_system_probe_loop())
 
 
 # ============================================================================
@@ -1377,6 +1481,189 @@ async def get_checklist(session_id: str):
 # ============================================================================
 # Templates store (dashboard runtime store; reusable / project-agnostic)
 # ============================================================================
+
+# ============================================================================
+# Plans action loop (§7.16, §9.7; §11 #22) — verdicts wired into the live flow
+# ============================================================================
+
+class PlanVerdictRequest(BaseModel):
+    """Answer a pending plan-approval pause. ``approve`` resumes the agent out
+    of plan mode via the proven `keys()` Enter (`test_plan_decision_hooks_live`
+    — NOT a hook `updatedInput`). ``revise`` sends Escape (keep planning) and
+    queues the revise feedback as the next prompt. Optionally records the
+    verdict on the plan doc's `.meta.json` sidecar (`filename` + the agent's
+    project resolves it)."""
+    verdict: Literal["approve", "revise"]
+    text: str | None = None        # revise feedback (queued to the agent)
+    filename: str | None = None    # plan doc to stamp the verdict on
+    by: str | None = None          # verdict author (defaults to "user")
+
+
+@app.post("/sessions/{session_id}/plan/verdict")
+async def plan_verdict(session_id: str, req: PlanVerdictRequest):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not session.driver:
+        raise HTTPException(status_code=503, detail="Session not connected yet")
+    drv = session.driver
+    if not hasattr(drv, "_bridge"):
+        raise HTTPException(status_code=400, detail="Driver has no plan control")
+
+    if req.verdict == "approve":
+        # The proven resume: Enter selects the plan menu's default approve.
+        await asyncio.to_thread(drv._bridge.keys, drv.tmux_name, "Enter")  # type: ignore[attr-defined]
+    else:
+        # Revise: Escape keeps the agent planning (⚠ assumed — the Escape leg
+        # is the unproven half; verified at the e2e drive), then the feedback
+        # queues as the next prompt.
+        await asyncio.to_thread(drv._bridge.keys, drv.tmux_name, "Escape")  # type: ignore[attr-defined]
+        if req.text:
+            entry = {
+                "id": str(uuid.uuid4())[:8], "prompt": req.text,
+                "source": "user", "recipients": [session_id],
+                "disposition": "next", "enqueued_at": datetime.now().isoformat(),
+            }
+            session.enqueue(entry, "next")
+            _schedule_flush(session)
+
+    # Resolve the open plan inbox card(s) for this agent.
+    for it in inbox.items_for(session_id):
+        if it["type"] == "plan":
+            inbox.resolve_item(session_id, it["id"], answer=req.verdict)
+
+    # Stamp the verdict on the plan doc's sidecar when named.
+    if req.filename and session.cwd:
+        try:
+            doc = library.resolve_document(session.cwd, req.filename)
+            if doc is not None:
+                library.set_doc_review(str(doc), verdict=req.verdict,
+                                       verdict_by=req.by or "user")
+        except Exception:
+            logger.warning("plan verdict: could not stamp %s", req.filename)
+
+    return {"status": "ok", "verdict": req.verdict, "session_id": session_id}
+
+
+class DocumentWriteRequest(BaseModel):
+    """Edit-in-place for a dashboard-owned doc/plan (§7.16: an explicit,
+    user-directed rewrite — never the review layer writing into content)."""
+    cwd: str
+    path: str
+    content: str
+
+
+@app.put("/library/document")
+async def library_write_document(req: DocumentWriteRequest):
+    if not library.document_in_store(req.path, req.cwd):
+        raise HTTPException(status_code=400,
+                            detail="writes are scoped to the project's .awl-cc-dash/ store")
+    p = Path(req.path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="Document not found")
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(req.content, encoding="utf-8")
+    os.replace(tmp, p)
+    return {"status": "written", "path": str(p), "size": len(req.content)}
+
+
+# ============================================================================
+# Projects — system-side surface (§3, §9.1, §9.8; §11 #26)
+# ============================================================================
+
+class ProjectPathRequest(BaseModel):
+    path: str
+
+
+class ProjectCloseRequest(BaseModel):
+    # §3.4: exactly two options — Close (detach; agents keep running in tmux)
+    # and Close & stop agents (also end the project's tmux sessions gracefully).
+    stop_agents: bool = False
+
+
+@app.get("/projects")
+async def list_projects():
+    """The Projects picker feed (§3.2): known canonical roots from the 🏠 index
+    (name, path, last-opened, agent count) plus which project is open (if any)."""
+    entries = [_project_entry(key, meta)
+               for key, meta in state_store.known_projects().items()]
+    entries.sort(key=lambda e: e.get("last_used") or "", reverse=True)
+    return {"open": _open_project, "projects": entries}
+
+
+@app.post("/projects/register")
+async def register_project(req: ProjectPathRequest):
+    """"Open other folder…" first half (§3.2): register a new project root into
+    the index (canonicalized). Does not open it."""
+    key = storage.project_key(req.path)
+    if not key:
+        raise HTTPException(status_code=400, detail="path required")
+    if not Path(key).is_dir():
+        raise HTTPException(status_code=400, detail=f"not a directory: {key}")
+    state_store.touch_projects_index(key)
+    return _project_entry(key, state_store.known_projects().get(key, {}))
+
+
+@app.post("/projects/open")
+async def open_project(req: ProjectPathRequest):
+    """Open a project (§9.1): load its persisted store (roster, inbox, links,
+    bookmarks, scratchpad board), warm-rebind still-alive tmux sessions and
+    cold-restore dead ones (§9.9 — transcript replay refills the feed via the
+    driver polls), and mark it the open project. One project at a time: opening
+    while another is open is a 409 — close-then-open IS the switch (§3.1)."""
+    global _open_project
+    key = storage.project_key(req.path)
+    if not key:
+        raise HTTPException(status_code=400, detail="path required")
+    if not Path(key).is_dir():
+        raise HTTPException(status_code=400, detail=f"not a directory: {key}")
+    if _open_project is not None and _open_project != key:
+        raise HTTPException(
+            status_code=409,
+            detail=f"another project is open ({_open_project}); close it first")
+    state_store.load_project(key)
+    await reconnect_sessions(project_key=key)
+    _open_project = key
+    state_store.touch_projects_index(key)
+    return {"status": "open", **_project_entry(key, state_store.known_projects().get(key, {}))}
+
+
+@app.post("/projects/close")
+async def close_project(req: ProjectCloseRequest | None = None):
+    """Close the open project (§3.4, §9.8). **Close** (default): the dashboard
+    lets go — agents keep running detached in tmux; nothing is flushed because
+    persistence is write-as-it-happens. **Close & stop agents**
+    (`stop_agents: true`): additionally ends the project's tmux sessions
+    gracefully; transcripts persist either way."""
+    global _open_project
+    if _open_project is None:
+        raise HTTPException(status_code=409, detail="no project is open")
+    key = _open_project
+    stop = bool(req and req.stop_agents)
+    closed_sessions = []
+    for sid, session in list(sessions.items()):
+        if storage.project_key(session.cwd) != key:
+            continue
+        if session.listen_task and not session.listen_task.done():
+            session.listen_task.cancel()
+        if stop and session.driver:
+            try:
+                # stop() ends the tmux session but KEEPS the roster record, so
+                # reopening the project can cold-restore the team (§9.9).
+                stopper = getattr(session.driver, "stop", None)
+                if stopper is not None:
+                    await stopper()
+                else:  # drivers without a stop(): fall back to close()
+                    await session.driver.close()
+            except Exception:
+                pass
+        state_store.unregister_agent(sid)
+        del sessions[sid]
+        closed_sessions.append(sid)
+    _open_project = None
+    return {"status": "closed", "path": key,
+            "stopped_agents": stop, "detached_sessions": closed_sessions}
+
 
 @app.get("/templates")
 async def list_templates_endpoint():

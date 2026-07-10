@@ -156,10 +156,28 @@ def fleet_badge() -> int:
 
 _ERROR_PATTERNS = [
     ("rate_limit", re.compile(r"\b(429|rate[ _-]?limit|quota exceeded|too many requests)\b", re.I)),
+    # Account-level subscription/usage caps (§7.2 System cards): the wording the
+    # TUI uses for plan limits — widened per §11 #27 (the spike's unmatched leg).
+    ("usage_cap", re.compile(
+        r"\b(weekly (usage )?limit|usage limit (reached|hit|exceeded)|"
+        r"session limit reached|out of (usage|credits)|"
+        r"usage credits? (are )?(exhausted|depleted)|requires usage credits|"
+        r"credit balance is too low)\b", re.I)),
+    # Account auth expiry / logged-out states (§7.2): deterministic wording match
+    # — the *reactive* mid-session expiry screen signal is best-effort (§11 #27's
+    # honest boundary; it cannot be forced on demand to verify).
+    ("auth", re.compile(
+        r"\b(auth(entication)? (error|failed|expired)|"
+        r"OAuth token (has )?expired|token expired|re-?authenticate|"
+        r"please run /login|not logged in|invalid api key)\b", re.I)),
     ("api", re.compile(r"\b(5\d\d|overloaded|api error|internal server error|service unavailable)\b", re.I)),
     ("tool_mcp", re.compile(r"\b(mcp\b.*(fail|error)|tool (execution )?(failed|error)|server failed)", re.I)),
     ("config", re.compile(r"\b(invalid|bad|malformed)\b.*\b(config|configuration|settings)\b", re.I)),
 ]
+
+# Error subtypes that are ACCOUNT/FLEET-level, not one agent's problem: they
+# additionally coalesce into ONE System-sourced fleet-wide card (§7.2).
+SYSTEM_WIDE_SUBTYPES = {"rate_limit", "usage_cap", "auth"}
 
 
 def classify_error(text: str | None) -> dict[str, Any] | None:
