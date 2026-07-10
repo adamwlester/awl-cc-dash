@@ -143,21 +143,21 @@ export interface InboxResponse {
 // ---- Linking (agent-to-agent links) ----------------------------------------
 
 export type LinkDirection = 'a2b' | 'b2a' | 'both'
-export type LinkTrigger = 'now' | 'next' | 'queue' | 'inject' | 'hold'
+export type LinkTrigger = 'now' | 'next' | 'queue' | 'inject' | 'hold' | 'piggyback'
 
 export interface Link {
   id: string
   a: string
   b: string
   direction: LinkDirection
-  relationship: string[]        // subset of {direct, shared}
+  relationship: string          // exactly one of {direct, shared} (§7.6 — both = two links)
   shared_content: string[]
   shared_backfill: boolean
   trigger: LinkTrigger
   end_after_exchanges: number | null
   end_after_tokens: number | null
   messages: number
-  exchanges: number
+  exchanges: number             // direction-aware: one-way = every fire; two-way = messages ÷ 2
   tokens: number
   active: boolean
 }
@@ -166,7 +166,7 @@ export interface GroupedLink {
   link_id: string
   other: string | null
   arrow: string                 // → / ← / ↔
-  relationship: string[]
+  relationship: string
   trigger: string
   active: boolean
 }
@@ -346,7 +346,7 @@ export const api = {
   // ---- linking ---------------------------------------------------------------
   links: () => getJSON<LinksResponse>('/links'),
   createLink: (body: {
-    a: string; b: string; direction?: LinkDirection; relationship?: string[]
+    a: string; b: string; direction?: LinkDirection; relationship?: string
     shared_content?: string[]; shared_backfill?: boolean; trigger?: LinkTrigger
     end_after_exchanges?: number | null; end_after_tokens?: number | null
   }) => postJSON<Link>('/links', body),

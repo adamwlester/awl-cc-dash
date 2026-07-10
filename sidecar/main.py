@@ -255,8 +255,9 @@ class SessionState:
                     _raise_response_card(self)
                 # Reply-to: relay this finished turn back to a linked peer FIRST (uses
                 # this turn's output before a queued prompt starts a new turn), then
-                # flush the next queued prompt.
+                # the shared-context fire (§7.6), then flush the next queued prompt.
                 _maybe_relay_reply(self)
+                _fire_shared_context(self)
                 _schedule_flush(self)
             return
 
@@ -302,11 +303,27 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
-            # Reply-to relay, then flush of the next queued prompt.
+            # Same turn accounting as the status_change idle branch (the SDK
+            # driver ends turns via `result`, not a screen-state transition).
+            if self._was_running:
+                self.turn_count += 1
+                self._was_running = False
+            # Reply-to relay, then the shared-context fire, then flush of the
+            # next queued prompt.
             _maybe_relay_reply(self)
+            _fire_shared_context(self)
             _schedule_flush(self)
 
 sessions: dict[str, SessionState] = {}
+
+
+def _render_piggyback(items: list[dict[str, Any]]) -> str:
+    """Render parked piggyback payloads as ONE bounded, attributed block (§7.6)
+    for prepending to the next prompt delivered to the target."""
+    lines = ["[Shared context from linked agents — passive awareness, no reply expected]"]
+    for it in items:
+        lines.append(f"- (from {it['source']}) {it['text']}")
+    return "\n".join(lines)
 
 
 async def _flush_queue(session: "SessionState") -> None:
@@ -315,10 +332,19 @@ async def _flush_queue(session: "SessionState") -> None:
     Re-entrancy is gated by flipping status to ``running`` *before* the only
     ``await`` (driver.send), so a concurrent flush sees ``running`` and returns —
     strict one-in-flight, no double-send.
+
+    Piggyback (§7.6): any payloads parked for this agent ride THIS delivery —
+    they never initiate a turn of their own. The parked block is prepended to
+    the prompt (one bounded block; parking was already watermark-deduped per
+    source→target at fire time, so nothing delivers twice).
     """
     if session.status == "running" or not session.prompt_queue or not session.driver:
         return
     entry = session.prompt_queue.popleft()
+    prompt = entry["prompt"]
+    rides = links.take_piggyback(session.session_id)
+    if rides:
+        prompt = _render_piggyback(rides) + "\n\n" + prompt
     session.status = "running"  # gate re-entry before the await
     session.push_event({
         "type": "status_change", "status": "running",
@@ -326,8 +352,16 @@ async def _flush_queue(session: "SessionState") -> None:
         "source": entry.get("source", "user"),
         "recipients": entry.get("recipients", ["user"]),
     })
+    if rides:
+        # Feed visibility: the parked shared context was delivered on this send.
+        session.push_event({
+            "type": "piggyback_delivered", "count": len(rides),
+            "sources": sorted({r["source"] for r in rides}),
+            "timestamp": datetime.now().isoformat(),
+            "source": "system", "recipients": [session.session_id],
+        })
     try:
-        await session.driver.send(entry["prompt"])
+        await session.driver.send(prompt)
     except Exception as e:  # pragma: no cover - exercised live
         logger.error(f"Session {session.session_id} queued-send failed: {e}")
         session.status = "error"
@@ -415,7 +449,8 @@ def _maybe_relay_reply(session: "SessionState",
     if not target or not target.driver:
         return
 
-    # Account the fire (one message, one direction) and check the End-After cap.
+    # Account the fire (one message, one direction) and check the End-After cap
+    # (direction-aware: a one-way link burns one exchange per fire, §7.6).
     lk.messages += 1
     lk.tokens += max(1, len(text) // 4)  # rough token estimate for the token cap
     capped = lk.over_cap()
@@ -425,6 +460,7 @@ def _maybe_relay_reply(session: "SessionState",
         # Set up the peer's reply-to back here so the conversation alternates.
         target.answering_source = session.session_id
         target.answering_link = link_id
+    links.touched(lk)  # write-through: counters/active persist (§8.3)
 
     logger.info("link_fire %s -> %s msg=%d exchanges=%d capped=%s trigger=%s",
                 session.session_id, src, lk.messages, lk.exchanges, capped, lk.trigger)
@@ -436,6 +472,13 @@ def _maybe_relay_reply(session: "SessionState",
     })
 
     trigger = lk.trigger or "queue"
+    if trigger == "piggyback":
+        # Piggyback never initiates a turn (§7.6): park the reply — it rides the
+        # next message delivered to the peer from any source (a piggybacked DM
+        # reads as a deferred reply).
+        links.park_piggyback(src, source=session.session_id, link_id=link_id,
+                             text=text)
+        return
     if trigger == "inject":
         # Mid-run delivery via the hook channel.
         inj = hookbus.enqueue_inject(src, text, kind="inject",
@@ -462,6 +505,100 @@ def _maybe_relay_reply(session: "SessionState",
             pass
         return
     _schedule_flush(target)
+
+
+def _fire_shared_context(session: "SessionState",
+                         _start_idx: int | None = None, _attempt: int = 0) -> None:
+    """Shared-context fire (§7.6): on this agent's completed turn, make the
+    turn's output available to every peer on an active ``shared`` link that lets
+    this agent send. Passive awareness only — no conversation semantics, so no
+    reply-to bookkeeping and no alternation.
+
+    Delivery rides the link's trigger: **piggyback** (the shared default) parks
+    the payload on the target's pending list — it rides the target's next
+    delivered message and never initiates a turn; ``inject`` rides the hook
+    channel as passive context; the queue-family triggers take the existing
+    prompt-queue path. Dedup: the per-(source→target) ``shared:{src}:{dst}``
+    watermark (the same §7.7 mechanism, persisted in the same
+    ``state/bookmarks.json``) is advanced to this turn's ordinal at fire time,
+    so an idle re-emission or channel overlap never delivers the same turn
+    twice. The ``shared_content`` content-type filter is a pass-through today
+    (no content-type classification at this seam yet) — the raw turn text is
+    shared. Fires count against End-After like any other fire (direction-aware).
+
+    Same transcript-lag retry as ``_maybe_relay_reply``: the bridge flips idle
+    ~1s before the turn text is polled into ``events``, so a missing text
+    retries rather than dropping the fire (the watermark advances only once the
+    text is in hand).
+    """
+    src_id = session.session_id
+    marker = session.turn_count
+    if marker <= 0:
+        return
+    due: list[tuple[Any, str]] = []
+    for lk in links.all_links():
+        if not lk.active or not lk.is_shared():
+            continue
+        dst = lk.other(src_id)
+        if dst is None or not lk.allows(src_id, dst):
+            continue
+        if watermark.get(f"shared:{src_id}:{dst}") >= marker:
+            continue  # this turn already shared to this target (dedup)
+        due.append((lk, dst))
+    if not due:
+        return
+    start_idx = session._turn_start_idx if _start_idx is None else _start_idx
+    text = _last_turn_assistant_text(session, start_idx)
+    if not text:
+        # Turn text not polled into events yet — retry, watermark un-advanced.
+        if _attempt < 6:
+            try:
+                asyncio.get_running_loop().call_later(
+                    1.5, lambda: _fire_shared_context(session, start_idx, _attempt + 1))
+            except RuntimeError:
+                pass  # no loop (hermetic tests) — text was simply absent
+        return
+    for lk, dst in due:
+        target = sessions.get(dst)
+        trigger = lk.trigger or "piggyback"
+        if trigger != "piggyback" and (target is None or target.driver is None):
+            continue  # nowhere to deliver — leave the watermark un-advanced
+        watermark.set(f"shared:{src_id}:{dst}", marker)
+        # Account the fire (End-After binds shared links too, direction-aware).
+        lk.messages += 1
+        lk.tokens += max(1, len(text) // 4)
+        if lk.over_cap():
+            lk.active = False
+        links.touched(lk)
+        session.push_event({
+            "type": "shared_context_fire", "link_id": lk.id, "text": text,
+            "timestamp": datetime.now().isoformat(),
+            "source": src_id, "recipients": [dst],
+            "exchanges": lk.exchanges, "capped": not lk.active,
+        })
+        if trigger == "piggyback":
+            links.park_piggyback(dst, source=src_id, link_id=lk.id, text=text)
+            continue
+        if trigger == "inject":
+            # Mid-run delivery via the hook channel, as PASSIVE context (never
+            # blocks Stop, never forces a continuation).
+            hookbus.enqueue_inject(dst, text, kind="context", source=src_id)
+            continue
+        entry = {
+            "id": str(uuid.uuid4())[:8], "prompt": text,
+            "source": src_id, "recipients": [dst],
+            "disposition": trigger, "enqueued_at": datetime.now().isoformat(),
+        }
+        target.enqueue(entry, trigger)
+        if trigger == "hold":
+            continue  # parked for manual release
+        if trigger == "now" and target.status == "running":
+            try:
+                asyncio.get_running_loop().create_task(target.driver.interrupt())
+            except Exception:  # pragma: no cover
+                pass
+            continue
+        _schedule_flush(target)
 
 
 def _raise_response_card(session: "SessionState") -> None:
@@ -783,10 +920,15 @@ class CreateLinkRequest(BaseModel):
     a: str
     b: str
     direction: Literal["a2b", "b2a", "both"] = "both"
-    relationship: list[str] = ["direct"]          # subset of {direct, shared}
+    # Exactly ONE relationship per link (§7.6) — "direct" | "shared"; wanting
+    # both between the same two agents = two links. A legacy list input is
+    # tolerated (its first element is taken) so pre-split clients don't 422.
+    relationship: str | list[str] = "direct"
     shared_content: list[str] = []                # shared-content type filter
     shared_backfill: bool = False
-    trigger: Literal["now", "next", "queue", "inject", "hold"] = "queue"  # link trigger mode
+    # Link trigger mode. None -> the per-relationship default (§7.6):
+    # direct → queue, shared → piggyback.
+    trigger: Literal["now", "next", "queue", "inject", "hold", "piggyback"] | None = None
     end_after_exchanges: int | None = 25          # End-After default
     end_after_tokens: int | None = None
 
@@ -1659,10 +1801,20 @@ async def utility_summarize(req: SummarizeRequest):
 
 @app.post("/links")
 async def create_link(req: CreateLinkRequest):
-    """Create an agent-to-agent link (relationship config)."""
+    """Create an agent-to-agent link (one relationship per link, §7.6).
+
+    A legacy list ``relationship`` is tolerated — its first element is taken
+    (the pre-split multi-select shape). No ``trigger`` applies the
+    per-relationship default: direct → queue, shared → piggyback."""
+    rel = req.relationship
+    if isinstance(rel, list):                     # legacy multi-select input
+        rel = next((str(r) for r in rel if r), "direct")
+    if rel not in ("direct", "shared"):
+        raise HTTPException(status_code=400,
+                            detail="relationship must be 'direct' or 'shared'")
     lk = links.add_link(
         a=req.a, b=req.b, direction=req.direction,
-        relationship=req.relationship, shared_content=req.shared_content,
+        relationship=rel, shared_content=req.shared_content,
         shared_backfill=req.shared_backfill, trigger=req.trigger,
         end_after_exchanges=req.end_after_exchanges,
         end_after_tokens=req.end_after_tokens,

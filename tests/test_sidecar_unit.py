@@ -503,7 +503,7 @@ class TestReplyToRelay:
         a, b = _agent("A"), _agent("B")
         main.sessions["A"], main.sessions["B"] = a, b
         try:
-            lk = links.add_link(a="A", b="B", relationship=["direct"], trigger="queue")
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
             b.answering_source, b.answering_link = "A", lk.id
             _finish_turn(b, "here is my reply")
             main._maybe_relay_reply(b)
@@ -532,8 +532,8 @@ class TestReplyToRelay:
         a, b = _agent("A"), _agent("B")
         main.sessions["A"], main.sessions["B"] = a, b
         try:
-            lk = links.add_link(a="A", b="B", relationship=["direct"],
-                                end_after_exchanges=1)  # cap at 2 messages
+            lk = links.add_link(a="A", b="B", relationship="direct",
+                                end_after_exchanges=1)  # two-way: cap at 2 messages
             # first fire B->A (message 1): not capped, sets A's reply-to
             b.answering_source, b.answering_link = "A", lk.id
             _finish_turn(b, "msg1")
@@ -551,7 +551,7 @@ class TestReplyToRelay:
         a, b = _agent("A"), _agent("B")
         main.sessions["A"], main.sessions["B"] = a, b
         try:
-            lk = links.add_link(a="A", b="B", relationship=["direct"], trigger="inject")
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="inject")
             b.answering_source, b.answering_link = "A", lk.id
             _finish_turn(b, "mid-run reply")
             main._maybe_relay_reply(b)
@@ -560,6 +560,182 @@ class TestReplyToRelay:
             assert [i["text"] for i in hookbus.pending("A")] == ["mid-run reply"]
         finally:
             main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_one_way_cap_burns_per_fire(self):
+        # §7.6 End-After, direction-aware: on a one-way link EVERY fire is one
+        # exchange, so a cap of 1 ends the link after a single relay.
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", direction="a2b",
+                                relationship="direct", end_after_exchanges=1)
+            a.answering_source, a.answering_link = "B", lk.id
+            _finish_turn(a, "one and only fire")
+            main._maybe_relay_reply(a)
+            assert lk.messages == 1 and lk.exchanges == 1
+            assert not lk.active                 # single fire hit the cap
+            assert b.answering_source is None    # no alternation set up
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_piggyback_trigger_parks_instead_of_enqueueing(self):
+        # A piggybacked DM reads as a deferred reply: the fire parks on the
+        # peer's pending list and never initiates a turn.
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct",
+                                trigger="piggyback")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "deferred reply")
+            main._maybe_relay_reply(b)
+            assert len(a.prompt_queue) == 0      # nothing enqueued
+            assert [p["text"] for p in links.pending_piggyback("A")] == ["deferred reply"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+
+# ---------------------------------------------------------------------------
+# Link endpoints — the §7.6 one-relationship contract at the API seam
+# ---------------------------------------------------------------------------
+
+class TestLinkEndpoints:
+    def test_create_defaults_trigger_per_relationship(self):
+        direct = asyncio.run(main.create_link(main.CreateLinkRequest(a="A", b="B")))
+        assert direct["relationship"] == "direct"
+        assert direct["trigger"] == "queue"
+        shared = asyncio.run(main.create_link(main.CreateLinkRequest(
+            a="A", b="B", relationship="shared")))
+        assert shared["relationship"] == "shared"
+        assert shared["trigger"] == "piggyback"
+
+    def test_create_explicit_trigger_kept(self):
+        out = asyncio.run(main.create_link(main.CreateLinkRequest(
+            a="A", b="B", relationship="shared", trigger="inject")))
+        assert out["trigger"] == "inject"
+
+    def test_create_legacy_list_relationship_takes_first(self):
+        # Pre-split clients sent a multi-select list; the first element wins.
+        out = asyncio.run(main.create_link(main.CreateLinkRequest(
+            a="A", b="B", relationship=["shared", "direct"])))
+        assert out["relationship"] == "shared"
+        assert out["trigger"] == "piggyback"     # default follows the taken value
+        empty = asyncio.run(main.create_link(main.CreateLinkRequest(
+            a="A", b="B", relationship=[])))
+        assert empty["relationship"] == "direct"
+
+    def test_create_invalid_relationship_400(self):
+        from fastapi import HTTPException as _HTTPExc
+        with pytest.raises(_HTTPExc) as exc:
+            asyncio.run(main.create_link(main.CreateLinkRequest(
+                a="A", b="B", relationship="bogus")))
+        assert exc.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Shared-context fire + piggyback delivery (§7.6)
+# ---------------------------------------------------------------------------
+
+import watermark  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _clean_watermark():
+    watermark.reset()
+    yield
+    watermark.reset()
+
+
+def _complete_turn(s, text):
+    """Drive a full driver-observed turn: running -> assistant text -> idle
+    (the idle transition is what fires the relay + shared-context engines)."""
+    s.handle_event({"type": "status_change", "status": "running",
+                    "timestamp": "t"})
+    s.push_event({"type": "assistant",
+                  "content": [{"type": "text", "text": text}], "timestamp": "t"})
+    s.handle_event({"type": "status_change", "status": "idle", "timestamp": "t"})
+
+
+class TestSharedContextFire:
+    def test_shared_fire_parks_piggyback_with_watermark(self):
+        import inbox
+        inbox.reset()
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="shared")  # piggyback default
+            _complete_turn(a, "the update")
+            # parked for B, never enqueued (piggyback never initiates a turn)
+            assert [p["text"] for p in links.pending_piggyback("B")] == ["the update"]
+            assert len(b.prompt_queue) == 0
+            # the fire counted + the shared watermark advanced to this turn
+            assert lk.messages == 1
+            assert watermark.get("shared:A:B") == 1
+            assert any(e["type"] == "shared_context_fire" for e in a.events)
+            # an idle re-emission does NOT double-park (watermark dedup)
+            a.handle_event({"type": "status_change", "status": "idle",
+                            "timestamp": "t"})
+            assert len(links.pending_piggyback("B")) == 1
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+            inbox.reset()
+
+    def test_shared_fire_respects_direction(self):
+        import inbox
+        inbox.reset()
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            links.add_link(a="A", b="B", direction="b2a", relationship="shared")
+            _complete_turn(a, "should not share")   # a2b is not allowed on b2a
+            assert links.pending_piggyback("B") == []
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+            inbox.reset()
+
+    def test_shared_fire_queue_trigger_takes_queue_path(self):
+        import inbox
+        inbox.reset()
+        a, b = _agent("A"), _agent("B")
+        b.status = "running"     # keep the enqueued share visible (no auto-flush)
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            links.add_link(a="A", b="B", relationship="shared", trigger="queue")
+            _complete_turn(a, "queued share")
+            assert [e["prompt"] for e in b.prompt_queue] == ["queued share"]
+            assert b.prompt_queue[0]["source"] == "A"
+            assert links.pending_piggyback("B") == []
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+            inbox.reset()
+
+    def test_flush_prepends_piggyback_block_once(self):
+        b = _agent("B")
+        b.status = "idle"
+        main.sessions["B"] = b
+        try:
+            links.park_piggyback("B", source="A", link_id="lnk1",
+                                 text="peer update")
+            b.enqueue({"prompt": "do the thing", "source": "user",
+                       "recipients": ["B"]}, "queue")
+            asyncio.run(main._flush_queue(b))
+            assert len(b.driver.sent) == 1
+            sent = b.driver.sent[0]
+            # ONE bounded block, prepended; the user's prompt rides after it
+            assert sent.startswith("[Shared context from linked agents")
+            assert "(from A) peer update" in sent
+            assert sent.endswith("do the thing")
+            # consumed exactly once + surfaced on the feed
+            assert links.pending_piggyback("B") == []
+            assert any(e["type"] == "piggyback_delivered" for e in b.events)
+            # the next flush carries no stale block
+            b.status = "idle"
+            b.enqueue({"prompt": "second send", "source": "user",
+                       "recipients": ["B"]}, "queue")
+            asyncio.run(main._flush_queue(b))
+            assert b.driver.sent[1] == "second send"
+        finally:
+            main.sessions.pop("B", None)
 
 
 class TestHookDrainEndpoints:
