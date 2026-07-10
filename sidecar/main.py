@@ -809,7 +809,32 @@ class ReviewRequest(BaseModel):
     owner: str | None = None
     state: str | None = None
     verdict: str | None = None
+    verdict_by: str | None = None
     comments: list[Any] | None = None
+
+class DocumentCreateRequest(BaseModel):
+    cwd: str
+    filename: str
+    content: str = ""
+    subdir: str = "docs"          # "docs" | "plans" — the two store collections
+
+class DocumentRenameRequest(BaseModel):
+    cwd: str
+    path: str                     # the .md to rename (must be store-scoped)
+    new_filename: str
+
+class CommentRequest(BaseModel):
+    cwd: str
+    path: str                     # the .md commented on (must be store-scoped)
+    text: str
+    author: str = "user"
+    anchor_quote: str | None = None
+    anchor_heading: str | None = None
+
+class CommentResolveRequest(BaseModel):
+    cwd: str
+    path: str
+    comment_id: str
 
 class SetEffortRequest(BaseModel):
     effort: str
@@ -1335,15 +1360,27 @@ async def delete_template_endpoint(template_id: str):
 
 
 # ============================================================================
-# Library — project-scoped read + render + the plan-review side-store
+# Library — project-scoped read + render + per-doc metadata sidecars (§8.5).
+# Every WRITE endpoint is scope-guarded to <project>/.awl-cc-dash/ — the rest
+# of the repo stays browse-read-only (§8.5 rule 5).
 # ============================================================================
 
 @app.get("/library/documents")
 async def library_documents(cwd: str, subdir: str | None = None):
-    """List the project's markdown Plans/Documents (read-only, project-scoped)."""
+    """List the project's markdown Plans/Documents (project-scoped).
+
+    ``subdir="plans"`` / ``"docs"`` list the project store
+    (``<project>/.awl-cc-dash/<subdir>``), falling back to the legacy
+    ``<root>/<subdir>`` when the store dir doesn't exist yet. No ``subdir``
+    keeps listing the project root itself — the browse-read-only surface
+    (other ``subdir`` values likewise browse ``<root>/<subdir>`` read-only)."""
     root = storage.project_root(cwd)
     if not root:
         raise HTTPException(status_code=400, detail="cwd required")
+    if subdir in ("plans", "docs"):
+        store_dir = storage.plans_dir(cwd) if subdir == "plans" else storage.docs_dir(cwd)
+        if store_dir is not None and store_dir.is_dir():
+            return library.list_markdown(str(store_dir))
     return library.list_markdown(str(root), subdir)
 
 
@@ -1355,16 +1392,108 @@ async def library_document(path: str):
         raise HTTPException(status_code=404, detail="Document not found")
 
 
+@app.post("/library/document")
+async def library_create_document(req: DocumentCreateRequest):
+    """Create a dashboard-owned document in the store (``docs/`` or ``plans/``).
+    409 when the target already exists; 400 on an invalid filename/subdir."""
+    try:
+        return library.create_document(req.cwd, req.filename, req.content, subdir=req.subdir)
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="Document already exists")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/library/document")
+async def library_delete_document(path: str, cwd: str):
+    """Delete a store document + its paired ``.meta.json``. 400 outside the
+    store (browse-only files are never deletable), 404 when missing."""
+    try:
+        return library.delete_document(path, cwd)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
+@app.post("/library/document/rename")
+async def library_rename_document(req: DocumentRenameRequest):
+    """Rename a store document AND its sidecar together (§8.5 rule 3). 400
+    outside the store, 404 when the source is missing, 409 on an existing target."""
+    if not library.document_in_store(req.path, req.cwd):
+        raise HTTPException(status_code=400,
+                            detail="path is not under the project store (.awl-cc-dash/)")
+    try:
+        return library.rename_document_pair(req.path, req.new_filename)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="Target already exists")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/library/reviews")
 async def library_reviews(cwd: str):
-    return library.load_reviews_for_cwd(cwd)
+    """Per-doc sidecar metadata for the whole project, filename-keyed (§8.5).
+    Runs the one-time legacy ``plan-reviews.json`` → sidecar migration first,
+    then aggregates every sidecar under the store's ``plans/`` + ``docs/``."""
+    if not storage.project_root(cwd):
+        raise HTTPException(status_code=400, detail="cwd required")
+    library.migrate_plan_reviews(cwd)
+    return library.aggregate_metas(cwd)
 
 
 @app.post("/library/reviews")
 async def library_set_review(req: ReviewRequest):
-    return library.set_review_for_cwd(
-        req.cwd, req.filename, owner=req.owner, state=req.state,
-        verdict=req.verdict, comments=req.comments)
+    """Write review fields into the doc's ``.meta.json`` sidecar (§8.5) —
+    merge-don't-clobber. The doc is resolved by bare filename (store ``plans/``,
+    then ``docs/``, then the project root); 404 when no such ``.md`` exists.
+    ``comments`` (backward-compatible: strings or dicts) append as comment
+    threads. Returns the updated sidecar."""
+    try:
+        md = library.resolve_document(req.cwd, req.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if md is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    library.set_doc_review(md, owner=req.owner, state=req.state,
+                           verdict=req.verdict, verdict_by=req.verdict_by)
+    for item in (req.comments or []):
+        if isinstance(item, dict):
+            library.add_comment(
+                md, text=str(item.get("text") or ""),
+                author=str(item.get("author") or req.owner or "user"),
+                anchor_quote=item.get("anchor_quote"),
+                anchor_heading=item.get("anchor_heading"))
+        else:
+            library.add_comment(md, text=str(item), author=req.owner or "user")
+    return library.load_meta(md)
+
+
+@app.post("/library/comments")
+async def library_add_comment(req: CommentRequest):
+    """Append a comment (optionally quote-anchored, §8.5) to a store document's
+    sidecar. 400 outside the store, 404 when the ``.md`` is missing."""
+    if not library.document_in_store(req.path, req.cwd):
+        raise HTTPException(status_code=400,
+                            detail="path is not under the project store (.awl-cc-dash/)")
+    if not Path(req.path).is_file():
+        raise HTTPException(status_code=404, detail="Document not found")
+    return library.add_comment(req.path, text=req.text, author=req.author,
+                               anchor_quote=req.anchor_quote,
+                               anchor_heading=req.anchor_heading)
+
+
+@app.post("/library/comments/resolve")
+async def library_resolve_comment(req: CommentResolveRequest):
+    """Mark one comment resolved. 400 outside the store, 404 for an unknown id."""
+    if not library.document_in_store(req.path, req.cwd):
+        raise HTTPException(status_code=400,
+                            detail="path is not under the project store (.awl-cc-dash/)")
+    if not library.resolve_comment(req.path, req.comment_id):
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"status": "resolved", "comment_id": req.comment_id}
 
 
 # ============================================================================

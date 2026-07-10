@@ -1,17 +1,31 @@
-"""Hermetic unit tests for the Library module (v1 = read + render).
+"""Hermetic unit tests for the Library module (read + render + per-doc sidecars).
 
 Pure file logic — no driver, no WSL2/tmux, no live agent, no servers. Proves:
 
   * ``list_markdown`` enumerates ``.md`` files under a directory (optionally a
     ``plans`` subdir), with size + modified, skipping non-``.md`` and missing dirs.
   * ``read_document`` returns ``{filename, path, content}`` and raises on absent.
-  * The plan-review side-store (a JSON object keyed by plan FILENAME, carrying the
-    plan↔agent owner mapping) round-trips through a real JSON file under a tmp
-    ``.awl/`` dir — set→get, partial-update merges fields, owner mapping persists,
-    remove works, and ``load`` on a missing file is ``{}``.
+  * The LEGACY plan-review side-store (a JSON object keyed by plan FILENAME,
+    carrying the plan↔agent owner mapping) round-trips through a real JSON file —
+    set→get, partial-update merges fields, owner mapping persists, remove works,
+    and ``load`` on a missing file is ``{}``. The function family is kept (it is
+    the migration's reader) even though the endpoints now ride the sidecars.
+  * **The per-doc metadata sidecar layer (§8.5)** — the store the review layer
+    actually writes: ``<stem>.meta.json`` paired to ``<stem>.md``, never inside
+    the content file. load/save round-trip with the skeleton on missing/corrupt;
+    atomic write-replace (no ``.tmp`` residue); ``schema_version: 1`` stamped on
+    every save; merge-don't-clobber review fields (+ ``verdict_by``/``verdict_at``);
+    comments with unique ``c<N>`` ids, quote-anchors, and resolve; provenance
+    with a first-write-stable ``created_at``; pair-rename (meta optional,
+    overwrite refused); orphan-detect + re-link; the legacy → sidecar migration
+    (non-destructive — existing sidecar fields win; legacy file renamed
+    ``.migrated``; idempotent); ``aggregate_metas``'s filename-keyed shape; and
+    the store-scoped create/delete guards (path escapes and outside-store
+    deletes refused; the sidecar dies with its doc).
 
-Everything operates on ``tmp_path`` — never a real project dir. These carry
-neither the ``integration`` nor the ``slow`` mark.
+Everything operates on ``tmp_path`` — never a real project dir. Sidecar-layer
+project dirs get a ``.git`` marker so ``storage.project_root`` pins to the tmp
+dir. These carry neither the ``integration`` nor the ``slow`` mark.
 """
 
 import sys
@@ -244,3 +258,466 @@ class TestCwdWrappers:
         proj = tmp_path / "myproj"
         proj.mkdir()
         assert library.load_reviews_for_cwd(str(proj)) == {}
+
+
+# ---------------------------------------------------------------------------
+# Per-doc metadata sidecars (§8.5) — content + metadata as paired files
+# ---------------------------------------------------------------------------
+
+def _project(tmp_path):
+    """A tmp project dir with a .git marker so storage.project_root pins here."""
+    proj = tmp_path / "proj"
+    (proj / ".git").mkdir(parents=True)
+    return proj
+
+
+def _md(dir_path, name="doc.md", body="# Doc\n"):
+    dir_path.mkdir(parents=True, exist_ok=True)
+    f = dir_path / name
+    f.write_text(body, encoding="utf-8")
+    return f
+
+
+class TestMetaPath:
+    def test_pairs_by_stem_next_to_the_md(self, tmp_path):
+        assert (library.meta_path(tmp_path / "roadmap.md")
+                == tmp_path / "roadmap.meta.json")
+
+    def test_nested_dir_is_preserved(self, tmp_path):
+        p = tmp_path / "plans" / "phase-1.md"
+        assert library.meta_path(p) == tmp_path / "plans" / "phase-1.meta.json"
+
+
+class TestLoadSaveMeta:
+    def test_missing_sidecar_is_skeleton(self, tmp_path):
+        meta = library.load_meta(tmp_path / "ghost.md")
+        assert meta["schema_version"] == 1
+        assert meta["review"] == {} and meta["comments"] == [] and meta["provenance"] == {}
+
+    def test_corrupt_sidecar_degrades_to_skeleton(self, tmp_path):
+        md = _md(tmp_path)
+        library.meta_path(md).write_text("{not json", encoding="utf-8")
+        assert library.load_meta(md)["comments"] == []
+
+    def test_non_object_json_degrades_to_skeleton(self, tmp_path):
+        md = _md(tmp_path)
+        library.meta_path(md).write_text("[1, 2]", encoding="utf-8")
+        assert library.load_meta(md)["review"] == {}
+
+    def test_save_then_load_round_trips(self, tmp_path):
+        md = _md(tmp_path)
+        meta = library.load_meta(md)
+        meta["review"]["owner"] = "coder-01"
+        library.save_meta(md, meta)
+        assert library.load_meta(md)["review"]["owner"] == "coder-01"
+
+    def test_save_stamps_schema_version_and_updated_at(self, tmp_path):
+        md = _md(tmp_path)
+        saved = library.save_meta(md, {"review": {}, "comments": [], "provenance": {}})
+        assert saved["schema_version"] == 1
+        assert isinstance(saved["updated_at"], str) and "T" in saved["updated_at"]
+        on_disk = json.loads(library.meta_path(md).read_text(encoding="utf-8"))
+        assert on_disk["schema_version"] == 1 and "updated_at" in on_disk
+
+    def test_atomic_write_leaves_no_tmp_residue(self, tmp_path):
+        md = _md(tmp_path)
+        library.save_meta(md, library.load_meta(md))
+        assert library.meta_path(md).is_file()
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_failed_save_leaves_no_tmp_and_keeps_prior_content(self, tmp_path):
+        md = _md(tmp_path)
+        library.save_meta(md, {"review": {"owner": "keep-me"},
+                               "comments": [], "provenance": {}})
+        with pytest.raises(TypeError):  # a set is not JSON-serializable
+            library.save_meta(md, {"review": {"bad": {1, 2}},
+                                   "comments": [], "provenance": {}})
+        assert list(tmp_path.glob("*.tmp")) == []
+        assert library.load_meta(md)["review"]["owner"] == "keep-me"  # torn write never lands
+
+
+class TestSetDocReview:
+    def test_creates_sidecar_next_to_doc(self, tmp_path):
+        md = _md(tmp_path, "roadmap.md")
+        library.set_doc_review(md, owner="coder-01", state="in_review")
+        assert (tmp_path / "roadmap.meta.json").is_file()
+        review = library.load_meta(md)["review"]
+        assert review["owner"] == "coder-01" and review["state"] == "in_review"
+
+    def test_merge_does_not_clobber_unset_fields(self, tmp_path):
+        md = _md(tmp_path)
+        library.set_doc_review(md, owner="coder-01", state="pending")
+        library.set_doc_review(md, state="approved")   # owner not passed
+        review = library.load_meta(md)["review"]
+        assert review["owner"] == "coder-01"           # preserved
+        assert review["state"] == "approved"           # changed
+
+    def test_verdict_stamps_who_and_when(self, tmp_path):
+        md = _md(tmp_path)
+        library.set_doc_review(md, verdict="approve", verdict_by="user")
+        review = library.load_meta(md)["review"]
+        assert review["verdict"] == "approve"
+        assert review["verdict_by"] == "user"
+        assert isinstance(review["verdict_at"], str) and "T" in review["verdict_at"]
+
+    def test_no_verdict_means_no_verdict_at_restamp(self, tmp_path):
+        md = _md(tmp_path)
+        library.set_doc_review(md, verdict="approve", verdict_by="user")
+        stamp = library.load_meta(md)["review"]["verdict_at"]
+        library.set_doc_review(md, state="done")       # no verdict passed
+        assert library.load_meta(md)["review"]["verdict_at"] == stamp
+
+
+class TestComments:
+    def test_ids_run_c1_c2_unique_per_sidecar(self, tmp_path):
+        md = _md(tmp_path)
+        assert library.add_comment(md, text="first", author="user")["id"] == "c1"
+        assert library.add_comment(md, text="second", author="user")["id"] == "c2"
+        other = _md(tmp_path, "other.md")
+        assert library.add_comment(other, text="own seq", author="user")["id"] == "c1"
+
+    def test_anchor_quote_and_heading_are_stored(self, tmp_path):
+        md = _md(tmp_path)
+        c = library.add_comment(md, text="tighten this", author="user",
+                                anchor_quote="the exact quoted snippet",
+                                anchor_heading="Goals")
+        stored = library.load_meta(md)["comments"][0]
+        assert stored["anchor_quote"] == "the exact quoted snippet"
+        assert stored["anchor_heading"] == "Goals"
+        assert stored["id"] == c["id"]
+
+    def test_doc_level_comment_has_null_anchors(self, tmp_path):
+        md = _md(tmp_path)
+        library.add_comment(md, text="no anchor", author="user")
+        stored = library.load_meta(md)["comments"][0]
+        assert stored["anchor_quote"] is None and stored["anchor_heading"] is None
+
+    def test_comment_shape(self, tmp_path):
+        md = _md(tmp_path)
+        c = library.add_comment(md, text="hello", author="coder-01")
+        assert c["text"] == "hello" and c["author"] == "coder-01"
+        assert c["resolved"] is False
+        assert isinstance(c["ts"], str) and "T" in c["ts"]
+
+    def test_resolve_flips_flag_and_persists(self, tmp_path):
+        md = _md(tmp_path)
+        library.add_comment(md, text="fix me", author="user")
+        assert library.resolve_comment(md, "c1") is True
+        assert library.load_meta(md)["comments"][0]["resolved"] is True
+
+    def test_resolve_unknown_id_is_false(self, tmp_path):
+        md = _md(tmp_path)
+        library.add_comment(md, text="x", author="user")
+        assert library.resolve_comment(md, "c99") is False
+
+    def test_ids_stay_unique_after_resolve(self, tmp_path):
+        md = _md(tmp_path)
+        library.add_comment(md, text="a", author="user")
+        library.resolve_comment(md, "c1")
+        assert library.add_comment(md, text="b", author="user")["id"] == "c2"
+
+
+class TestProvenance:
+    def test_created_at_stamped_on_first_write(self, tmp_path):
+        md = _md(tmp_path)
+        library.set_provenance(md, created_by="coder-01", session="sess-1")
+        prov = library.load_meta(md)["provenance"]
+        assert prov["created_by"] == "coder-01" and prov["session"] == "sess-1"
+        assert isinstance(prov["created_at"], str) and "T" in prov["created_at"]
+
+    def test_created_at_never_restamped(self, tmp_path):
+        md = _md(tmp_path)
+        library.set_provenance(md, created_by="coder-01")
+        # Pin created_at to a sentinel, then write provenance again: the
+        # sentinel must survive (created_at records first entry, not last touch).
+        meta = library.load_meta(md)
+        meta["provenance"]["created_at"] = "2020-01-01T00:00:00+00:00"
+        library.save_meta(md, meta)
+        library.set_provenance(md, session="sess-2")
+        prov = library.load_meta(md)["provenance"]
+        assert prov["created_at"] == "2020-01-01T00:00:00+00:00"
+        assert prov["created_by"] == "coder-01" and prov["session"] == "sess-2"
+
+
+class TestRenameDocumentPair:
+    def test_renames_md_and_meta_together(self, tmp_path):
+        md = _md(tmp_path, "draft.md")
+        library.set_doc_review(md, owner="coder-01")
+        out = library.rename_document_pair(md, "final.md")
+        assert not md.exists() and not (tmp_path / "draft.meta.json").exists()
+        assert (tmp_path / "final.md").is_file()
+        assert (tmp_path / "final.meta.json").is_file()
+        assert library.load_meta(tmp_path / "final.md")["review"]["owner"] == "coder-01"
+        assert out == {"old": str(md), "new": str(tmp_path / "final.md")}
+
+    def test_meta_may_be_absent(self, tmp_path):
+        md = _md(tmp_path, "bare.md")
+        library.rename_document_pair(md, "renamed.md")
+        assert (tmp_path / "renamed.md").is_file()
+        assert not (tmp_path / "renamed.meta.json").exists()
+
+    def test_refuses_overwriting_existing_md(self, tmp_path):
+        md = _md(tmp_path, "a.md")
+        _md(tmp_path, "b.md")
+        with pytest.raises(FileExistsError):
+            library.rename_document_pair(md, "b.md")
+        assert md.is_file()  # nothing moved
+
+    def test_refuses_overwriting_existing_meta(self, tmp_path):
+        md = _md(tmp_path, "a.md")
+        library.set_doc_review(md, owner="x")           # a.meta.json exists
+        (tmp_path / "b.meta.json").write_text("{}", encoding="utf-8")
+        with pytest.raises(FileExistsError):
+            library.rename_document_pair(md, "b.md")
+        assert md.is_file() and (tmp_path / "a.meta.json").is_file()  # pair intact
+
+    def test_missing_source_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            library.rename_document_pair(tmp_path / "ghost.md", "x.md")
+
+    def test_rejects_separators_in_new_name(self, tmp_path):
+        md = _md(tmp_path)
+        with pytest.raises(ValueError):
+            library.rename_document_pair(md, "../escape.md")
+
+
+class TestOrphanMetas:
+    def test_detects_only_unpaired_metas(self, tmp_path):
+        md = _md(tmp_path, "paired.md")
+        library.set_doc_review(md, owner="x")
+        (tmp_path / "orphan.meta.json").write_text("{}", encoding="utf-8")
+        assert library.find_orphan_metas(tmp_path) == [str(tmp_path / "orphan.meta.json")]
+
+    def test_missing_dir_is_empty(self, tmp_path):
+        assert library.find_orphan_metas(tmp_path / "nope") == []
+
+    def test_relink_renames_meta_into_pair_position(self, tmp_path):
+        orphan = tmp_path / "old-name.meta.json"
+        orphan.write_text(json.dumps({"review": {"owner": "x"}}), encoding="utf-8")
+        md = _md(tmp_path, "new-name.md")
+        assert library.relink_meta(orphan, md) is True
+        assert not orphan.exists()
+        assert library.load_meta(md)["review"]["owner"] == "x"
+
+    def test_relink_refuses_when_target_already_has_meta(self, tmp_path):
+        orphan = tmp_path / "orphan.meta.json"
+        orphan.write_text("{}", encoding="utf-8")
+        md = _md(tmp_path, "doc.md")
+        library.set_doc_review(md, owner="keep")
+        assert library.relink_meta(orphan, md) is False
+        assert orphan.exists()                          # untouched
+        assert library.load_meta(md)["review"]["owner"] == "keep"
+
+    def test_relink_to_missing_md_is_false(self, tmp_path):
+        orphan = tmp_path / "orphan.meta.json"
+        orphan.write_text("{}", encoding="utf-8")
+        assert library.relink_meta(orphan, tmp_path / "ghost.md") is False
+
+    def test_relink_already_paired_is_true(self, tmp_path):
+        md = _md(tmp_path, "doc.md")
+        library.set_doc_review(md, owner="x")
+        assert library.relink_meta(library.meta_path(md), md) is True
+
+
+class TestMigratePlanReviews:
+    def _legacy(self, proj, entries):
+        store = proj / ".awl-cc-dash"
+        store.mkdir(parents=True, exist_ok=True)
+        (store / "plan-reviews.json").write_text(
+            json.dumps(entries), encoding="utf-8")
+        return store / "plan-reviews.json"
+
+    def test_entry_lands_next_to_plans_md(self, tmp_path):
+        proj = _project(tmp_path)
+        _md(proj / ".awl-cc-dash" / "plans", "phase-1.md")
+        self._legacy(proj, {"phase-1.md": {"owner": "coder-01", "state": "pending"}})
+        assert library.migrate_plan_reviews(str(proj)) == 1
+        meta = library.load_meta(proj / ".awl-cc-dash" / "plans" / "phase-1.md")
+        assert meta["review"]["owner"] == "coder-01"
+        assert meta["review"]["state"] == "pending"
+
+    def test_entry_matches_project_root_md_second(self, tmp_path):
+        # The legacy store keyed bare filenames from the old flat layout — a doc
+        # still at the project root pairs there when plans/ has no match.
+        proj = _project(tmp_path)
+        _md(proj, "rootplan.md")
+        self._legacy(proj, {"rootplan.md": {"owner": "coder-02"}})
+        library.migrate_plan_reviews(str(proj))
+        assert (proj / "rootplan.meta.json").is_file()
+        assert library.load_meta(proj / "rootplan.md")["review"]["owner"] == "coder-02"
+
+    def test_unmatched_entry_becomes_plans_orphan(self, tmp_path):
+        # No .md anywhere: the sidecar is still written (in plans/) rather than
+        # dropping review data — it surfaces as a detectable, re-linkable orphan.
+        proj = _project(tmp_path)
+        self._legacy(proj, {"ghost.md": {"owner": "coder-03"}})
+        library.migrate_plan_reviews(str(proj))
+        plans = proj / ".awl-cc-dash" / "plans"
+        assert (plans / "ghost.meta.json").is_file()
+        assert library.find_orphan_metas(plans) == [str(plans / "ghost.meta.json")]
+
+    def test_existing_sidecar_fields_win(self, tmp_path):
+        proj = _project(tmp_path)
+        md = _md(proj / ".awl-cc-dash" / "plans", "phase-1.md")
+        library.set_doc_review(md, owner="sidecar-owner")
+        library.add_comment(md, text="sidecar comment", author="user")
+        self._legacy(proj, {"phase-1.md": {"owner": "legacy-owner",
+                                           "state": "pending",
+                                           "comments": "legacy note"}})
+        library.migrate_plan_reviews(str(proj))
+        meta = library.load_meta(md)
+        assert meta["review"]["owner"] == "sidecar-owner"   # sidecar wins
+        assert meta["review"]["state"] == "pending"          # absent field filled
+        # The sidecar already had comments -> legacy comments are NOT appended.
+        assert [c["text"] for c in meta["comments"]] == ["sidecar comment"]
+
+    def test_legacy_string_comments_become_a_comment(self, tmp_path):
+        proj = _project(tmp_path)
+        md = _md(proj / ".awl-cc-dash" / "plans", "phase-1.md")
+        self._legacy(proj, {"phase-1.md": {"owner": "coder-01",
+                                           "comments": "tighten the scope"}})
+        library.migrate_plan_reviews(str(proj))
+        comments = library.load_meta(md)["comments"]
+        assert len(comments) == 1
+        assert comments[0]["id"] == "c1"
+        assert comments[0]["text"] == "tighten the scope"
+        assert comments[0]["author"] == "coder-01"          # falls back to owner
+        assert comments[0]["resolved"] is False
+
+    def test_legacy_file_renamed_migrated_and_idempotent(self, tmp_path):
+        proj = _project(tmp_path)
+        md = _md(proj / ".awl-cc-dash" / "plans", "phase-1.md")
+        legacy = self._legacy(proj, {"phase-1.md": {"comments": "note"}})
+        assert library.migrate_plan_reviews(str(proj)) == 1
+        assert not legacy.exists()
+        assert legacy.with_name("plan-reviews.json.migrated").is_file()
+        # Second run: no legacy file -> no-op, nothing re-applied.
+        assert library.migrate_plan_reviews(str(proj)) == 0
+        assert len(library.load_meta(md)["comments"]) == 1
+
+    def test_no_legacy_file_is_noop(self, tmp_path):
+        proj = _project(tmp_path)
+        assert library.migrate_plan_reviews(str(proj)) == 0
+
+
+class TestAggregateMetas:
+    def test_filename_keyed_union_of_plans_and_docs(self, tmp_path):
+        proj = _project(tmp_path)
+        plan = _md(proj / ".awl-cc-dash" / "plans", "roadmap.md")
+        doc = _md(proj / ".awl-cc-dash" / "docs", "notes.md")
+        library.set_doc_review(plan, owner="a")
+        library.set_doc_review(doc, owner="b")
+        agg = library.aggregate_metas(str(proj))
+        assert set(agg.keys()) == {"roadmap.md", "notes.md"}
+        assert agg["roadmap.md"]["review"]["owner"] == "a"
+        assert agg["notes.md"]["review"]["owner"] == "b"
+        assert agg["notes.md"]["schema_version"] == 1
+
+    def test_docs_without_sidecars_do_not_appear(self, tmp_path):
+        proj = _project(tmp_path)
+        _md(proj / ".awl-cc-dash" / "plans", "bare.md")   # no sidecar written
+        assert library.aggregate_metas(str(proj)) == {}
+
+    def test_empty_project_is_empty(self, tmp_path):
+        assert library.aggregate_metas(str(_project(tmp_path))) == {}
+
+
+class TestCreateDeleteDocument:
+    def test_create_defaults_to_docs(self, tmp_path):
+        proj = _project(tmp_path)
+        out = library.create_document(str(proj), "notes.md", "# Notes\n")
+        target = proj / ".awl-cc-dash" / "docs" / "notes.md"
+        assert target.is_file()
+        assert target.read_text(encoding="utf-8") == "# Notes\n"
+        assert out["filename"] == "notes.md" and out["subdir"] == "docs"
+
+    def test_create_in_plans(self, tmp_path):
+        proj = _project(tmp_path)
+        library.create_document(str(proj), "phase-1.md", "plan", subdir="plans")
+        assert (proj / ".awl-cc-dash" / "plans" / "phase-1.md").is_file()
+
+    def test_create_refuses_existing(self, tmp_path):
+        proj = _project(tmp_path)
+        library.create_document(str(proj), "notes.md", "one")
+        with pytest.raises(FileExistsError):
+            library.create_document(str(proj), "notes.md", "two")
+
+    def test_create_rejects_path_escapes(self, tmp_path):
+        proj = _project(tmp_path)
+        for bad in ("a/b.md", "a\\b.md", "..\\evil.md", "../evil.md", "..md"):
+            with pytest.raises(ValueError):
+                library.create_document(str(proj), bad, "x")
+
+    def test_create_rejects_non_md_and_bad_subdir(self, tmp_path):
+        proj = _project(tmp_path)
+        with pytest.raises(ValueError):
+            library.create_document(str(proj), "notes.txt", "x")
+        with pytest.raises(ValueError):
+            library.create_document(str(proj), "notes.md", "x", subdir="assets")
+
+    def test_delete_removes_md_and_paired_meta(self, tmp_path):
+        proj = _project(tmp_path)
+        out = library.create_document(str(proj), "gone.md", "x")
+        library.set_doc_review(out["path"], owner="a")
+        result = library.delete_document(out["path"], str(proj))
+        assert not Path(out["path"]).exists()
+        assert not library.meta_path(out["path"]).exists()
+        assert len(result["deleted"]) == 2
+
+    def test_delete_refuses_paths_outside_the_store(self, tmp_path):
+        proj = _project(tmp_path)
+        outside = _md(proj, "readme.md")           # project root, NOT the store
+        with pytest.raises(ValueError):
+            library.delete_document(str(outside), str(proj))
+        assert outside.is_file()                   # untouched
+
+    def test_delete_refuses_dotdot_escape_from_store(self, tmp_path):
+        proj = _project(tmp_path)
+        outside = _md(proj, "readme.md")
+        sneaky = proj / ".awl-cc-dash" / "docs" / ".." / ".." / "readme.md"
+        with pytest.raises(ValueError):
+            library.delete_document(str(sneaky), str(proj))
+        assert outside.is_file()
+
+    def test_delete_missing_raises_not_found(self, tmp_path):
+        proj = _project(tmp_path)
+        (proj / ".awl-cc-dash" / "docs").mkdir(parents=True)
+        with pytest.raises(FileNotFoundError):
+            library.delete_document(str(proj / ".awl-cc-dash" / "docs" / "ghost.md"),
+                                    str(proj))
+
+    def test_delete_refuses_non_md_targets(self, tmp_path):
+        proj = _project(tmp_path)
+        out = library.create_document(str(proj), "doc.md", "x")
+        library.set_doc_review(out["path"], owner="a")
+        with pytest.raises(ValueError):   # the sidecar is not addressed directly
+            library.delete_document(str(library.meta_path(out["path"])), str(proj))
+
+
+class TestResolveDocumentAndScope:
+    def test_priority_plans_then_docs_then_root(self, tmp_path):
+        proj = _project(tmp_path)
+        _md(proj, "x.md", "root")
+        assert library.resolve_document(str(proj), "x.md") == proj / "x.md"
+        _md(proj / ".awl-cc-dash" / "docs", "x.md", "docs")
+        assert (library.resolve_document(str(proj), "x.md")
+                == proj / ".awl-cc-dash" / "docs" / "x.md")
+        _md(proj / ".awl-cc-dash" / "plans", "x.md", "plans")
+        assert (library.resolve_document(str(proj), "x.md")
+                == proj / ".awl-cc-dash" / "plans" / "x.md")
+
+    def test_missing_everywhere_is_none(self, tmp_path):
+        assert library.resolve_document(str(_project(tmp_path)), "ghost.md") is None
+
+    def test_rejects_separators(self, tmp_path):
+        with pytest.raises(ValueError):
+            library.resolve_document(str(_project(tmp_path)), "../../etc.md")
+
+    def test_document_in_store_boundaries(self, tmp_path):
+        proj = _project(tmp_path)
+        inside = proj / ".awl-cc-dash" / "docs" / "in.md"
+        outside = proj / "out.md"
+        escape = proj / ".awl-cc-dash" / ".." / "out.md"  # resolves outside
+        assert library.document_in_store(str(inside), str(proj)) is True
+        assert library.document_in_store(str(outside), str(proj)) is False
+        assert library.document_in_store(str(escape), str(proj)) is False

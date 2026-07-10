@@ -38,10 +38,10 @@ durable part. Keep this table current when you add/remove/rename test files (see
 | File | Pins down (module under test) | ~cases |
 |------|-------------------------------|:-----:|
 | `test_bridge_unit.py` | `bridge/` pkg (screen-state detection, context-usage & turn derivation, transcript parsing) + `sidecar/drivers/base.py` + `sidecar/drivers/bridge.py` (non-live paths) + `sidecar/runtime_store.py` | ~88 |
-| `test_sidecar_unit.py` | `sidecar/main.py` endpoints + driver wiring + `identity.py` + hookbus/links/eventbus integration | ~41 |
+| `test_sidecar_unit.py` | `sidecar/main.py` endpoints (incl. the Library sidecar-store endpoints: reviews migration+aggregate, document create/delete/rename, comments + their `.awl-cc-dash/` scope guards) + driver wiring + `identity.py` + hookbus/links/eventbus integration | ~59 |
 | `test_settings_io_unit.py` | `settings_io.py` (settings read/write) | ~35 |
 | `test_marquee_unit.py` | `marquee.py` (transcript tail marquee) | ~25 |
-| `test_library_unit.py` | `library.py` (doc/plan render, deferrals) | ~25 |
+| `test_library_unit.py` | `library.py` (doc/plan render; per-doc `.meta.json` sidecars §8.5 — review/comments/anchors/provenance, atomic writes, pair-rename, orphan re-link, legacy `plan-reviews.json` migration, store-scoped create/delete guards) | ~83 |
 | `test_checklist_unit.py` | `checklist.py` (run-strip completion parser + barber-pole floor) | ~19 |
 | `test_watermark_unit.py` | `watermark.py` (read-watermark deltas) | ~17 |
 | `test_templates_store_unit.py` | `templates_store.py` (prompt templates, placeholder extraction) | ~17 |
