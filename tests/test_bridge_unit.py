@@ -11,6 +11,11 @@ Two things are covered:
   * ``derive_context_usage`` — overall context tokens/percent and turn count
     derived from transcript ``message.usage``, no ``/context`` call.
 
+Later sections extend the file with further non-live bridge/driver contracts
+(transcript/session-id resolution, registry reads, launch-config composition,
+and the ``create()``/``resume()`` launch argv incl. the §9.9 cold-restore
+resume-launch path) — each section states its own contract inline.
+
 Screens below are representative captures matching the layout the diagnostic
 recorded (see .scratch/bridge-diagnostic-*.md appendix A4/A5/A6).
 """
@@ -570,6 +575,145 @@ class TestValidPermissionModes:
         # Every mode the sidecar's SetModeRequest accepts must be launchable.
         for mode in ("default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"):
             assert mode in VALID_PERMISSION_MODES
+
+
+# -----------------------------------------------------------------------------
+# create()/resume() launch argv — the §9.9 cold-restore resume-launch path.
+# Hermetic: _run / _list_raw / _clear_startup_gates are monkeypatched so the
+# tmux command string is CAPTURED, never executed (no WSL/tmux touched). The
+# live counterpart proving the resumed process really continues the same
+# conversation/id is tests/test_cold_restore_live.py.
+# -----------------------------------------------------------------------------
+
+import pytest
+
+from bridge.bridge import TmuxBridgeError
+
+
+class TestCreateResumeLaunch:
+    RESUME_ID = "7bbef5e5-af47-4389-bffd-3186ac0e1a09"
+
+    def _patched_bridge(self, monkeypatch, name):
+        """A TmuxBridge whose launch side effects are captured, not run."""
+        b = TmuxBridge()
+        captured = {"commands": [], "gates_cleared": []}
+
+        def fake_run(cmd, timeout=30, stdin_data=None):
+            captured["commands"].append(cmd)
+            return ""
+
+        state = {"listed": 0}
+
+        def fake_list_raw():
+            # First call = create()'s duplicate check (no sessions yet); later
+            # calls = the post-launch verification (session now exists).
+            state["listed"] += 1
+            return {} if state["listed"] == 1 else {name: {"pid": "42"}}
+
+        monkeypatch.setattr(b, "_run", fake_run)
+        monkeypatch.setattr(b, "_list_raw", fake_list_raw)
+        monkeypatch.setattr(
+            b, "_clear_startup_gates",
+            lambda n, **kw: captured["gates_cleared"].append(n),
+        )
+        monkeypatch.setattr("bridge.bridge.time.sleep", lambda s: None)
+        return b, captured
+
+    def _launch_cmd(self, captured):
+        cmds = [c for c in captured["commands"] if c.startswith("tmux new-session")]
+        assert len(cmds) == 1, f"expected one tmux new-session, got: {cmds}"
+        return cmds[0]
+
+    def test_fresh_create_pins_session_id(self, monkeypatch):
+        b, captured = self._patched_bridge(monkeypatch, "fresh")
+        info = b.create("fresh", cwd="/tmp/x")
+        cmd = self._launch_cmd(captured)
+        assert "--session-id" in cmd
+        assert "--resume" not in cmd
+        assert info["session_id"] == b.session_id_for("fresh")
+        assert info["resumed_conversation"] is False
+
+    def test_resume_launch_uses_resume_flag_not_session_id(self, monkeypatch):
+        b, captured = self._patched_bridge(monkeypatch, "restored")
+        info = b.create("restored", cwd="/tmp/x",
+                        resume_session_id=self.RESUME_ID)
+        cmd = self._launch_cmd(captured)
+        assert f"--resume {self.RESUME_ID}" in cmd
+        assert "--session-id" not in cmd
+        # The resumed id is registered so find_transcript keeps resolving the
+        # SAME <id>.jsonl (plain --resume does not fork — live-proven 2.1.202).
+        assert b.session_id_for("restored") == self.RESUME_ID
+        assert info["session_id"] == self.RESUME_ID
+        assert info["resumed_conversation"] is True
+        # Startup gates are cleared as usual on the resume-launch path.
+        assert captured["gates_cleared"] == ["restored"]
+
+    def test_resume_launch_applies_other_launch_config(self, monkeypatch):
+        b, captured = self._patched_bridge(monkeypatch, "restored")
+        b.create("restored", cwd="/tmp/x", model="sonnet",
+                 permission_mode="acceptEdits",
+                 disallowed_tools=["WebSearch"],
+                 settings={"permissions": {}},
+                 resume_session_id=self.RESUME_ID)
+        cmd = self._launch_cmd(captured)
+        assert f"--resume {self.RESUME_ID}" in cmd
+        assert "--model sonnet" in cmd
+        assert "--permission-mode acceptEdits" in cmd
+        assert "--disallowedTools WebSearch" in cmd
+        assert "--settings" in cmd  # materialized per-agent settings file
+
+    def test_session_id_and_resume_session_id_are_mutually_exclusive(self, monkeypatch):
+        b, _ = self._patched_bridge(monkeypatch, "conflicted")
+        with pytest.raises(TmuxBridgeError):
+            b.create("conflicted", session_id="a" * 36,
+                     resume_session_id=self.RESUME_ID)
+
+    def test_resume_dead_session_with_id_cold_restores(self, monkeypatch):
+        # Dead tmux + a known claude id → fall through to the resume-launch
+        # create(), SAME conversation (the §9.9 cold-restore wiring).
+        b = TmuxBridge()
+        monkeypatch.setattr(b, "_list_raw", lambda: {})
+        seen = {}
+
+        def fake_create(name, cwd=None, model=None, **kw):
+            seen.update(name=name, cwd=cwd, model=model, **kw)
+            return {"status": "created", "name": name}
+
+        monkeypatch.setattr(b, "create", fake_create)
+        b.resume("gone", cwd="/tmp/x", model="sonnet",
+                 resume_session_id=self.RESUME_ID)
+        assert seen["resume_session_id"] == self.RESUME_ID
+        assert seen["cwd"] == "/tmp/x" and seen["model"] == "sonnet"
+
+    def test_resume_dead_session_without_id_stays_fresh_create(self, monkeypatch):
+        # Legacy behavior unchanged: dead + no id → a brand-new conversation.
+        b = TmuxBridge()
+        monkeypatch.setattr(b, "_list_raw", lambda: {})
+        seen = {}
+
+        def fake_create(name, cwd=None, model=None, **kw):
+            seen.update(name=name, cwd=cwd, model=model, **kw)
+            return {"status": "created", "name": name}
+
+        monkeypatch.setattr(b, "create", fake_create)
+        b.resume("gone", cwd="/tmp/x")
+        assert "resume_session_id" not in seen
+
+    def test_resume_alive_session_registers_given_id(self, monkeypatch):
+        # Alive tmux → rebind only (no relaunch), but re-register the claude id
+        # so find_transcript resolves the session's own <id>.jsonl again.
+        b = TmuxBridge()
+        monkeypatch.setattr(b, "_list_raw", lambda: {"alive": {"pid": "7"}})
+        out = b.resume("alive", resume_session_id=self.RESUME_ID)
+        assert out["status"] == "resumed"
+        assert b.session_id_for("alive") == self.RESUME_ID
+
+    def test_resume_alive_session_without_id_unchanged(self, monkeypatch):
+        b = TmuxBridge()
+        monkeypatch.setattr(b, "_list_raw", lambda: {"alive": {"pid": "7"}})
+        out = b.resume("alive")
+        assert out["status"] == "resumed"
+        assert b.session_id_for("alive") is None
 
 
 # -----------------------------------------------------------------------------

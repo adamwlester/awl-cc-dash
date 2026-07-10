@@ -282,7 +282,8 @@ class TmuxBridge:
 
     def create(self, name, cwd=None, model=None, claude_args="", show=False,
                permission_mode=None, allowed_tools=None, disallowed_tools=None,
-               settings=None, mcp_config=None, session_id=None):
+               settings=None, mcp_config=None, session_id=None,
+               resume_session_id=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -305,6 +306,17 @@ class TmuxBridge:
                 ``~/.claude/sessions/{PID}.json`` mapping was verified DEAD on
                 this build — 2.1.195 no longer writes those files — so the
                 native ``--session-id`` flag is used instead.)
+            resume_session_id: Cold-restore (§9.9): launch with
+                ``--resume <resume_session_id>`` (and NO ``--session-id``) so the
+                new process RESUMES that prior conversation instead of starting a
+                fresh one. Mutually exclusive with ``session_id``. Plain
+                ``--resume`` (without ``--fork-session``) reuses the SAME session
+                id and keeps appending to the same ``<id>.jsonl`` — live-verified
+                on Claude Code 2.1.202 (``tests/test_cold_restore_live.py``) — so
+                the given id is registered as-is and transcript resolution
+                continues on the same file. All other launch config (model,
+                permission_mode, tools, settings, mcp_config) applies as normal,
+                and startup gates are cleared as usual.
             permission_mode: Initial permission mode for the session, passed as
                 claude's ``--permission-mode`` flag (one of
                 ``VALID_PERMISSION_MODES``). An unrecognized/empty value is
@@ -336,11 +348,19 @@ class TmuxBridge:
                 later) only for explicit human attach.
 
         Returns:
-            dict with session info: name, cwd, pid.
+            dict with session info: name, cwd, pid, session_id, and
+            resumed_conversation (True only on a ``resume_session_id`` launch).
 
         Raises:
-            TmuxBridgeError: If the session already exists or creation fails.
+            TmuxBridgeError: If the session already exists, both ``session_id``
+                and ``resume_session_id`` are given, or creation fails.
         """
+        if session_id and resume_session_id:
+            raise TmuxBridgeError(
+                "Pass either session_id (pin a NEW conversation's id) or "
+                "resume_session_id (cold-restore a prior conversation), not both."
+            )
+
         # Check for duplicate
         existing = self._list_raw()
         if name in existing:
@@ -355,10 +375,19 @@ class TmuxBridge:
         # tool specs / file paths containing spaces, parens, or globs survive the
         # bash -> tmux -> sh layering intact.
         argv = [CLAUDE_BIN]
-        # Pin a known session id so this agent's transcript is `<id>.jsonl`,
-        # resolvable by find_transcript even when co-located agents share a dir.
-        claude_session_id = session_id or str(uuid.uuid4())
-        argv += ["--session-id", claude_session_id]
+        if resume_session_id:
+            # Cold-restore (§9.9): resume the prior conversation. No --session-id
+            # — plain --resume reuses the SAME id and appends to the same
+            # `<id>.jsonl` (live-proven on CC 2.1.202; a fork would need the
+            # explicit --fork-session flag), so registering the given id keeps
+            # find_transcript resolving the same file.
+            claude_session_id = resume_session_id
+            argv += ["--resume", resume_session_id]
+        else:
+            # Pin a known session id so this agent's transcript is `<id>.jsonl`,
+            # resolvable by find_transcript even when co-located agents share a dir.
+            claude_session_id = session_id or str(uuid.uuid4())
+            argv += ["--session-id", claude_session_id]
         use_model = model or self._default_model
         if use_model:
             argv += ["--model", use_model]
@@ -423,6 +452,7 @@ class TmuxBridge:
             "cwd": resolved_cwd,
             "pid": sessions[name].get("pid"),
             "session_id": claude_session_id,
+            "resumed_conversation": bool(resume_session_id),
         }
 
     def session_id_for(self, name):
@@ -641,27 +671,40 @@ class TmuxBridge:
         self._tmux(f"rename-session -t '{old_name}' '{new_name}'")
         return {"status": "renamed", "old": old_name, "new": new_name}
 
-    def resume(self, name, cwd=None, model=None):
+    def resume(self, name, cwd=None, model=None, resume_session_id=None):
         """Reconnect to an existing session, or create if it doesn't exist.
 
-        If the session exists in tmux, returns its info.
-        If not, creates a new session with that name.
+        If the session is alive in tmux, rebind to it (and, when
+        ``resume_session_id`` is given, re-register the claude id so
+        ``find_transcript`` resolves the session's own ``<id>.jsonl`` again —
+        the warm-restore of §9.9). If the tmux session is DEAD and
+        ``resume_session_id`` is given, cold-restore it: relaunch via
+        ``create(..., resume_session_id=...)`` — ``claude --resume <id>``, the
+        SAME conversation rebuilt from its transcript. Dead with no id keeps the
+        legacy behavior: a fresh ``create()`` (a brand-new conversation).
 
         Args:
             name: Session name.
             cwd: Working directory (only used if creating).
             model: Model flag (only used if creating).
+            resume_session_id: The claude session id of the prior conversation.
+                Alive session → re-registered; dead session → cold-restored.
 
         Returns:
             dict with session info and whether it was resumed or created.
         """
         existing = self._list_raw()
         if name in existing:
+            if resume_session_id:
+                self.register_session_id(name, resume_session_id)
             return {
                 "status": "resumed",
                 "name": name,
                 "pid": existing[name].get("pid"),
             }
+        if resume_session_id:
+            return self.create(name, cwd=cwd, model=model,
+                               resume_session_id=resume_session_id)
         return self.create(name, cwd=cwd, model=model)
 
     def status(self, name):
