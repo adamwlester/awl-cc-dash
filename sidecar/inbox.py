@@ -23,17 +23,55 @@ import itertools
 import re
 from collections import defaultdict
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
-TYPES = ("permission", "error", "warning", "plan", "decision")
+# The type set is OPEN-ENDED, not a closed enum (§7.8) — `type` is stored as a
+# string. This tuple is the current vocabulary, not a validation gate.
+TYPES = ("permission", "error", "warning", "plan", "decision", "response")
 
 _id_counter = itertools.count(1)
 # agent_id -> list[item dict]; items carry resolved=True once handled.
 _INBOX: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
+# Optional write-through persist hook (installed by state_store): fired with the
+# agent id after any mutation so items land in state/inbox.json (§8.3).
+_persist_hook: Callable[[str], None] | None = None
+
+
+def set_persist_hook(fn: Callable[[str], None] | None) -> None:
+    """Install (or clear) the write-through persist hook."""
+    global _persist_hook
+    _persist_hook = fn
+
+
+def _notify(agent_id: str) -> None:
+    if _persist_hook is not None:
+        try:
+            _persist_hook(agent_id)
+        except Exception:  # pragma: no cover - persistence must never break raises
+            pass
+
 
 def reset() -> None:
     _INBOX.clear()
+
+
+def restore(agent_id: str, items: list[dict[str, Any]]) -> None:
+    """Seed an agent's items from a persisted store (project load) — no hooks.
+
+    Advances the id counter past any restored ``ibx<N>`` ids so new items never
+    collide with reloaded ones.
+    """
+    global _id_counter
+    _INBOX[agent_id] = list(items)
+    max_n = 0
+    for it in items:
+        m = re.match(r"^ibx(\d+)$", str(it.get("id") or ""))
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    if max_n:
+        current = next(_id_counter)
+        _id_counter = itertools.count(max(current, max_n + 1))
 
 
 def raise_item(agent_id: str, itype: str, data: dict[str, Any] | None = None, *,
@@ -49,6 +87,7 @@ def raise_item(agent_id: str, itype: str, data: dict[str, Any] | None = None, *,
             if not it.get("resolved") and it.get("dedup_key") == dedup_key:
                 it["data"] = data or {}
                 it["updated_at"] = datetime.now().isoformat()
+                _notify(agent_id)
                 return it
     it = {
         "id": item_id or f"ibx{next(_id_counter)}",
@@ -62,6 +101,7 @@ def raise_item(agent_id: str, itype: str, data: dict[str, Any] | None = None, *,
         "created_at": datetime.now().isoformat(),
     }
     _INBOX[agent_id].append(it)
+    _notify(agent_id)
     return it
 
 
@@ -71,8 +111,15 @@ def resolve_item(agent_id: str, item_id: str, answer: Any = None) -> bool:
             it["resolved"] = True
             it["answer"] = answer
             it["resolved_at"] = datetime.now().isoformat()
+            _notify(agent_id)
             return True
     return False
+
+
+def drop_agent(agent_id: str) -> None:
+    """Remove ALL of an agent's items (hard delete, §7.12/§11 #11)."""
+    if _INBOX.pop(agent_id, None) is not None:
+        _notify(agent_id)
 
 
 def get_item(agent_id: str, item_id: str) -> dict[str, Any] | None:

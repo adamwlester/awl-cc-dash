@@ -42,7 +42,9 @@ import deletion
 import library
 import templates_store
 import storage
+import state_store
 import scratchpad
+import watermark
 import marquee
 import console_catalog
 import settings_io
@@ -178,6 +180,17 @@ class SessionState:
                                emitted_ids=self._emitted_ids)
         if event is None:
             return
+        # Routing overlay (§8.6): persist NON-default routing only — the default
+        # `agent -> [user]` is re-derivable from the transcript and never written.
+        src, rcp = event.get("source"), event.get("recipients")
+        if (src not in (None, self.session_id) or rcp not in (None, ["user"])) \
+                and not (src == "user" and rcp == [self.session_id]):
+            try:
+                state_store.append_routing(self.session_id, event["id"],
+                                           src or self.session_id,
+                                           rcp or ["user"])
+            except Exception:  # pragma: no cover - overlay is best-effort
+                pass
         self.events.append(event)
         # Reply-to relay: mark where the current turn's output begins so the reply-to
         # engine can lift just this turn's assistant text on the next idle.
@@ -580,6 +593,10 @@ async def reconnect_sessions():
         # newly-created agent doesn't reuse a reconnected one's color/number.
         if isinstance(identity, dict) and isinstance(identity.get("number"), int):
             _identity_ordinal = max(_identity_ordinal, identity["number"])
+        # Load the project's persisted state (lazy, idempotent) and register the
+        # agent→project mapping before any event/persist hook can fire for it.
+        state_store.load_project(rec.get("cwd"))
+        state_store.register_agent(sid, rec.get("cwd"))
         session = SessionState(
             session_id=sid,
             agent_type=None,
@@ -667,6 +684,7 @@ async def _cap_poll_loop():
 
 @app.on_event("startup")
 async def _on_startup():
+    state_store.install_hooks()   # write-through persistence (§8.3)
     await reconnect_sessions()
     asyncio.create_task(_cap_poll_loop())
 
@@ -789,12 +807,22 @@ async def health():
 async def create_session(req: CreateSessionRequest):
     global _identity_ordinal
     session_id = str(uuid.uuid4())[:8]
+    # First session for a project loads its persisted state/ (lazy, §11 #3) and
+    # registers the agent→project mapping the write-through hooks route by.
+    state_store.load_project(req.cwd)
+    state_store.register_agent(session_id, req.cwd)
     # Resolve the dashboard-owned identity (round-robin color/icon/number, with
     # any caller-provided overrides), then advance the round-robin counter.
     identity = assign_identity(
         req.identity.model_dump() if req.identity else None, _identity_ordinal
     )
     _identity_ordinal += 1
+    # Retired numbers are NEVER reused (§7.12): an auto-assigned number that was
+    # retired skips forward to the next free one (explicit requests pass through).
+    if not (req.identity and req.identity.number is not None):
+        if deletion.is_retired(identity["number"]):
+            identity["number"] = deletion.next_free_number(identity["number"])
+            _identity_ordinal = max(_identity_ordinal, identity["number"])
     session = SessionState(
         session_id=session_id,
         agent_type=req.agent_type,
@@ -888,24 +916,39 @@ async def close_session(session_id: str, hard: bool = False):
                     Path(p).unlink(missing_ok=True)
             except Exception:
                 pass
-        # remove the dashboard runtime record
+        # remove the roster record (project state/agents.json or app-level fallback)
         try:
             import runtime_store
             runtime_store.remove_record(session_id)
         except Exception:
             pass
-        # tombstone shared links (inactive, non-functional) + retire the number
+        # tombstone shared links (inactive, non-functional — persisted) + retire
+        # the number (persisted per project: never reused, §7.12/§11 #11)
         for lid in link_ids:
             lk = links.get_link(lid)
             if lk:
                 lk.active = False
+                links.touched(lk)
+        project_key = state_store.project_of(session_id)
         if isinstance(number, int):
             deletion.retire_number(number)
-        # drop operational state
+            if project_key:
+                try:
+                    state_store.persist_retired_number(project_key, number)
+                except Exception:
+                    pass
+        # drop operational state + the agent's rows in the project state/ files:
+        # its inbox items and its read-bookmarks (roster row removed above;
+        # routing.jsonl is append-only history and is deliberately kept).
         session.prompt_queue.clear()
         session.held.clear()
-        for it in inbox.items_for(session_id):
-            inbox.resolve_item(session_id, it["id"])
+        inbox.drop_agent(session_id)
+        for key in list(watermark.keys()):
+            parts = key.split(":")
+            if (key.startswith("scratch:") and parts[-1] == session_id) or \
+                    (key.startswith("shared:") and session_id in parts[1:3]):
+                watermark.drop(key)
+        state_store.unregister_agent(session_id)
         session.status = "closed"
         del sessions[session_id]
         logger.info("Deleted (hard) session %s (number %s retired)", session_id, number)

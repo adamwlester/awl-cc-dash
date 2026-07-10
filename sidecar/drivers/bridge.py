@@ -448,6 +448,14 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
+        # The resolved WSL transcript path, persisted in the roster record (§8.6
+        # #2: resolution is verified, not trusted — and the verified result is
+        # remembered so the mapping survives restarts and scheme drift).
+        self._transcript_path: str | None = None
+        # The last-persisted runtime/roster record, kept so later refreshes
+        # (e.g. the transcript path resolving after the first turn) re-save the
+        # full record rather than a fragment.
+        self._record: dict[str, Any] | None = None
 
     def bind_session_id(self, session_id: str) -> None:
         """Associate the sidecar session id (used for the runtime record)."""
@@ -524,6 +532,17 @@ class BridgeDriver(AgentDriver):
         settings: dict[str, Any] = {
             "cleanupPeriodDays": TRANSCRIPT_RETENTION_DAYS,
         }
+        # Plan-mode output redirects into the project store (§8.5): the ABSOLUTE
+        # WSL path <canonical-root>/.awl-cc-dash/plans — a relative "./" would
+        # resolve against the agent's raw cwd and break subfolder launches.
+        if self.config.cwd:
+            try:
+                import storage  # sidecar dir on sys.path (runtime)
+            except ImportError:  # pragma: no cover - package import (tests)
+                from .. import storage  # type: ignore[no-redef]
+            plans_wsl = storage.plans_dir_wsl(self.config.cwd)
+            if plans_wsl:
+                settings["plansDirectory"] = plans_wsl
         rules = self.config.permission_rules or {}
         perms = {k: list(rules[k]) for k in ("allow", "deny", "ask") if rules.get(k)}
         if perms:
@@ -593,29 +612,33 @@ class BridgeDriver(AgentDriver):
             logger.warning("wait_idle failed for %s: %s", self._name, e)
 
         # Persist a minimal record so a restarted sidecar can rebind to this
-        # still-alive tmux session.
+        # still-alive tmux session (or cold-restore a dead one, §9.9).
         if self._session_id:
+            self._record = {
+                "session_id": self._session_id,
+                "tmux_name": self._name,
+                "driver": "bridge",
+                "model": self.config.model,
+                "permission_mode": self.config.permission_mode,
+                "cwd": self.config.cwd,
+                # The claude --session-id naming this agent's transcript, so a
+                # restarted sidecar resolves the right <id>.jsonl on resume.
+                "claude_session_id": self._claude_session_id,
+                # The verified transcript path (§8.6 #2) — resolved lazily once
+                # the transcript exists (see events()) and refreshed on resolve.
+                "transcript_path": self._transcript_path,
+                # Applied per-agent launch config — kept for readback after a
+                # sidecar restart (reconnect rebinds, it does not relaunch).
+                "allowed_tools": self.config.allowed_tools,
+                "disallowed_tools": self.config.disallowed_tools,
+                "permission_rules": self.config.permission_rules,
+                "enabled_plugins": self.config.enabled_plugins,
+                "mcp_servers": self.config.mcp_servers,
+                # Dashboard-owned identity, persisted so it survives restart.
+                "identity": self.config.identity,
+            }
             try:
-                _save_record({
-                    "session_id": self._session_id,
-                    "tmux_name": self._name,
-                    "driver": "bridge",
-                    "model": self.config.model,
-                    "permission_mode": self.config.permission_mode,
-                    "cwd": self.config.cwd,
-                    # The claude --session-id naming this agent's transcript, so a
-                    # restarted sidecar resolves the right <id>.jsonl on resume.
-                    "claude_session_id": self._claude_session_id,
-                    # Applied per-agent launch config — kept for readback after a
-                    # sidecar restart (reconnect rebinds, it does not relaunch).
-                    "allowed_tools": self.config.allowed_tools,
-                    "disallowed_tools": self.config.disallowed_tools,
-                    "permission_rules": self.config.permission_rules,
-                    "enabled_plugins": self.config.enabled_plugins,
-                    "mcp_servers": self.config.mcp_servers,
-                    # Dashboard-owned identity, persisted so it survives restart.
-                    "identity": self.config.identity,
-                })
+                _save_record(self._record)
             except Exception as e:  # pragma: no cover - best effort
                 logger.warning("could not persist runtime record: %s", e)
 
@@ -627,6 +650,28 @@ class BridgeDriver(AgentDriver):
     async def send(self, prompt: str) -> None:
         await asyncio.to_thread(self._bridge.send, self._name, prompt)
 
+    def _resolve_and_persist_transcript_path(self) -> None:
+        """Resolve this agent's transcript path once and persist it (§8.6/#4).
+
+        Called (in a thread) after the first successful transcript read — the
+        file provably exists then — so the verified path lands in the roster
+        record and the mapping survives restarts and scheme drift.
+        """
+        try:
+            from bridge.transcript import find_transcript  # type: ignore[import-not-found]
+            path = find_transcript(self._bridge, self._name)
+        except Exception:  # pragma: no cover - environment dependent
+            path = None
+        if not path:
+            return
+        self._transcript_path = path
+        if self._record is not None:
+            self._record["transcript_path"] = path
+            try:
+                _save_record(self._record)
+            except Exception as e:  # pragma: no cover - best effort
+                logger.warning("could not refresh runtime record: %s", e)
+
     async def events(self) -> AsyncIterator[dict[str, Any]]:
         while not self._closed:
             # 1) New transcript entries -> assistant/user events.
@@ -634,6 +679,10 @@ class BridgeDriver(AgentDriver):
                 entries = await asyncio.to_thread(self._bridge.read_log, self._name)
             except Exception:
                 entries = []  # transcript may not exist until the first turn
+            if entries and self._transcript_path is None:
+                # The transcript exists now — resolve + persist its verified
+                # path once (one extra WSL call per session lifetime).
+                await asyncio.to_thread(self._resolve_and_persist_transcript_path)
             if len(entries) > self._seen:
                 for entry in entries[self._seen:]:
                     event = _entry_to_event(entry)

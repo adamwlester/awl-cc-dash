@@ -19,10 +19,29 @@ stores); callers run single-threaded per request.
 
 from __future__ import annotations
 
-from typing import Any, List, Tuple
+from typing import Any, Callable, List, Tuple
 
 # key -> highest seq already read
 _marks: dict[str, int] = {}
+
+# Optional write-through persist hook (installed by state_store): fired with the
+# key after any mutation, so advanced marks land in the project's
+# state/bookmarks.json (§8.3). None (the default) = pure in-memory behavior.
+_persist_hook: Callable[[str], None] | None = None
+
+
+def set_persist_hook(fn: Callable[[str], None] | None) -> None:
+    """Install (or clear) the write-through persist hook."""
+    global _persist_hook
+    _persist_hook = fn
+
+
+def _notify(key: str) -> None:
+    if _persist_hook is not None:
+        try:
+            _persist_hook(key)
+        except Exception:  # pragma: no cover - persistence must never break reads
+            pass
 
 
 def reset() -> None:
@@ -38,6 +57,25 @@ def get(key: str) -> int:
 def set(key: str, seq: int) -> None:
     """Force the watermark for ``key`` to ``seq``."""
     _marks[key] = seq
+    _notify(key)
+
+
+def drop(key: str) -> bool:
+    """Remove a key's watermark entirely (agent deletion, §7.12/§11 #11)."""
+    existed = _marks.pop(key, None) is not None
+    if existed:
+        _notify(key)
+    return existed
+
+
+def keys() -> list[str]:
+    """All keys currently holding a watermark."""
+    return list(_marks.keys())
+
+
+def restore(marks: dict[str, int]) -> None:
+    """Seed watermarks from a persisted store (project load) — no hooks fired."""
+    _marks.update(marks)
 
 
 def _select(key: str, items: List[Tuple[int, Any]]) -> List[Any]:
@@ -64,6 +102,7 @@ def delta(key: str, items: List[Tuple[int, Any]]) -> List[Any]:
     max_seq = max(seq for seq, _ in items)
     if max_seq > get(key):
         _marks[key] = max_seq
+        _notify(key)
     return new
 
 

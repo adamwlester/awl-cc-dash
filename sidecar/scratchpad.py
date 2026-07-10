@@ -21,7 +21,6 @@ board). `reset()` clears it.
 """
 from __future__ import annotations
 
-import itertools
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -30,11 +29,16 @@ from typing import Any
 import watermark
 
 _LOG: dict[str, list[dict[str, Any]]] = defaultdict(list)
-_seq = itertools.count(1)
+# Monotonic post seq (module-global; per-project boards only need per-board
+# monotonicity, which a global counter gives for free). A plain int rather than
+# itertools.count so `restore()` can advance it past reloaded posts' seqs.
+_next_seq: int = 1
 
 
 def reset() -> None:
+    global _next_seq
     _LOG.clear()
+    _next_seq = 1
 
 
 def _wm_key(agent_id: str, project_key: str) -> str:
@@ -45,16 +49,32 @@ def post(project_key: str, author: str, text: str, *,
          persist_path: str | None = None) -> dict[str, Any]:
     """Append a post (author attribution + timestamp + monotonic seq) to the
     project's board; optionally mirror the board to a markdown file."""
+    global _next_seq
     p = {
-        "seq": next(_seq),
+        "seq": _next_seq,
         "author": author,
         "text": text,
         "ts": datetime.now().isoformat(),
     }
+    _next_seq += 1
     _LOG[project_key].append(p)
     if persist_path:
         _persist(project_key, persist_path)
     return p
+
+
+def restore(project_key: str, posts: list[dict[str, Any]]) -> None:
+    """Seed a project's board from its persisted ``.md`` mirror (project load).
+
+    Replaces the board wholesale (load runs before any live posts) and advances
+    the seq counter past the reloaded posts so future posts keep monotonicity —
+    the reloaded seqs (1..N by line order) are what persisted bookmarks refer to.
+    """
+    global _next_seq
+    _LOG[project_key] = list(posts)
+    max_seq = max((int(p.get("seq") or 0) for p in posts), default=0)
+    if max_seq >= _next_seq:
+        _next_seq = max_seq + 1
 
 
 def all_posts(project_key: str) -> list[dict[str, Any]]:
