@@ -69,7 +69,7 @@ it encodes — read that docstring first; it is the spec.
 ### Feasibility spikes (opt-in, live) — engine-capability evidence
 
 One-shot **engine-feasibility probes** (built 2026-07-02, verified against commit
-`af4964d`), each answering an open question in `docs/ARCHITECTURE.md` §10: *can the
+`af4964d`), each answering a then-open question in `docs/ARCHITECTURE.md`: *can the
 real Claude Code engine, via the bridge, actually do X?* They live in the live tier
 (they need WSL2 + tmux + a real TUI, and carry the `integration`+`slow` markers, so
 the hermetic run deselects them) but differ in **purpose** from the standing suite
@@ -77,7 +77,9 @@ above — they generate **evidence**, not regression protection: run one to *set
 question*, not on every change. Each file's module docstring states the decided
 behavior; the `Verdict` here is the one-line summary, and the run records are in
 `tests/log/`. The full findings + their doc consequences are folded into
-`ARCHITECTURE.md` §10 (the open questions these answer).
+`ARCHITECTURE.md` — since the 2026-07-09 Phase-9b refactor they live as the settled
+body's inline evidence citations (each body section names its proving test); the two
+INFEASIBLE tails live in §10's Decided omissions.
 
 | File | Probes: can the engine… | Verdict |
 |------|-------------------------|---------|
@@ -93,14 +95,14 @@ behavior; the `Verdict` here is the one-line summary, and the run records are in
 | `test_bypass_auto_preconditions_live.py` | …reach the Bypass/Auto permission segments given how the agent was launched? | ✅ FEASIBLE (bypass is silently absent if not pre-armed) |
 | `test_usage_context_sources_live.py` | …read mid-run context + account/usage from local sources? | ✅ FEASIBLE (data-boundaries only; live % is screen-scrape) |
 | `test_console_mirror_live.py` | …passthrough keystrokes and recover ANSI from the console pane? | ✅ FEASIBLE (faithful xterm rendering = a frontend job) |
-| `test_console_stream_attach_live.py` | …stream a real *live* terminal (ttyd/WS attached to the agent's tmux session) into the dashboard — reachable from Windows, coexisting with the sidecar's capture-pane poller? | ✅ FEASIBLE — reachable over `localhost` (no port-forward); scraper keeps classifying under a live viewer (`window-size manual` pins geometry); streaming ~11 ms vs polled ~778 ms round-trip (§10 #5) |
+| `test_console_stream_attach_live.py` | …stream a real *live* terminal (ttyd/WS attached to the agent's tmux session) into the dashboard — reachable from Windows, coexisting with the sidecar's capture-pane poller? | ✅ FEASIBLE — reachable over `localhost` (no port-forward); scraper keeps classifying under a live viewer (`window-size manual` pins geometry); streaming ~11 ms vs polled ~778 ms round-trip (ARCHITECTURE §7.13) |
 | `test_oneclick_launch_live.py` | …have the app own the sidecar lifecycle without killing agents? | ✅ FEASIBLE (modeled in Python; real Electron POC still owed) |
 | `tests/ui/test_ui_slice_live.py` | …drive the whole live loop from a browser speaking only `api.ts`? | ✅ FEASIBLE |
 | `test_system_fault_harvest_live.py` | …read machine signals for System faults (rate/usage cap, auth, MCP)? | ⚠ PARTIAL — MCP + auth OK; **usage-cap wording not matched** |
 | `test_console_clear_transcript_live.py` | …survive a Console `/clear` without orphaning the transcript? | ⚠ HAZARD — `/clear` **orphans** new turns (`/compact` is safe) |
 | `test_polling_scale_ceiling_live.py` | …scale the ~1s per-agent poll to a fleet? | ⚠ FEASIBLE test, bad curve — **degrades from N=1** (needs rework) |
-| `test_inject_tail_live.py` | …deliver an Inject *mid-turn*, earlier than the tool/turn boundary? | ❌ INFEASIBLE — typeahead is held to the turn boundary → pure Next/Queue (§10 #4) |
-| `test_runstrip_tail_live.py` | …get a real work-completion % (a denominator) from the engine? | ❌ INFEASIBLE — engine emits numerators only, no denominator (§10 #7) |
+| `test_inject_tail_live.py` | …deliver an Inject *mid-turn*, earlier than the tool/turn boundary? | ❌ INFEASIBLE — typeahead is held to the turn boundary → pure Next/Queue (ARCHITECTURE §7.3 / §10 Decided omissions) |
+| `test_runstrip_tail_live.py` | …get a real work-completion % (a denominator) from the engine? | ❌ INFEASIBLE — engine emits numerators only, no denominator (ARCHITECTURE §7.10 / §10 Decided omissions) |
 | `workflow_probe/test_workflow_orchestration_live.py` † | …run a **workflow** (JS fan-out of `workflow-subagent`s) whose on-disk artifacts an *external* observer (our sidecar) can consume — and is the run manifest live or completion-only? | ✅ FEASIBLE — `journal.jsonl` streams live; the `<runId>.json` manifest is **completion-only**; manifest ↔ journal ↔ per-agent transcripts reconcile; the approval gate is pre-authorizable via `skipWorkflowUsageWarning` |
 | `workflow_approval_probe/test_workflow_approval_intercept_live.py` ‡ | …**intercept a workflow at its approval gate** — read the full preview (name/description/phases/script) and round-trip Approve/Reject back to the agent (the "review a workflow before it runs" card)? | ✅ FEASIBLE — a PreToolUse hook **fires for the `Workflow` tool** and carries the full preview; a hook **deny aborts** / **allow launches** (A/B-proven the verdict *alone* controls launch, deny reason surfaced); the hook **preempts** the built-in dialog (dashboard can be the *sole* gate); and the on-pane dialog is a working **fallback** (renders per-session, Escape rejects) |
 
