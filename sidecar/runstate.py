@@ -31,6 +31,7 @@ clears it.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from typing import Any
@@ -58,6 +59,25 @@ _SUBAGENTS: dict[str, dict[str, dict[str, Any]]] = {}
 _SEEN: dict[str, list[str]] = {}
 _SEEN_MAX = 64
 
+# Env-guarded ingest capture (``AWL_RUNSTATE_DEBUG=1``): a bounded per-agent
+# list of every ingested delivery (event name + the arbiter-relevant fields +
+# the raw payload key set), so a live test can read back EXACTLY which hook
+# events the installed CLI fired and what each payload carried (§11 #21's live
+# verify). Off by default — zero cost in production.
+_DEBUG: dict[str, list[dict[str, Any]]] = {}
+_DEBUG_MAX = 500
+
+
+def _debug_enabled() -> bool:
+    return os.environ.get("AWL_RUNSTATE_DEBUG") == "1"
+
+
+def debug_log(agent_id: str) -> list[dict[str, Any]]:
+    """The captured ingest deliveries for an agent (empty unless the
+    ``AWL_RUNSTATE_DEBUG=1`` capture is enabled)."""
+    with _lock:
+        return [dict(r) for r in _DEBUG.get(agent_id, [])]
+
 
 def reset() -> None:
     global _seq
@@ -66,6 +86,7 @@ def reset() -> None:
         _STATE.clear()
         _SUBAGENTS.clear()
         _SEEN.clear()
+        _DEBUG.clear()
 
 
 def _dedup_key(event: str, payload: dict[str, Any]) -> str | None:
@@ -97,6 +118,20 @@ def ingest(agent_id: str, event: str, payload: dict[str, Any] | None = None) -> 
     global _seq
     payload = payload or {}
     with _lock:
+        if _debug_enabled():
+            dbg = _DEBUG.setdefault(agent_id, [])
+            dbg.append({
+                "ts": time.time(),
+                "event": event,
+                "permission_mode": payload.get("permission_mode")
+                or payload.get("permissionMode"),
+                "tool_name": payload.get("tool_name") or payload.get("toolName"),
+                "tool_use_id": payload.get("tool_use_id")
+                or payload.get("toolUseId"),
+                "prompt_id": payload.get("prompt_id"),
+                "payload_keys": sorted(payload.keys()),
+            })
+            del dbg[:-_DEBUG_MAX]
         key = _dedup_key(event, payload)
         if key is not None:
             seen = _SEEN.setdefault(agent_id, [])
@@ -191,11 +226,12 @@ def effective(agent_id: str, poll_status: str | None = None, *,
               freshness_s: float = FRESHNESS_S) -> dict[str, Any]:
     """The arbitrated run-state: pushed fields when fresh, poll floor otherwise.
 
-    Returns ``{source, age_s, phase, permission_mode, current_tool, prompt_id}``
-    — ``source`` is "push" when the last push is within the freshness window,
-    else "poll" (pushed fields still reported, marked stale by ``age_s``).
-    ``poll_status`` is the caller's screen-poll status; it is the phase used
-    whenever push is not fresh.
+    Returns ``{source, age_s, phase, permission_mode, current_tool, prompt_id,
+    last_event}`` — ``source`` is "push" when the last push is within the
+    freshness window, else "poll" (pushed fields still reported, marked stale by
+    ``age_s``). ``poll_status`` is the caller's screen-poll status; it is the
+    phase used whenever push is not fresh. ``last_event`` is the name of the
+    last ingested hook event (observability: which event the freshness rides).
     """
     rec = _STATE.get(agent_id)
     now = time.time()
@@ -209,6 +245,7 @@ def effective(agent_id: str, poll_status: str | None = None, *,
             "permission_mode": rec["permission_mode"],
             "current_tool": rec["current_tool"] if fresh else None,
             "prompt_id": rec["prompt_id"],
+            "last_event": rec["last_event"],
         }
     return {
         "source": "poll",
@@ -217,6 +254,7 @@ def effective(agent_id: str, poll_status: str | None = None, *,
         "permission_mode": None,
         "current_tool": None,
         "prompt_id": None,
+        "last_event": None,
     }
 
 
@@ -231,3 +269,4 @@ def drop_agent(agent_id: str) -> None:
         _STATE.pop(agent_id, None)
         _SUBAGENTS.pop(agent_id, None)
         _SEEN.pop(agent_id, None)
+        _DEBUG.pop(agent_id, None)

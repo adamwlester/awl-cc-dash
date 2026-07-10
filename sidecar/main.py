@@ -1273,6 +1273,17 @@ async def hook_subagent(agent: str, body: dict[str, Any] | None = None):
     return {}
 
 
+@app.get("/internal/debug/run-state/{agent}")
+async def debug_run_state(agent: str):
+    """Env-guarded (``AWL_RUNSTATE_DEBUG=1``) read-back of every hook delivery
+    the arbiter ingested for an agent — event name, arbiter-relevant fields, and
+    the raw payload key set. A live-test observability aid (§11 #21's verify
+    reads exactly which events the installed CLI fired); 404 unless enabled."""
+    if os.environ.get("AWL_RUNSTATE_DEBUG") != "1":
+        raise HTTPException(status_code=404, detail="Not enabled")
+    return {"agent": agent, "deliveries": runstate.debug_log(agent)}
+
+
 # --- Plan/Decision detection via the PreToolUse hook channel ---
 # The agent's ExitPlanMode (Plan) and AskUserQuestion (Decision) tool calls are
 # visible to hooks even when the screen isn't. The spike confirmed the hook
