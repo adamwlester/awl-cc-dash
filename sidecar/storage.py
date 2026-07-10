@@ -35,11 +35,14 @@ rather than re-solving path normalization per feature.
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 from pathlib import Path
 
 import runtime_store
+
+logger = logging.getLogger("awl-sidecar.storage")
 
 # Reuse the proven WSL2↔Windows path translation from the bridge package. The
 # sidecar runs with its own dir on sys.path (not the repo root), so add the repo
@@ -310,8 +313,12 @@ def migrate_legacy_store(cwd: str | None) -> bool:
     (``scratchpad.md`` → ``docs/scratchpad.md``; ``plan-reviews.json`` → the
     store root), anything unrecognized moves to the store root verbatim, and an
     existing target is NEVER overwritten (the legacy file is left in place for a
-    human to reconcile). The legacy dir is removed only when emptied. Returns
-    True when anything was migrated.
+    human to reconcile). A child that cannot be moved (e.g. locked by another
+    process) is skipped with a warning and the rest keep migrating — this
+    function never raises into :func:`ensure_project_awl_dir`, so a stuck
+    legacy file can never break session create; the skipped child is retried
+    on the next touch. The legacy dir is removed only when emptied. Returns
+    True when anything was actually moved (honest — skipped children don't count).
     """
     root = project_root(cwd)
     if root is None:
@@ -329,12 +336,24 @@ def migrate_legacy_store(cwd: str | None) -> bool:
         if target.exists():
             continue  # never overwrite; leave the legacy copy for reconciliation
         target.parent.mkdir(parents=True, exist_ok=True)
-        child.rename(target)
+        try:
+            child.rename(target)
+        except OSError:
+            # A locked/unmovable child must not break the migration (nor the
+            # session create above it) — skip it, keep going, retry next touch.
+            logger.warning("legacy store migration: could not move %s (skipped)",
+                           child, exc_info=True)
+            continue
         moved_any = True
     try:
         next(legacy.iterdir())
     except StopIteration:
-        legacy.rmdir()
+        try:
+            legacy.rmdir()
+        except OSError:  # pragma: no cover - removal is best-effort
+            pass
+    except OSError:  # pragma: no cover - listing is best-effort
+        pass
     return moved_any
 
 
