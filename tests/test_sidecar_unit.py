@@ -1,10 +1,25 @@
-"""Hermetic unit tests for the sidecar's session bookkeeping.
+"""Hermetic unit tests for the sidecar's session bookkeeping + endpoint wiring.
 
-Pure: no driver, no WSL2/tmux, no model. Feeds plain event dicts through
-``SessionState.handle_event`` to prove the permission wiring — a
-``permission_request`` event flips ``has_pending_permission`` and stores the
-detail; a ``permission_resolved`` event clears it. These carry neither the
-``integration`` nor the ``slow`` mark.
+Pure: no driver, no WSL2/tmux, no model, no HTTP server (async endpoint
+functions are called directly via ``asyncio.run``). Proves:
+
+  * the permission wiring — a ``permission_request`` event flips
+    ``has_pending_permission`` and stores the detail; ``permission_resolved``
+    clears it;
+  * default driver selection (``bridge`` unless explicitly overridden) and
+    agent identity assignment;
+  * the cross-agent event envelope, the merged ``/events/history`` filters,
+    the per-agent prompt queue/dispositions, hook-boundary Inject delivery,
+    and reply-to link relays;
+  * **the Library endpoints on the per-doc sidecar store (§8.5)** — GET
+    ``/library/reviews`` runs the legacy migration then aggregates sidecars;
+    POST resolves the doc (plans/ → docs/ → root; 404 when absent) and writes
+    the sidecar; document create (409 on exists) / delete / rename and the
+    comment add/resolve endpoints, including the 400 guards that scope every
+    write to ``<project>/.awl-cc-dash/``; and the ``subdir=plans|docs`` store
+    listing with its legacy ``<root>/<subdir>`` fallback.
+
+These carry neither the ``integration`` nor the ``slow`` mark.
 """
 
 import sys
@@ -552,3 +567,216 @@ class TestHookDrainEndpoints:
             assert [i["text"] for i in hookbus.pending("s1")] == ["passive"]
         finally:
             main.sessions.pop("s1", None)
+
+
+# ---------------------------------------------------------------------------
+# Library endpoints — the per-doc sidecar store (§8.5). Async endpoint
+# functions called directly (asyncio.run), all file I/O on tmp_path.
+# ---------------------------------------------------------------------------
+
+import json  # noqa: E402
+
+from fastapi import HTTPException  # noqa: E402
+
+import library  # noqa: E402
+
+
+def _proj(tmp_path):
+    """A tmp project with a .git marker so storage.project_root pins to it."""
+    proj = tmp_path / "proj"
+    (proj / ".git").mkdir(parents=True)
+    return proj
+
+
+def _store_md(proj, subdir, name, body="# Doc\n"):
+    d = proj / ".awl-cc-dash" / subdir
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / name
+    f.write_text(body, encoding="utf-8")
+    return f
+
+
+class TestLibraryReviewEndpoints:
+    def test_get_runs_migration_then_aggregates(self, tmp_path):
+        proj = _proj(tmp_path)
+        _store_md(proj, "plans", "phase-1.md")
+        legacy = proj / ".awl-cc-dash" / "plan-reviews.json"
+        legacy.write_text(json.dumps(
+            {"phase-1.md": {"owner": "coder-01", "comments": "old note"}}),
+            encoding="utf-8")
+        out = asyncio.run(main.library_reviews(cwd=str(proj)))
+        # the legacy entry landed in a per-doc sidecar and is aggregated back
+        assert out["phase-1.md"]["review"]["owner"] == "coder-01"
+        assert [c["text"] for c in out["phase-1.md"]["comments"]] == ["old note"]
+        assert (proj / ".awl-cc-dash" / "plans" / "phase-1.meta.json").is_file()
+        # migration never re-runs: the legacy file is renamed .migrated
+        assert not legacy.exists()
+        assert legacy.with_name("plan-reviews.json.migrated").is_file()
+
+    def test_post_writes_a_sidecar(self, tmp_path):
+        proj = _proj(tmp_path)
+        md = _store_md(proj, "plans", "phase-1.md")
+        out = asyncio.run(main.library_set_review(main.ReviewRequest(
+            cwd=str(proj), filename="phase-1.md", owner="coder-01",
+            state="in_review", verdict="approve", verdict_by="user",
+            comments=["looks good"])))
+        assert library.meta_path(md).is_file()
+        assert out["review"]["verdict"] == "approve"
+        assert out["review"]["verdict_by"] == "user"
+        assert [c["text"] for c in out["comments"]] == ["looks good"]
+        # and the content file stayed pristine (§8.5 rule 1)
+        assert md.read_text(encoding="utf-8") == "# Doc\n"
+
+    def test_post_404_when_doc_missing(self, tmp_path):
+        proj = _proj(tmp_path)
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_set_review(main.ReviewRequest(
+                cwd=str(proj), filename="ghost.md", owner="x")))
+        assert ei.value.status_code == 404
+
+    def test_post_resolves_docs_and_root_docs_too(self, tmp_path):
+        # Documents get the same review treatment as Plans (§8.5 rule 4).
+        proj = _proj(tmp_path)
+        _store_md(proj, "docs", "notes.md")
+        out = asyncio.run(main.library_set_review(main.ReviewRequest(
+            cwd=str(proj), filename="notes.md", state="commented")))
+        assert out["review"]["state"] == "commented"
+
+
+class TestLibraryDocumentEndpoints:
+    def test_create_then_409_on_duplicate(self, tmp_path):
+        proj = _proj(tmp_path)
+        out = asyncio.run(main.library_create_document(main.DocumentCreateRequest(
+            cwd=str(proj), filename="notes.md", content="# N\n")))
+        assert (proj / ".awl-cc-dash" / "docs" / "notes.md").is_file()
+        assert out["filename"] == "notes.md"
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_create_document(main.DocumentCreateRequest(
+                cwd=str(proj), filename="notes.md", content="again")))
+        assert ei.value.status_code == 409
+
+    def test_create_400_on_path_escape(self, tmp_path):
+        proj = _proj(tmp_path)
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_create_document(main.DocumentCreateRequest(
+                cwd=str(proj), filename="../escape.md", content="x")))
+        assert ei.value.status_code == 400
+
+    def test_delete_removes_doc_and_meta(self, tmp_path):
+        proj = _proj(tmp_path)
+        md = _store_md(proj, "docs", "gone.md")
+        library.set_doc_review(md, owner="a")
+        out = asyncio.run(main.library_delete_document(path=str(md), cwd=str(proj)))
+        assert not md.exists() and not library.meta_path(md).exists()
+        assert len(out["deleted"]) == 2
+
+    def test_delete_400_outside_store(self, tmp_path):
+        proj = _proj(tmp_path)
+        outside = proj / "readme.md"
+        outside.write_text("keep", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_delete_document(path=str(outside), cwd=str(proj)))
+        assert ei.value.status_code == 400
+        assert outside.is_file()
+
+    def test_delete_404_when_missing(self, tmp_path):
+        proj = _proj(tmp_path)
+        ghost = proj / ".awl-cc-dash" / "docs" / "ghost.md"
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_delete_document(path=str(ghost), cwd=str(proj)))
+        assert ei.value.status_code == 404
+
+    def test_rename_moves_the_pair(self, tmp_path):
+        proj = _proj(tmp_path)
+        md = _store_md(proj, "plans", "draft.md")
+        library.set_doc_review(md, owner="a")
+        out = asyncio.run(main.library_rename_document(main.DocumentRenameRequest(
+            cwd=str(proj), path=str(md), new_filename="final.md")))
+        plans = proj / ".awl-cc-dash" / "plans"
+        assert (plans / "final.md").is_file() and (plans / "final.meta.json").is_file()
+        assert not md.exists()
+        assert out["new"] == str(plans / "final.md")
+
+    def test_rename_400_outside_store(self, tmp_path):
+        proj = _proj(tmp_path)
+        outside = proj / "readme.md"
+        outside.write_text("x", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_rename_document(main.DocumentRenameRequest(
+                cwd=str(proj), path=str(outside), new_filename="y.md")))
+        assert ei.value.status_code == 400
+
+    def test_listing_subdir_prefers_store_then_falls_back_legacy(self, tmp_path):
+        proj = _proj(tmp_path)
+        # No store plans dir yet -> the legacy <root>/plans listing still works.
+        legacy_dir = proj / "plans"
+        legacy_dir.mkdir()
+        (legacy_dir / "old.md").write_text("x", encoding="utf-8")
+        names = {e["filename"] for e in asyncio.run(
+            main.library_documents(cwd=str(proj), subdir="plans"))}
+        assert names == {"old.md"}
+        # Once the store dir exists it wins over the legacy location.
+        _store_md(proj, "plans", "new.md")
+        names = {e["filename"] for e in asyncio.run(
+            main.library_documents(cwd=str(proj), subdir="plans"))}
+        assert names == {"new.md"}
+
+    def test_listing_no_subdir_keeps_root_readonly_browse(self, tmp_path):
+        proj = _proj(tmp_path)
+        (proj / "readme.md").write_text("x", encoding="utf-8")
+        _store_md(proj, "docs", "stored.md")
+        names = {e["filename"] for e in asyncio.run(
+            main.library_documents(cwd=str(proj)))}
+        assert names == {"readme.md"}   # root browse only; the store isn't merged in
+
+
+class TestLibraryCommentEndpoints:
+    def test_add_comment_with_anchor(self, tmp_path):
+        proj = _proj(tmp_path)
+        md = _store_md(proj, "docs", "notes.md")
+        out = asyncio.run(main.library_add_comment(main.CommentRequest(
+            cwd=str(proj), path=str(md), text="tighten", author="user",
+            anchor_quote="quoted bit", anchor_heading="Goals")))
+        assert out["id"] == "c1"
+        stored = library.load_meta(md)["comments"][0]
+        assert stored["anchor_quote"] == "quoted bit"
+        assert stored["anchor_heading"] == "Goals"
+
+    def test_add_comment_400_outside_store(self, tmp_path):
+        proj = _proj(tmp_path)
+        outside = proj / "readme.md"
+        outside.write_text("x", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_add_comment(main.CommentRequest(
+                cwd=str(proj), path=str(outside), text="nope", author="user")))
+        assert ei.value.status_code == 400
+
+    def test_add_comment_404_when_md_missing(self, tmp_path):
+        proj = _proj(tmp_path)
+        ghost = proj / ".awl-cc-dash" / "docs" / "ghost.md"
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_add_comment(main.CommentRequest(
+                cwd=str(proj), path=str(ghost), text="x", author="user")))
+        assert ei.value.status_code == 404
+
+    def test_resolve_comment_roundtrip_and_404(self, tmp_path):
+        proj = _proj(tmp_path)
+        md = _store_md(proj, "docs", "notes.md")
+        library.add_comment(md, text="fix", author="user")
+        out = asyncio.run(main.library_resolve_comment(main.CommentResolveRequest(
+            cwd=str(proj), path=str(md), comment_id="c1")))
+        assert out["status"] == "resolved"
+        assert library.load_meta(md)["comments"][0]["resolved"] is True
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_resolve_comment(main.CommentResolveRequest(
+                cwd=str(proj), path=str(md), comment_id="c99")))
+        assert ei.value.status_code == 404
+
+    def test_resolve_400_outside_store(self, tmp_path):
+        proj = _proj(tmp_path)
+        outside = proj / "readme.md"
+        outside.write_text("x", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_resolve_comment(main.CommentResolveRequest(
+                cwd=str(proj), path=str(outside), comment_id="c1")))
+        assert ei.value.status_code == 400
