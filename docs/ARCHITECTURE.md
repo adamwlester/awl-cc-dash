@@ -396,9 +396,8 @@ scrollback, watch, wait_idle, export, mcp_sync, plus `set_cwd`/`set_model` and i
 - **Windows↔WSL2 translation.** [`paths.py`](../bridge/paths.py) converts `C:\…` ↔ `/mnt/c/…`; large
   payloads are **piped via stdin** to dodge the ~32 KB command-line limit. Per-agent launch config (the
   materialized `--settings` including hook config, plus `mcp.json`) is written to
-  `~/.awl-cc-dash-agents/<name>/` inside WSL — deliberately kept **out** of the real `~/.claude`.
-  ⚠ **Today:** the directory is `~/.awl-agents/<name>/` (the `WSL_AWL_DIR` constant in
-  [`bridge/paths.py`](../bridge/paths.py)).
+  `~/.awl-cc-dash-agents/<name>/` inside WSL (the `WSL_AWL_DIR` constant in
+  [`bridge/paths.py`](../bridge/paths.py)) — deliberately kept **out** of the real `~/.claude`.
 - **The hook callback loop.** WSL2 NAT means `localhost` from inside WSL does **not** reach the Windows
   host. So the bridge resolves the **default-gateway IP** (`ip route show default`, cached) and builds
   `http://<gateway>:7690/internal/hooks/…` as the URL each agent's hooks POST to. This inbound-push half of
@@ -757,8 +756,8 @@ projects?"** — one project → 📁; reusable → 🏠.
   dashboard state, and different projects never mix.
 - **Transcripts** are the master record (§8.6); the dashboard pins their retention and remembers where they
   are, but never copies them.
-- **Launch config** is materialized per agent at launch (§6.4). ⚠ **Today:** at `~/.awl-agents/<name>/`
-  (`WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py)); the target name is `~/.awl-cc-dash-agents/`.
+- **Launch config** is materialized per agent at launch (§6.4) at `~/.awl-cc-dash-agents/<name>/`
+  (`WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py)).
 - **Claude config** is surfaced and edited **in place** via the Settings step-in UI — never owned or copied.
 - **Derived** state holds nothing on disk — deliberately ephemeral, rebuilt from transcripts and live
   drivers on every start.
@@ -874,7 +873,7 @@ The single lookup tying **home ↔ path ↔ UI ↔ restart behavior**. UI anchor
 | Unsent prompt queue / Hold | ⚡ | — (drops on close, by design) | Prompt→Compose (send-timing) | matches target |
 | Message feed / cap metrics / console / subagents / run-strip / marquee | ⚡ | — (derived, §8.3) | Feed / Team Graph / Agent→Console | matches target |
 | Session transcripts (full history, incl. subagents) | 📜 | `~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl` (WSL) | Feed/History (replayed) | retention pinned (`cleanupPeriodDays: 3650` in every materialized per-agent settings); path persistence rides #4 |
-| Per-agent launch files (`settings.json`, `mcp.json`) | 🛠 | `~/.awl-cc-dash-agents/<name>/` | — | `~/.awl-agents/<name>/` (`WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py)) |
+| Per-agent launch files (`settings.json`, `mcp.json`) | 🛠 | `~/.awl-cc-dash-agents/<name>/` | — | matches target — `WSL_AWL_DIR` in [`bridge/paths.py`](../bridge/paths.py) |
 | Claude Code config (MCP/plugins/settings) | 🔌 | `~/.claude`, `<project>/.claude` | Settings (step-in) · `settings-row`, `registry-row` | matches target — surfaced, not owned |
 
 *Env overrides on the storage model:* `AWL_SIDECAR_RUNTIME` (moves 🏠) · `AWL_EVENT_RING_MAX` (event ring
@@ -1122,7 +1121,6 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §4.4, §7.5, §7.10 | Renderer trails the design system (16/25 colours, Console gaps, marquee omitted) — superseded by the fresh rebuild | #37 |
 | §5.2 | Console live attach not wired; no Projects endpoints | #29, #26 |
 | §6.2 | `set_mode` / `set_thinking` / `set_fast` are in-code no-ops (the proven `keys()` levers are unwired); polling degrades from N=1 | #12, #34 |
-| §6.4, §8.1 | Launch-config dir still `~/.awl-agents/` (target `~/.awl-cc-dash-agents/`) | #9 |
 | §7.2 | No reserved System identity; no System-sourced Error cards; usage-cap matcher gap | #27 |
 | §7.4 | Run-state push channel + arbiter unbuilt (only inject / plan / decision hooks registered) | #21 |
 | §7.5 | Identity editing + `--name`/`/rename` registration unwired; randomize not drawing from the shipped pool | #14, #40 |
@@ -1157,7 +1155,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 6. **Per-doc metadata sidecars** *(→ §8.5)* — `<doc>.meta.json` read/write (verdict, comments, quote-anchors, provenance), replacing `plan-reviews.json`; Documents comment endpoints; dashboard-mediated rename of the doc + sidecar pair; orphan detection/re-link. Where: [`sidecar/library.py`](../sidecar/library.py), [`sidecar/storage.py`](../sidecar/storage.py).
 7. **Absolute `plansDirectory`** *(→ §8.5; depends on #2)* — set `plansDirectory` to the absolute WSL path `<canonical-root>/.awl-cc-dash/plans` in the materialized per-agent settings (a relative `./` resolves against raw cwd and breaks subfolder launches). Where: `_build_settings()` ([`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py)).
 8. **Cold-restore on startup** *(→ §9.9; enables #17)* — on startup, dead-tmux records **resume** (`claude --resume <claude_session_id>`, correct cwd) instead of prune. Needs a bridge resume-launch path (today a passed `session_id` only pins `--session-id` — still a NEW conversation — and `resume()`'s dead-session fall-through calls `create()` with no id). Graceful degrade = restore data, manual re-resume. *(Mechanism proven feasible by the one-click-launch + rewind/handoff live spikes.)* Where: [`sidecar/main.py`](../sidecar/main.py), [`bridge/bridge.py`](../bridge/bridge.py).
-9. **WSL home dir rename** *(→ §6.4, §8.1)* — rename `~/.awl-agents/` → `~/.awl-cc-dash-agents/`. Where: `WSL_AWL_DIR` ([`bridge/paths.py`](../bridge/paths.py)).
+9. *(built 2026-07-09 — WSL launch-config dir renamed; see DEVLOG)*
 10. **Dogfood the committed store** *(→ §8.2 self-dogfooding; depends on #1)* — commit this repo's `.awl-cc-dash/`; add a CLAUDE.md note (runtime data, deliberate commits); confirm tests stay on temp dirs. Where: `.gitignore`, `CLAUDE.md`.
 11. **Delete → project state files** *(→ §9.10, §7.12; depends on #3)* — extend the delete/tombstone flow to the project `state/` files — the roster entry plus inbox/links/routing/bookmarks rows — not just the runtime record + transcripts. Where: [`sidecar/deletion.py`](../sidecar/deletion.py), [`sidecar/main.py`](../sidecar/main.py).
 
