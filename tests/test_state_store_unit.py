@@ -17,13 +17,27 @@ The decided contract this file encodes:
   * The roster lives per-project: ``runtime_store.save_record`` routes records
     with a resolvable project cwd into ``state/agents.json`` (+ the 🏠
     ``projects.json`` index, §3.5); cwd-less records fall back to the app-level
-    ``sessions.json``. ``all_records()`` aggregates both.
+    ``sessions.json``. ``all_records()`` aggregates both — **project-first**, so
+    a stale pre-migration app-level copy never shadows the project record, and
+    a project-side ``save_record`` removes any app-level copy of the session.
+  * Concurrency (§8.7): every read→modify→write pair in the state store (and
+    the runtime store's legacy file) is serialized under a module lock, so
+    concurrent in-process writers never lose each other's updates; tmp names
+    are unique per write. Writes are merge-shaped: ``persist_inbox_for``
+    replaces only the triggering agent's slice, and ``persist_links_for``
+    merges one link's row by id (tombstoned links of unregistered agents
+    survive other links' writes).
+  * ``load_project`` clamps a project's persisted ``scratch:{key}:*``
+    watermarks to the reloaded board's length (legacy global-seq marks could
+    exceed it and would swallow every new post forever).
 
 No WSL, no network, no live agent — pure files on tmp_path.
 """
 
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -121,6 +135,29 @@ class TestRoster:
         state_store.persist_retired_number(key, 7)
         assert state_store.load_retired_numbers(key) == [3, 7]
 
+    def test_project_roster_wins_over_stale_legacy_copy(self, tmp_path):
+        """all_records builds PROJECT-FIRST: a pre-migration app-level copy of
+        the same session must not shadow the fresher project record."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        runtime_store._write_all_legacy(
+            {"s1": {"session_id": "s1", "model": "stale-app-copy"}})
+        state_store.save_roster_record(
+            key, {"session_id": "s1", "cwd": cwd, "model": "fresh-project"})
+        state_store.touch_projects_index(key)
+        recs = {r["session_id"]: r for r in runtime_store.all_records()}
+        assert recs["s1"]["model"] == "fresh-project"
+
+    def test_save_record_removes_stale_legacy_copy(self, tmp_path):
+        """A project-side save_record cleans up any app-level copy of the same
+        session left from before the per-project migration."""
+        cwd = _proj(tmp_path)
+        runtime_store._write_all_legacy({"s1": {"session_id": "s1"}})
+        runtime_store.save_record({"session_id": "s1", "cwd": cwd, "model": "m"})
+        assert runtime_store._load_all_legacy() == {}
+        key = storage.project_key(cwd)
+        assert state_store.load_roster(key)["s1"]["model"] == "m"
+
     def test_runtime_store_routes_by_project_home(self, tmp_path):
         cwd = _proj(tmp_path)
         runtime_store.save_record({"session_id": "s1", "cwd": cwd, "tmux_name": "t1"})
@@ -140,6 +177,57 @@ class TestRoster:
         runtime_store.remove_record("s1")
         runtime_store.remove_record("s2")
         assert runtime_store.all_records() == []
+
+
+# ---------------------------------------------------------------------------
+# Concurrency: read→modify→write pairs are serialized (§8.7)
+# ---------------------------------------------------------------------------
+
+class TestConcurrentWriters:
+    def test_concurrent_retired_number_writes_lose_nothing(self, tmp_path, monkeypatch):
+        """Interleaved read→modify→write pairs must not clobber each other.
+
+        The widened read window (a sleep after every read) makes the pre-lock
+        race deterministic: without the module lock every thread reads the same
+        stale file and the last writer wins, losing the other numbers.
+        """
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        real_read = state_store._read_json
+
+        def slow_read(path):
+            data = real_read(path)
+            time.sleep(0.05)
+            return data
+
+        monkeypatch.setattr(state_store, "_read_json", slow_read)
+        threads = [threading.Thread(target=state_store.persist_retired_number,
+                                    args=(key, n)) for n in (1, 2, 3, 4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert state_store.load_retired_numbers(key) == [1, 2, 3, 4]
+
+    def test_concurrent_legacy_runtime_saves_lose_nothing(self, tmp_path, monkeypatch):
+        """runtime_store's legacy sessions.json pair is locked the same way."""
+        real_load = runtime_store._load_all_legacy
+
+        def slow_load():
+            data = real_load()
+            time.sleep(0.05)
+            return data
+
+        monkeypatch.setattr(runtime_store, "_load_all_legacy", slow_load)
+        recs = [{"session_id": f"s{n}", "tmux_name": f"t{n}"} for n in (1, 2, 3)]
+        threads = [threading.Thread(target=runtime_store.save_record, args=(r,))
+                   for r in recs]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        sids = {r["session_id"] for r in runtime_store.all_records()}
+        assert sids == {"s1", "s2", "s3"}
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +267,74 @@ class TestWriteThrough:
         links.remove_link(lk.id)
         rows = json.loads(state_store.links_path(key).read_text(encoding="utf-8"))["links"]
         assert rows == []
+
+    def test_inbox_persist_preserves_other_agents_slices(self, tmp_path):
+        """Per-agent merge (§8.3): a write for one agent must not rebuild the
+        file from registered agents only — an unloaded/unregistered agent's
+        persisted items stay on disk untouched."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.register_agent("a1", cwd)
+        state_store.register_agent("a2", cwd)
+        inbox.raise_item("a1", "error", {"m": 1})
+        inbox.raise_item("a2", "decision", {"q": "?"})
+        # a2 drops off the in-memory registration (e.g. not yet reloaded in
+        # this process) — its persisted slice must survive a1's next write.
+        state_store.unregister_agent("a2")
+        inbox.raise_item("a1", "warning", {})
+        data = json.loads(state_store.inbox_path(key).read_text(encoding="utf-8"))
+        assert data["items"]["a2"][0]["type"] == "decision"
+        assert [i["type"] for i in data["items"]["a1"]] == ["error", "warning"]
+
+    def test_inbox_persist_drops_only_the_emptied_agents_key(self, tmp_path):
+        """The §7.12 wipe still lands: an agent whose items are dropped loses
+        its key, other agents' slices stay."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.register_agent("a1", cwd)
+        state_store.register_agent("a2", cwd)
+        inbox.raise_item("a1", "error", {})
+        inbox.raise_item("a2", "error", {})
+        inbox.drop_agent("a1")
+        data = json.loads(state_store.inbox_path(key).read_text(encoding="utf-8"))
+        assert "a1" not in data["items"]
+        assert "a2" in data["items"]
+
+    def test_tombstoned_link_survives_other_links_writes(self, tmp_path):
+        """Merge-by-id (§7.12 tombstones): a link whose endpoints are no longer
+        registered must not vanish from links.json when another link writes."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.register_agent("a", cwd)
+        state_store.register_agent("b", cwd)
+        dead = links.add_link(a="a", b="b", link_id="lnkdead")
+        dead.active = False
+        links.touched(dead)                    # tombstone persisted
+        state_store.unregister_agent("a")      # agents deleted/unloaded
+        state_store.unregister_agent("b")
+        state_store.register_agent("c", cwd)
+        state_store.register_agent("d", cwd)
+        links.add_link(a="c", b="d", link_id="lnklive")
+        rows = json.loads(state_store.links_path(key).read_text(encoding="utf-8"))["links"]
+        by_id = {r["id"]: r for r in rows}
+        assert set(by_id) == {"lnkdead", "lnklive"}
+        assert by_id["lnkdead"]["active"] is False
+
+    def test_unregistered_tombstone_update_reaches_the_file_by_id(self, tmp_path):
+        """A touched() on a link with NO registered endpoint still updates its
+        persisted row — routed via the known-projects scan by link id."""
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.touch_projects_index(key)  # the project is known (§3.5)
+        state_store.register_agent("a", cwd)
+        state_store.register_agent("b", cwd)
+        lk = links.add_link(a="a", b="b", link_id="lnkT")
+        state_store.unregister_agent("a")
+        state_store.unregister_agent("b")
+        lk.active = False
+        links.touched(lk)
+        rows = json.loads(state_store.links_path(key).read_text(encoding="utf-8"))["links"]
+        assert rows[0]["id"] == "lnkT" and rows[0]["active"] is False
 
     def test_bookmarks_scratch_and_shared_routing(self, tmp_path):
         cwd = _proj(tmp_path)

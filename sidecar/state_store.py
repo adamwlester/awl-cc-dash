@@ -14,10 +14,18 @@ lose), living in the open project's ``<project>/.awl-cc-dash/state/``:
   * ``routing.jsonl``  — append-only thin routing overlay: ``{anchor_id, source,
                          recipients}`` for NON-default routing only (§8.6).
 
-Mechanics (§8.7): **atomic write-replace per file** (tmp + ``os.replace``) so
-concurrent writers can't tear JSON; append-only for the ``.jsonl``; every
-committed JSON carries a ``schema_version`` stamp (#42 — readers tolerate a
-missing/older stamp; migration machinery stays deferred until a format changes).
+Mechanics (§8.7): **atomic write-replace per file** (a per-write-unique tmp name
++ ``os.replace``) so concurrent writers can't tear JSON; append-only for the
+``.jsonl``; every committed JSON carries a ``schema_version`` stamp (#42 —
+readers tolerate a missing/older stamp; migration machinery stays deferred until
+a format changes). Every read→modify→write pair here runs under one module-level
+lock (``_IO_LOCK``) so concurrent in-process writers (request handlers, hook
+callbacks, threads) can't interleave and lose each other's updates. Writes are
+also **merge-shaped, not rebuild-shaped**: ``persist_inbox_for`` replaces only
+the triggering agent's slice of ``inbox.json`` (other agents' items — loaded or
+not — stay untouched), and ``persist_links_for`` merges one link's row by ``id``
+into every candidate ``links.json`` (so a tombstoned link whose endpoints are no
+longer registered never vanishes from disk).
 
 Loading is **lazy per project** (§11 #3): the first session whose canonical root
 resolves to a project triggers :func:`load_project`, which seeds the in-memory
@@ -38,6 +46,7 @@ import json
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -59,6 +68,12 @@ _LOADED: set[str] = set()
 # id can route to the right project store. Registered by the session layer.
 _AGENT_PROJECT: dict[str, str] = {}
 
+# One lock over every read→modify→write pair in this module (§8.7 concurrent
+# writers): request handlers, hook callbacks, and worker threads all funnel
+# their state-file updates through here, so no writer can read a file, be
+# interleaved by another writer, and then clobber that writer's update.
+_IO_LOCK = threading.Lock()
+
 
 def reset() -> None:
     """Test/lifecycle hook: forget loads + agent routing (files stay put)."""
@@ -79,10 +94,15 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
-    """Atomic write-replace (§8.7): tmp file + ``os.replace`` — never torn."""
+    """Atomic write-replace (§8.7): tmp file + ``os.replace`` — never torn.
+
+    The tmp name is UNIQUE per write (``.{pid}-{threadid}.tmp``) so two
+    concurrent writers can never collide on one tmp file; ``os.replace``
+    consumes the tmp, which is its cleanup.
+    """
     data = {"schema_version": SCHEMA_VERSION, **data}
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}-{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)
 
@@ -160,27 +180,29 @@ def save_roster_record(project_key: str, record: dict[str, Any]) -> None:
     p = agents_path(project_key)
     if not sid or p is None:
         return
-    data = _read_json(p)
-    agents = data.get("agents")
-    if not isinstance(agents, dict):
-        agents = {}
-    agents[sid] = record
-    data["agents"] = agents
-    data.setdefault("retired_numbers", [])
-    _write_json(p, data)
+    with _IO_LOCK:
+        data = _read_json(p)
+        agents = data.get("agents")
+        if not isinstance(agents, dict):
+            agents = {}
+        agents[sid] = record
+        data["agents"] = agents
+        data.setdefault("retired_numbers", [])
+        _write_json(p, data)
 
 
 def remove_roster_record(project_key: str, session_id: str) -> bool:
     p = agents_path(project_key)
     if p is None:
         return False
-    data = _read_json(p)
-    agents = data.get("agents")
-    if not isinstance(agents, dict) or session_id not in agents:
-        return False
-    del agents[session_id]
-    data["agents"] = agents
-    _write_json(p, data)
+    with _IO_LOCK:
+        data = _read_json(p)
+        agents = data.get("agents")
+        if not isinstance(agents, dict) or session_id not in agents:
+            return False
+        del agents[session_id]
+        data["agents"] = agents
+        _write_json(p, data)
     return True
 
 
@@ -197,14 +219,15 @@ def persist_retired_number(project_key: str, number: int) -> None:
     p = agents_path(project_key)
     if p is None:
         return
-    data = _read_json(p)
-    nums = data.get("retired_numbers")
-    nums = [int(n) for n in nums] if isinstance(nums, list) else []
-    if int(number) not in nums:
-        nums.append(int(number))
-    data["retired_numbers"] = sorted(nums)
-    data.setdefault("agents", {})
-    _write_json(p, data)
+    with _IO_LOCK:
+        data = _read_json(p)
+        nums = data.get("retired_numbers")
+        nums = [int(n) for n in nums] if isinstance(nums, list) else []
+        if int(number) not in nums:
+            nums.append(int(number))
+        data["retired_numbers"] = sorted(nums)
+        data.setdefault("agents", {})
+        _write_json(p, data)
 
 
 # ---------------------------------------------------------------------------
@@ -215,16 +238,17 @@ def touch_projects_index(project_key: str) -> None:
     """Upsert a canonical root into the known-projects index (cold discovery)."""
     from datetime import datetime
     path = storage.projects_index_path()
-    data = _read_json(path)
-    projects = data.get("projects")
-    if not isinstance(projects, dict):
-        projects = {}
-    entry = projects.get(project_key)
-    entry = dict(entry) if isinstance(entry, dict) else {}
-    entry["last_used"] = datetime.now().isoformat()
-    projects[project_key] = entry
-    data["projects"] = projects
-    _write_json(path, data)
+    with _IO_LOCK:
+        data = _read_json(path)
+        projects = data.get("projects")
+        if not isinstance(projects, dict):
+            projects = {}
+        entry = projects.get(project_key)
+        entry = dict(entry) if isinstance(entry, dict) else {}
+        entry["last_used"] = datetime.now().isoformat()
+        projects[project_key] = entry
+        data["projects"] = projects
+        _write_json(path, data)
 
 
 def known_projects() -> dict[str, dict[str, Any]]:
@@ -238,35 +262,79 @@ def known_projects() -> dict[str, dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def persist_inbox_for(agent_id: str) -> None:
-    """Write the owning project's whole inbox slice (all its agents' items)."""
+    """Merge ONE agent's inbox slice into its project's ``inbox.json``.
+
+    Per-agent merge, never a rebuild: only the triggering agent's key is
+    set/replaced (deleted when its item list is empty — the §7.12 hard-delete
+    wipe); every other agent's slice in the file — including agents that are
+    unloaded or no longer registered — stays untouched, so a write for one
+    agent can never silently drop another's persisted items.
+    """
     key = project_of(agent_id)
     if not key:
         return
     p = inbox_path(key)
     if p is None:
         return
-    items = {
-        aid: inbox.items_for(aid, include_resolved=True)
-        for aid, akey in _AGENT_PROJECT.items() if akey == key
-    }
-    items = {aid: lst for aid, lst in items.items() if lst}
-    _write_json(p, {"items": items})
+    with _IO_LOCK:
+        data = _read_json(p)
+        items = data.get("items")
+        items = dict(items) if isinstance(items, dict) else {}
+        lst = inbox.items_for(agent_id, include_resolved=True)
+        if lst:
+            items[agent_id] = lst
+        else:
+            items.pop(agent_id, None)
+        _write_json(p, {"items": items})
 
 
 def persist_links_for(link: Any) -> None:
-    """Write every project store that either endpoint agent belongs to."""
-    keys = {k for k in (project_of(link.a), project_of(link.b)) if k}
-    for key in keys:
-        _persist_links_project(key)
+    """Merge ONE link's row (by ``id``) into every candidate ``links.json``.
 
-
-def _persist_links_project(project_key: str) -> None:
-    p = links_path(project_key)
-    if p is None:
+    Candidates are the projects of the link's currently-registered endpoints
+    PLUS any known project whose ``links.json`` already contains this link id —
+    so a tombstoned link of a deleted/unregistered agent (§7.12: kept,
+    attributed, inactive) still updates in place instead of vanishing on the
+    next write. In each file the row is updated-or-appended by ``id`` (removed
+    when the link no longer exists in the live store); rows for OTHER links are
+    never dropped, whether or not their agents are registered.
+    """
+    link_id = getattr(link, "id", None)
+    if not link_id:
         return
-    rows = [lk.to_dict() for lk in links.all_links()
-            if project_of(lk.a) == project_key or project_of(lk.b) == project_key]
-    _write_json(p, {"links": rows})
+    keys = {k for k in (project_of(link.a), project_of(link.b)) if k}
+    for key in known_projects():
+        if key in keys:
+            continue
+        p = links_path(key)
+        if p is None or not p.is_file():
+            continue
+        rows = _read_json(p).get("links")
+        if isinstance(rows, list) and any(
+                isinstance(r, dict) and r.get("id") == link_id for r in rows):
+            keys.add(key)
+    live = links.get_link(link_id)
+    for key in keys:
+        p = links_path(key)
+        if p is None:
+            continue
+        with _IO_LOCK:
+            data = _read_json(p)
+            rows = data.get("links")
+            rows = [r for r in rows if isinstance(r, dict)] \
+                if isinstance(rows, list) else []
+            replaced = False
+            for i, r in enumerate(rows):
+                if r.get("id") == link_id:
+                    if live is not None:
+                        rows[i] = live.to_dict()
+                    else:
+                        del rows[i]   # the link was removed from the store
+                    replaced = True
+                    break
+            if live is not None and not replaced:
+                rows.append(live.to_dict())
+            _write_json(p, {"links": rows})
 
 
 def persist_bookmark(key: str) -> None:
@@ -289,14 +357,15 @@ def persist_bookmark(key: str) -> None:
     p = bookmarks_path(project)
     if p is None:
         return
-    data = _read_json(p)
-    marks = data.get("marks")
-    marks = marks if isinstance(marks, dict) else {}
-    if key in watermark.keys():
-        marks[key] = watermark.get(key)
-    else:
-        marks.pop(key, None)   # dropped (agent deletion) → row removed
-    _write_json(p, {"marks": marks})
+    with _IO_LOCK:
+        data = _read_json(p)
+        marks = data.get("marks")
+        marks = marks if isinstance(marks, dict) else {}
+        if key in watermark.keys():
+            marks[key] = watermark.get(key)
+        else:
+            marks.pop(key, None)   # dropped (agent deletion) → row removed
+        _write_json(p, {"marks": marks})
 
 
 def append_routing(agent_id: str, anchor_id: str,
@@ -308,8 +377,9 @@ def append_routing(agent_id: str, anchor_id: str,
     p = routing_path(key)
     if p is None:
         return
-    _append_jsonl(p, {"anchor_id": anchor_id, "source": source,
-                      "recipients": list(recipients)})
+    with _IO_LOCK:
+        _append_jsonl(p, {"anchor_id": anchor_id, "source": source,
+                          "recipients": list(recipients)})
 
 
 def load_routing(project_key: str) -> list[dict[str, Any]]:
