@@ -561,6 +561,14 @@ Files: archive/design/design-v13p1/ (new, 8 files), DEVLOG.md
 
 ---
 
+### 2026-07-09 22:31:00 — dev: build-sprint prompt authored — full-autonomy run, reins off (dev/prompts/2026-07-09-build-sprint-run.md)
+
+Wrote [dev/prompts/2026-07-09-build-sprint-run.md](dev/prompts/2026-07-09-build-sprint-run.md), the operator-issued prompt for the build sprint (Fable 5 / ultracode, unattended, bypass-permissions launch). Reworked from the in-chat draft per operator direction: the CLAUDE.md no-branch rule is **suspended for this run by an express in-repo grant** (branches/worktrees freely, with merge-back-to-main + branch cleanup obligations), the agent must **never pause for operator approval** (undocumented forks → best doc-consistent call, marked "⚠ assumed" in DEVLOG), and resources are unconstrained (manage only its own context — handoff-state-and-continue rather than degrade). Scope raised from "spine first" to **the complete §11 queue** with the same graceful-incompleteness priority order (URGENT #5 retention → storage #1–11 → HIGH spine → readouts → renderer rebuild #37 → lifecycle/features → §10 #1 ladder). Correctness rules stay: tab-less bridge, design/ consumed-not-redesigned, DEVLOG discipline, doc-marker maintenance, honest end-to-end final report.
+
+Files: dev/prompts/2026-07-09-build-sprint-run.md (new), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
