@@ -37,8 +37,8 @@ durable part. Keep this table current when you add/remove/rename test files (see
 
 | File | Pins down (module under test) | ~cases |
 |------|-------------------------------|:-----:|
-| `test_bridge_unit.py` | `bridge/` pkg (screen-state detection, context-usage & turn derivation, transcript parsing) + `sidecar/drivers/base.py` + `sidecar/drivers/bridge.py` (non-live paths) + `sidecar/runtime_store.py` | ~88 |
-| `test_sidecar_unit.py` | `sidecar/main.py` endpoints (incl. the Library sidecar-store endpoints: reviews migration+aggregate, document create/delete/rename, comments + their `.awl-cc-dash/` scope guards) + driver wiring + `identity.py` + hookbus/links/eventbus integration | ~59 |
+| `test_bridge_unit.py` | `bridge/` pkg (screen-state detection, context-usage & turn derivation, transcript parsing, the `create()`/`resume()` launch argv incl. `--name` display-name registration §7.5) + `sidecar/drivers/base.py` + `sidecar/drivers/bridge.py` (non-live paths, incl. `set_display_name` → `/rename`) + `sidecar/runtime_store.py` | ~103 |
+| `test_sidecar_unit.py` | `sidecar/main.py` endpoints (incl. the Library sidecar-store endpoints: reviews migration+aggregate, document create/delete/rename, comments + their `.awl-cc-dash/` scope guards; the link endpoints' §7.6 one-relationship contract + per-relationship trigger defaults; the §7.5 identity-edit endpoint with retired-number refusal + rename wiring) + driver wiring + `identity.py` + hookbus/links/eventbus integration, the reply-to relay, and the shared-context fire / piggyback delivery | ~75 |
 | `test_settings_io_unit.py` | `settings_io.py` (settings read/write) | ~35 |
 | `test_marquee_unit.py` | `marquee.py` (transcript tail marquee) | ~25 |
 | `test_library_unit.py` | `library.py` (doc/plan render; per-doc `.meta.json` sidecars §8.5 — review/comments/anchors/provenance, atomic writes, pair-rename, orphan re-link, legacy `plan-reviews.json` migration, store-scoped create/delete guards) | ~83 |
@@ -52,7 +52,7 @@ durable part. Keep this table current when you add/remove/rename test files (see
 | `test_storage_unit.py` | `storage.py` (on-disk store) | ~14 |
 | `test_subagents_naming_unit.py` | `subagents_naming.py` (subagent identity/naming) | ~13 |
 | `test_hookbus_unit.py` | `hookbus.py` (hook-boundary Inject, hook delivery) | ~12 |
-| `test_links_unit.py` | `links.py` (link edges/persistence) | ~10 |
+| `test_links_unit.py` | `links.py` (the §7.6 one-relationship link model, per-relationship trigger defaults incl. Piggyback, direction-aware End-After exchange counting, legacy list-relationship restore degrade, the piggyback park-store) | ~28 |
 | `test_scratchpad_unit.py` | `scratchpad.py` (+ `watermark.py`) | ~8 |
 | `test_utility_llm_unit.py` | `utility_llm.py` (Revise/Summarize passes) | ~6 |
 
@@ -66,6 +66,7 @@ it encodes — read that docstring first; it is the spec.
 | `test_tmux_bridge.py` | The `bridge` package control surface end-to-end: create/send/keys/read/list/rename/resume/status/batch/broadcast/interrupt/scrollback/watch/wait_idle/export/show/set_cwd/set_model/mcp_sync/read_log | ~29 |
 | `test_bridge_finisher_live.py` | The bridge **driver** behaviors the product leans on: **permission approve/deny**, **resume-after-restart**, **model + effort take** | ~4 |
 | `test_cold_restore_live.py` | The §9.9 **cold-restore** contract: `create(resume_session_id=…)` relaunches a DEAD agent's conversation via `claude --resume` — same session id, same `<id>.jsonl`, memory retained (same-id-vs-fork verdict recorded in `log/cold_restore_findings_latest.txt`) | ~1 |
+| `test_identity_rename_live.py` | The §7.5 **name-registration** contract: `create(display_name=…)` launches with `claude --name`, `/rename <name>` over `send()` renames the LIVE session (idle + still answering), and `~/.claude/sessions/<pid>.json` reads the registered name back (verdict in `log/identity_rename_findings_latest.txt`) | ~1 |
 
 ### Feasibility spikes (opt-in, live) — engine-capability evidence
 
@@ -117,7 +118,7 @@ INFEASIBLE tails live in §10's Decided omissions.
 |------|---------|
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) + per-run timestamped DEBUG log setup. Adds the repo root to `sys.path`. |
 | `run.ps1` | Convenience runner — resolves the local `.venv` and passes all args through to pytest. |
-| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. The cold-restore test writes `cold_restore_findings_*.txt` (+ `_latest`) — its same-id-vs-fork verdict. |
+| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. The cold-restore test writes `cold_restore_findings_*.txt` (+ `_latest`) — its same-id-vs-fork verdict. The identity-rename test writes `identity_rename_findings_*.txt` (+ `_latest`) — its `--name`/`/rename` registration + read-back verdict. |
 
 ---
 
