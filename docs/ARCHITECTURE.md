@@ -158,10 +158,10 @@ Config**). It renders:
 - When a project is open, it renders as a **highlighted card pinned at the top** of the list, carrying the
   **Close Project** action.
 
-⚠ **Today:** no Projects surface exists yet — the React Settings tabs are Usage / MCP / Plugins / Config
-(plus a file-editor tab) in [`frontend/src/renderer/Settings.tsx`](../frontend/src/renderer/Settings.tsx);
-the design work is queued in the design lane, and the system-side surface — the `projects.json` index plus
-the open/close endpoints and flow — is queued (§11 #26).
+⚠ **Today:** the **system side exists** — the `projects.json` index plus `GET /projects` /
+`POST /projects/{register,open,close}` and the §9.1/§9.8 flows ([`sidecar/main.py`](../sidecar/main.py))
+— but no Projects *tab* renders yet: the React Settings tabs are Usage / MCP / Plugins / Config in the
+parked renderer; the picker UI rides the rebuild (§11 #37) and the design work is the design lane's.
 
 ### 3.3 The active-project chip
 
@@ -181,7 +181,8 @@ Closing a project raises a confirm dialog with **exactly two options**:
 
 The **same dialog appears on app quit** while a project is open. There is **no Save button anywhere in the
 product**: an explicit Save would contradict the continuous-persistence contract, so none exists.
-⚠ **Today:** no close dialog exists; the app has no open/close notion at all yet.
+⚠ **Today:** the close *semantics* are served (`POST /projects/close` with `stop_agents` — detach vs
+graceful stop, record-keeping either way); the confirm *dialog* itself rides the renderer rebuild (§11 #37).
 
 ### 3.5 The projects index
 
@@ -320,7 +321,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — `mode`/`fast`/`thinking` are capability-gated `400`s under the bridge driver (§6.2) |
 | **Settings** | `GET /settings/{read,account,config,mcp,plugins}` · `POST /settings/write` (confirm-gated) |
 | **Templates** | `GET/POST /templates` · `DELETE /templates/{id}` |
-| **Projects** | the Projects surface — index list, open, close (§3) — ⚠ **Today:** no endpoint surface exists yet (§11 #26) |
+| **Projects** | `GET /projects` (picker feed + open flag) · `POST /projects/register` · `POST /projects/open` (409 when another is open) · `POST /projects/close` (`stop_agents` = the §3.4 second option) |
 | **Utility LLM** | `POST /utility/{revise,summarize}` — run on the in-process Claude Agent **SDK** path (they call SDK `query()` directly, not the `sdk` driver class), never the bridge |
 | **Assets** | `GET /assets/agent-icons/{name}?color=` — recolorable agent SVGs (§7.5) |
 
@@ -455,14 +456,14 @@ Two reserved pseudo-identities exist alongside the agents:
   — infrastructure failures (tmux/WSL2/sidecar down), account-level events (rate/usage caps, auth expiry),
   and shared-service failures (a global MCP server failing) — and on Log lines. System is excluded from
   Compose **To**, Compose **From**, and History **From**; **Reply is disabled** on System cards. The
-  harvest half is part-proven (`test_system_fault_harvest_live`, live, 2026-07-02): global-MCP outage and
-  auth expiry are detectable, the deterministic tmux/WSL/sidecar-liveness probes are ordinary build, and
-  the two unconfirmed legs — the usage-cap wording matcher and a reliable *reactive* auth-expiry screen
-  signal — are verified live during the build, never assumed (§11 #27).
-  ⚠ **Today:** no reserved System identity exists — the string `"system"` appears only as a fallback
-  source on hook-inject events in [`sidecar/main.py`](../sidecar/main.py) and as the SDK `SystemMessage`
-  type mapping in [`sidecar/serialize.py`](../sidecar/serialize.py); there are no System-sourced Error
-  cards and no System filter entry.
+  harvest half is built (§11 #27, 2026-07-10): the reserved `system` identity exists
+  (`SYSTEM_AGENT` in [`sidecar/main.py`](../sidecar/main.py)); account/fleet-level error subtypes
+  (rate-limit, the widened **usage-cap wording matcher**, auth-expiry wording) coalesce into ONE
+  System-sourced fleet-wide Error card + one bus event; and a ~10 s deterministic tmux/WSL liveness probe
+  raises/auto-resolves the `infra` card (sidecar-down needs no probe — the frontend's `/health` failure
+  covers it, §4.3). **Recorded boundary:** a reliable *reactive* auth-expiry screen signal could not be
+  forced live to verify — the deterministic wording matcher + probes are the shipped detection, per the
+  §11 #27 honest-degrade instruction. The System filter entry in the UI rides the rebuild (§11 #37).
 
 ### 7.3 The prompt queue & delivery dispositions
 
@@ -698,12 +699,14 @@ non-image/unsupported files — built on Electron's `nativeImage.createThumbnail
 thumbnail provider) with `app.getFileIcon()` as the icon fallback, so no third-party dependency; the UI rule
 lives in `design/DESIGN.md` (Library → Assets).
 
-Plan-approve from the dashboard resumes the agent out of plan mode. ⚠ **Today:** that resume path is
-proven (`test_plan_decision_hooks_live` — a `keys()` Enter, not a hook `updatedInput`) but not yet wired
-(§11 #22); listing is still **non-recursive** (the store's `plans/`/`docs/` dirs list first with a legacy
-`<root>/<subdir>` fallback; nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)),
-and no Assets surface exists yet (§10 #1 / design lane). Reviews, comments, create/delete/rename, and the
-Documents comment store all live on the per-doc `.meta.json` sidecars now (§8.5, §5.2).
+Plan-approve from the dashboard resumes the agent out of plan mode — wired (§11 #22, 2026-07-10):
+`POST /sessions/{id}/plan/verdict` drives the proven `keys()` Enter for **approve** (resolving the plan
+card + stamping the sidecar verdict), and **revise** sends Escape (keep planning) + queues the feedback at
+the head of the prompt queue (the Escape leg is ⚠ assumed pending the e2e drive — the approve leg is the
+live-proven one). Edit-in-place ships as `PUT /library/document` (store-scoped). ⚠ **Today:** listing is
+still **non-recursive** (the store's `plans/`/`docs/` dirs list first with a legacy `<root>/<subdir>`
+fallback; nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)), and no Assets
+surface exists yet (§10 #1 / design lane).
 
 ### 7.17 Subagents
 
@@ -962,8 +965,11 @@ Startup lands on the empty state and steps into Settings → Projects (§3.1). P
 index (or "Open other folder…", which registers a new root) opens it: the sidecar loads the project store —
 roster + identities from `state/agents.json`, inbox/links/bookmarks from `state/`, the scratchpad board
 from its `.md` — warm-rebinds any still-alive tmux sessions and cold-restores dead ones (§9.9), and replays
-transcripts into the feed. The active-project chip appears; the panes fill. ⚠ **Today:** there is no
-open/close flow; the sidecar starts against whatever sessions its runtime store holds.
+transcripts into the feed. The active-project chip appears; the panes fill. ⚠ **Today:** the system-side
+flow is served (`POST /projects/open` loads the store + warm-rebinds/cold-restores that project's records)
+but sidecar **startup** still restores ALL persisted records rather than waiting for an open (the
+picker-first startup lands with the renderer rebuild + one-click shell, §11 #37/#20), and the picker/chip
+UI rides #37.
 
 ### 9.2 Create an agent
 `POST /sessions` → the sidecar assigns identity (§7.5) → the `bridge` driver `start()` →
@@ -1104,19 +1110,18 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | Body § | What's owed today | Queue item |
 |--------|-------------------|------------|
 | §2, §4.1 | One-click launch: Electron main doesn't spawn/supervise the sidecar (`.bat` is the launcher); no sidecar log file | #20, #43 |
-| §3.1–§3.5, §9.1 | The whole Projects surface: system side (index, open/close endpoints + flow) and the UI (picker tab, chip, close dialog) | #26 (UI rides #37) |
+| §3.1–§3.5, §9.1 | Projects UI (picker tab, chip, close dialog) + picker-first startup — the system side is built | #37 (UI), #20 |
 | §4.3 | No degraded-mode freeze/stale/backoff in the client | #38 |
 | §4.4, §7.5, §7.10 | Renderer trails the design system (16/25 colours, Console gaps, marquee omitted) — superseded by the fresh rebuild | #37 |
-| §5.2 | Console live attach not wired; no Projects endpoints | #29, #26 |
+| §5.2 | Console live attach not wired | #29 |
 | §6.2 | `set_mode` / `set_thinking` / `set_fast` are in-code no-ops (the proven `keys()` levers are unwired); polling degrades from N=1 | #12, #34 |
-| §7.2 | No reserved System identity; no System-sourced Error cards; usage-cap matcher gap | #27 |
-| §7.4 | Run-state push channel + arbiter unbuilt (only inject / plan / decision hooks registered) | #21 |
+| §7.4 | Run-state arbiter built; live payload verify (field presence, prompt_id floor) in flight | #21 |
 | §7.5 | Identity editing + `--name`/`/rename` registration unwired; randomize not drawing from the shipped pool | #14, #40 |
 | §7.6 | Multi-select relationship list; no Piggyback trigger value; exchanges counted as pairs | #25 |
 | §7.11 | Mid-run mode cycling + Bypass/Auto launch-gating unwired | #12, #13 |
 | §7.13 | Streaming attach + xterm renderer unbuilt; React Console stubbed; post-`/clear` re-resolve missing | #29, #35 |
 | §7.15 | Per-agent cost unsurfaced; account split-source reader unfixed | #32, #33 |
-| §7.16 | Approve→resume unwired; listing non-recursive; no Assets surface | #22, §10 #1 |
+| §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
 | §7.18 | No `/context` breakdown, compact history, or per-turn statusLine capture wired | #30, #31 |
 | §7.19 | No rewind/fork endpoint or Timeline wiring | #15 |
@@ -1152,12 +1157,12 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 ### 11.4 Coordination spine, hooks & inbox (#21–28)
 
 21. **Hook lifecycle ingestion & run-state arbiter** *(→ §7.4, §7.17; **HIGH**)* — register the HTTP `SubagentStart`/`SubagentStop` + run-state event set to the sidecar; a per-agent arbiter merges pushed run-state / `permission_mode` (**authoritative-when-fresh**) with the screen-poll fallback (Option C hybrid); the subagent hook fields become the roster's active-vs-quiet signal. **Verify during build, never assume:** arbiter ordering/dedup under concurrent load; record the `prompt_id` version floor (v2.1.196+). Where: [`sidecar/hookbus.py`](../sidecar/hookbus.py), [`sidecar/main.py`](../sidecar/main.py), [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
-22. **Plans action loop** *(→ §7.16, §9.7)* — plan edit-in-place, and wire the Approve/Revise verdicts into the live flow: approve → resume the agent via the proven **`keys()` Enter** (not a hook `updatedInput`). Where: [`sidecar/library.py`](../sidecar/library.py), [`sidecar/main.py`](../sidecar/main.py), [`bridge/bridge.py`](../bridge/bridge.py).
+22. *(built 2026-07-10 — `POST /sessions/{id}/plan/verdict` (approve = the proven `keys()` Enter; revise = Escape + queued feedback, ⚠ assumed leg pending the e2e drive) + `PUT /library/document` edit-in-place; see DEVLOG)*
 23. **Workflow approval via the Inbox** *(→ §7.3, §7.11; spike-proven — [`tests/workflow_approval_probe/`](../tests/workflow_approval_probe/))* — intercept a `Workflow` tool call with a **PreToolUse hook** and surface it as an Inbox **Review** card (the renamed Plans-&-Docs section) with an Approve/Reject round-trip. Proven live: the hook fires with the **full script preview** in `tool_input.script` (name / description / phases recoverable for the card content), deny aborts / allow launches, and the hook verdict **preempts** the built-in dialog (the dashboard can be the sole gate; the on-pane dialog stays the fallback). Workflow subagents are headless/one-shot — a future Subagents tab is read-only *tracking*, not control; workflow editing reuses the Library editor. Card design is the design lane's.
 24. **Queue awareness** *(→ §7.3, §7.6)* — for >2 linked agents, share in message front matter that another agent's message is queued, so an agent can decide whether to wait.
 25. **Links model fixes** *(→ §7.6)* — split the multi-select `relationship` list into **one relationship per link** (both-relationships = two links); add the **Piggyback** trigger value + the §7.6 defaults (Direct → Queue, Shared → Piggyback); count an exchange **per fire on one-way links** (today `messages ÷ 2` burns caps at half rate). Where: [`sidecar/links.py`](../sidecar/links.py).
-26. **Projects surface — system side** *(→ §3, §9.1, §9.8)* — the `projects.json` index in the dashboard store (known roots + last-opened); endpoints to list/register/open/close; the open flow (load the project store, warm-rebind / cold-restore per §9.9, replay transcripts) and the close flow (two-option dialog semantics, §3.4). Feeds the Projects tab + active-project chip (UI rides #37). Where: [`sidecar/main.py`](../sidecar/main.py), [`sidecar/storage.py`](../sidecar/storage.py), new endpoints.
-27. **System-fault cards — probes, matcher, coalescing** *(→ §7.2, §7.8)* — the reserved System identity + one **coalesced fleet-wide System Error card**: deterministic tmux/WSL/sidecar-liveness probes (ordinary build); widen `classify_error` to subscription-cap wording ("weekly usage limit", …); **confirm a reliable reactive auth-expiry screen signal live during the build** — if none exists, deterministic probes + best-effort screen text, recorded as a boundary. System excluded from To/From/Reply per §7.2. Where: [`sidecar/inbox.py`](../sidecar/inbox.py), [`sidecar/eventbus.py`](../sidecar/eventbus.py), [`sidecar/main.py`](../sidecar/main.py).
+26. *(built 2026-07-10 — the Projects system surface: `GET /projects` + register/open/close with the §9.1/§9.8 flows and record-keeping stop; picker/chip/dialog UI rides #37; see DEVLOG)*
+27. *(built 2026-07-10 — reserved System identity + coalesced fleet card + widened usage-cap/auth matcher + tmux/WSL liveness probe; the reactive auth-expiry screen signal recorded as an unforceable boundary per the item's honest-degrade instruction; see DEVLOG)*
 28. **Import external Claude context** *(→ §7.3, §7.16, §8.6; the extractors exist — [`dev/tools/claude-context-extractor/`](../dev/tools/claude-context-extractor/))* — wrap the working exporters (`extract-web.py`, `extract-desktop.py`) behind a sidecar **import module** + a thin frontend Import control, pulling an outside Claude session in by title. One engine, one selectable destination: **(a)** agent-to-agent (prompt queue / Inbox — the operator's primary interest); **(b)** operator-facing read panel — the acute pain today, since the desktop app's own export is broken/misplaced; **(c)** Library reference doc. Distinct from §8.6 (agents' *own* transcripts). Open operator calls (not blocking): destination order (recorded lean: (a) first, (b) close behind) and which panel hosts Import.
 
 ### 11.5 Readouts, console & cost (#29–36)
