@@ -1564,10 +1564,11 @@ async def plan_verdict(session_id: str, req: PlanVerdictRequest):
         if it["type"] == "plan":
             inbox.resolve_item(session_id, it["id"], answer=req.verdict)
 
-    # Stamp the verdict on the plan doc's sidecar when named.
+    # Stamp the verdict on the plan doc's sidecar when named (a review WRITE —
+    # resolved over the store's plans/+docs/ only, never the project root).
     if req.filename and session.cwd:
         try:
-            doc = library.resolve_document(session.cwd, req.filename)
+            doc = library.resolve_document_for_write(session.cwd, req.filename)
             if doc is not None:
                 library.set_doc_review(str(doc), verdict=req.verdict,
                                        verdict_by=req.by or "user")
@@ -1587,9 +1588,9 @@ class DocumentWriteRequest(BaseModel):
 
 @app.put("/library/document")
 async def library_write_document(req: DocumentWriteRequest):
-    if not library.document_in_store(req.path, req.cwd):
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="writes are scoped to the project's .awl-cc-dash/ store")
+                            detail="writes are scoped to the store's plans/ and docs/ dirs")
     p = Path(req.path)
     if not p.is_file():
         raise HTTPException(status_code=404, detail="Document not found")
@@ -1716,8 +1717,10 @@ async def delete_template_endpoint(template_id: str):
 
 # ============================================================================
 # Library — project-scoped read + render + per-doc metadata sidecars (§8.5).
-# Every WRITE endpoint is scope-guarded to <project>/.awl-cc-dash/ — the rest
-# of the repo stays browse-read-only (§8.5 rule 5).
+# Every WRITE endpoint is scope-guarded to the store's plans/ and docs/ content
+# dirs (document_in_content_dirs — never state/ or other store files); the rest
+# of the repo stays browse-read-only (§8.5 rule 5), and review writes never
+# mint a sidecar at the repo root (resolve_document_for_write).
 # ============================================================================
 
 @app.get("/library/documents")
@@ -1762,7 +1765,8 @@ async def library_create_document(req: DocumentCreateRequest):
 @app.delete("/library/document")
 async def library_delete_document(path: str, cwd: str):
     """Delete a store document + its paired ``.meta.json``. 400 outside the
-    store (browse-only files are never deletable), 404 when missing."""
+    store's ``plans/``/``docs/`` dirs (browse-only files and ``state/`` are
+    never deletable), 404 when missing."""
     try:
         return library.delete_document(path, cwd)
     except ValueError as e:
@@ -1774,10 +1778,11 @@ async def library_delete_document(path: str, cwd: str):
 @app.post("/library/document/rename")
 async def library_rename_document(req: DocumentRenameRequest):
     """Rename a store document AND its sidecar together (§8.5 rule 3). 400
-    outside the store, 404 when the source is missing, 409 on an existing target."""
-    if not library.document_in_store(req.path, req.cwd):
+    outside the store's ``plans/``/``docs/`` dirs, 404 when the source is
+    missing, 409 on an existing target."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     try:
         return library.rename_document_pair(req.path, req.new_filename)
     except FileNotFoundError:
@@ -1802,12 +1807,13 @@ async def library_reviews(cwd: str):
 @app.post("/library/reviews")
 async def library_set_review(req: ReviewRequest):
     """Write review fields into the doc's ``.meta.json`` sidecar (§8.5) —
-    merge-don't-clobber. The doc is resolved by bare filename (store ``plans/``,
-    then ``docs/``, then the project root); 404 when no such ``.md`` exists.
-    ``comments`` (backward-compatible: strings or dicts) append as comment
-    threads. Returns the updated sidecar."""
+    merge-don't-clobber. The doc is resolved by bare filename over the WRITE
+    collections only (store ``plans/``, then ``docs/`` — never the project
+    root, so no sidecar is ever minted at the repo root); 404 when no such
+    ``.md`` exists there. ``comments`` (backward-compatible: strings or dicts)
+    append as comment threads. Returns the updated sidecar."""
     try:
-        md = library.resolve_document(req.cwd, req.filename)
+        md = library.resolve_document_for_write(req.cwd, req.filename)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if md is None:
@@ -1829,10 +1835,11 @@ async def library_set_review(req: ReviewRequest):
 @app.post("/library/comments")
 async def library_add_comment(req: CommentRequest):
     """Append a comment (optionally quote-anchored, §8.5) to a store document's
-    sidecar. 400 outside the store, 404 when the ``.md`` is missing."""
-    if not library.document_in_store(req.path, req.cwd):
+    sidecar. 400 outside the store's ``plans/``/``docs/`` dirs, 404 when the
+    ``.md`` is missing."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     if not Path(req.path).is_file():
         raise HTTPException(status_code=404, detail="Document not found")
     return library.add_comment(req.path, text=req.text, author=req.author,
@@ -1842,10 +1849,11 @@ async def library_add_comment(req: CommentRequest):
 
 @app.post("/library/comments/resolve")
 async def library_resolve_comment(req: CommentResolveRequest):
-    """Mark one comment resolved. 400 outside the store, 404 for an unknown id."""
-    if not library.document_in_store(req.path, req.cwd):
+    """Mark one comment resolved. 400 outside the store's ``plans/``/``docs/``
+    dirs, 404 for an unknown id."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     if not library.resolve_comment(req.path, req.comment_id):
         raise HTTPException(status_code=404, detail="Comment not found")
     return {"status": "resolved", "comment_id": req.comment_id}

@@ -17,11 +17,17 @@ Pure file logic — no driver, no WSL2/tmux, no live agent, no servers. Proves:
     every save; merge-don't-clobber review fields (+ ``verdict_by``/``verdict_at``);
     comments with unique ``c<N>`` ids, quote-anchors, and resolve; provenance
     with a first-write-stable ``created_at``; pair-rename (meta optional,
-    overwrite refused); orphan-detect + re-link; the legacy → sidecar migration
-    (non-destructive — existing sidecar fields win; legacy file renamed
-    ``.migrated``; idempotent); ``aggregate_metas``'s filename-keyed shape; and
-    the store-scoped create/delete guards (path escapes and outside-store
-    deletes refused; the sidecar dies with its doc).
+    overwrite refused, and a mid-pair meta-rename failure rolls the ``.md``
+    back — never a half-renamed pair); orphan-detect + re-link; the legacy →
+    sidecar migration (non-destructive — existing sidecar fields win; legacy
+    file renamed ``.migrated``; idempotent); ``aggregate_metas``'s
+    filename-keyed shape (plans/ + docs/ + the project ROOT's top-level metas,
+    read-only, earlier dirs winning collisions); and the WRITE-scope guards:
+    mutations gate on ``document_in_content_dirs`` (only the store's ``plans/``
+    and ``docs/`` subtrees — ``state/``, bare store-root files, escapes, and
+    outside-store paths refused), deletes operate on the ``resolve()``d path
+    (alias spellings can't half-delete; the sidecar dies with its doc), and
+    ``resolve_document_for_write`` never lands on the repo root.
 
 Everything operates on ``tmp_path`` — never a real project dir. Sidecar-layer
 project dirs get a ``.git`` marker so ``storage.project_root`` pins to the tmp
@@ -480,6 +486,27 @@ class TestRenameDocumentPair:
         with pytest.raises(ValueError):
             library.rename_document_pair(md, "../escape.md")
 
+    def test_meta_rename_failure_rolls_the_md_back(self, tmp_path, monkeypatch):
+        """If the SECOND rename (the sidecar) fails, the first (the .md) is
+        rolled back — a pair is never left half-renamed."""
+        md = _md(tmp_path, "draft.md")
+        library.set_doc_review(md, owner="coder-01")
+        real_rename = Path.rename
+
+        def failing(self, target):
+            if self.name.endswith(".meta.json"):
+                raise OSError("simulated: meta locked")
+            return real_rename(self, target)
+
+        monkeypatch.setattr(Path, "rename", failing)
+        with pytest.raises(OSError):
+            library.rename_document_pair(md, "final.md")
+        # The pair is intact under its ORIGINAL name; nothing half-moved.
+        assert md.is_file()
+        assert (tmp_path / "draft.meta.json").is_file()
+        assert not (tmp_path / "final.md").exists()
+        assert not (tmp_path / "final.meta.json").exists()
+
 
 class TestOrphanMetas:
     def test_detects_only_unpaired_metas(self, tmp_path):
@@ -618,6 +645,25 @@ class TestAggregateMetas:
         _md(proj / ".awl-cc-dash" / "plans", "bare.md")   # no sidecar written
         assert library.aggregate_metas(str(proj)) == {}
 
+    def test_root_level_metas_are_aggregated_read_only(self, tmp_path):
+        # A migrated root-doc review (rootplan.meta.json at the project ROOT —
+        # the migration's recorded root-seam behavior) must stay visible in the
+        # aggregate, not silently invisible.
+        proj = _project(tmp_path)
+        root_md = _md(proj, "rootplan.md")
+        library.set_doc_review(root_md, owner="coder-02")
+        agg = library.aggregate_metas(str(proj))
+        assert agg["rootplan.md"]["review"]["owner"] == "coder-02"
+
+    def test_store_dirs_win_root_on_name_collision(self, tmp_path):
+        proj = _project(tmp_path)
+        plan = _md(proj / ".awl-cc-dash" / "plans", "x.md")
+        root = _md(proj, "x.md")
+        library.set_doc_review(plan, owner="plans-owner")
+        library.set_doc_review(root, owner="root-owner")
+        agg = library.aggregate_metas(str(proj))
+        assert agg["x.md"]["review"]["owner"] == "plans-owner"
+
     def test_empty_project_is_empty(self, tmp_path):
         assert library.aggregate_metas(str(_project(tmp_path))) == {}
 
@@ -693,6 +739,38 @@ class TestCreateDeleteDocument:
         with pytest.raises(ValueError):   # the sidecar is not addressed directly
             library.delete_document(str(library.meta_path(out["path"])), str(proj))
 
+    def test_delete_refuses_state_and_store_root_files(self, tmp_path):
+        # Mutations are scoped to the store's plans/+docs/ CONTENT dirs only —
+        # state/ (the dashboard's JSON state) and bare store-root files are
+        # off-limits even though they sit inside .awl-cc-dash/.
+        proj = _project(tmp_path)
+        state_md = _md(proj / ".awl-cc-dash" / "state", "agents.md")
+        root_md = _md(proj / ".awl-cc-dash", "loose.md")
+        with pytest.raises(ValueError):
+            library.delete_document(str(state_md), str(proj))
+        with pytest.raises(ValueError):
+            library.delete_document(str(root_md), str(proj))
+        assert state_md.is_file() and root_md.is_file()
+
+    def test_delete_operates_on_the_resolved_path(self, tmp_path):
+        # An alias spelling of the doc (here its Windows 8.3 short name; a
+        # symlink behaves the same) must not half-delete the pair: resolve()
+        # first, then unlink + meta pairing on the REAL path.
+        import ctypes
+        proj = _project(tmp_path)
+        md = _md(proj / ".awl-cc-dash" / "docs", "longdocumentname.md")
+        library.set_doc_review(md, owner="a")
+        meta = library.meta_path(md)
+        buf = ctypes.create_unicode_buffer(520)
+        rc = ctypes.windll.kernel32.GetShortPathNameW(str(md), buf, 520)
+        alias = buf.value
+        if not rc or alias.lower() == str(md).lower():
+            pytest.skip("8.3 short names unavailable on this volume")
+        out = library.delete_document(alias, str(proj))
+        assert not md.exists()
+        assert not meta.exists()          # the sidecar died with its doc
+        assert len(out["deleted"]) == 2
+
 
 class TestResolveDocumentAndScope:
     def test_priority_plans_then_docs_then_root(self, tmp_path):
@@ -721,3 +799,33 @@ class TestResolveDocumentAndScope:
         assert library.document_in_store(str(inside), str(proj)) is True
         assert library.document_in_store(str(outside), str(proj)) is False
         assert library.document_in_store(str(escape), str(proj)) is False
+
+    def test_document_in_content_dirs_boundaries(self, tmp_path):
+        # The WRITE gate: only plans/ and docs/ subtrees pass — state/, bare
+        # store-root files, and everything outside the store are refused.
+        proj = _project(tmp_path)
+        store = proj / ".awl-cc-dash"
+        assert library.document_in_content_dirs(
+            str(store / "docs" / "in.md"), str(proj)) is True
+        assert library.document_in_content_dirs(
+            str(store / "plans" / "p.md"), str(proj)) is True
+        assert library.document_in_content_dirs(
+            str(store / "plans" / "nested" / "deep.md"), str(proj)) is True
+        assert library.document_in_content_dirs(
+            str(store / "state" / "agents.json"), str(proj)) is False
+        assert library.document_in_content_dirs(
+            str(store / "loose.md"), str(proj)) is False
+        assert library.document_in_content_dirs(
+            str(proj / "out.md"), str(proj)) is False
+        assert library.document_in_content_dirs(
+            str(store / "docs" / ".." / ".." / "out.md"), str(proj)) is False
+
+    def test_resolve_document_for_write_skips_the_project_root(self, tmp_path):
+        # Write-side resolution never lands on the repo root: a root-only doc
+        # is None (no sidecar minted there); a store copy resolves normally.
+        proj = _project(tmp_path)
+        _md(proj, "x.md", "root")
+        assert library.resolve_document_for_write(str(proj), "x.md") is None
+        _md(proj / ".awl-cc-dash" / "docs", "x.md", "docs")
+        assert (library.resolve_document_for_write(str(proj), "x.md")
+                == proj / ".awl-cc-dash" / "docs" / "x.md")

@@ -663,13 +663,37 @@ class TestLibraryReviewEndpoints:
                 cwd=str(proj), filename="ghost.md", owner="x")))
         assert ei.value.status_code == 404
 
-    def test_post_resolves_docs_and_root_docs_too(self, tmp_path):
+    def test_post_resolves_docs_too(self, tmp_path):
         # Documents get the same review treatment as Plans (§8.5 rule 4).
         proj = _proj(tmp_path)
         _store_md(proj, "docs", "notes.md")
         out = asyncio.run(main.library_set_review(main.ReviewRequest(
             cwd=str(proj), filename="notes.md", state="commented")))
         assert out["review"]["state"] == "commented"
+
+    def test_post_never_writes_a_sidecar_at_the_project_root(self, tmp_path):
+        # A doc that exists ONLY at the repo root is not a WRITE target: 404,
+        # and no .meta.json is minted at the root. (Reads keep the root seam —
+        # GET /library/reviews aggregates migrated root metas.)
+        proj = _proj(tmp_path)
+        (proj / "rootdoc.md").write_text("# R\n", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_set_review(main.ReviewRequest(
+                cwd=str(proj), filename="rootdoc.md", verdict="approve")))
+        assert ei.value.status_code == 404
+        assert not (proj / "rootdoc.meta.json").exists()
+
+    def test_get_still_surfaces_migrated_root_metas(self, tmp_path):
+        # The read side of the root seam: a root-doc review the migration
+        # recorded at the project root stays visible in the aggregate.
+        proj = _proj(tmp_path)
+        (proj / "rootdoc.md").write_text("# R\n", encoding="utf-8")
+        store = proj / ".awl-cc-dash"
+        store.mkdir(parents=True, exist_ok=True)
+        (store / "plan-reviews.json").write_text(
+            json.dumps({"rootdoc.md": {"owner": "coder-02"}}), encoding="utf-8")
+        out = asyncio.run(main.library_reviews(cwd=str(proj)))
+        assert out["rootdoc.md"]["review"]["owner"] == "coder-02"
 
 
 class TestLibraryDocumentEndpoints:
@@ -714,6 +738,32 @@ class TestLibraryDocumentEndpoints:
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.library_delete_document(path=str(ghost), cwd=str(proj)))
         assert ei.value.status_code == 404
+
+    def test_write_endpoints_refuse_state_files(self, tmp_path):
+        # Mutations are scoped to the store's plans/+docs/ content dirs: even
+        # an .md under state/ (or a bare store-root file) is 400 — the
+        # dashboard's JSON state is never a Library write target.
+        proj = _proj(tmp_path)
+        state = proj / ".awl-cc-dash" / "state"
+        state.mkdir(parents=True)
+        f = state / "sneaky.md"
+        f.write_text("keep", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_write_document(main.DocumentWriteRequest(
+                cwd=str(proj), path=str(f), content="clobber")))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_delete_document(path=str(f), cwd=str(proj)))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_rename_document(main.DocumentRenameRequest(
+                cwd=str(proj), path=str(f), new_filename="renamed.md")))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_add_comment(main.CommentRequest(
+                cwd=str(proj), path=str(f), text="x", author="user")))
+        assert ei.value.status_code == 400
+        assert f.read_text(encoding="utf-8") == "keep"
 
     def test_rename_moves_the_pair(self, tmp_path):
         proj = _proj(tmp_path)
