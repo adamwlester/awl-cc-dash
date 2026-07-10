@@ -1319,6 +1319,17 @@ IDLE_AUTO_MODE_SCREEN = """\
   ⏵⏵ auto mode on (shift+tab to cycle)
 """
 
+# CC ≥ 2.1.206 renders `default` explicitly as "manual mode on" (real capture,
+# 2026-07-10); older builds show no indicator for default (IDLE_SCREEN above).
+IDLE_MANUAL_MODE_SCREEN = """\
+● Done.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ Try "fix lint errors"
+────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents                         /rc
+"""
+
 # The Meta+T "Toggle thinking mode" modal — the ✔ marks the ACTIVE option.
 THINKING_PANEL_ENABLED = """\
  Toggle thinking mode
@@ -1360,16 +1371,19 @@ High-speed mode for Opus 4.8. Draws from usage credits at a higher rate.
 Learn more: https://code.claude.com/docs/en/fast-mode
 """
 
-# Credit-gated account (live capture wording, CC 2.1.198): the panel opens but
-# reports it needs usage credits — no keystroke can turn Fast on.
+# Credit-gated account (real capture, CC 2.1.206, 2026-07-10): the panel opens
+# but reports it needs usage credits — no keystroke can turn Fast on.
 FAST_PANEL_CREDIT_GATED = """\
-↯ Fast mode (research preview)
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ↯ Fast mode (research preview)
+   High-speed mode for Opus 4.8. Draws from usage credits at a higher rate.
+   Separate rate limits apply.
 
-High-speed mode for Opus 4.8. Fast mode requires usage credits.
+     Fast mode requires usage credits · /usage-credits to turn them on
 
-  Fast mode  OFF
+   Learn more: https://code.claude.com/docs/en/fast-mode
 
-Learn more: https://code.claude.com/docs/en/fast-mode
+   Esc to cancel
 """
 
 # A CLOSED-panel footer mentioning "Fast mode OFF" — must NOT parse as a panel
@@ -1397,6 +1411,10 @@ class TestParseModeIndicator:
 
     def test_auto(self):
         assert parse_mode_indicator(IDLE_AUTO_MODE_SCREEN) == "auto"
+
+    def test_manual_mode_indicator_is_default(self):
+        # CC ≥ 2.1.206: default renders explicitly as "manual mode on".
+        assert parse_mode_indicator(IDLE_MANUAL_MODE_SCREEN) == "default"
 
     def test_bypass_readable_while_generating(self):
         # The indicator stays on the status bar mid-turn — the read is safe in
@@ -1628,16 +1646,19 @@ class TestSetThinking:
 
 
 class _FakeFastBridge(TmuxBridge):
-    """The Meta+O panel as a state machine: M-o opens; Space toggles (unless the
-    account is credit-gated); Enter/Escape only close."""
+    """The Fast panel as a state machine: M-o opens (unless ``mo_dead`` — the
+    CC 2.1.206 reality, where only the typed /fast command opens it); Space
+    toggles (unless the account is credit-gated); Enter/Escape only close."""
 
-    def __init__(self, on=False, credit_gated=False, state="idle"):
+    def __init__(self, on=False, credit_gated=False, state="idle", mo_dead=False):
         super().__init__()
         self.on = on
         self.credit_gated = credit_gated
         self.state = state
+        self.mo_dead = mo_dead
         self.panel_open = False
         self.keys_sent = []
+        self.sent = []
 
     def _require_session(self, name):
         pass
@@ -1648,10 +1669,16 @@ class _FakeFastBridge(TmuxBridge):
     def status(self, name):
         return {"state": self.state}
 
+    def send(self, name, text, press_enter=True):
+        self.sent.append(text)
+        if text == "/fast":
+            self.panel_open = True
+        return {"status": "sent", "name": name, "textLength": len(text)}
+
     def keys(self, name, *key_names):
         self.keys_sent += list(key_names)
         for k in key_names:
-            if k == "M-o":
+            if k == "M-o" and not self.mo_dead:
                 self.panel_open = True
             elif k in ("Escape", "Enter"):
                 self.panel_open = False
@@ -1686,6 +1713,20 @@ class TestSetFast:
         out = b.set_fast("s", False, idle_timeout=0, poll_interval=0)
         assert out == {"ok": True, "on": False}
         assert "Space" not in b.keys_sent
+
+    def test_mo_dead_falls_back_to_typed_fast_command(self):
+        # CC 2.1.206: M-o no longer opens the panel — the typed /fast command
+        # is the fallback opener (same panel, same wording).
+        b = _FakeFastBridge(on=False, mo_dead=True)
+        out = b.set_fast("s", True, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": True, "on": True}
+        assert b.sent == ["/fast"]
+
+    def test_mo_dead_state_read_falls_back_too(self):
+        b = _FakeFastBridge(on=True, mo_dead=True)
+        out = b.fast_state("s", idle_timeout=0, poll_interval=0)
+        assert out == {"ok": True, "on": True}
+        assert b.sent == ["/fast"]
 
     def test_credit_gated_is_honest_degrade(self):
         # The credit-gated account never gets a faked toggle — the panel state

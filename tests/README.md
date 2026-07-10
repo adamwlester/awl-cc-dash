@@ -37,8 +37,8 @@ durable part. Keep this table current when you add/remove/rename test files (see
 
 | File | Pins down (module under test) | ~cases |
 |------|-------------------------------|:-----:|
-| `test_bridge_unit.py` | `bridge/` pkg (screen-state detection, context-usage & turn derivation, transcript parsing) + `sidecar/drivers/base.py` + `sidecar/drivers/bridge.py` (non-live paths) + `sidecar/runtime_store.py` | ~88 |
-| `test_sidecar_unit.py` | `sidecar/main.py` endpoints (incl. the Library sidecar-store endpoints: reviews migration+aggregate, document create/delete/rename, comments + their `.awl-cc-dash/` scope guards) + driver wiring + `identity.py` + hookbus/links/eventbus integration | ~59 |
+| `test_bridge_unit.py` | `bridge/` pkg (screen-state detection, context-usage & turn derivation, transcript parsing, the §11 #12 live-control parsers — mode indicator / thinking modal / fast panel — and the bounded Shift+Tab cycle + read-first toggles via scripted fakes) + `sidecar/drivers/base.py` + `sidecar/drivers/bridge.py` (non-live paths) + `sidecar/runtime_store.py` | ~133 |
+| `test_sidecar_unit.py` | `sidecar/main.py` endpoints (incl. the Library sidecar-store endpoints: reviews migration+aggregate, document create/delete/rename, comments + their `.awl-cc-dash/` scope guards; the §11 #12 mode/fast/thinking control endpoints with their honest 409/400 mapping) + driver wiring + `identity.py` + hookbus/links/eventbus integration | ~71 |
 | `test_settings_io_unit.py` | `settings_io.py` (settings read/write) | ~35 |
 | `test_marquee_unit.py` | `marquee.py` (transcript tail marquee) | ~25 |
 | `test_library_unit.py` | `library.py` (doc/plan render; per-doc `.meta.json` sidecars §8.5 — review/comments/anchors/provenance, atomic writes, pair-rename, orphan re-link, legacy `plan-reviews.json` migration, store-scoped create/delete guards) | ~83 |
@@ -65,6 +65,7 @@ it encodes — read that docstring first; it is the spec.
 |------|-----------|:-----:|
 | `test_tmux_bridge.py` | The `bridge` package control surface end-to-end: create/send/keys/read/list/rename/resume/status/batch/broadcast/interrupt/scrollback/watch/wait_idle/export/show/set_cwd/set_model/mcp_sync/read_log | ~29 |
 | `test_bridge_finisher_live.py` | The bridge **driver** behaviors the product leans on: **permission approve/deny**, **resume-after-restart**, **model + effort take** | ~4 |
+| `test_mode_control_wired_live.py` | The **wired live mode/thinking/fast controls** (§11 #12) — the production `BridgeDriver.set_mode/set_thinking/set_fast` path (what `POST /sessions/{id}/{mode,thinking,fast}` calls): Shift+Tab ring cycle with status-line read-back, the `Meta+T` modal read-first toggle, and the Fast panel (`Meta+O`, or `/fast` on CC ≥ 2.1.206) with the **credit-gate honest degrade** accepted as a valid outcome | ~1 |
 | `test_cold_restore_live.py` | The §9.9 **cold-restore** contract: `create(resume_session_id=…)` relaunches a DEAD agent's conversation via `claude --resume` — same session id, same `<id>.jsonl`, memory retained (same-id-vs-fork verdict recorded in `log/cold_restore_findings_latest.txt`) | ~1 |
 
 ### Feasibility spikes (opt-in, live) — engine-capability evidence

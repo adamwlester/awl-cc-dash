@@ -38,15 +38,19 @@ VALID_PERMISSION_MODES = frozenset({
 
 
 # Status-line permission-mode indicators, live-verified on Claude Code 2.1.198
-# (test_bypass_auto_preconditions_live). Plain-text substrings — `read()` uses
-# `capture-pane -p -J`, which strips ANSI, so the words are matched. Order
-# matters: most specific first. `default` shows NO indicator at all, so it is
-# inferred (see parse_mode_indicator) rather than matched.
+# (test_bypass_auto_preconditions_live) and re-verified on 2.1.206 (2026-07-10).
+# Plain-text substrings — `read()` uses `capture-pane -p -J`, which strips ANSI,
+# so the words are matched. Order matters: most specific first. `default` is
+# double-covered: CC ≥ 2.1.206 renders it explicitly as "⏸ manual mode on"
+# (live-caught 2026-07-10); older builds show NO indicator for it, so it is
+# also inferred from an indicator-less rendered screen (see
+# parse_mode_indicator).
 MODE_INDICATORS = (
     ("bypassPermissions", "bypass permissions on"),
     ("acceptEdits", "accept edits on"),
     ("plan", "plan mode on"),
     ("auto", "auto mode on"),
+    ("default", "manual mode on"),
 )
 
 # The largest possible Shift+Tab mode ring (mode-control research + the live
@@ -69,11 +73,12 @@ def parse_mode_indicator(content):
     """Parse the CURRENT permission mode off a captured screen's status line.
 
     Pure function (no live session) so it is hermetically unit-testable. The
-    status line shows a plain-text mode indicator for every non-default mode
-    ("accept edits on", "plan mode on", "auto mode on", "bypass permissions
-    on"); `default` shows no indicator, so it is reported only when the capture
-    shows evidence of a rendered TUI screen (the input-box rule or the prompt
-    marker) with none of the indicators present.
+    status line shows a plain-text mode indicator for every mode ("accept edits
+    on", "plan mode on", "auto mode on", "bypass permissions on", and — CC ≥
+    2.1.206 — "manual mode on" for `default`). On older builds `default` shows
+    no indicator, so it is also reported when the capture shows evidence of a
+    rendered TUI screen (the input-box rule or the prompt marker) with none of
+    the indicators present.
 
     Args:
         content: A captured screen block (as from ``read``/``status``).
@@ -1086,8 +1091,30 @@ class TmuxBridge:
             return {"ok": False, "on": None, "reason": "unreadable"}
         return {"ok": state2 == target, "on": state2 == "enabled"}
 
+    def _open_fast_panel(self, name, poll_interval=0.6):
+        """Open the Fast panel and parse its state; returns ``(state, content)``.
+
+        Two openers, tried in order: the `Meta+O` keybinding (``chat:fastMode``
+        — proven on CC 2.1.198–2.1.201, test_fast_mode_toggle_live), then the
+        typed ``/fast`` command as the fallback (proven on CC 2.1.206, where
+        `M-o` no longer opens the panel — live-caught 2026-07-10; the panel and
+        its wording are identical either way).
+        """
+        state, content = self._open_panel_and_parse(
+            name, "M-o", parse_fast_panel, tries=5, interval=poll_interval)
+        if state is not None:
+            return state, content
+        self.send(name, "/fast")
+        for _ in range(14):
+            content = self.read(name, lines=45)["content"]
+            state = parse_fast_panel(content)
+            if state is not None:
+                return state, content
+            time.sleep(poll_interval)
+        return None, content
+
     def fast_state(self, name, idle_timeout=5.0, poll_interval=0.6):
-        """Read the Fast-mode state via the `Meta+O` panel.
+        """Read the Fast-mode state via the Fast panel (`Meta+O`, or `/fast`).
 
         Opens the panel, reads the ``Fast mode OFF/ON`` line, closes with
         Escape. Returns ``{"ok": True, "on": bool}``, or ``{"ok": False,
@@ -1098,8 +1125,7 @@ class TmuxBridge:
         """
         if not self._idle_gate(name, timeout=idle_timeout):
             return {"ok": False, "on": None, "reason": "busy"}
-        state, _ = self._open_panel_and_parse(
-            name, "M-o", parse_fast_panel, interval=poll_interval)
+        state, _ = self._open_fast_panel(name, poll_interval=poll_interval)
         self.keys(name, "Escape")
         if state == "credit-gated":
             return {"ok": False, "on": None, "reason": "credit_gated"}
@@ -1108,12 +1134,13 @@ class TmuxBridge:
         return {"ok": True, "on": state == "on"}
 
     def set_fast(self, name, on, idle_timeout=5.0, poll_interval=0.6):
-        """Set Fast mode via the `Meta+O` panel — `Space` is the toggle lever.
+        """Set Fast mode via the Fast panel — `Space` is the toggle lever.
 
-        Open the panel, READ the current state first, `Space`-toggle only if
-        needed (Enter/Escape merely CLOSE the panel), read the flipped line
-        back, close. A credit-gated account degrades honestly (see
-        ``fast_state``) — the toggle is never faked.
+        Open the panel (`Meta+O`, or `/fast` — see ``_open_fast_panel``), READ
+        the current state first, `Space`-toggle only if needed (Enter/Escape
+        merely CLOSE the panel), read the flipped line back, close. A
+        credit-gated account degrades honestly (see ``fast_state``) — the
+        toggle is never faked.
 
         Returns:
             ``{"ok": True, "on": bool}`` on success; ``{"ok": False, "on": None,
@@ -1122,8 +1149,7 @@ class TmuxBridge:
         if not self._idle_gate(name, timeout=idle_timeout):
             return {"ok": False, "on": None, "reason": "busy"}
         target = "on" if on else "off"
-        state, _ = self._open_panel_and_parse(
-            name, "M-o", parse_fast_panel, interval=poll_interval)
+        state, _ = self._open_fast_panel(name, poll_interval=poll_interval)
         if state == "credit-gated":
             self.keys(name, "Escape")
             return {"ok": False, "on": None, "reason": "credit_gated"}
