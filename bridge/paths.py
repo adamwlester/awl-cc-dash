@@ -118,7 +118,7 @@ WSL_KNOWN_MARKETPLACES = f"{WSL_PLUGINS_DIR}/known_marketplaces.json"
 # Where per-agent launch config (settings.json / mcp.json) is materialized, one
 # subdir per tmux session name. WSL-reachable so claude's --settings/--mcp-config
 # launch flags resolve it; kept out of ~/.claude so it never pollutes real config.
-WSL_AWL_DIR = f"{WSL_HOME}/.awl-agents"
+WSL_AWL_DIR = f"{WSL_HOME}/.awl-cc-dash-agents"
 
 # Windows Claude config accessible from WSL
 WIN_CLAUDE_JSON = "/mnt/c/Users/lester/.claude.json"
