@@ -31,6 +31,17 @@ export interface LaunchConfig {
   mcp_servers: string[] | null
 }
 
+// The arbitrated run-state (§7.4): hook-pushed fields when fresh (source="push"),
+// the screen-poll floor otherwise. Additive beside `status`.
+export interface RunState {
+  source: 'push' | 'poll'
+  age_s: number | null
+  phase: string | null
+  permission_mode: string | null
+  current_tool: string | null
+  prompt_id: string | null
+}
+
 export interface Session {
   session_id: string
   agent_type: string | null
@@ -46,6 +57,7 @@ export interface Session {
   has_pending_permission: boolean
   permission_request: PermissionDetail | null
   identity: Identity | null
+  run_state?: RunState
   launch_config: LaunchConfig
 }
 
@@ -121,7 +133,10 @@ export interface PermissionDetail {
 
 // ---- Inbox (5 typed sections) ----------------------------------------------
 
-export type InboxType = 'permission' | 'error' | 'warning' | 'plan' | 'decision'
+// Open-ended (§7.8) — the current vocabulary; `response` is the coalesced
+// non-blocking "run ended with unreviewed output" card. The reserved `system`
+// agent id groups the fleet-wide System Error cards.
+export type InboxType = 'permission' | 'error' | 'warning' | 'plan' | 'decision' | 'response' | string
 
 export interface InboxItem {
   id: string
@@ -183,6 +198,38 @@ export interface ScratchPost { seq: number; author: string; text: string; ts: st
 export interface LibraryDoc { filename: string; path: string; size: number; modified: string }
 export interface LibraryDocument { filename: string; path: string; content: string }
 export interface Review { owner?: string; state?: string; verdict?: string; comments?: any; updated_at?: string }
+
+// Per-doc .meta.json sidecar shape (§8.5): review + comments + provenance.
+export interface DocComment {
+  id: string
+  text: string
+  author: string
+  ts?: string
+  resolved?: boolean
+  anchor_quote?: string | null
+  anchor_heading?: string | null
+}
+export interface DocMeta {
+  schema_version?: number
+  owner?: string
+  state?: string
+  verdict?: string
+  verdict_by?: string
+  verdict_at?: string
+  comments?: DocComment[]
+  provenance?: { created_by?: string; created_at?: string; session?: string }
+  updated_at?: string
+}
+
+// Projects picker feed (§3.2/§11 #26).
+export interface ProjectEntry {
+  path: string
+  name: string
+  last_used: string | null
+  agent_count: number
+  open: boolean
+}
+export interface ProjectsResponse { open: string | null; projects: ProjectEntry[] }
 
 export interface ConsoleCommand {
   command: string
@@ -359,11 +406,38 @@ export const api = {
   postScratch: (body: { cwd: string; author: string; text: string }) =>
     postJSON<{ status: string; post: ScratchPost }>('/scratch', body),
 
-  // ---- library (read + render) ---------------------------------------------
+  // ---- library (docs + per-doc .meta.json sidecars, §8.5) ------------------
   libraryDocuments: (cwd: string, subdir?: string) =>
     getJSON<LibraryDoc[]>(`/library/documents${qs({ cwd, subdir })}`),
   libraryDocument: (path: string) => getJSON<LibraryDocument>(`/library/document${qs({ path })}`),
-  libraryReviews: (cwd: string) => getJSON<Record<string, Review>>(`/library/reviews${qs({ cwd })}`),
+  libraryReviews: (cwd: string) => getJSON<Record<string, DocMeta>>(`/library/reviews${qs({ cwd })}`),
+  createDocument: (body: { cwd: string; filename: string; content: string; subdir?: 'docs' | 'plans' }) =>
+    postJSON<{ status: string; path: string }>('/library/document', body),
+  writeDocument: (body: { cwd: string; path: string; content: string }) =>
+    fetch(`${API}/library/document`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => (r.ok ? r.json() : null)).catch(() => null),
+  deleteDocument: (path: string, cwd: string) =>
+    delJSON<any>(`/library/document${qs({ path, cwd })}`),
+  renameDocument: (body: { cwd: string; path: string; new_filename: string }) =>
+    postJSON<{ old: string; new: string }>('/library/document/rename', body),
+  addComment: (body: { cwd: string; path: string; text: string; author: string; anchor_quote?: string; anchor_heading?: string }) =>
+    postJSON<DocComment>('/library/comments', body),
+  resolveComment: (body: { cwd: string; path: string; comment_id: string }) =>
+    postJSON<{ status: string }>('/library/comments/resolve', body),
+
+  // ---- plans action loop (§7.16/§9.7) ---------------------------------------
+  planVerdict: (id: string, body: { verdict: 'approve' | 'revise'; text?: string; filename?: string; by?: string }) =>
+    postJSON<{ status: string; verdict: string }>(`/sessions/${id}/plan/verdict`, body),
+
+  // ---- projects (§3, one project at a time) ---------------------------------
+  projects: () => getJSON<ProjectsResponse>('/projects'),
+  registerProject: (path: string) => postJSON<ProjectEntry>('/projects/register', { path }),
+  openProject: (path: string) => postJSON<ProjectEntry & { status: string }>('/projects/open', { path }),
+  closeProject: (stopAgents = false) =>
+    postJSON<{ status: string; path: string; stopped_agents: boolean }>('/projects/close', { stop_agents: stopAgents }),
 
   // ---- console (slash-command runner) ----------------------------------------
   consoleCatalog: (q?: string) => getJSON<ConsoleCatalog & { commands?: ConsoleCommand[] }>(`/console/catalog${qs({ q })}`),
