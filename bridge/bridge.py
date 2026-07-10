@@ -37,6 +37,130 @@ VALID_PERMISSION_MODES = frozenset({
 })
 
 
+# Status-line permission-mode indicators, live-verified on Claude Code 2.1.198
+# (test_bypass_auto_preconditions_live). Plain-text substrings — `read()` uses
+# `capture-pane -p -J`, which strips ANSI, so the words are matched. Order
+# matters: most specific first. `default` shows NO indicator at all, so it is
+# inferred (see parse_mode_indicator) rather than matched.
+MODE_INDICATORS = (
+    ("bypassPermissions", "bypass permissions on"),
+    ("acceptEdits", "accept edits on"),
+    ("plan", "plan mode on"),
+    ("auto", "auto mode on"),
+)
+
+# The largest possible Shift+Tab mode ring (mode-control research + the live
+# launch-matrix spike): default → acceptEdits → plan → [bypassPermissions] →
+# [auto] → wrap. Optional segments are LAUNCH-ARMED; an un-armed segment is
+# silently absent from the ring (no refusal, no indicator — it simply never
+# appears). This bounds set_permission_mode's cycle attempts so an absent
+# target yields an honest "unreachable", never an infinite loop.
+MODE_RING_MAX = 5
+
+# The `Meta+T` "Toggle thinking mode" modal (live-verified,
+# test_thinking_toggle_live) and the `Meta+O` "↯ Fast mode (research preview)"
+# panel (live-verified, test_fast_mode_toggle_live).
+_THINKING_PANEL_MARKER = "toggle thinking mode"
+_PANEL_CHECKMARKS = ("✔", "✓")  # the mark on the currently-active option
+_FAST_PANEL_MARKER = "fast mode (research preview)"
+
+
+def parse_mode_indicator(content):
+    """Parse the CURRENT permission mode off a captured screen's status line.
+
+    Pure function (no live session) so it is hermetically unit-testable. The
+    status line shows a plain-text mode indicator for every non-default mode
+    ("accept edits on", "plan mode on", "auto mode on", "bypass permissions
+    on"); `default` shows no indicator, so it is reported only when the capture
+    shows evidence of a rendered TUI screen (the input-box rule or the prompt
+    marker) with none of the indicators present.
+
+    Args:
+        content: A captured screen block (as from ``read``/``status``).
+
+    Returns:
+        One of ``"default" / "acceptEdits" / "plan" / "auto" /
+        "bypassPermissions"``, or ``None`` when the capture doesn't look like a
+        rendered TUI screen.
+    """
+    if not content:
+        return None
+    low = content.lower()
+    for label, needle in MODE_INDICATORS:
+        if needle in low:
+            return label
+    if re.search(r"─{10,}", content) or "❯" in content:
+        return "default"
+    return None
+
+
+def parse_thinking_panel(content):
+    """Parse the open `Meta+T` "Toggle thinking mode" panel.
+
+    Pure function. The panel is a numbered menu whose active option carries a
+    check mark::
+
+        ❯ 1. Enabled ✔  Claude will think before responding
+          2. Disabled   Claude will respond without extended thinking
+
+    Returns:
+        ``"enabled"`` / ``"disabled"`` (whichever option line carries the mark),
+        or ``None`` when the panel isn't open / can't be parsed.
+    """
+    if not content or _THINKING_PANEL_MARKER not in content.lower():
+        return None
+    state = None
+    for line in content.splitlines():
+        if not any(c in line for c in _PANEL_CHECKMARKS):
+            continue
+        low = line.lower()
+        if "disabled" in low:
+            state = "disabled"
+        elif "enabled" in low:
+            state = "enabled"
+    return state
+
+
+def parse_fast_panel(content):
+    """Parse the open `Meta+O` "↯ Fast mode (research preview)" panel.
+
+    Pure function. The state is the panel's ``Fast mode  OFF/ON  $…/Mtok`` line
+    — the ``$/Mtok`` marker only exists in the OPEN panel, so a closed-state
+    footer reading "Fast mode OFF" cannot be confused for it. A credit-gated
+    account (no Fast usage credits) is reported distinctly: the panel says
+    "requires usage credits" and no keystroke can turn Fast on.
+
+    Returns:
+        ``"on"`` / ``"off"`` / ``"credit-gated"``, or ``None`` when the panel
+        isn't open / can't be parsed.
+    """
+    if not content:
+        return None
+    low = content.lower()
+    if _FAST_PANEL_MARKER not in low:
+        return None
+    if "requires usage credits" in low or "usage-credits" in low:
+        return "credit-gated"
+    for line in content.splitlines():
+        if "mtok" not in line.lower():
+            continue
+        norm = re.sub(r"\s+", " ", line.lower()).strip()
+        if "fast mode on" in norm:
+            return "on"
+        if "fast mode off" in norm:
+            return "off"
+    return None
+
+
+def _looks_like_optin_menu(content):
+    """A numbered opt-in/enrollment menu (e.g. the auto-mode one-time opt-in)
+    rendered instead of a clean mode line mid-cycle — the cycle helper backs out
+    with Escape and keeps counting."""
+    low = content.lower()
+    return ("don't ask again" in low or "enable auto" in low
+            or "opt in" in low or "do you want to enable" in low)
+
+
 # Lines that look like a numbered menu option, e.g. "❯ 1. Yes" or "  3. No".
 _MENU_OPTION_RE = re.compile(r"^\s*[❯>]?\s*(\d+)\.\s+(.*\S)\s*$")
 # How close to the bottom of the capture the menu's last option must sit to count
@@ -809,6 +933,219 @@ class TmuxBridge:
             return "idle"
 
         return "unknown"
+
+    # --- Live mode / thinking / fast controls (§11 #12) ---
+    #
+    # The three levers proven live on the real TUI (see the three spikes:
+    # tests/test_permission_mode_cycle_live.py, tests/test_thinking_toggle_live.py,
+    # tests/test_fast_mode_toggle_live.py). All are tab-less keys()/read()
+    # sequences; every one is gated on a verified-idle screen (keys landing
+    # mid-turn are lost, misfire, or answer a pending permission menu), and every
+    # result is a READ-BACK of the resulting screen state — never an echo of the
+    # value sent.
+
+    def _idle_gate(self, name, timeout=5.0, interval=0.5):
+        """Poll until the screen is idle; True when safe to send control keys.
+
+        Checks at least once even with ``timeout=0`` (so a fake/pre-idle screen
+        gates in one read). Only "idle" is safe — "permission_prompt" is a menu
+        that a control key would answer.
+        """
+        deadline = time.time() + timeout
+        while True:
+            if self.status(name).get("state") == "idle":
+                return True
+            if time.time() >= deadline:
+                return False
+            time.sleep(interval)
+
+    def _open_panel_and_parse(self, name, key, parser, tries=14, interval=0.5):
+        """Send a panel-opening keybinding, poll until the panel parses.
+
+        Returns ``(state, content)`` — state is the parser's result, or ``None``
+        when the panel never became parseable within ``tries`` reads.
+        """
+        self.keys(name, key)
+        content = ""
+        for _ in range(tries):
+            content = self.read(name, lines=45)["content"]
+            state = parser(content)
+            if state is not None:
+                return state, content
+            time.sleep(interval)
+        return None, content
+
+    def permission_mode(self, name):
+        """Read the CURRENT permission mode off the live status line.
+
+        Read-only and safe in any run state (the mode indicator stays on the
+        status bar while generating). Returns one of ``"default" /
+        "acceptEdits" / "plan" / "auto" / "bypassPermissions"``, or ``None``
+        when the capture doesn't look like a rendered TUI screen.
+        """
+        return parse_mode_indicator(self.read(name, lines=20)["content"])
+
+    def set_permission_mode(self, name, target_mode, step_delay=1.2,
+                            idle_timeout=5.0):
+        """Set the permission mode on a RUNNING session — the proven cycle lever.
+
+        No absolute set exists on the TUI (mode-control research; confirmed at
+        every layer), so this cycles ``Shift+Tab`` (tmux ``BTab``) at a
+        known-idle screen, reading the resulting mode back from the status line
+        after each step until it equals ``target_mode``. The cycle is BOUNDED at
+        the ring size + 1: an un-armed Bypass/Auto segment is SILENTLY ABSENT
+        from the ring (§7.11 — no refusal, no indicator), so a target that never
+        appears yields an honest ``unreachable``, never an infinite loop. The
+        auto segment's one-time opt-in menu, if it interposes, is backed out of
+        with Escape and the cycle continues.
+
+        Returns:
+            ``{"ok": True, "mode": <read-back>}`` on success;
+            ``{"ok": False, "mode": <current>, "reason": "busy"}`` when the
+            screen never went idle; ``{"ok": False, "mode": <current>,
+            "reason": "unreachable"}`` when the target is not in this session's
+            armed ring (the launch pre-arm — ``--permission-mode`` /
+            ``--allow-dangerously-skip-permissions`` — is a create()-time
+            choice).
+        """
+        if not self._idle_gate(name, timeout=idle_timeout):
+            return {"ok": False, "mode": self.permission_mode(name),
+                    "reason": "busy"}
+        current = self.permission_mode(name)
+        if current == target_mode:
+            return {"ok": True, "mode": current}
+        for _ in range(MODE_RING_MAX + 1):
+            if not self._idle_gate(name, timeout=idle_timeout):
+                return {"ok": False, "mode": self.permission_mode(name),
+                        "reason": "busy"}
+            self.keys(name, "BTab")
+            time.sleep(step_delay)
+            content = self.read(name, lines=20)["content"]
+            mode = parse_mode_indicator(content)
+            if mode == "default" and _looks_like_optin_menu(content):
+                self.keys(name, "Escape")
+                time.sleep(step_delay)
+                continue
+            log.debug("set_permission_mode(%s): BTab -> %s (want %s)",
+                      name, mode, target_mode)
+            if mode == target_mode:
+                return {"ok": True, "mode": mode}
+        return {"ok": False, "mode": self.permission_mode(name),
+                "reason": "unreachable"}
+
+    def thinking_state(self, name, idle_timeout=5.0, poll_interval=0.5):
+        """Read the extended-thinking state via the `Meta+T` modal.
+
+        Opens the modal, reads which option carries the check mark, closes with
+        Escape. Returns ``{"ok": True, "on": bool}``, or ``{"ok": False,
+        "on": None, "reason": "busy" | "unreadable"}``.
+        """
+        if not self._idle_gate(name, timeout=idle_timeout):
+            return {"ok": False, "on": None, "reason": "busy"}
+        state, _ = self._open_panel_and_parse(
+            name, "M-t", parse_thinking_panel, interval=poll_interval)
+        self.keys(name, "Escape")  # leave the modal closed regardless
+        if state is None:
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        return {"ok": True, "on": state == "enabled"}
+
+    def set_thinking(self, name, on, idle_timeout=5.0, poll_interval=0.5,
+                     step_delay=1.2):
+        """Set extended thinking ABSOLUTELY via the `Meta+T` modal.
+
+        Open the modal, READ the current state first, toggle only if needed
+        (numbered-menu digit + Enter — Enter both confirms and closes), then
+        re-open to read the result back. The read-back is the returned state —
+        never the value sent.
+
+        Returns:
+            ``{"ok": True, "on": bool}`` on success; ``{"ok": False, "on": None,
+            "reason": "busy" | "unreadable"}`` on the honest failures.
+        """
+        if not self._idle_gate(name, timeout=idle_timeout):
+            return {"ok": False, "on": None, "reason": "busy"}
+        target = "enabled" if on else "disabled"
+        state, _ = self._open_panel_and_parse(
+            name, "M-t", parse_thinking_panel, interval=poll_interval)
+        if state is None:
+            self.keys(name, "Escape")
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        if state == target:
+            self.keys(name, "Escape")
+            return {"ok": True, "on": on}
+        # Numbered-menu selection by digit (1=Enabled, 2=Disabled) + Enter —
+        # the proven pattern (the startup bypass gate selects "2" the same way).
+        self.keys(name, "1" if on else "2")
+        time.sleep(step_delay / 3)
+        self.keys(name, "Enter")
+        time.sleep(step_delay)
+        state2, _ = self._open_panel_and_parse(
+            name, "M-t", parse_thinking_panel, interval=poll_interval)
+        self.keys(name, "Escape")
+        if state2 is None:
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        return {"ok": state2 == target, "on": state2 == "enabled"}
+
+    def fast_state(self, name, idle_timeout=5.0, poll_interval=0.6):
+        """Read the Fast-mode state via the `Meta+O` panel.
+
+        Opens the panel, reads the ``Fast mode OFF/ON`` line, closes with
+        Escape. Returns ``{"ok": True, "on": bool}``, or ``{"ok": False,
+        "on": None, "reason": "busy" | "credit_gated" | "unreadable"}`` —
+        ``credit_gated`` is the honest degrade for an account without Fast
+        usage credits (the panel reports "requires usage credits" and no
+        keystroke can turn Fast on).
+        """
+        if not self._idle_gate(name, timeout=idle_timeout):
+            return {"ok": False, "on": None, "reason": "busy"}
+        state, _ = self._open_panel_and_parse(
+            name, "M-o", parse_fast_panel, interval=poll_interval)
+        self.keys(name, "Escape")
+        if state == "credit-gated":
+            return {"ok": False, "on": None, "reason": "credit_gated"}
+        if state is None:
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        return {"ok": True, "on": state == "on"}
+
+    def set_fast(self, name, on, idle_timeout=5.0, poll_interval=0.6):
+        """Set Fast mode via the `Meta+O` panel — `Space` is the toggle lever.
+
+        Open the panel, READ the current state first, `Space`-toggle only if
+        needed (Enter/Escape merely CLOSE the panel), read the flipped line
+        back, close. A credit-gated account degrades honestly (see
+        ``fast_state``) — the toggle is never faked.
+
+        Returns:
+            ``{"ok": True, "on": bool}`` on success; ``{"ok": False, "on": None,
+            "reason": "busy" | "credit_gated" | "unreadable"}`` otherwise.
+        """
+        if not self._idle_gate(name, timeout=idle_timeout):
+            return {"ok": False, "on": None, "reason": "busy"}
+        target = "on" if on else "off"
+        state, _ = self._open_panel_and_parse(
+            name, "M-o", parse_fast_panel, interval=poll_interval)
+        if state == "credit-gated":
+            self.keys(name, "Escape")
+            return {"ok": False, "on": None, "reason": "credit_gated"}
+        if state is None:
+            self.keys(name, "Escape")
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        if state == target:
+            self.keys(name, "Escape")
+            return {"ok": True, "on": on}
+        self.keys(name, "Space")
+        state2 = None
+        for _ in range(14):
+            time.sleep(poll_interval)
+            state2 = parse_fast_panel(self.read(name, lines=45)["content"])
+            if state2 is not None:
+                break
+        self.keys(name, "Escape")
+        if state2 == "credit-gated":
+            return {"ok": False, "on": None, "reason": "credit_gated"}
+        if state2 is None:
+            return {"ok": False, "on": None, "reason": "unreadable"}
+        return {"ok": state2 == target, "on": state2 == "on"}
 
     # --- Multi-Agent ---
 

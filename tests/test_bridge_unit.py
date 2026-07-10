@@ -1271,3 +1271,439 @@ class TestDefaultGatewayParse:
         assert sidecar_base_url("172.26.112.1") == "http://172.26.112.1:7690"
         assert sidecar_base_url("10.0.0.5", port=8000) == "http://10.0.0.5:8000"
         assert sidecar_base_url(None) is None
+
+
+# -----------------------------------------------------------------------------
+# Live mode / thinking / fast control parsing (§11 #12) — the pure screen
+# parsers behind TmuxBridge.permission_mode / set_permission_mode /
+# thinking_state / set_thinking / fast_state / set_fast. Representative captures
+# lifted from the three proving live spikes (test_permission_mode_cycle_live,
+# test_thinking_toggle_live, test_fast_mode_toggle_live) and the launch-matrix
+# spike (test_bypass_auto_preconditions_live), which recorded the exact
+# status-line indicator and panel wordings on Claude Code 2.1.198/2.1.201.
+# -----------------------------------------------------------------------------
+
+from bridge.bridge import (
+    MODE_RING_MAX,
+    parse_fast_panel,
+    parse_mode_indicator,
+    parse_thinking_panel,
+)
+
+# Idle screens carrying each non-default mode's status-line indicator (default
+# shows NO indicator — the plain IDLE_SCREEN above reads as "default").
+IDLE_ACCEPT_EDITS_SCREEN = """\
+● Done.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to cycle)
+"""
+
+IDLE_PLAN_MODE_SCREEN = """\
+● Done.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────────────────────────────────────
+  ⏸ plan mode on (shift+tab to cycle)
+"""
+
+IDLE_AUTO_MODE_SCREEN = """\
+● Done.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)
+"""
+
+# The Meta+T "Toggle thinking mode" modal — the ✔ marks the ACTIVE option.
+THINKING_PANEL_ENABLED = """\
+ Toggle thinking mode
+
+ ❯ 1. Enabled ✔  Claude will think before responding
+   2. Disabled   Claude will respond without extended thinking
+
+ Enter to confirm · Esc to cancel
+"""
+
+THINKING_PANEL_DISABLED = """\
+ Toggle thinking mode
+
+   1. Enabled     Claude will think before responding
+ ❯ 2. Disabled ✔  Claude will respond without extended thinking
+
+ Enter to confirm · Esc to cancel
+"""
+
+# The Meta+O "↯ Fast mode (research preview)" panel — the `$/Mtok` line is the
+# state; it exists only in the OPEN panel.
+FAST_PANEL_OFF = """\
+↯ Fast mode (research preview)
+
+High-speed mode for Opus 4.8. Draws from usage credits at a higher rate.
+
+  Fast mode  OFF  $10/$50 per Mtok
+
+Learn more: https://code.claude.com/docs/en/fast-mode
+"""
+
+FAST_PANEL_ON = """\
+↯ Fast mode (research preview)
+
+High-speed mode for Opus 4.8. Draws from usage credits at a higher rate.
+
+  Fast mode  ON  $10/$50 per Mtok
+
+Learn more: https://code.claude.com/docs/en/fast-mode
+"""
+
+# Credit-gated account (live capture wording, CC 2.1.198): the panel opens but
+# reports it needs usage credits — no keystroke can turn Fast on.
+FAST_PANEL_CREDIT_GATED = """\
+↯ Fast mode (research preview)
+
+High-speed mode for Opus 4.8. Fast mode requires usage credits.
+
+  Fast mode  OFF
+
+Learn more: https://code.claude.com/docs/en/fast-mode
+"""
+
+# A CLOSED-panel footer mentioning "Fast mode OFF" — must NOT parse as a panel
+# state (the $/Mtok line only exists in the open panel).
+IDLE_WITH_FAST_FOOTER = """\
+● Done.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────────────────────────────────────
+  Fast mode OFF · ? for shortcuts
+"""
+
+
+class TestParseModeIndicator:
+    def test_default_shows_no_indicator(self):
+        # A rendered TUI screen with no mode indicator IS default mode.
+        assert parse_mode_indicator(IDLE_SCREEN) == "default"
+
+    def test_accept_edits(self):
+        assert parse_mode_indicator(IDLE_ACCEPT_EDITS_SCREEN) == "acceptEdits"
+
+    def test_plan(self):
+        assert parse_mode_indicator(IDLE_PLAN_MODE_SCREEN) == "plan"
+
+    def test_auto(self):
+        assert parse_mode_indicator(IDLE_AUTO_MODE_SCREEN) == "auto"
+
+    def test_bypass_readable_while_generating(self):
+        # The indicator stays on the status bar mid-turn — the read is safe in
+        # any run state (GENERATING_SCREEN carries "bypass permissions on").
+        assert parse_mode_indicator(GENERATING_SCREEN) == "bypassPermissions"
+
+    def test_empty_is_none(self):
+        assert parse_mode_indicator("") is None
+        assert parse_mode_indicator(None) is None
+
+    def test_non_tui_capture_is_none_not_default(self):
+        # No rule, no prompt marker — not a rendered TUI screen, so no honest
+        # mode can be read (never guess "default" off garbage).
+        assert parse_mode_indicator("connection to WSL lost\n") is None
+
+
+class TestParseThinkingPanel:
+    def test_enabled(self):
+        assert parse_thinking_panel(THINKING_PANEL_ENABLED) == "enabled"
+
+    def test_disabled(self):
+        assert parse_thinking_panel(THINKING_PANEL_DISABLED) == "disabled"
+
+    def test_not_open_is_none(self):
+        assert parse_thinking_panel(IDLE_SCREEN) is None
+        assert parse_thinking_panel("") is None
+
+    def test_panel_without_checkmark_is_none(self):
+        # Panel marker present but no ✔ on either option — unparseable, not a guess.
+        broken = "Toggle thinking mode\n 1. Enabled\n 2. Disabled\n"
+        assert parse_thinking_panel(broken) is None
+
+
+class TestParseFastPanel:
+    def test_off(self):
+        assert parse_fast_panel(FAST_PANEL_OFF) == "off"
+
+    def test_on(self):
+        assert parse_fast_panel(FAST_PANEL_ON) == "on"
+
+    def test_credit_gated(self):
+        assert parse_fast_panel(FAST_PANEL_CREDIT_GATED) == "credit-gated"
+
+    def test_closed_footer_is_none(self):
+        # "Fast mode OFF" outside the open panel (no panel marker) — not a state.
+        assert parse_fast_panel(IDLE_WITH_FAST_FOOTER) is None
+
+    def test_panel_without_state_line_is_none(self):
+        assert parse_fast_panel("↯ Fast mode (research preview)\n") is None
+
+    def test_empty_is_none(self):
+        assert parse_fast_panel("") is None
+        assert parse_fast_panel(None) is None
+
+
+# -----------------------------------------------------------------------------
+# The bounded Shift+Tab cycle + read-first panel toggles (§11 #12) — hermetic
+# fakes drive the REAL TmuxBridge control methods with scripted screens (no
+# WSL/tmux; all delays zeroed). These pin the honest-failure contract: busy →
+# {"reason": "busy"}; a target absent from the armed ring → a BOUNDED cycle and
+# {"reason": "unreachable"} (§7.11's silently-absent un-armed Bypass/Auto);
+# credit-gated Fast → {"reason": "credit_gated"}, never a faked toggle.
+# -----------------------------------------------------------------------------
+
+_MODE_STATUS_LINES = {
+    "default": "  ? for shortcuts",
+    "acceptEdits": "  ⏵⏵ accept edits on (shift+tab to cycle)",
+    "plan": "  ⏸ plan mode on (shift+tab to cycle)",
+    "auto": "  ⏵⏵ auto mode on (shift+tab to cycle)",
+    "bypassPermissions": "  ⏵⏵ bypass permissions on (shift+tab to cycle)",
+}
+
+
+class _FakeRingBridge(TmuxBridge):
+    """TmuxBridge with a scripted mode ring: BTab advances the ring; read()
+    renders an idle screen carrying the current segment's indicator."""
+
+    def __init__(self, ring, state="idle"):
+        super().__init__()
+        self.ring = list(ring)
+        self.idx = 0
+        self.state = state
+        self.keys_sent = []
+
+    def _require_session(self, name):
+        pass
+
+    def _run(self, *a, **k):  # pragma: no cover - guard
+        raise AssertionError("hermetic fake must not shell out")
+
+    def status(self, name):
+        return {"state": self.state}
+
+    def keys(self, name, *key_names):
+        self.keys_sent += list(key_names)
+        if "BTab" in key_names:
+            self.idx = (self.idx + 1) % len(self.ring)
+        return {"status": "sent", "name": name, "keys": list(key_names)}
+
+    def read(self, name, lines=50):
+        content = (
+            "────────────────────────────────────────\n"
+            "❯ \xa0\n"
+            "────────────────────────────────────────\n"
+            + _MODE_STATUS_LINES[self.ring[self.idx]]
+        )
+        return {"status": "ok", "name": name, "lines": 4, "content": content}
+
+
+class TestSetPermissionModeCycle:
+    def test_one_btab_reaches_accept_edits(self):
+        b = _FakeRingBridge(["default", "acceptEdits", "plan", "auto"])
+        out = b.set_permission_mode("s", "acceptEdits", step_delay=0, idle_timeout=0)
+        assert out == {"ok": True, "mode": "acceptEdits"}
+        assert b.keys_sent.count("BTab") == 1
+
+    def test_already_at_target_sends_no_keys(self):
+        b = _FakeRingBridge(["default", "acceptEdits", "plan", "auto"])
+        out = b.set_permission_mode("s", "default", step_delay=0, idle_timeout=0)
+        assert out == {"ok": True, "mode": "default"}
+        assert b.keys_sent == []
+
+    def test_unarmed_bypass_is_bounded_unreachable(self):
+        # §7.11: an un-armed Bypass is SILENTLY ABSENT from the ring — the cycle
+        # must terminate at ring size + 1 and report honestly, never loop.
+        b = _FakeRingBridge(["default", "acceptEdits", "plan", "auto"])
+        out = b.set_permission_mode(
+            "s", "bypassPermissions", step_delay=0, idle_timeout=0)
+        assert out["ok"] is False
+        assert out["reason"] == "unreachable"
+        assert out["mode"] in _MODE_STATUS_LINES        # honest current read-back
+        assert b.keys_sent.count("BTab") == MODE_RING_MAX + 1
+
+    def test_armed_bypass_reached_by_cycling(self):
+        b = _FakeRingBridge(
+            ["default", "acceptEdits", "plan", "bypassPermissions", "auto"])
+        out = b.set_permission_mode(
+            "s", "bypassPermissions", step_delay=0, idle_timeout=0)
+        assert out == {"ok": True, "mode": "bypassPermissions"}
+        assert b.keys_sent.count("BTab") == 3
+
+    def test_busy_screen_refuses_without_keys(self):
+        b = _FakeRingBridge(["default", "acceptEdits"], state="generating")
+        out = b.set_permission_mode("s", "acceptEdits", step_delay=0, idle_timeout=0)
+        assert out["ok"] is False and out["reason"] == "busy"
+        assert b.keys_sent == []
+
+    def test_permission_prompt_screen_counts_as_busy(self):
+        # A pending permission menu is NOT a safe screen — a BTab would land in it.
+        b = _FakeRingBridge(["default", "acceptEdits"], state="permission_prompt")
+        out = b.set_permission_mode("s", "acceptEdits", step_delay=0, idle_timeout=0)
+        assert out["ok"] is False and out["reason"] == "busy"
+        assert b.keys_sent == []
+
+
+class _FakeThinkingBridge(TmuxBridge):
+    """The Meta+T modal as a state machine: M-t opens showing the CURRENT state;
+    digit selects; Enter confirms + closes; Escape closes without applying."""
+
+    def __init__(self, enabled=True, state="idle"):
+        super().__init__()
+        self.enabled = enabled
+        self.state = state
+        self.panel_open = False
+        self._selected = None
+        self.keys_sent = []
+
+    def _require_session(self, name):
+        pass
+
+    def _run(self, *a, **k):  # pragma: no cover - guard
+        raise AssertionError("hermetic fake must not shell out")
+
+    def status(self, name):
+        return {"state": self.state}
+
+    def keys(self, name, *key_names):
+        self.keys_sent += list(key_names)
+        for k in key_names:
+            if k == "M-t":
+                self.panel_open, self._selected = True, None
+            elif k == "Escape":
+                self.panel_open = False
+            elif k in ("1", "2") and self.panel_open:
+                self._selected = k
+            elif k == "Enter" and self.panel_open:
+                if self._selected:
+                    self.enabled = self._selected == "1"
+                self.panel_open = False
+        return {"status": "sent", "name": name, "keys": list(key_names)}
+
+    def read(self, name, lines=50):
+        content = (THINKING_PANEL_ENABLED if self.enabled
+                   else THINKING_PANEL_DISABLED) if self.panel_open else IDLE_SCREEN
+        return {"status": "ok", "name": name, "lines": 6, "content": content}
+
+
+class TestSetThinking:
+    def test_toggle_off_reads_back(self):
+        b = _FakeThinkingBridge(enabled=True)
+        out = b.set_thinking("s", False, idle_timeout=0, poll_interval=0, step_delay=0)
+        assert out == {"ok": True, "on": False}
+        assert b.enabled is False
+
+    def test_toggle_on_reads_back(self):
+        b = _FakeThinkingBridge(enabled=False)
+        out = b.set_thinking("s", True, idle_timeout=0, poll_interval=0, step_delay=0)
+        assert out == {"ok": True, "on": True}
+        assert b.enabled is True
+
+    def test_already_at_target_only_opens_and_closes(self):
+        # Read-first: no digit/Enter is sent when the state already matches.
+        b = _FakeThinkingBridge(enabled=True)
+        out = b.set_thinking("s", True, idle_timeout=0, poll_interval=0, step_delay=0)
+        assert out == {"ok": True, "on": True}
+        assert b.keys_sent == ["M-t", "Escape"]
+
+    def test_state_read(self):
+        assert _FakeThinkingBridge(enabled=True).thinking_state(
+            "s", idle_timeout=0, poll_interval=0) == {"ok": True, "on": True}
+        assert _FakeThinkingBridge(enabled=False).thinking_state(
+            "s", idle_timeout=0, poll_interval=0) == {"ok": True, "on": False}
+
+    def test_busy_refuses(self):
+        b = _FakeThinkingBridge(enabled=True, state="generating")
+        out = b.set_thinking("s", False, idle_timeout=0, poll_interval=0, step_delay=0)
+        assert out == {"ok": False, "on": None, "reason": "busy"}
+        assert b.keys_sent == []
+
+
+class _FakeFastBridge(TmuxBridge):
+    """The Meta+O panel as a state machine: M-o opens; Space toggles (unless the
+    account is credit-gated); Enter/Escape only close."""
+
+    def __init__(self, on=False, credit_gated=False, state="idle"):
+        super().__init__()
+        self.on = on
+        self.credit_gated = credit_gated
+        self.state = state
+        self.panel_open = False
+        self.keys_sent = []
+
+    def _require_session(self, name):
+        pass
+
+    def _run(self, *a, **k):  # pragma: no cover - guard
+        raise AssertionError("hermetic fake must not shell out")
+
+    def status(self, name):
+        return {"state": self.state}
+
+    def keys(self, name, *key_names):
+        self.keys_sent += list(key_names)
+        for k in key_names:
+            if k == "M-o":
+                self.panel_open = True
+            elif k in ("Escape", "Enter"):
+                self.panel_open = False
+            elif k == "Space" and self.panel_open and not self.credit_gated:
+                self.on = not self.on
+        return {"status": "sent", "name": name, "keys": list(key_names)}
+
+    def read(self, name, lines=50):
+        if not self.panel_open:
+            content = IDLE_SCREEN
+        elif self.credit_gated:
+            content = FAST_PANEL_CREDIT_GATED
+        else:
+            content = FAST_PANEL_ON if self.on else FAST_PANEL_OFF
+        return {"status": "ok", "name": name, "lines": 6, "content": content}
+
+
+class TestSetFast:
+    def test_toggle_on_reads_back(self):
+        b = _FakeFastBridge(on=False)
+        out = b.set_fast("s", True, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": True, "on": True}
+        assert b.on is True
+
+    def test_toggle_off_reads_back(self):
+        b = _FakeFastBridge(on=True)
+        out = b.set_fast("s", False, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": True, "on": False}
+
+    def test_already_at_target_sends_no_space(self):
+        b = _FakeFastBridge(on=False)
+        out = b.set_fast("s", False, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": True, "on": False}
+        assert "Space" not in b.keys_sent
+
+    def test_credit_gated_is_honest_degrade(self):
+        # The credit-gated account never gets a faked toggle — the panel state
+        # is reported as the machine-readable reason and Space is never sent.
+        b = _FakeFastBridge(credit_gated=True)
+        out = b.set_fast("s", True, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": False, "on": None, "reason": "credit_gated"}
+        assert "Space" not in b.keys_sent
+
+    def test_state_read(self):
+        assert _FakeFastBridge(on=True).fast_state(
+            "s", idle_timeout=0, poll_interval=0) == {"ok": True, "on": True}
+        assert _FakeFastBridge(credit_gated=True).fast_state(
+            "s", idle_timeout=0, poll_interval=0) == {
+                "ok": False, "on": None, "reason": "credit_gated"}
+
+    def test_busy_refuses(self):
+        b = _FakeFastBridge(state="generating")
+        out = b.set_fast("s", True, idle_timeout=0, poll_interval=0)
+        assert out == {"ok": False, "on": None, "reason": "busy"}
+        assert b.keys_sent == []
