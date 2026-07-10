@@ -131,7 +131,7 @@ talks to `127.0.0.1:7690`.)
 is partitioned per project folder (§8), so serving a different project is a matter of which project store
 it is reading and writing — never a second process.
 
-**Sidecar operational posture — decided (2026-07-05).** Crash-supervision: **manual relaunch is the v1 model** — agents survive in tmux and persistence is write-as-it-happens (§8.3), so a dead sidecar loses nothing but the live readouts; auto-restart supervision is deferred (it folds into the one-click shell, §11 #20, if unattended operation ever matters). Logging: the sidecar writes a **small, size-bounded rotating log** under the gitignored `sidecar/runtime/` so a crash leaves a trail (queued, §11 #43). ⚠ **Today:** ad-hoc stdout only.
+**Sidecar operational posture — decided (2026-07-05).** Crash-supervision: **manual relaunch is the v1 model** — agents survive in tmux and persistence is write-as-it-happens (§8.3), so a dead sidecar loses nothing but the live readouts; auto-restart supervision is deferred (it folds into the one-click shell, §11 #20, if unattended operation ever matters). Logging: the sidecar writes a **small, size-bounded rotating log** under the gitignored `sidecar/runtime/` (`sidecar.log`, 1 MB × 3 — `_install_file_log()` in [`sidecar/main.py`](../sidecar/main.py)) so a crash leaves a trail.
 
 ---
 
@@ -1109,7 +1109,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 
 | Body § | What's owed today | Queue item |
 |--------|-------------------|------------|
-| §2, §4.1 | One-click launch: Electron main doesn't spawn/supervise the sidecar (`.bat` is the launcher); no sidecar log file | #20, #43 |
+| §2, §4.1 | One-click launch: Electron main doesn't spawn/supervise the sidecar (`.bat` is the launcher) | #20 |
 | §3.1–§3.5, §9.1 | Projects UI (picker tab, chip, close dialog) + picker-first startup — the system side is built | #37 (UI), #20 |
 | §4.3 | No degraded-mode freeze/stale/backoff in the client | #38 |
 | §4.4, §7.5, §7.10 | Renderer trails the design system (16/25 colours, Console gaps, marquee omitted) — superseded by the fresh rebuild | #37 |
@@ -1187,7 +1187,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 ### 11.7 Platform, hygiene & support (#42–49)
 
 42. *(built 2026-07-10 — `schema_version` stamped by the state-store writer; see DEVLOG)*
-43. **Sidecar log file** *(→ §2)* — a small, size-bounded rotating diagnostic log under the gitignored `sidecar/runtime/`, so a crash/fault leaves a trail. A candidate drill-in for the design-lane system-health indicator. Where: app logging config ([`sidecar/main.py`](../sidecar/main.py)).
+43. *(built 2026-07-10 — rotating `sidecar/runtime/sidecar.log`, 1 MB × 3; see DEVLOG)*
 44. **Docs in agent context (light)** *(→ §7.16, §10 #6)* — a curated docs home agents are pointed at (the **Library**) + **per-agent doc attachment at launch**; automatic relevance-retrieval stays §10 #6. Operator interface sketch (kept broad, for the design agents): the **Library is the hub**, reusing the review-panels' nav-rail lens pattern but organized by task / project / subproject (the Outline tab possibly going icon-based to free a slot). Where: [`sidecar/library.py`](../sidecar/library.py), prompt composition, `state/agents.json`.
 45. **Prompt/UI-text markdown library (scope-aware)** *(→ §7.14, §8.2, §8.4)* — one human-editable **markdown prompt library** as the single home for every UI-injected/canned text the dashboard sends on the user's behalf: the post-reviewer-request instructions, the reviewer-request **Send** and Library **Revise** texts, Compose **snippets + templates**, the **Revise scope chip** and **Response (Structure)** options, and the Team Feed **Summarize** action (which may route to a small system-run utility model) — plus more as they surface. Format: markdown with the `##` group / `###` item convention (JSON only where placeholder fill-in genuinely needs it), organized by purpose (`responses.md`, `snippets.md`, `actions.md`). **Two scopes:** a **System copy** (the persistent cross-project store, absorbing the old "User" scope; the lean is `~/.claude` for shared runtime docs) + a **Project copy** (`<project>/.awl-cc-dash/`, §8.2). Includes adding these doc types to the **§8.4 master table**. Design-lane consumers (Compose Snippets dropdown, the Documents scoped/typed browser) are queued in the design lane.
 46. **Per-turn settings + summary capture** *(→ §7.19, §7.14; feeds #15 and #39)* — capture, per Timeline turn: the agent's **settings at that turn** (model + mode/effort/thinking) and a **concise one-line turn summary**, so Timeline turn rows render a settings string + summary and collapsed Team Feed / History cards show a one-line preview. The summary's source ties to the response-format preamble (#39) — the lean is agents leading every reply with a one-liner. Display is the design lane's; this is the capture/storage side.
