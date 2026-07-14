@@ -18,6 +18,8 @@ Contract:
   * `set_effort(effort)` — best-effort; update reasoning effort.
   * `set_fast(on)`       — best-effort; toggle fast mode.
   * `set_thinking(on)`   — best-effort; toggle extended thinking.
+  * `set_display_name(name)` — best-effort; register the agent's display name
+                           with the underlying engine (§7.5 name registration).
   * `answer_permission(approve)` — answer a pending tool-permission prompt.
   * `get_context_usage()`— return context usage (or None if unsupported).
   * `close()`            — tear the agent down and stop `events()`.
@@ -103,6 +105,13 @@ class AgentDriver:
         return None
 
     async def set_thinking(self, on: bool) -> None:
+        return None
+
+    async def set_display_name(self, name: str) -> None:
+        """Register ``name`` as the engine-side session display name (§7.5).
+
+        Capability-gated (``set_display_name``): the default is a no-op for
+        drivers with no display-name surface (e.g. the sdk driver)."""
         return None
 
     async def answer_permission(self, approve: bool) -> None:

@@ -668,6 +668,19 @@ class TestCreateResumeLaunch:
             b.create("conflicted", session_id="a" * 36,
                      resume_session_id=self.RESUME_ID)
 
+    def test_display_name_passes_name_flag(self, monkeypatch):
+        # §7.5 name registration: the identity name doubles as the Claude Code
+        # session display name, set at launch via `claude --name` (flag verified
+        # present on CC 2.1.202).
+        b, captured = self._patched_bridge(monkeypatch, "named")
+        b.create("named", cwd="/tmp/x", display_name="ivy")
+        assert "--name ivy" in self._launch_cmd(captured)
+
+    def test_no_display_name_omits_name_flag(self, monkeypatch):
+        b, captured = self._patched_bridge(monkeypatch, "anon")
+        b.create("anon", cwd="/tmp/x")
+        assert "--name" not in self._launch_cmd(captured)
+
     def test_resume_dead_session_with_id_cold_restores(self, monkeypatch):
         # Dead tmux + a known claude id → fall through to the resume-launch
         # create(), SAME conversation (the §9.9 cold-restore wiring).
@@ -1208,6 +1221,69 @@ class TestBuildLaunchConfig:
     def test_mcp_none_inherits_global(self):
         # mcp_servers unset -> None -> no --mcp-config (inherit the global registry).
         assert _driver()._build_mcp_config() is None
+
+
+# -----------------------------------------------------------------------------
+# Display-name registration (§7.5 / §11 #14) — the identity NAME doubles as the
+# Claude Code session display name: `claude --name` at launch (from
+# config.identity), `/rename <name>` over send() on a live-session edit.
+# Hermetic: the TmuxBridge calls are monkeypatch-captured, never executed.
+# -----------------------------------------------------------------------------
+
+import asyncio as _asyncio
+
+
+class TestDisplayNameRegistration:
+    def _capture_create(self, d, monkeypatch):
+        seen = {}
+
+        def fake_create(name, **kw):
+            seen["name"] = name
+            seen.update(kw)
+            return {"session_id": "deadbeef"}
+
+        monkeypatch.setattr(d._bridge, "create", fake_create)
+        return seen
+
+    def test_create_session_passes_identity_name(self, monkeypatch):
+        d = _driver(identity={"role": "Agent", "number": 1, "name": "zippy",
+                              "color": "#008149", "icon": "fox-head"})
+        seen = self._capture_create(d, monkeypatch)
+        d._create_session()
+        assert seen["display_name"] == "zippy"
+
+    def test_create_session_empty_or_missing_name_passes_none(self, monkeypatch):
+        for cfg in ({"identity": {"name": ""}}, {"identity": None}, {}):
+            d = _driver(**cfg)
+            seen = self._capture_create(d, monkeypatch)
+            d._create_session()
+            assert seen["display_name"] is None
+
+    def test_set_display_name_sends_rename(self, monkeypatch):
+        d = _driver()
+        sent = []
+        monkeypatch.setattr(d._bridge, "send",
+                            lambda name, text: sent.append((name, text)))
+        _asyncio.run(d.set_display_name("nova"))
+        assert sent == [(d.tmux_name, "/rename nova")]
+
+    def test_set_display_name_empty_is_noop(self, monkeypatch):
+        d = _driver()
+        sent = []
+        monkeypatch.setattr(d._bridge, "send",
+                            lambda name, text: sent.append((name, text)))
+        _asyncio.run(d.set_display_name(""))
+        assert sent == []
+
+    def test_capability_advertised_on_bridge_only(self):
+        from sidecar.drivers.base import AgentDriver
+        assert "set_display_name" in BridgeDriver.CAPABILITIES
+        # The base default (what the sdk driver inherits) is a capability-gated
+        # no-op: not advertised, returns None.
+        assert "set_display_name" not in AgentDriver.CAPABILITIES
+        assert _asyncio.run(
+            AgentDriver(DriverConfig(), lambda e: None).set_display_name("x")
+        ) is None
 
 
 # ---------------------------------------------------------------------------

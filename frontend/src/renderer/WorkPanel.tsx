@@ -116,7 +116,7 @@ function LinkRow({ link, sessions, onDelete, onKickoff }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: C.t1 }}>{shortId(link.a, sessions)} {arrow} {shortId(link.b, sessions)}</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 8.5, fontWeight: 800, color: C.t3, background: C.surface, border: `1.5px solid ${C.rule}`, borderRadius: 3, padding: '1px 5px' }}>{link.relationship.join('+')}</span>
+        <span style={{ fontSize: 8.5, fontWeight: 800, color: C.t3, background: C.surface, border: `1.5px solid ${C.rule}`, borderRadius: 3, padding: '1px 5px' }}>{link.relationship}</span>
         <span style={{ fontSize: 8.5, fontWeight: 800, color: C.t3, background: C.surface, border: `1.5px solid ${C.rule}`, borderRadius: 3, padding: '1px 5px' }}>{link.trigger}</span>
       </div>
       <div style={{ fontSize: 9, color: C.t5, marginTop: 4, fontFamily: MONO }}>
@@ -162,7 +162,7 @@ function CreateLink({ sessions, onCreate }: { sessions: Session[]; onCreate: (b:
 
   const create = () => {
     onCreate({
-      a, b, direction, relationship: rel.length ? rel : ['direct'], trigger,
+      a, b, direction, relationship: rel[0] || 'direct', trigger,  // ONE relationship per link (§7.6)
       end_after_exchanges: cap.trim() ? Number(cap) : null,
     })
     setA(''); setB('')

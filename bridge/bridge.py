@@ -283,7 +283,7 @@ class TmuxBridge:
     def create(self, name, cwd=None, model=None, claude_args="", show=False,
                permission_mode=None, allowed_tools=None, disallowed_tools=None,
                settings=None, mcp_config=None, session_id=None,
-               resume_session_id=None):
+               resume_session_id=None, display_name=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -340,6 +340,13 @@ class TmuxBridge:
                 ``--mcp-config`` together with ``--strict-mcp-config`` (the agent
                 sees ONLY these servers). Pass ``{"mcpServers": {}}`` for none;
                 pass ``None`` (the default) to inherit the global MCP registry.
+            display_name: Optional Claude Code session display name, passed as
+                claude's ``--name`` flag (verified present on CC 2.1.202:
+                ``-n, --name <name>  Set a display name for this session``). It
+                surfaces in the ``--resume`` picker / the VS Code extension's
+                session list and is recorded in ``~/.claude/sessions/<pid>.json``
+                (``name`` + ``nameSource``). Renaming a LIVE session later is a
+                ``/rename <name>`` slash command over ``send()``, not a flag.
             show: When True, open a visible Windows Terminal tab attached to the
                 new session. Defaults to False: the tmux session runs detached and
                 is fully drivable via capture-pane/send-keys without a window, so
@@ -391,6 +398,10 @@ class TmuxBridge:
         use_model = model or self._default_model
         if use_model:
             argv += ["--model", use_model]
+        if display_name:
+            # Register the session's Claude Code display name at launch (§7.5 —
+            # the dashboard identity name doubles as the session name).
+            argv += ["--name", str(display_name)]
         if permission_mode in VALID_PERMISSION_MODES:
             argv += ["--permission-mode", permission_mode]
         elif permission_mode:
