@@ -1286,6 +1286,83 @@ class TestDisplayNameRegistration:
         ) is None
 
 
+# -----------------------------------------------------------------------------
+# BridgeDriver warm-resume (§9.9): the driver seeds transcript_path + the full
+# persisted record, and resume() carries cwd/model/resume_session_id so the
+# dead-in-the-race-window fall-through cold-restores the SAME conversation
+# instead of creating a blank session.
+# -----------------------------------------------------------------------------
+
+class _FakeResumeBridge:
+    """Stands in for TmuxBridge on the warm-resume path (no WSL/tmux)."""
+
+    def __init__(self):
+        self.resume_kwargs = None
+        self.registered = None
+
+    def register_session_id(self, name, session_id):
+        self.registered = (name, session_id)
+
+    def resume(self, name, cwd=None, model=None, resume_session_id=None):
+        self.resume_kwargs = {"name": name, "cwd": cwd, "model": model,
+                              "resume_session_id": resume_session_id}
+        return {"status": "resumed", "name": name}
+
+    def wait_idle(self, name, timeout, interval):
+        return True
+
+
+class TestBridgeDriverWarmResume:
+    _REC = {
+        "session_id": "s1", "tmux_name": "awl-warm", "driver": "bridge",
+        "model": "sonnet", "permission_mode": "acceptEdits",
+        "cwd": "/mnt/c/proj", "claude_session_id": "cid-123",
+        "transcript_path": "/home/u/.claude/projects/x/cid-123.jsonl",
+        "identity": {"number": 3},
+        # A field some OTHER writer persisted into the roster record — a
+        # record refresh must carry it forward, never drop it.
+        "notes": "another-writers-field",
+    }
+
+    def _resumed(self, monkeypatch, saved):
+        import sidecar.drivers.bridge as db
+        monkeypatch.setattr(db, "_save_record", lambda r: saved.update(r))
+        rec = dict(self._REC)
+        d = BridgeDriver(
+            DriverConfig(model="sonnet", cwd="/mnt/c/proj"),
+            lambda e: None,
+            resume_name="awl-warm", session_id="s1",
+            claude_session_id="cid-123",
+            transcript_path=rec["transcript_path"],
+            persisted_record=rec,
+        )
+        fake = _FakeResumeBridge()
+        d._bridge = fake
+        return d, fake
+
+    def test_resume_seeds_transcript_path_and_record_base(self, monkeypatch):
+        saved: dict = {}
+        d, _fake = self._resumed(monkeypatch, saved)
+        # Seeded up front — a known path is never pointlessly re-resolved.
+        assert d._transcript_path == self._REC["transcript_path"]
+        _asyncio.run(d.start())
+        # The refreshed record kept the known transcript path AND the field
+        # another writer persisted.
+        assert saved["transcript_path"] == self._REC["transcript_path"]
+        assert saved["notes"] == "another-writers-field"
+        assert saved["claude_session_id"] == "cid-123"
+
+    def test_warm_resume_carries_cold_restore_fallback_args(self, monkeypatch):
+        d, fake = self._resumed(monkeypatch, {})
+        _asyncio.run(d.start())
+        assert fake.resume_kwargs == {
+            "name": "awl-warm", "cwd": "/mnt/c/proj", "model": "sonnet",
+            "resume_session_id": "cid-123",
+        }
+        # The persisted claude id was re-registered for transcript resolution.
+        assert fake.registered == ("awl-warm", "cid-123")
+
+
 # ---------------------------------------------------------------------------
 # Transcript events carry a deterministic anchor (the JSONL entry uuid)
 # so the sidecar can build a stable, dedup-able event id.

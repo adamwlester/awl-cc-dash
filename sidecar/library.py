@@ -7,8 +7,15 @@ The Library surfaces the agents' own working artifacts to the dashboard:
     ``docs/`` dirs (§8.2). Enumerate the files (:func:`list_markdown`), return a
     single doc's raw content (:func:`read_document`), and — for the
     dashboard-owned store only — create / delete / rename (:func:`create_document`,
-    :func:`delete_document`, :func:`rename_document_pair`). Everything outside
-    ``<project>/.awl-cc-dash/`` stays browse-read-only (§8.5 rule 5).
+    :func:`delete_document`, :func:`rename_document_pair`). **Write scope is the
+    two content collections**: every mutating operation is gated to files under
+    the store's ``plans/`` or ``docs/`` subtrees
+    (:func:`document_in_content_dirs`) — never ``state/`` or other store files;
+    read-side checks keep the wider :func:`document_in_store`. Everything outside
+    ``<project>/.awl-cc-dash/`` stays browse-read-only (§8.5 rule 5), and review
+    writes never mint a sidecar at the repo root
+    (:func:`resolve_document_for_write` drops the root candidate that
+    :func:`resolve_document` keeps for reads).
 
   * **Per-doc metadata sidecars (§8.5)** — content and metadata are separate
     files, **paired by name**: ``roadmap.md`` + ``roadmap.meta.json`` next to it.
@@ -328,7 +335,9 @@ def rename_document_pair(md_path: str | Path, new_filename: str) -> dict:
     ``final.md`` + ``final.meta.json`` (the sidecar may be absent — then only the
     ``.md`` moves). Refuses to overwrite an existing target (``.md`` **or**
     sidecar) with :class:`FileExistsError`, checked before anything moves so a
-    refusal never leaves a half-renamed pair. ``new_filename`` is a bare
+    refusal never leaves a half-renamed pair; if the sidecar's rename itself
+    fails mid-pair, the ``.md`` rename is rolled back (best-effort) before the
+    error propagates — a pair is never left half-renamed. ``new_filename`` is a bare
     ``.md`` filename (validated — no separators/``..``). Raises
     :class:`FileNotFoundError` when the source ``.md`` doesn't exist. Returns
     ``{"old": str, "new": str}`` (the ``.md`` paths).
@@ -346,7 +355,16 @@ def rename_document_pair(md_path: str | Path, new_filename: str) -> dict:
         raise FileExistsError(str(dst_meta))
     src.rename(dst)
     if src_meta.is_file():
-        src_meta.rename(dst_meta)
+        try:
+            src_meta.rename(dst_meta)
+        except OSError:
+            # The pair must never be left half-renamed: roll the .md back
+            # (best-effort) before surfacing the failure.
+            try:
+                dst.rename(src)
+            except OSError:  # pragma: no cover - rollback is best-effort
+                pass
+            raise
     return {"old": str(src), "new": str(dst)}
 
 
@@ -396,7 +414,8 @@ def document_in_store(path: str | Path, cwd: str | None) -> bool:
 
     Both sides are ``resolve()``d before comparing, so symlinks and relative
     segments can't smuggle a path out of (or fake a path into) the store. The
-    write-scope gate for every mutating Library operation (§8.5 rule 5).
+    READ-side scope check; mutating operations gate on the tighter
+    :func:`document_in_content_dirs` (§8.5 rule 5).
     """
     store = storage.project_awl_dir(cwd)
     if store is None:
@@ -407,6 +426,32 @@ def document_in_store(path: str | Path, cwd: str | None) -> bool:
     except OSError:
         return False
     return p == store_resolved or store_resolved in p.parents
+
+
+def document_in_content_dirs(path: str | Path, cwd: str | None) -> bool:
+    """Is ``path`` inside the store's ``plans/`` or ``docs/`` content dirs?
+
+    The WRITE-scope gate for every mutating Library operation (create / delete /
+    rename / edit-in-place / comment / review writes): only the two document
+    collections of ``<project>/.awl-cc-dash/`` are writable — never ``state/``
+    (the dashboard's JSON state) nor arbitrary store files. Both sides are
+    ``resolve()``d like :func:`document_in_store`, which stays the read-side
+    check.
+    """
+    try:
+        p = Path(path).resolve()
+    except OSError:
+        return False
+    for d in (storage.plans_dir(cwd), storage.docs_dir(cwd)):
+        if d is None:
+            continue
+        try:
+            d_resolved = d.resolve()
+        except OSError:
+            continue
+        if d_resolved in p.parents:
+            return True
+    return False
 
 
 def create_document(cwd: str | None, filename: str, content: str, subdir: str = "docs") -> dict:
@@ -433,16 +478,21 @@ def create_document(cwd: str | None, filename: str, content: str, subdir: str = 
 def delete_document(path: str | Path, cwd: str | None) -> dict:
     """Delete a dashboard-owned document AND its paired sidecar.
 
-    Refuses (``ValueError``) any path not under ``<project>/.awl-cc-dash/`` —
-    the Library may browse other repo ``.md`` read-only, it never deletes them
-    (§8.5 rule 5; scope checked via :func:`document_in_store`, both sides
-    resolved). Only ``.md`` targets are deletable (the sidecar rides along, it
-    is not addressed directly). Raises :class:`FileNotFoundError` when the
-    ``.md`` is missing. Returns ``{"deleted": [paths]}``.
+    Refuses (``ValueError``) any path not under the store's ``plans/`` or
+    ``docs/`` content dirs — the Library may browse other repo ``.md``
+    read-only, and it never deletes ``state/`` or other store files (§8.5
+    rule 5; scope checked via :func:`document_in_content_dirs`, both sides
+    resolved). The path is ``resolve()``d first and BOTH the unlink and the
+    sidecar pairing operate on the resolved path, so an alias spelling
+    (symlink, short name, dotted segment) can never half-delete the pair. Only
+    ``.md`` targets are deletable (the sidecar rides along, it is not addressed
+    directly). Raises :class:`FileNotFoundError` when the ``.md`` is missing.
+    Returns ``{"deleted": [resolved paths]}``.
     """
-    if not document_in_store(path, cwd):
-        raise ValueError(f"path is not under the project store (.awl-cc-dash/): {path}")
-    p = Path(path)
+    if not document_in_content_dirs(path, cwd):
+        raise ValueError(
+            f"path is not under the project store's plans/ or docs/ dirs: {path}")
+    p = Path(path).resolve()
     if p.suffix.lower() != _MD_SUFFIX:
         raise ValueError(f"only .md documents can be deleted: {path}")
     if not p.is_file():
@@ -460,9 +510,23 @@ def resolve_document(cwd: str | None, filename: str) -> Path | None:
     """Find a document by bare filename: store ``plans/``, then store ``docs/``,
     then the project root. Returns the first existing ``.md`` path, else
     ``None``. The filename is validated (no separators/``..``) so a crafted
-    value can't address outside those three collections."""
+    value can't address outside those three collections. READ-side resolution —
+    review/comment writes resolve via :func:`resolve_document_for_write`."""
     name = _safe_md_filename(filename)
     for base in (storage.plans_dir(cwd), storage.docs_dir(cwd), storage.project_root(cwd)):
+        if base is not None and (base / name).is_file():
+            return base / name
+    return None
+
+
+def resolve_document_for_write(cwd: str | None, filename: str) -> Path | None:
+    """Like :func:`resolve_document` but WRITE-scoped: only the store's
+    ``plans/`` and ``docs/`` collections are candidates — the bare project-root
+    candidate is dropped, so a review/comment write can never mint a sidecar at
+    the repo root (§8.5 rule 5; the migration keeps its own recorded root-seam
+    behavior for legacy entries)."""
+    name = _safe_md_filename(filename)
+    for base in (storage.plans_dir(cwd), storage.docs_dir(cwd)):
         if base is not None and (base / name).is_file():
             return base / name
     return None
@@ -560,17 +624,21 @@ def _comments_from_legacy(entry: dict) -> list[dict]:
 
 
 def aggregate_metas(cwd: str | None) -> dict:
-    """Every sidecar under the project store's ``plans/`` and ``docs/`` dirs,
-    as a **filename-keyed** dict — the ``GET /library/reviews`` response shape.
+    """Every sidecar under the project store's ``plans/`` and ``docs/`` dirs —
+    plus the project ROOT's top-level ``*.meta.json`` (read-only, so migrated
+    root-doc reviews stay visible) — as a **filename-keyed** dict: the
+    ``GET /library/reviews`` response shape.
 
     Keys are the paired ``.md`` filenames (``roadmap.md`` → its meta); orphaned
     sidecars are included under their implied ``.md`` name (they still carry
-    review data worth showing). On the rare same-name collision across the two
-    dirs, ``plans/`` wins (it is scanned first; the docs entry is not merged).
+    review data worth showing). On a same-name collision the scan order wins:
+    ``plans/``, then ``docs/``, then the root (later entries are not merged).
+    The root scan is READ-side only — no write path creates sidecars there.
     Missing dirs contribute nothing.
     """
     out: dict = {}
-    for d in (storage.plans_dir(cwd), storage.docs_dir(cwd)):
+    for d in (storage.plans_dir(cwd), storage.docs_dir(cwd),
+              storage.project_root(cwd)):
         if d is None or not d.is_dir():
             continue
         for child in sorted(d.iterdir()):
@@ -578,7 +646,7 @@ def aggregate_metas(cwd: str | None) -> dict:
                 continue
             md_name = child.name[: -len(_META_SUFFIX)] + _MD_SUFFIX
             if md_name in out:
-                continue  # plans/ scanned first → plans wins the collision
+                continue  # earlier dirs win the collision (plans → docs → root)
             out[md_name] = load_meta(d / md_name)
     return out
 

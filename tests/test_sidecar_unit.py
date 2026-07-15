@@ -127,6 +127,25 @@ def test_response_card_coalesces_per_agent():
         inbox.reset()
 
 
+def test_result_event_raises_response_card():
+    """SDK-driver turns end via the `result` event — never a status_change-idle
+    with `_was_running` — so the §7.8 Response card must raise on the result
+    path too, not only on the bridge's idle transition."""
+    import inbox
+    inbox.reset()
+    try:
+        s = _session()
+        s.handle_event({"type": "status_change", "status": "running"})
+        s.handle_event({"type": "result",
+                        "data": {"total_cost_usd": 0.01, "num_turns": 1}})
+        cards = [i for i in inbox.items_for("s1") if i["type"] == "response"]
+        assert len(cards) == 1
+        assert cards[0]["data"]["runs"] == 1
+        assert s.status == "idle" and s.total_turns == 1
+    finally:
+        inbox.reset()
+
+
 # ---------------------------------------------------------------------------
 # Default driver selection
 #
@@ -953,13 +972,37 @@ class TestLibraryReviewEndpoints:
                 cwd=str(proj), filename="ghost.md", owner="x")))
         assert ei.value.status_code == 404
 
-    def test_post_resolves_docs_and_root_docs_too(self, tmp_path):
+    def test_post_resolves_docs_too(self, tmp_path):
         # Documents get the same review treatment as Plans (§8.5 rule 4).
         proj = _proj(tmp_path)
         _store_md(proj, "docs", "notes.md")
         out = asyncio.run(main.library_set_review(main.ReviewRequest(
             cwd=str(proj), filename="notes.md", state="commented")))
         assert out["review"]["state"] == "commented"
+
+    def test_post_never_writes_a_sidecar_at_the_project_root(self, tmp_path):
+        # A doc that exists ONLY at the repo root is not a WRITE target: 404,
+        # and no .meta.json is minted at the root. (Reads keep the root seam —
+        # GET /library/reviews aggregates migrated root metas.)
+        proj = _proj(tmp_path)
+        (proj / "rootdoc.md").write_text("# R\n", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_set_review(main.ReviewRequest(
+                cwd=str(proj), filename="rootdoc.md", verdict="approve")))
+        assert ei.value.status_code == 404
+        assert not (proj / "rootdoc.meta.json").exists()
+
+    def test_get_still_surfaces_migrated_root_metas(self, tmp_path):
+        # The read side of the root seam: a root-doc review the migration
+        # recorded at the project root stays visible in the aggregate.
+        proj = _proj(tmp_path)
+        (proj / "rootdoc.md").write_text("# R\n", encoding="utf-8")
+        store = proj / ".awl-cc-dash"
+        store.mkdir(parents=True, exist_ok=True)
+        (store / "plan-reviews.json").write_text(
+            json.dumps({"rootdoc.md": {"owner": "coder-02"}}), encoding="utf-8")
+        out = asyncio.run(main.library_reviews(cwd=str(proj)))
+        assert out["rootdoc.md"]["review"]["owner"] == "coder-02"
 
 
 class TestLibraryDocumentEndpoints:
@@ -1004,6 +1047,32 @@ class TestLibraryDocumentEndpoints:
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.library_delete_document(path=str(ghost), cwd=str(proj)))
         assert ei.value.status_code == 404
+
+    def test_write_endpoints_refuse_state_files(self, tmp_path):
+        # Mutations are scoped to the store's plans/+docs/ content dirs: even
+        # an .md under state/ (or a bare store-root file) is 400 — the
+        # dashboard's JSON state is never a Library write target.
+        proj = _proj(tmp_path)
+        state = proj / ".awl-cc-dash" / "state"
+        state.mkdir(parents=True)
+        f = state / "sneaky.md"
+        f.write_text("keep", encoding="utf-8")
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_write_document(main.DocumentWriteRequest(
+                cwd=str(proj), path=str(f), content="clobber")))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_delete_document(path=str(f), cwd=str(proj)))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_rename_document(main.DocumentRenameRequest(
+                cwd=str(proj), path=str(f), new_filename="renamed.md")))
+        assert ei.value.status_code == 400
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.library_add_comment(main.CommentRequest(
+                cwd=str(proj), path=str(f), text="x", author="user")))
+        assert ei.value.status_code == 400
+        assert f.read_text(encoding="utf-8") == "keep"
 
     def test_rename_moves_the_pair(self, tmp_path):
         proj = _proj(tmp_path)
@@ -1235,3 +1304,50 @@ class TestLiveControlEndpoints:
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.set_mode("ghost", main.SetModeRequest(mode="plan")))
         assert ei.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Scratchpad endpoints — lazy project load (§7.7/§8.3): touching a project's
+# board through the API must first load its persisted state, so a POST into a
+# not-yet-loaded project appends to the persisted board (never clobbers it)
+# and a GET surfaces it with no session ever created.
+# ---------------------------------------------------------------------------
+
+import scratchpad  # noqa: E402
+import state_store  # noqa: E402
+import storage  # noqa: E402
+import watermark  # noqa: E402
+
+
+class TestScratchEndpointsLazyLoad:
+    @pytest.fixture(autouse=True)
+    def _isolated(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        scratchpad.reset(); watermark.reset(); state_store.reset()
+        yield
+        scratchpad.reset(); watermark.reset(); state_store.reset()
+
+    def _board(self, tmp_path, lines):
+        proj = tmp_path / "proj"
+        (proj / ".git").mkdir(parents=True)
+        sp = storage.scratchpad_path(str(proj))
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text("# Shared scratchpad\n\n" + "\n".join(lines) + "\n",
+                      encoding="utf-8")
+        return proj, sp
+
+    def test_post_to_unloaded_project_never_clobbers_persisted_board(self, tmp_path):
+        proj, sp = self._board(
+            tmp_path, ["- **ada** (2026-07-01T00:00:00): prior post"])
+        out = asyncio.run(main.post_scratch(main.ScratchPostRequest(
+            cwd=str(proj), author="bee", text="new post")))
+        assert out["post"]["seq"] == 2          # appended AFTER the loaded post
+        content = sp.read_text(encoding="utf-8")
+        assert "prior post" in content and "new post" in content
+        got = asyncio.run(main.get_scratch(str(proj)))
+        assert [p["text"] for p in got["posts"]] == ["prior post", "new post"]
+
+    def test_get_surfaces_a_persisted_board_without_any_session(self, tmp_path):
+        proj, _sp = self._board(tmp_path, ["- **ada** (t): hello"])
+        got = asyncio.run(main.get_scratch(str(proj)))
+        assert [p["text"] for p in got["posts"]] == ["hello"]

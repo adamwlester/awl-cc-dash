@@ -345,11 +345,13 @@ class SessionState:
                 "type": "status_change", "status": "idle",
                 "timestamp": datetime.now().isoformat(),
             })
-            # Same turn accounting as the status_change idle branch (the SDK
-            # driver ends turns via `result`, not a screen-state transition).
+            # SDK-driver turns end HERE (a `result`, never a was-running idle
+            # status_change): same turn accounting as the idle branch, and the
+            # §7.8 Response card raises on this path too.
             if self._was_running:
                 self.turn_count += 1
                 self._was_running = False
+            _raise_response_card(self)
             # Reply-to relay, then the shared-context fire, then flush of the
             # next queued prompt.
             _maybe_relay_reply(self)
@@ -913,6 +915,11 @@ async def reconnect_sessions(project_key: str | None = None):
                 resume_name=tmux_name, session_id=sid,
                 claude_session_id=rec.get("claude_session_id"),
                 cold_restore=cold,
+                # The persisted transcript path skips a pointless re-resolve;
+                # the full record seeds the driver's record base so refreshes
+                # never drop fields another writer persisted.
+                transcript_path=rec.get("transcript_path"),
+                persisted_record=rec,
             )
             session.driver = driver
             # Warm: resume() rebinds the live tmux session. Cold: a fresh
@@ -1706,10 +1713,11 @@ async def plan_verdict(session_id: str, req: PlanVerdictRequest):
         if it["type"] == "plan":
             inbox.resolve_item(session_id, it["id"], answer=req.verdict)
 
-    # Stamp the verdict on the plan doc's sidecar when named.
+    # Stamp the verdict on the plan doc's sidecar when named (a review WRITE —
+    # resolved over the store's plans/+docs/ only, never the project root).
     if req.filename and session.cwd:
         try:
-            doc = library.resolve_document(session.cwd, req.filename)
+            doc = library.resolve_document_for_write(session.cwd, req.filename)
             if doc is not None:
                 library.set_doc_review(str(doc), verdict=req.verdict,
                                        verdict_by=req.by or "user")
@@ -1729,9 +1737,9 @@ class DocumentWriteRequest(BaseModel):
 
 @app.put("/library/document")
 async def library_write_document(req: DocumentWriteRequest):
-    if not library.document_in_store(req.path, req.cwd):
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="writes are scoped to the project's .awl-cc-dash/ store")
+                            detail="writes are scoped to the store's plans/ and docs/ dirs")
     p = Path(req.path)
     if not p.is_file():
         raise HTTPException(status_code=404, detail="Document not found")
@@ -1858,8 +1866,10 @@ async def delete_template_endpoint(template_id: str):
 
 # ============================================================================
 # Library — project-scoped read + render + per-doc metadata sidecars (§8.5).
-# Every WRITE endpoint is scope-guarded to <project>/.awl-cc-dash/ — the rest
-# of the repo stays browse-read-only (§8.5 rule 5).
+# Every WRITE endpoint is scope-guarded to the store's plans/ and docs/ content
+# dirs (document_in_content_dirs — never state/ or other store files); the rest
+# of the repo stays browse-read-only (§8.5 rule 5), and review writes never
+# mint a sidecar at the repo root (resolve_document_for_write).
 # ============================================================================
 
 @app.get("/library/documents")
@@ -1904,7 +1914,8 @@ async def library_create_document(req: DocumentCreateRequest):
 @app.delete("/library/document")
 async def library_delete_document(path: str, cwd: str):
     """Delete a store document + its paired ``.meta.json``. 400 outside the
-    store (browse-only files are never deletable), 404 when missing."""
+    store's ``plans/``/``docs/`` dirs (browse-only files and ``state/`` are
+    never deletable), 404 when missing."""
     try:
         return library.delete_document(path, cwd)
     except ValueError as e:
@@ -1916,10 +1927,11 @@ async def library_delete_document(path: str, cwd: str):
 @app.post("/library/document/rename")
 async def library_rename_document(req: DocumentRenameRequest):
     """Rename a store document AND its sidecar together (§8.5 rule 3). 400
-    outside the store, 404 when the source is missing, 409 on an existing target."""
-    if not library.document_in_store(req.path, req.cwd):
+    outside the store's ``plans/``/``docs/`` dirs, 404 when the source is
+    missing, 409 on an existing target."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     try:
         return library.rename_document_pair(req.path, req.new_filename)
     except FileNotFoundError:
@@ -1944,12 +1956,13 @@ async def library_reviews(cwd: str):
 @app.post("/library/reviews")
 async def library_set_review(req: ReviewRequest):
     """Write review fields into the doc's ``.meta.json`` sidecar (§8.5) —
-    merge-don't-clobber. The doc is resolved by bare filename (store ``plans/``,
-    then ``docs/``, then the project root); 404 when no such ``.md`` exists.
-    ``comments`` (backward-compatible: strings or dicts) append as comment
-    threads. Returns the updated sidecar."""
+    merge-don't-clobber. The doc is resolved by bare filename over the WRITE
+    collections only (store ``plans/``, then ``docs/`` — never the project
+    root, so no sidecar is ever minted at the repo root); 404 when no such
+    ``.md`` exists there. ``comments`` (backward-compatible: strings or dicts)
+    append as comment threads. Returns the updated sidecar."""
     try:
-        md = library.resolve_document(req.cwd, req.filename)
+        md = library.resolve_document_for_write(req.cwd, req.filename)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if md is None:
@@ -1971,10 +1984,11 @@ async def library_set_review(req: ReviewRequest):
 @app.post("/library/comments")
 async def library_add_comment(req: CommentRequest):
     """Append a comment (optionally quote-anchored, §8.5) to a store document's
-    sidecar. 400 outside the store, 404 when the ``.md`` is missing."""
-    if not library.document_in_store(req.path, req.cwd):
+    sidecar. 400 outside the store's ``plans/``/``docs/`` dirs, 404 when the
+    ``.md`` is missing."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     if not Path(req.path).is_file():
         raise HTTPException(status_code=404, detail="Document not found")
     return library.add_comment(req.path, text=req.text, author=req.author,
@@ -1984,10 +1998,11 @@ async def library_add_comment(req: CommentRequest):
 
 @app.post("/library/comments/resolve")
 async def library_resolve_comment(req: CommentResolveRequest):
-    """Mark one comment resolved. 400 outside the store, 404 for an unknown id."""
-    if not library.document_in_store(req.path, req.cwd):
+    """Mark one comment resolved. 400 outside the store's ``plans/``/``docs/``
+    dirs, 404 for an unknown id."""
+    if not library.document_in_content_dirs(req.path, req.cwd):
         raise HTTPException(status_code=400,
-                            detail="path is not under the project store (.awl-cc-dash/)")
+                            detail="path is not under the project store's plans/ or docs/ dirs")
     if not library.resolve_comment(req.path, req.comment_id):
         raise HTTPException(status_code=404, detail="Comment not found")
     return {"status": "resolved", "comment_id": req.comment_id}
@@ -2005,6 +2020,9 @@ class ScratchPostRequest(BaseModel):
 
 @app.get("/scratch")
 async def get_scratch(cwd: str):
+    # Lazy-load (idempotent): a GET against a not-yet-loaded project must
+    # surface its persisted board, not an empty in-memory one.
+    state_store.load_project(cwd)
     # Boards are keyed by the CANONICAL project root, so any cwd spelling the
     # client passes resolves to the same board an agent in that project uses.
     key = storage.project_key(cwd) or cwd
@@ -2016,6 +2034,10 @@ async def post_scratch(req: ScratchPostRequest):
     """Append a post; feed it (recipients:[scratch]); and push each RUNNING agent
     in the same project its unread delta mid-run via the hook channel (idle agents
     catch up at their next run's first tool boundary)."""
+    # Lazy-load (idempotent) BEFORE posting: a post into a not-yet-loaded
+    # project must append to the persisted board, never clobber it with a
+    # one-post mirror rewrite.
+    state_store.load_project(req.cwd)
     key = storage.project_key(req.cwd) or req.cwd
     persist = None
     try:

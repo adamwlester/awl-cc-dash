@@ -7,11 +7,16 @@ Pure path logic — no driver, no WSL2/tmux, no live agent. The decided contract
   * Project home — ``<project>/.awl-cc-dash/`` where ``<project>`` is the
     **canonical repo root** derived from the agent's ``cwd``: git top-level,
     with symlink and ``C:\\…``/``/mnt/c/…`` aliases resolved to ONE form, so a
-    subfolder launch or a path alias still lands on the same store.
+    subfolder launch or a path alias still lands on the same store. WSL-internal
+    cwds map to their ``\\\\wsl.localhost\\<distro>\\…`` UNC form (never the
+    Windows current drive), and their WSL-reachable accessors are
+    ``/home/…``-rooted.
   * §8.2 subdir taxonomy: ``plans/`` · ``docs/`` (scratchpad = ``docs/scratchpad.md``)
     · ``assets/`` · ``state/`` — created as first populated, never scaffolded.
   * One-time legacy migration: a pre-rename ``<project>/.awl/`` store folds into
-    ``.awl-cc-dash/`` on first touch; existing targets are never overwritten.
+    ``.awl-cc-dash/`` on first touch; existing targets are never overwritten; an
+    unmovable (locked) child is skipped with a warning — the migration never
+    raises into ``ensure_project_awl_dir``, so it can't break session create.
 
 These carry neither the ``integration`` nor the ``slow`` mark.
 """
@@ -62,6 +67,20 @@ class TestCanonicalRoot:
         a = storage.project_key("/mnt/c/Users/lester/proj")
         b = storage.project_key(r"C:\Users\lester\proj")
         assert a == b
+
+    def test_wsl_internal_posix_and_unc_spellings_share_one_key(self):
+        # /home/… (a true WSL-internal cwd) and its \\wsl.localhost UNC
+        # spelling are the SAME project — one canonical key.
+        a = storage.project_key("/home/awl-test-user/proj")
+        b = storage.project_key(r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
+        assert a == b
+
+    def test_wsl_internal_root_never_anchors_to_a_windows_drive(self):
+        # The old behavior resolved /home/… against the Windows current drive
+        # (C:\home\…), corrupting the key. It must map to the UNC form.
+        key = storage.project_key("/home/awl-test-user/proj")
+        assert key.lower().startswith("\\\\wsl.localhost\\")
+        assert ":" not in key    # no drive letter crept in
 
     def test_project_key_matches_root(self, tmp_path):
         proj = tmp_path / "p"
@@ -183,6 +202,43 @@ class TestLegacyMigration:
         assert (proj / ".awl-cc-dash" / "docs" / "scratchpad.md").is_file()
         assert not legacy.exists()
 
+    def test_locked_child_is_skipped_and_the_rest_migrate(self, tmp_path, monkeypatch):
+        """A child that can't be moved (locked file) is skipped with a warning;
+        every other child still migrates, moved_any stays honest, and the
+        function never raises into ensure_project_awl_dir (a locked legacy
+        file must not break session create)."""
+        proj = tmp_path / "p"
+        legacy = proj / ".awl"
+        legacy.mkdir(parents=True)
+        (legacy / "locked.bin").write_text("x", encoding="utf-8")
+        (legacy / "other.json").write_text("{}", encoding="utf-8")
+        (legacy / "scratchpad.md").write_text("board", encoding="utf-8")
+        real_rename = Path.rename
+
+        def flaky(self, target):
+            if self.name == "locked.bin":
+                raise PermissionError("simulated: file locked")
+            return real_rename(self, target)
+
+        monkeypatch.setattr(Path, "rename", flaky)
+        assert storage.migrate_legacy_store(str(proj)) is True  # others moved
+        awl = proj / ".awl-cc-dash"
+        assert (awl / "docs" / "scratchpad.md").is_file()
+        assert (awl / "other.json").is_file()
+        assert (legacy / "locked.bin").is_file()   # left in place, not lost
+        # And the ensure path stays clean on the same stuck store.
+        storage.ensure_project_awl_dir(str(proj))
+
+    def test_all_children_locked_reports_nothing_moved(self, tmp_path, monkeypatch):
+        proj = tmp_path / "p"
+        legacy = proj / ".awl"
+        legacy.mkdir(parents=True)
+        (legacy / "a.json").write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(Path, "rename", lambda self, target: (_ for _ in ()).throw(
+            PermissionError("locked")))
+        assert storage.migrate_legacy_store(str(proj)) is False  # honest report
+        assert (legacy / "a.json").is_file()
+
 
 # ---------------------------------------------------------------------------
 # WSL-reachability — the agents read the project home from inside WSL2
@@ -205,6 +261,17 @@ class TestWslReachable:
         # §8.5: plansDirectory = the ABSOLUTE WSL path of the project's plans/.
         wsl = storage.plans_dir_wsl("C:/Users/lester/proj")
         assert wsl == "/mnt/c/Users/lester/proj/.awl-cc-dash/plans"
+
+    def test_wsl_internal_root_yields_home_rooted_wsl_paths(self):
+        # A WSL-internal project's WSL-reachable accessors are /home/…-rooted —
+        # NEVER a /mnt/c/home/… mistranslation of a corrupted drive anchor.
+        wsl = storage.plans_dir_wsl("/home/awl-test-user/proj")
+        assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/plans"
+
+    def test_wsl_unc_root_translates_back_inside_wsl(self):
+        wsl = storage.scratchpad_path_wsl(
+            r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
+        assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/docs/scratchpad.md"
 
     def test_none_cwd_has_no_wsl_path(self):
         assert storage.project_awl_dir_wsl(None) is None

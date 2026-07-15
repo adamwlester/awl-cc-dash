@@ -11,8 +11,10 @@ dashboard; Claude's own data is surfaced or referenced, never owned or copied.**
 
   📁 **Project** — ``<project>/.awl-cc-dash/`` where ``<project>`` is the
       **canonical repo root** derived from an agent's ``cwd`` (git top-level,
-      symlink + ``/mnt``-alias normalized — :func:`project_root`): everything
-      about ONE project and its team, committed so it travels with the repo.
+      symlink + ``/mnt``-alias normalized, WSL-internal POSIX homes mapped to
+      their ``\\\\wsl.localhost\\<distro>\\…`` UNC form — :func:`project_root`):
+      everything about ONE project and its team, committed so it travels with
+      the repo.
       Subdir taxonomy (§8.2): ``plans/`` · ``docs/`` (scratchpad lives here) ·
       ``assets/`` · ``state/`` (dashboard-owned JSON state). Subdirs are created
       as they are first populated — no empty scaffolding.
@@ -33,11 +35,14 @@ rather than re-solving path normalization per feature.
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 from pathlib import Path
 
 import runtime_store
+
+logger = logging.getLogger("awl-sidecar.storage")
 
 # Reuse the proven WSL2↔Windows path translation from the bridge package. The
 # sidecar runs with its own dir on sys.path (not the repo root), so add the repo
@@ -49,8 +54,11 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 try:
-    from bridge.paths import win_to_wsl  # type: ignore[import-not-found]
+    from bridge import paths as _bridge_paths  # type: ignore[import-not-found]
+    win_to_wsl = _bridge_paths.win_to_wsl
 except Exception:  # pragma: no cover - exercised only when bridge is unavailable
+    _bridge_paths = None
+
     def win_to_wsl(path):  # type: ignore[no-redef]
         """Fallback copy of the proven translation (see ``bridge/paths.py``)."""
         if not path:
@@ -62,6 +70,12 @@ except Exception:  # pragma: no cover - exercised only when bridge is unavailabl
         if m:
             return f"/mnt/{m.group(1).lower()}/{m.group(2)}"
         return path
+
+# The WSL distro anchoring the \\wsl.localhost\<distro>\ UNC form of a
+# WSL-INTERNAL cwd. bridge.paths doesn't currently export a distro constant
+# (TmuxBridge defaults its own ctor arg), so probe for one and fall back to
+# the same "Ubuntu" default the bridge uses.
+_WSL_DISTRO: str = getattr(_bridge_paths, "DEFAULT_DISTRO", None) or "Ubuntu"
 
 
 # Project-home directory + the files that live in it. The folder spells out the
@@ -125,18 +139,34 @@ _MNT_RE = re.compile(r"^/mnt/([A-Za-z])(/.*)?$")
 
 
 def _normalize_alias(cwd: str) -> str:
-    """Fold the WSL ``/mnt/<drive>/…`` alias of a Windows path back to ``X:\\…``.
+    """Fold every cwd spelling to ONE canonical Windows-side form.
 
-    The sidecar runs on Windows; an agent's cwd may arrive in either spelling.
-    Both must land on ONE canonical form so a project never splits across two
-    stores. Non-``/mnt`` POSIX paths (true WSL-internal homes) pass through
-    unchanged — they have no Windows spelling to fold to.
+    The sidecar runs on Windows; an agent's cwd may arrive in several
+    spellings, and all of them must land on one canonical form so a project
+    never splits across two stores:
+
+      * ``/mnt/<drive>/…`` (the WSL alias of a Windows path) folds back to
+        ``X:\\…``.
+      * A POSIX-rooted path that is NOT ``/mnt/<drive>/…`` is a true
+        **WSL-internal** home (e.g. ``/home/lester/x``) — its canonical
+        Windows-side form is the ``\\\\wsl.localhost\\<distro>\\…`` UNC path.
+        (Passing it through unchanged, the old behavior, made ``Path.resolve``
+        anchor it to the Windows current drive — ``C:\\home\\…`` — corrupting
+        the key.)
+      * UNC inputs (``\\\\wsl.localhost\\…`` and other shares) pass through;
+        ``Path.resolve()`` normalizes them, so both spellings of a WSL-internal
+        root yield ONE project key.
     """
-    m = _MNT_RE.match(cwd.replace("\\", "/")) if cwd.startswith("/") else None
-    if m:
-        drive = m.group(1).upper()
-        rest = (m.group(2) or "/").lstrip("/")
-        return f"{drive}:\\{rest.replace('/', chr(92))}" if rest else f"{drive}:\\"
+    posix = cwd.replace("\\", "/")
+    if posix.startswith("//"):
+        return cwd            # already UNC — resolve() normalizes it
+    if posix.startswith("/"):
+        m = _MNT_RE.match(posix)
+        if m:
+            drive = m.group(1).upper()
+            rest = (m.group(2) or "/").lstrip("/")
+            return f"{drive}:\\{rest.replace('/', chr(92))}" if rest else f"{drive}:\\"
+        return f"\\\\wsl.localhost\\{_WSL_DISTRO}" + posix.replace("/", "\\")
     return cwd
 
 
@@ -158,9 +188,11 @@ def project_root(cwd: str | None) -> Path | None:
 
     §8.1: git top-level, with symlink and ``C:\\…``/``/mnt/c/…`` path aliases
     resolved to one canonical form — so a subfolder launch or a path alias still
-    lands on the same ``.awl-cc-dash/`` folder. Code keys off each agent's
-    ``cwd``, never a fixed path, so a project can physically move with no
-    rearchitecting. Returns None when the agent has no cwd.
+    lands on the same ``.awl-cc-dash/`` folder. WSL-internal cwds are first-class:
+    ``/home/lester/x`` and ``\\\\wsl.localhost\\<distro>\\home\\lester\\x`` are one
+    project (both canonicalize to the UNC form — see :func:`_normalize_alias`).
+    Code keys off each agent's ``cwd``, never a fixed path, so a project can
+    physically move with no rearchitecting. Returns None when the agent has no cwd.
     """
     if not cwd:
         return None
@@ -281,8 +313,12 @@ def migrate_legacy_store(cwd: str | None) -> bool:
     (``scratchpad.md`` → ``docs/scratchpad.md``; ``plan-reviews.json`` → the
     store root), anything unrecognized moves to the store root verbatim, and an
     existing target is NEVER overwritten (the legacy file is left in place for a
-    human to reconcile). The legacy dir is removed only when emptied. Returns
-    True when anything was migrated.
+    human to reconcile). A child that cannot be moved (e.g. locked by another
+    process) is skipped with a warning and the rest keep migrating — this
+    function never raises into :func:`ensure_project_awl_dir`, so a stuck
+    legacy file can never break session create; the skipped child is retried
+    on the next touch. The legacy dir is removed only when emptied. Returns
+    True when anything was actually moved (honest — skipped children don't count).
     """
     root = project_root(cwd)
     if root is None:
@@ -300,12 +336,24 @@ def migrate_legacy_store(cwd: str | None) -> bool:
         if target.exists():
             continue  # never overwrite; leave the legacy copy for reconciliation
         target.parent.mkdir(parents=True, exist_ok=True)
-        child.rename(target)
+        try:
+            child.rename(target)
+        except OSError:
+            # A locked/unmovable child must not break the migration (nor the
+            # session create above it) — skip it, keep going, retry next touch.
+            logger.warning("legacy store migration: could not move %s (skipped)",
+                           child, exc_info=True)
+            continue
         moved_any = True
     try:
         next(legacy.iterdir())
     except StopIteration:
-        legacy.rmdir()
+        try:
+            legacy.rmdir()
+        except OSError:  # pragma: no cover - removal is best-effort
+            pass
+    except OSError:  # pragma: no cover - listing is best-effort
+        pass
     return moved_any
 
 
@@ -313,12 +361,24 @@ def migrate_legacy_store(cwd: str | None) -> bool:
 # WSL-reachable forms (the agents read the project home from inside WSL2)
 # ---------------------------------------------------------------------------
 
+# \\wsl.localhost\<distro>\<path> — the in-WSL form is simply /<path>.
+_WSL_UNC_RE = re.compile(r"^[\\/]{2}wsl\.localhost[\\/][^\\/]+([\\/].*)?$",
+                         re.IGNORECASE)
+
+
 def _to_wsl(path: Path | None) -> str | None:
     if path is None:
         return None
+    s = str(path)
+    # A \\wsl.localhost\<distro>\… root is already INSIDE WSL: strip the UNC
+    # prefix to the plain /<path> the agents see (win_to_wsl would pass the
+    # UNC through untranslated — never hand agents a /mnt/c/home/… mistake).
+    m = _WSL_UNC_RE.match(s)
+    if m:
+        return (m.group(1) or "/").replace("\\", "/")
     # win_to_wsl wants forward slashes / a drive-letter path; str(Path) on
     # Windows yields backslashes, which the translator normalizes.
-    return win_to_wsl(str(path))
+    return win_to_wsl(s)
 
 
 def project_awl_dir_wsl(cwd: str | None) -> str | None:
