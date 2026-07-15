@@ -649,6 +649,14 @@ Files: frontend/src/renderer/store.tsx, frontend/src/renderer/components/Console
 
 ---
 
+### 2026-07-15 15:48:11 — build-sprint Stage 5 #19: per-agent git identity (env-injection attribution)
+
+Every dashboard agent now commits under its own git author name + a synthetic per-agent email on the fixed non-deliverable domain `agents.awl-cc-dash.invalid`, so "what did AI touch" is a pure `git log --author='@agents.awl-cc-dash.invalid'` query with no maintained ledger (ARCHITECTURE §7.5, §11 #19, HIGH). Mechanism = **per-launch environment injection**, not repo-local `git config`: agents sharing one repo share one `.git/config`, so `git config user.*` would collide/race across the fleet, while `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env vars are per-process and inherited by any `git` the agent's Bash tool runs. New pure helpers in [sidecar/identity.py](sidecar/identity.py) — `git_author(identity)→(name, email)`, `git_env(identity)→4 GIT_* vars`, `_slugify`, `AGENT_EMAIL_DOMAIN` (named→`zippy`/`zippy-3@…`, unnamed→`researcher-2`/`researcher-2@…`, author keeps the human form, only the email local-part is slugged). [bridge/bridge.py](bridge/bridge.py) `create()` takes optional `git_author_name`/`git_author_email` and, when both are set, prepends the four shell-quoted `GIT_*=…` assignments to the launch command (honored through the tmux `sh -c` path the `--settings`/`--name` flags already ride; omitting both leaves the ambient identity untouched — backward-compatible for the CLI). [sidecar/drivers/bridge.py](sidecar/drivers/bridge.py) `_create_session()` derives them from the agent identity and forwards — every dashboard agent gets attribution, named or not; sessions stay tab-less. Tests: new hermetic [tests/test_git_identity_unit.py](tests/test_git_identity_unit.py) (17 tests — derivation, fixed-domain invariant, safe slugify, None-safety, the 4 GIT_* env, and that `create()` injects all four before the claude binary when both args are given and nothing when omitted) + a skipped live-tier stub [tests/test_git_identity_live.py](tests/test_git_identity_live.py) with the real-commit-attribution drive procedure. Hermetic **794 passed** (777 + 17). Deferred (plan-scoped): per-folder `index.md` (drift-accepted, lower priority) and the live attribution proof. Built by a subagent against the ratified plan; reviewed (identity helpers + the shell-quoting are sound), tested, committed here. Also lands the Stage-5 build plan doc.
+
+Files: sidecar/identity.py, bridge/bridge.py, sidecar/drivers/bridge.py, tests/test_git_identity_unit.py, tests/test_git_identity_live.py, tests/README.md, dev/notes/2026-07-15-stage5-build-plan.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

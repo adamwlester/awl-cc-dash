@@ -535,7 +535,8 @@ class TmuxBridge:
     def create(self, name, cwd=None, model=None, claude_args="", show=False,
                permission_mode=None, allowed_tools=None, disallowed_tools=None,
                settings=None, mcp_config=None, session_id=None,
-               resume_session_id=None, display_name=None):
+               resume_session_id=None, display_name=None,
+               git_author_name=None, git_author_email=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -605,6 +606,22 @@ class TmuxBridge:
                 callers (tests, the sidecar) get no tab and never steal desktop
                 focus. Opening a tab is opt-in — pass show=True (or use show()
                 later) only for explicit human attach.
+            git_author_name: Optional per-agent git commit-author/committer name
+                (ARCHITECTURE §7.5, §11 #19). When BOTH this and
+                ``git_author_email`` are given, the launch command is prefixed
+                with ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``/
+                ``GIT_COMMITTER_NAME``/``GIT_COMMITTER_EMAIL`` env assignments, so
+                any ``git`` the agent runs authors AND commits under its own
+                identity. Env is per-process and inherited by every child (the
+                Bash tool's git), so a shared repo ``.git/config`` never
+                collides across the fleet, and "what did AI touch" is a pure
+                ``git log --author='@agents.awl-cc-dash.invalid'`` query. The
+                sidecar derives these from the agent's identity
+                (``sidecar/identity.py`` ``git_author``); omit both (the default)
+                to leave the ambient git identity untouched.
+            git_author_email: The synthetic per-agent email paired with
+                ``git_author_name`` (see above). Both are required to inject the
+                git env prefix; passing only one is a no-op.
 
         Returns:
             dict with session info: name, cwd, pid, session_id, and
@@ -676,6 +693,23 @@ class TmuxBridge:
             argv += ["--mcp-config", mcp_path, "--strict-mcp-config"]
 
         claude_cmd = " ".join(shlex.quote(a) for a in argv)
+        # Per-agent git attribution (ARCHITECTURE §7.5, §11 #19): prepend the four
+        # GIT_* env assignments so any `git` the launched agent runs authors AND
+        # commits under its own identity + synthetic per-agent email. Env is
+        # per-process and inherited by every child (the Bash tool's git), so a
+        # shared repo `.git/config` never collides across the fleet — this is the
+        # decided mechanism over repo-local `git config`. Each value is shell-quoted
+        # individually here; the whole line is quoted once more for the tmux
+        # `new-session '<cmd>'` slot below (tmux runs it via `sh -c`, which honors
+        # the leading VAR=value assignments).
+        if git_author_name and git_author_email:
+            claude_cmd = (
+                f"GIT_AUTHOR_NAME={shlex.quote(git_author_name)} "
+                f"GIT_AUTHOR_EMAIL={shlex.quote(git_author_email)} "
+                f"GIT_COMMITTER_NAME={shlex.quote(git_author_name)} "
+                f"GIT_COMMITTER_EMAIL={shlex.quote(git_author_email)} "
+                + claude_cmd
+            )
         if claude_args:
             claude_cmd += " " + claude_args  # raw passthrough (legacy)
 

@@ -692,6 +692,17 @@ class BridgeDriver(AgentDriver):
         # Name registration (§7.5): the dashboard identity NAME doubles as the
         # Claude Code session display name, set at launch via `claude --name`.
         display_name = (self.config.identity or {}).get("name") or None
+        # Per-agent git attribution (§7.5, §11 #19): derive this agent's git
+        # author name + synthetic per-agent email from its identity and inject
+        # them as GIT_* env on the launch command, so any `git` it runs commits
+        # under its own identity (the AI-touched query keys off the fixed
+        # `agents.awl-cc-dash.invalid` domain). Every dashboard agent — named or
+        # not — gets attribution, so nothing AI-authored escapes the query.
+        try:
+            import identity as _identity  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import identity as _identity  # type: ignore[no-redef]
+        git_author_name, git_author_email = _identity.git_author(self.config.identity)
         info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
@@ -702,6 +713,8 @@ class BridgeDriver(AgentDriver):
             settings=self._build_settings(),
             mcp_config=self._build_mcp_config(),
             display_name=display_name,
+            git_author_name=git_author_name,
+            git_author_email=git_author_email,
             **kwargs,
         )
         # Remember the launched claude session id so it can be persisted for

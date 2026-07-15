@@ -30,6 +30,7 @@ the human-name pools, and in-panel identity editing (v1 is read-only).
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 # The agent colors as (name, hex), in the mockup's interleaved round-robin order
@@ -114,4 +115,87 @@ def assign_identity(requested: dict | None, ordinal: int) -> dict:
         "name": (req.get("name") or ""),
         "color": (req.get("color") or color_hex),
         "icon": (req.get("icon") or icon),
+    }
+
+
+# --- Per-agent git attribution (ARCHITECTURE §7.5, §11 #19) -----------------
+#
+# Every dashboard agent commits under its OWN git author name + a synthetic
+# per-agent email on a FIXED, guaranteed-non-deliverable domain, so "what did
+# AI touch" is a pure git query with no maintained ledger:
+#     git log --author='@agents.awl-cc-dash.invalid'
+# `.invalid` is the RFC-2606 reserved TLD (never routable); the domain is fixed
+# so the query catches the whole fleet. Attribution is injected as per-launch
+# GIT_* env (see BridgeDriver._create_session -> TmuxBridge.create), NOT
+# repo-local `git config`: agents in one repo share a single `.git/config`, so
+# repo-local `user.*` would collide/race across the fleet, while env vars are
+# per-process and inherited by any `git` the agent runs — collision-free.
+
+# The fixed synthetic-email domain (RFC-2606 `.invalid` — guaranteed
+# non-deliverable). The AI-touched query keys off this exact suffix.
+AGENT_EMAIL_DOMAIN = "agents.awl-cc-dash.invalid"
+
+
+def _slugify(text: str) -> str:
+    """Lowercase, safe slug for an email local-part.
+
+    Lowercases, maps every run of non-alphanumeric chars to a single hyphen,
+    and trims leading/trailing hyphens. Falls back to ``"agent"`` when the
+    input slugs to nothing (e.g. all-punctuation), so an email is always valid.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return slug or "agent"
+
+
+def git_author(identity: dict | None) -> tuple[str, str]:
+    """Derive an agent's ``(author_name, synthetic_email)`` for git attribution.
+
+    Author name = the identity ``name`` (the human-facing name, validated to
+    double safely as a git commit-author name, §7.5); when the agent is unnamed
+    it falls back to ``"<role>-<number>"`` (e.g. ``"Agent-3"``) so an author is
+    always present. The synthetic email is ``<slug>-<number>@<domain>`` where
+    the slug is derived from the name (or the role, when unnamed) and the domain
+    is the fixed ``agents.awl-cc-dash.invalid`` (see module notes) — so an
+    unnamed agent still lands on the AI-touched domain.
+
+    Examples::
+
+        {"name": "zippy", "number": 3}                  ->
+            ("zippy", "zippy-3@agents.awl-cc-dash.invalid")
+        {"role": "researcher", "name": "", "number": 2} ->
+            ("researcher-2", "researcher-2@agents.awl-cc-dash.invalid")
+        {"name": "Nova Prime!", "number": 5}            ->
+            ("Nova Prime!", "nova-prime-5@agents.awl-cc-dash.invalid")
+
+    Pure function (no I/O) so it unit-tests hermetically.
+    """
+    ident = identity or {}
+    name = str(ident.get("name") or "").strip()
+    role = (str(ident.get("role") or "").strip()) or "Agent"
+    number = ident.get("number")
+    if name:
+        author_name = name
+        slug = _slugify(name)
+    else:
+        # Unnamed: the role (+ number) doubles as the commit-author name.
+        author_name = f"{role}-{number}" if number is not None else role
+        slug = _slugify(role)
+    local = f"{slug}-{number}" if number is not None else slug
+    return author_name, f"{local}@{AGENT_EMAIL_DOMAIN}"
+
+
+def git_env(identity: dict | None) -> dict[str, str]:
+    """The four GIT_* env vars that attribute an agent's commits (§11 #19).
+
+    Both the AUTHOR and the COMMITTER identity are set to the same per-agent
+    name + synthetic email — the agent both writes and records its own commits.
+    Injected onto the agent's launch command (per-process, inherited by every
+    ``git`` the agent runs). See ``git_author`` for the derivation.
+    """
+    author_name, email = git_author(identity)
+    return {
+        "GIT_AUTHOR_NAME": author_name,
+        "GIT_AUTHOR_EMAIL": email,
+        "GIT_COMMITTER_NAME": author_name,
+        "GIT_COMMITTER_EMAIL": email,
     }
