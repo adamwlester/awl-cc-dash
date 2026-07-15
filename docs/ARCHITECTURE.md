@@ -318,7 +318,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Library** | `GET /library/documents` · `GET /library/document` · `POST /library/document` (create) · `DELETE /library/document` (delete the `.md` + its paired `.meta.json`) · `GET/POST /library/reviews` — ⚠ **Today:** only the GET pair + reviews exist; no create/delete endpoint yet (§7.16) |
 | **Console** | `GET /console/catalog` · `POST /sessions/{id}/console/run` (+ the live streaming terminal — `ttyd`/WebSocket attach, §7.13 — ⚠ **Today:** not wired into the renderer) |
 | **Readouts** | `GET /sessions/{id}/{context,subagents,checklist,marquee}` · `GET /usage` |
-| **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — `mode`/`fast`/`thinking` are capability-gated `400`s under the bridge driver (§6.2) |
+| **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — mode/fast/thinking drive the wired `keys()` levers and return the read-back state (409 `busy` / 400 `unreachable`·`credit_gated`, §6.2) · `POST /sessions/{id}/identity` (edit + `/rename` sync, §7.5) · `POST /sessions/{id}/plan/verdict` (§7.16) |
 | **Settings** | `GET /settings/{read,account,config,mcp,plugins}` · `POST /settings/write` (confirm-gated) |
 | **Templates** | `GET/POST /templates` · `DELETE /templates/{id}` |
 | **Projects** | `GET /projects` (picker feed + open flag) · `POST /projects/register` · `POST /projects/open` (409 when another is open) · `POST /projects/close` (`stop_agents` = the §3.4 second option) |
@@ -364,7 +364,7 @@ persists a runtime record so the session survives a sidecar restart (§9.9). Its
 poll** that reads the transcript + screen and emits stamped events — this single loop is the shared seam
 feeding three consumers: the event stream, the queue's idle/turn-boundary detection, and inbox raising.
 
-Deliberately **not** advertised *yet*: `set_mode`, `set_fast`, `set_thinking` — the CLI's flag-level API exposes none of them, but all three live controls are **proven feasible** on the real TUI via the bridge's `keys()` levers: permission mode cycles via **Shift+Tab at a known-idle screen**, deterministically, with the resulting mode read back from the status line (`test_permission_mode_cycle_live`, live, 2026-07-02); thinking toggles via the **`Meta+T`** modal, read-backable from transcript thinking blocks (`test_thinking_toggle_live`, live, 2026-07-02); and Fast mode toggles via **`Meta+O` + `Space`** — the panel's `Fast mode OFF/ON` line is a plain-text scrape, proven settable + read-backable + repeatable (`test_fast_mode_toggle_live`, live, 2026-07-04; credit-gate detection — the panel reports "requires usage credits" — stays the honest degrade for accounts without Fast credits). Wiring these levers into the driver — replacing the in-code no-ops and backing `POST /sessions/{id}/{mode,thinking,fast}` — is queued (§11 #12); until it lands the endpoints return honest `400`s and the UI never fakes a live control. (The SDK's stream-json control API — `set_permission_mode` / `set_max_thinking_tokens` — *does* expose these programmatically; forgoing it is the deliberate price of keeping the interactive real TUI.)
+All three live controls are **wired** (§11 #12, built 2026-07-10): the driver's `set_mode` / `set_thinking` / `set_fast` drive the proven `keys()` levers — permission mode cycles via **Shift+Tab at a known-idle screen** with the resulting mode read back from the status line (`test_permission_mode_cycle_live`, live, 2026-07-02; bounded ring-size+1 attempts, `unreachable` returned honestly when a target segment is un-armed, §7.11); thinking toggles via the **`Meta+T`** modal with a read-current-state-first step (`test_thinking_toggle_live`, live, 2026-07-02); and Fast toggles via the Fast panel's **`Space`** lever with credit-gate detection as the honest degrade (`test_fast_mode_toggle_live`, live, 2026-07-04). `POST /sessions/{id}/{mode,thinking,fast}` return the **read-back** state and map failures honestly (409 `busy`, 400 `unreachable`/`credit_gated`). The wired path is live-proven end to end (`test_mode_control_wired_live`, 2026-07-10, CC 2.1.206) — which also caught **CLI drift**: 2.1.206 renders an explicit *"manual mode on"* indicator for `default`, and `Meta+O` no longer opens the Fast panel (a typed `/fast` fallback opener is wired; same panel, same wording). (The SDK's stream-json control API — `set_permission_mode` / `set_max_thinking_tokens` — *does* expose these programmatically; forgoing it is the deliberate price of keeping the interactive real TUI.)
 
 ⚠ **Today (scale):** each agent's ~1 s `events()` cycle spawns ~5 WSL processes and crosses the Windows→WSL boundary, so the fleet degrades from N=1 (~1.3 s/cycle at N=1; ~10 s event-lag by N=9 — measured, `test_polling_scale_ceiling_live`); the batching + adaptive-cadence rework, then a re-measured practical ceiling, is queued (§11 #34).
 
@@ -496,7 +496,7 @@ the WSL gateway URL, §6.4):
   resumes the agent via a **`keys()` Enter on the pane** — not a hook `updatedInput` response; the
   approve→resume wiring is queued (§11 #22).
 
-Beyond inject and Plan/Decision, the hook channel is also the decided **run-state push channel** (Option C hybrid — `test_hook_event_stream_live`, live, plus [`claude_code_hook_event_stream_report.md`](../dev/notes/research/claude_code_hook_event_stream_report.md), 2026-07-02): every agent's lifecycle hooks POST run-state (`permission_mode`, current tool) to the sidecar, treated as **authoritative-when-fresh**, with screen-polling kept as the watchdog floor — HTTP-hook failures are silent, so a pure-push replacement is unsafe. Caveat for the build: `permission_mode` is **event-specific** — the `Notification` event lacks it — so the arbiter must key per event type. `SubagentStart`/`SubagentStop` ride the same channel as the roster's subagent signal (§7.17). The per-agent merge arbiter's ordering/dedup under concurrent load is design, not yet proof — verified during the build, never assumed (§11 #21; record the `prompt_id` version floor, v2.1.196+, from the build). ⚠ **Today:** only the inject / plan / decision hooks are registered — the run-state event set and the arbiter are unbuilt (§11 #21).
+Beyond inject and Plan/Decision, the hook channel is also the **run-state push channel** (Option C hybrid, built §11 #21, 2026-07-10): every agent's lifecycle hooks (`UserPromptSubmit`, `PreToolUse` catch-all, `PostToolUse`, `Stop`, `Notification`, `SubagentStart`/`SubagentStop`) POST run-state (`permission_mode`, current tool, `prompt_id`) to `/internal/hooks/run-state|subagent/{agent}`, ingested by the per-agent **arbiter** ([`sidecar/runstate.py`](../sidecar/runstate.py)) — **authoritative-when-fresh** with screen-polling as the watchdog floor (HTTP-hook failures are silent, so a pure-push replacement is unsafe). `permission_mode` is **event-specific** — `Notification` lacks it and never sets/clears the mode. Ordering/dedup under concurrent load is lock-serialized with exact-redelivery dedup — **live-verified, not assumed** (`test_hook_ingest_live`, 2026-07-10, CC 2.1.206: the production hook set really POSTs through the WSL gateway; ~30 concurrent synthetic posts stay coherent; **`prompt_id` is present on every genuine event** — the v2.1.196+ floor holds). `SubagentStart`/`SubagentStop` ride the same channel as the roster's subagent signal (§7.17); on 2.1.206 `SubagentStart` fires (it did not on the 2.1.198 spike). `GET /sessions/{id}` carries the arbitrated `run_state` beside the poll-driven `status`.
 
 ### 7.5 Agent identity
 
@@ -509,9 +509,12 @@ kept in sync on edit via `/rename` — so it surfaces in the VS Code extension's
 `--resume` picker, not only inside the dashboard. Pools are **25 colours and 50 curated icons**, assigned
 round-robin (`colour = n mod 25`, `icon = n mod 50`); past 16 agents the icon becomes the primary
 disambiguator. Icons are recolorable SVGs served from `assets/icons/agents/` via
-`GET /assets/agent-icons/{name}?color=`. The Create panel's randomize affordance draws from the **curated name pool** shipped at [`assets/names/agent-names.json`](../assets/names/agent-names.json) — 179 one-word, 3–5-letter, lowercase names, validated to double safely as git commit-author names (§11 #19) — with user-typed names always available; wiring the randomize/auto-name draw is queued (§11 #40). The Create panel's **role number auto-fills**: the No. field pre-fills the next value in that role's sequence (e.g. a second `researcher` pre-fills `02`) but **stays editable** — runtime behavior with nothing to draw in the static mockup (recorded 2026-07-08 from the design lane's IN-2 note). ⚠ **Today:** the React client ships only 16 colours (design-parity
-lag, §4.4 — not a decision change); identity editing and the `--name`/`/rename` registration are speced but
-not yet wired (§11 #14).
+`GET /assets/agent-icons/{name}?color=`. The Create panel's randomize affordance draws from the **curated name pool** shipped at [`assets/names/agent-names.json`](../assets/names/agent-names.json) — 179 one-word, 3–5-letter, lowercase names, validated to double safely as git commit-author names (§11 #19) — with user-typed names always available; wiring the randomize/auto-name draw is queued (§11 #40). The Create panel's **role number auto-fills**: the No. field pre-fills the next value in that role's sequence (e.g. a second `researcher` pre-fills `02`) but **stays editable** — runtime behavior with nothing to draw in the static mockup (recorded 2026-07-08 from the design lane's IN-2 note). Identity editing + name registration are wired (§11 #14, built 2026-07-10): `POST /sessions/{id}/identity`
+merges any field subset (retired numbers refused), persists through the roster record, and the **name**
+registers as the session's own display name — `claude --name` at launch (the flag exists on CC 2.1.206)
+and `/rename` on a live edit, both live-proven with a read-back from `~/.claude/sessions/<pid>.json`
+(`test_identity_rename_live`). ⚠ **Today:** the React client ships only 16 colours (design-parity lag,
+§4.4 — cleared by the rebuild #37); the randomize/auto-name draw from the shipped pool is queued (§11 #40).
 
 ### 7.6 Links — agent-to-agent context
 
@@ -525,9 +528,9 @@ A **link** joins two agents and carries **exactly one relationship**:
 - **Shared context** — passive awareness: the source's output (filtered by content-type, with an optional
   backfill toggle) is made available to the target without conversation semantics.
 
-Wanting both relationships between the same two agents = **two links**. ⚠ **Today:** a link carries a
-multi-select `relationship` list (`Link.relationship` in [`sidecar/links.py`](../sidecar/links.py)) that
-can hold both at once — the one-relationship split is queued (§11 #25).
+Wanting both relationships between the same two agents = **two links** (`Link.relationship` is a single
+string in [`sidecar/links.py`](../sidecar/links.py); a persisted legacy list restores as its first entry —
+the recorded degrade of the one-relationship split, §11 #25, built 2026-07-10).
 
 **Triggers.** The delivery-trigger vocabulary is **Now · Inject · Next · Queue · Hold · Piggyback**, riding
 the prompt-queue dispositions (§7.3). Defaults: **Direct messaging → Queue**, **Shared context →
@@ -536,16 +539,16 @@ target *from any source*. This matters because an actively-delivered share costs
 just to ingest it; Piggyback makes shared context free, which is why it is the shared-context default.
 Shared-context delivery is bounded by a per-(source→target) **watermark** that dedups across channels — the
 same watermark mechanism as the scratchpad (§7.7), persisted in the same `state/bookmarks.json` (§8.2).
-⚠ **Today:** the trigger vocabulary in
-[`sidecar/links.py`](../sidecar/links.py) is Now/Next/Queue/Inject/Hold with no Piggyback value (§11 #25).
+Piggyback payloads park per-target (`links.park_piggyback`) and ride the next `_flush_queue` delivery as
+one bounded attributed block — never initiating a turn.
 
 **End-After.** Each link carries two independent caps — **Exchanges** and **Tokens** — each individually
 toggleable; the default is **25 exchanges**. An exchange is one message each direction, and on a **one-way
 link each fire counts as an exchange**, so End-After binds one-way links too. Exchanges are explicitly
 **not** internal turns/steps — those belong to the lifecycle caps (§7.8). Together with
 one-inbound-in-flight, End-After is what keeps bidirectional links from running away. Links carry
-**Active/Expired** state. ⚠ **Today:** `Link.exchanges` counts message *pairs* (`messages ÷ 2`), so a
-one-way link burns its cap at half rate (§11 #25).
+**Active/Expired** state. Exchange counting is **direction-aware**: on a one-way link every fire counts
+as an exchange; on a two-way link an exchange is one message each direction (`messages ÷ 2`).
 
 **Tracking.** No on-graph edges and no per-card link badges; link tracking lives in the **Link Config
 panel** as an all-links list **grouped by agent** — each link double-listed under both participating
@@ -651,7 +654,7 @@ partial step-into over the left + middle columns. Its model is a **real live-str
 - **Geometry pinning (required):** the agent's tmux pane is pinned via `window-size manual` so an attached viewer cannot resize it and perturb the sidecar's capture-pane coordination reads — the one coexistence hazard, and its fix (naive `window-size latest` lets a viewer resize the pane, and the resize **persists** after it detaches).
 - **Passthrough:** the Console input passes keystrokes through to the TUI over the stream, so interactive slash-command follow-ups are answered exactly as if sitting at the terminal.
 - **Slash-command runner:** a full grouped catalog with filter, staged into a run bar (`GET /console/catalog`, `POST /sessions/{id}/console/run`), routed via the bridge's `send`/`keys`.
-- **`/clear` hazard:** a Console `/clear` **rotates the agent's JSONL transcript** and orphans the sidecar's pinned resolution until a re-resolve — new turns are lost to the sidecar meanwhile; `/compact` is safe, same file (`test_console_clear_transcript_live`, live, 2026-07-02). The post-`/clear` re-resolve + `register_session_id` is queued (§11 #35).
+- **`/clear` hazard — handled (§11 #35, built 2026-07-10):** a Console `/clear` **rotates the agent's JSONL transcript**; `/compact` is safe, same file (`test_console_clear_transcript_live`, live, 2026-07-02). The console-run path now detects `/clear` and re-resolves: `TmuxBridge.reresolve_session_id()` re-pins by newest-`.jsonl`-in-project-dir (the live process args keep the OLD id — newest-file is the only signal), and the driver adopts the rotation (fresh replay, path re-persisted) — on 2.1.206 the rotated file appears only at the first post-`/clear` turn, so the driver's per-poll retry adopts it then; post-`/clear` turns provably reach the feed (`test_console_clear_reresolve_live`, live, 2026-07-10).
 - **Interception stays on the transcript:** an interactive TUI only ever emits a *painted screen*, so machine-readable data (messages, tool calls, permission events) is read from the JSONL transcript / event bus (§7.1, §8.6) — never parsed off the terminal stream. The stream is the human's surface; the transcript is the machine's.
 
 ⚠ **Today:** neither the streaming attach nor a polled mirror is wired into the React Console (a parked-renderer gap), and the React Console is stubbed in places; the catalog + run endpoints exist. The streaming transport is proven feasible end-to-end (`test_console_stream_attach_live`); what remains is the build — the sidecar/bridge attach endpoint plus the xterm.js-class renderer in the rebuilt Console (§11 #29).
@@ -714,12 +717,14 @@ A subagent is a **sub-identity of its parent** (e.g. `coder-01 › A2`), riding 
 the addressing model (§7.2) rather than getting its own top-level identity. Naming is **group+member**
 (`A2`), never flat `s1…sN`. The one net-new backend piece: the sidecar ingests each subagent's
 **own transcript** via a folder-watch on the parent's `subagents/` directory, joined to its spawn event.
-Pending-vs-active status is **readable**: proven live off the subagent's **own transcript** recency
-(`test_subagent_status_live`, 2026-07-02), with the `SubagentStart`/`SubagentStop` hook fields (`agent_id`,
-`transcript_path`) as the cleaner authoritative signal once hook ingestion lands (§11 #21); the
-identity/naming/ingestion half is unit-proven (`test_subagents_naming_unit`). Badge-click, the nested
-filter tree, and the Details accordion are DESIGN.md's. ⚠ **Today:** the hook fields are not ingested and
-no active-vs-quiet signal is wired into the roster (§11 #21).
+Pending-vs-active status is **readable and wired** (§11 #21, built 2026-07-10): the
+`SubagentStart`/`SubagentStop` hook fields (`agent_id`, `agent_type`, and the subagent's own transcript via
+`agent_transcript_path` — the payload's plain `transcript_path` is the PARENT session's, live-mapped on CC
+2.1.206) feed the arbiter's subagent registry, which `GET /sessions/{id}/subagents` blends over the
+transcript-derived list as the authoritative active-vs-quiet signal; the transcript-recency fallback stays
+proven (`test_subagent_status_live`, 2026-07-02) and the identity/naming half is unit-proven
+(`test_subagents_naming_unit`). Badge-click, the nested filter tree, and the Details accordion are
+DESIGN.md's.
 
 ### 7.18 Context readout, compaction & per-turn sources
 
@@ -1114,12 +1119,10 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §4.3 | No degraded-mode freeze/stale/backoff in the client | #38 |
 | §4.4, §7.5, §7.10 | Renderer trails the design system (16/25 colours, Console gaps, marquee omitted) — superseded by the fresh rebuild | #37 |
 | §5.2 | Console live attach not wired | #29 |
-| §6.2 | `set_mode` / `set_thinking` / `set_fast` are in-code no-ops (the proven `keys()` levers are unwired); polling degrades from N=1 | #12, #34 |
-| §7.4 | Run-state arbiter built; live payload verify (field presence, prompt_id floor) in flight | #21 |
-| §7.5 | Identity editing + `--name`/`/rename` registration unwired; randomize not drawing from the shipped pool | #14, #40 |
-| §7.6 | Multi-select relationship list; no Piggyback trigger value; exchanges counted as pairs | #25 |
-| §7.11 | Mid-run mode cycling + Bypass/Auto launch-gating unwired | #12, #13 |
-| §7.13 | Streaming attach + xterm renderer unbuilt; React Console stubbed; post-`/clear` re-resolve missing | #29, #35 |
+| §6.2 | Polling degrades from N=1 (batching + adaptive cadence owed) | #34 |
+| §7.5 | Randomize/auto-name not drawing from the shipped pool; 16/25 colours (renderer parity) | #40, #37 |
+| §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) | #13 UI (rides #37) |
+| §7.13 | Streaming attach + xterm renderer unbuilt; React Console stubbed | #29 |
 | §7.15 | Per-agent cost unsurfaced; account split-source reader unfixed | #32, #33 |
 | §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
@@ -1144,9 +1147,9 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 ### 11.3 Agent control & lifecycle (#12–20)
 
-12. **Live mode / thinking / fast control wiring** *(→ §6.2, §7.11)* — replace the driver's `set_mode` / `set_thinking` / `set_fast` no-ops with the proven `keys()` levers: Shift+Tab cycle at a known-idle screen with status-line read-back; `Meta+T` modal with a current-state read first; `Meta+O` + `Space` with credit-gate detection as the honest degrade (`Enter`/`Escape` only close the Fast panel — `Space` is the lever; wire as open-panel → read current state → `Space`-to-target → close). Back `POST /sessions/{id}/{mode,thinking,fast}` with them and un-gate the capability set. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), [`bridge/bridge.py`](../bridge/bridge.py).
-13. **Bypass/Auto launch gating** *(→ §7.11)* — the Create panel sets the Bypass/Auto launch flags, and the mode control disables/hides un-armed segments (an un-pre-armed Bypass is silently absent from the mode ring). UI half rides #37. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), Create panel.
-14. **Identity editing + session-name registration** *(→ §7.5)* — all five identity fields editable after create; the **name** registers as the Claude Code session's own display name (`claude --name` at launch, `/rename` kept in sync on edit) so it surfaces in the VS Code extension list and the `--resume` picker. Where: [`sidecar/identity.py`](../sidecar/identity.py), [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py), [`bridge/bridge.py`](../bridge/bridge.py).
+12. *(built 2026-07-10 — the keys() levers wired end to end with read-back + honest 409/400; live-proven on CC 2.1.206, incl. the caught CLI drift: "manual mode on" indicator + /fast fallback opener; see DEVLOG)*
+13. *(backend built 2026-07-10 — launch pre-arming re-verified live on 2.1.206; `unreachable` is the honest un-armed signal. The Create-panel UI half rides #37.)*
+14. *(built 2026-07-10 — POST /sessions/{id}/identity + `claude --name` launch / `/rename` live-edit registration, live-proven with sessions-file read-back; see DEVLOG)*
 15. **Rewind / Fork (Timeline)** *(→ §7.19)* — implement `/rewind` (tmux-driven, conversation-restore) + `--fork-session` + `/rewind`-inside-the-fork for branch-from-N; an explicit per-fork **file-state isolation** policy (git worktree / code-checkpoint); a **≥ v2.1.191** version gate at session create. Where: [`bridge/bridge.py`](../bridge/bridge.py), [`sidecar/main.py`](../sidecar/main.py).
 16. **Handoff artifacts** *(→ §7.19; DESIGN.md's explicit deferral)* — generate a summary/handoff report on Handoff, layered on the plain context-carry-over (which ships first, #15).
 17. **Load past agents** *(→ §9.9; gated on #8)* — load past agents by name, ID, or via file explorer. Fleet Setups save/load and startup auto-reconnect exist; still no on-demand per-agent resume (endpoint or UI).
@@ -1156,11 +1159,11 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 ### 11.4 Coordination spine, hooks & inbox (#21–28)
 
-21. **Hook lifecycle ingestion & run-state arbiter** *(→ §7.4, §7.17; **HIGH**)* — register the HTTP `SubagentStart`/`SubagentStop` + run-state event set to the sidecar; a per-agent arbiter merges pushed run-state / `permission_mode` (**authoritative-when-fresh**) with the screen-poll fallback (Option C hybrid); the subagent hook fields become the roster's active-vs-quiet signal. **Verify during build, never assume:** arbiter ordering/dedup under concurrent load; record the `prompt_id` version floor (v2.1.196+). Where: [`sidecar/hookbus.py`](../sidecar/hookbus.py), [`sidecar/main.py`](../sidecar/main.py), [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
+21. *(built 2026-07-10 — runstate.py arbiter + full hook set + subagent registry, live-verified on CC 2.1.206: prompt_id present on every genuine event (the v2.1.196+ floor holds), concurrent-load coherent, SubagentStart fires, subagent transcript rides `agent_transcript_path`; see DEVLOG)*
 22. *(built 2026-07-10 — `POST /sessions/{id}/plan/verdict` (approve = the proven `keys()` Enter; revise = Escape + queued feedback, ⚠ assumed leg pending the e2e drive) + `PUT /library/document` edit-in-place; see DEVLOG)*
 23. **Workflow approval via the Inbox** *(→ §7.3, §7.11; spike-proven — [`tests/workflow_approval_probe/`](../tests/workflow_approval_probe/))* — intercept a `Workflow` tool call with a **PreToolUse hook** and surface it as an Inbox **Review** card (the renamed Plans-&-Docs section) with an Approve/Reject round-trip. Proven live: the hook fires with the **full script preview** in `tool_input.script` (name / description / phases recoverable for the card content), deny aborts / allow launches, and the hook verdict **preempts** the built-in dialog (the dashboard can be the sole gate; the on-pane dialog stays the fallback). Workflow subagents are headless/one-shot — a future Subagents tab is read-only *tracking*, not control; workflow editing reuses the Library editor. Card design is the design lane's.
 24. **Queue awareness** *(→ §7.3, §7.6)* — for >2 linked agents, share in message front matter that another agent's message is queued, so an agent can decide whether to wait.
-25. **Links model fixes** *(→ §7.6)* — split the multi-select `relationship` list into **one relationship per link** (both-relationships = two links); add the **Piggyback** trigger value + the §7.6 defaults (Direct → Queue, Shared → Piggyback); count an exchange **per fire on one-way links** (today `messages ÷ 2` burns caps at half rate). Where: [`sidecar/links.py`](../sidecar/links.py).
+25. *(built 2026-07-10 — one relationship per link, Piggyback trigger + park-store + §7.6 defaults, direction-aware exchange counting, and the shared-context fire itself; see DEVLOG)*
 26. *(built 2026-07-10 — the Projects system surface: `GET /projects` + register/open/close with the §9.1/§9.8 flows and record-keeping stop; picker/chip/dialog UI rides #37; see DEVLOG)*
 27. *(built 2026-07-10 — reserved System identity + coalesced fleet card + widened usage-cap/auth matcher + tmux/WSL liveness probe; the reactive auth-expiry screen signal recorded as an unforceable boundary per the item's honest-degrade instruction; see DEVLOG)*
 28. **Import external Claude context** *(→ §7.3, §7.16, §8.6; the extractors exist — [`dev/tools/claude-context-extractor/`](../dev/tools/claude-context-extractor/))* — wrap the working exporters (`extract-web.py`, `extract-desktop.py`) behind a sidecar **import module** + a thin frontend Import control, pulling an outside Claude session in by title. One engine, one selectable destination: **(a)** agent-to-agent (prompt queue / Inbox — the operator's primary interest); **(b)** operator-facing read panel — the acute pain today, since the desktop app's own export is broken/misplaced; **(c)** Library reference doc. Distinct from §8.6 (agents' *own* transcripts). Open operator calls (not blocking): destination order (recorded lean: (a) first, (b) close behind) and which panel hosts Import.
@@ -1173,8 +1176,8 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 32. **Per-agent cost on cards** *(→ §7.15)* — scrape `/cost` (via the console path) for the per-session dollar figure and surface it on each agent card, complementing the account-level band. Where: [`bridge/bridge.py`](../bridge/bridge.py), `sidecar`, renderer.
 33. **Usage band — account split-source + auth-expiry reader** *(→ §7.15)* — read account tier from the correct source (the `.claude.json` tier fields are unmatched today) and add an auth-expiry signal. Where: [`sidecar/settings_io.py`](../sidecar/settings_io.py).
 34. **Polling-scale rework** *(→ §4.3, §6.2)* — batch the ~5 WSL spawns/cycle and add an adaptive cadence so the fleet stops degrading from N=1; then **re-measure the practical ceiling** and document it. Where: [`sidecar/drivers/bridge.py`](../sidecar/drivers/bridge.py).
-35. **Console `/clear` transcript re-resolve** *(→ §7.13, §8.6, §8.7)* — after a Console `/clear`, re-resolve + `register_session_id` so the pinned transcript follows the rotated JSONL (`/compact` is safe, no change). Where: [`bridge/bridge.py`](../bridge/bridge.py), [`sidecar/main.py`](../sidecar/main.py).
-36. **Sidecar `Task`→`Agent` parser audit** *(→ §7.17, §10 #2)* — confirm the transcript parser keys on the current `Agent` tool name (renamed from `Task` in v2.1.63) and add dual-name compatibility so subagent events aren't silently missed. Where: `sidecar` transcript/serialize path.
+35. *(built 2026-07-10 — /clear detection + newest-file re-resolve + rotation adoption, live acceptance green; see DEVLOG)*
+36. *(audited 2026-07-10 — parser already dual-name (`Agent`/`Task`) everywhere; end-to-end pinning test added; see DEVLOG)*
 
 ### 11.6 Frontend build (#37–41)
 
