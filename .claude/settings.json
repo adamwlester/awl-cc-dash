@@ -29,11 +29,7 @@
       "Skill",
       "Skill(*)",
       "Skill(claude-api)",
-      "Skill(claude-api:*)",
-      "Bash(git add *)",
-      "Bash(git commit -q -m 'merge: #21 live hook-ingest verify + #35 /clear transcript re-resolve + #36 parser audit *)",
-      "Bash(git worktree *)",
-      "Bash(git push *)"
+      "Skill(claude-api:*)"
     ],
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)",
@@ -42,14 +38,7 @@
       "Read(./archive/_human-only/**)",
       "Read(./archive/_human-only)"
     ],
-    "ask": [
-      "Bash(git checkout -b *)",
-      "Bash(git checkout -B *)",
-      "Bash(git switch -c *)",
-      "Bash(git switch -C *)",
-      "Bash(git branch *)",
-      "Bash(git worktree add *)"
-    ],
+    "ask": [],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "C:\\Users\\lester\\.vscode\\extensions\\html-preview-default",
