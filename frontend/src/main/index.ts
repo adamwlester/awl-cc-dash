@@ -14,7 +14,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    backgroundColor: '#091318',
+    backgroundColor: '#fef6e4', // --background (cream canvas) — matches the rebuilt renderer
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {

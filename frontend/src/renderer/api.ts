@@ -11,7 +11,10 @@
 // the old per-session /history + send({prompt}) minimum.
 // ============================================================================
 
-export const API: string = (window as any).awl?.sidecarUrl || 'http://127.0.0.1:7690'
+// Dev override: when served standalone in a browser, `?sidecar=http://…` picks
+// the sidecar instance to verify against (multiple lanes run parallel sidecars).
+const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sidecar') : null
+export const API: string = (window as any).awl?.sidecarUrl || _q || 'http://127.0.0.1:7690'
 
 // ---- Types (mirror sidecar to_dict / endpoint shapes) ----------------------
 
@@ -271,6 +274,10 @@ export interface CreatePayload {
   identity?: Partial<Identity> | null
   max_turns?: number | null
   max_context_pct?: number | null
+  // Per-agent scoping (LaunchConfig mirror) — sent only when the user picked
+  // values; older sidecars ignore unknown fields.
+  mcp_servers?: string[] | null
+  enabled_plugins?: Record<string, boolean> | null
 }
 
 export type Disposition = 'now' | 'next' | 'queue' | 'hold' | 'inject'
@@ -376,6 +383,10 @@ export const api = {
   setModel: (id: string, model: string) => postJSON(`/sessions/${id}/model`, { model }),
   setMode: (id: string, mode: string) => postJSON(`/sessions/${id}/mode`, { mode }),
   setEffort: (id: string, effort: string) => postJSON(`/sessions/${id}/effort`, { effort }),
+  // Live toggles the backend lane is adding — callers treat a null return as
+  // "endpoint absent / rejected" and revert their optimistic UI (renderer #37).
+  setFast: (id: string, on: boolean) => postJSON<{ status: string; on?: boolean }>(`/sessions/${id}/fast`, { on }),
+  setThinking: (id: string, on: boolean) => postJSON<{ status: string; on?: boolean }>(`/sessions/${id}/thinking`, { on }),
   answerPermission: (id: string, approve: boolean) => postJSON(`/sessions/${id}/permission`, { approve }),
   // Post-create identity edit (§7.5): merge any subset of the five fields.
   // 400 on a retired number; a name change also /rename's the live session.
@@ -443,10 +454,14 @@ export const api = {
   closeProject: (stopAgents = false) =>
     postJSON<{ status: string; path: string; stopped_agents: boolean }>('/projects/close', { stop_agents: stopAgents }),
 
-  // ---- console (slash-command runner) ----------------------------------------
+  // ---- console (slash-command runner + live terminal attach) ---------------
   consoleCatalog: (q?: string) => getJSON<ConsoleCatalog & { commands?: ConsoleCommand[] }>(`/console/catalog${qs({ q })}`),
   consoleRun: (id: string, command: string) =>
     postJSON<ConsoleRunResult>(`/sessions/${id}/console/run`, { command }),
+  // Attach-on-open streaming terminal (backend lane, §11 #37f contract):
+  // POST /sessions/{id}/console/attach → { ws_url } (ttyd-style raw WebSocket).
+  // Null → endpoint not merged yet; the Console degrades to catalog-only.
+  consoleAttach: (id: string) => postJSON<{ ws_url: string }>(`/sessions/${id}/console/attach`),
 
   // ---- templates -------------------------------------------------------------
   templates: () => getJSON<Template[]>('/templates'),
