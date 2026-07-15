@@ -6,6 +6,7 @@ All tmux commands are dispatched via `wsl -d Ubuntu -- bash -c '...'` when
 running from Windows, or directly when running inside WSL.
 """
 
+import base64
 import json
 import logging
 import shlex
@@ -18,6 +19,11 @@ from .paths import (
     is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN,
     parse_default_gateway, sidecar_base_url,
 )
+
+# Console streaming attach (§7.13, §11 #29): the port range ttyd instances are
+# allocated from, one per attached session. Starts above the sidecar's :7690
+# (and clear of the spike's fixed 7691/7692) so a stray spike run can't collide.
+CONSOLE_PORT_RANGE = (7710, 7789)
 
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
@@ -249,6 +255,105 @@ def parse_permission_prompt(content):
     return {"question": question, "options": options, "raw": raw}
 
 
+# /cost Usage-dialog parse targets (§7.15, §11 #32) — the per-SESSION panel's
+# "Total cost:  $X" line (the defensible per-agent figure; never merely any `$`
+# on screen, which would include incidental figures) plus the per-model
+# "($0.0012)" breakdown parens. Shapes proven live by test_per_agent_cost_live.
+_COST_TOTAL_RE = re.compile(r"Total cost:\s*\$\s?(\d+(?:\.\d+)?)")
+_COST_PER_MODEL_RE = re.compile(r"\(\$\s?(\d+(?:\.\d+)?)\)")
+
+
+def parse_cost_output(content):
+    """Parse the `/cost` Usage dialog's per-session cost panel. Pure function.
+
+    Anchors on the specific ``Total cost: $X`` line (the spike-proven
+    defensible number — Claude Code's OWN estimate for THIS session, which for
+    a bridge agent is that one agent) and collects the per-model ``($Y)``
+    breakdown figures alongside it.
+
+    Args:
+        content: A captured screen/scrollback block.
+
+    Returns:
+        ``{"usd": float, "per_model": [floats], "raw": str}`` (raw = the lines
+        around the Total-cost anchor), or ``None`` when no per-session Total
+        cost line is present — the honest miss, never a fabricated figure.
+    """
+    if not content:
+        return None
+    m = _COST_TOTAL_RE.search(content)
+    if not m:
+        return None
+    per_model = [float(x) for x in _COST_PER_MODEL_RE.findall(content)]
+    # Raw excerpt: a window of lines around the anchor, for display/diagnosis.
+    lines = content.splitlines()
+    anchor = next((i for i, ln in enumerate(lines) if _COST_TOTAL_RE.search(ln)), 0)
+    raw = "\n".join(lines[max(0, anchor - 3):anchor + 12])
+    return {"usd": float(m.group(1)), "per_model": per_model, "raw": raw}
+
+
+def parse_bundle_envelope(raw, sentinel):
+    """Parse one ``poll_bundle`` stdout into its delimited parts. Pure function.
+
+    The envelope is four sentinel-delimited sections (see ``poll_bundle``)::
+
+        <state screen (last ~15 rows)>   \n <sentinel>
+        <detail screen (last ~40 rows)>  \n <sentinel>
+        <transcript size in bytes | -1>  \n <sentinel>
+        <base64(transcript bytes from the offset)>
+
+    Base64 makes the transcript chunk immune to ``_run``'s trailing-strip and
+    any encoding mangling — the decoded bytes are byte-exact, so the caller's
+    offset arithmetic holds. A fresh uuid sentinel per call means screen
+    content can never fake a delimiter.
+
+    Returns:
+        ``{"screen": str, "screen_detail": str, "size": int, "chunk": bytes}``
+        — ``size`` is -1 when the transcript file is missing/unstated.
+
+    Raises:
+        TmuxBridgeError: when the envelope is corrupt (sentinels missing).
+    """
+    lines = (raw or "").split("\n")
+    idxs = [i for i, ln in enumerate(lines) if ln.strip() == sentinel]
+    if len(idxs) < 3:
+        raise TmuxBridgeError(
+            f"poll bundle envelope corrupt: {len(idxs)} sentinel(s) found")
+    screen = "\n".join(lines[:idxs[0]])
+    screen_detail = "\n".join(lines[idxs[0] + 1:idxs[1]])
+    size_text = "".join(ln.strip() for ln in lines[idxs[1] + 1:idxs[2]])
+    try:
+        size = int(size_text or "-1")
+    except ValueError:
+        size = -1
+    b64 = "".join(ln.strip() for ln in lines[idxs[2] + 1:])
+    try:
+        chunk = base64.b64decode(b64) if b64 else b""
+    except Exception:
+        chunk = b""
+    return {"screen": screen, "screen_detail": screen_detail,
+            "size": size, "chunk": chunk}
+
+
+def pick_console_port(ss_output, start=CONSOLE_PORT_RANGE[0],
+                      end=CONSOLE_PORT_RANGE[1], taken=()):
+    """Pick the first free console-attach port in ``[start, end]``.
+
+    Pure function (hermetically unit-testable). ``ss_output`` is the raw
+    ``ss -ltn`` listing from inside WSL — every ``:<port>`` seen in it counts as
+    occupied, plus any ``taken`` ports the caller already allocated in-process
+    (attaches started this cycle whose listener may not show in ``ss`` yet).
+
+    Returns the port int, or ``None`` when the whole range is occupied.
+    """
+    used = {int(p) for p in re.findall(r":(\d+)\b", ss_output or "")}
+    used.update(int(p) for p in taken)
+    for port in range(start, end + 1):
+        if port not in used:
+            return port
+    return None
+
+
 class TmuxBridge:
     """Programmatic control of Claude Code TUI sessions in WSL2/tmux.
 
@@ -279,6 +384,10 @@ class TmuxBridge:
         # "" = resolved-but-none; None = not yet resolved. Stable within a WSL
         # boot, so resolved once and reused for every agent's hook URL.
         self._host_ip: str | None = None
+        # Console streaming attaches (§7.13, §11 #29): tmux session name -> the
+        # live ttyd attach info ({port, pid, url, ws_url}). One attach per
+        # session; a re-attach returns the existing one.
+        self._console_attaches: dict[str, dict] = {}
 
     # --- Low-level execution ---
 
@@ -373,6 +482,20 @@ class TmuxBridge:
             stdin_data=json.dumps(data, indent=2),
         )
         return path
+
+    def _write_wsl_text(self, path, text):
+        """Write ``text`` to a WSL path as pure-LF bytes.
+
+        Base64 through bash dodges BOTH the Windows text-mode CRLF mangling
+        (subprocess text-mode stdin rewrites ``\\n`` -> ``\\r\\n``, which breaks
+        multi-line shell scripts) and shell quoting — the pattern proven by the
+        console streaming-attach spike.
+        """
+        b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+        self._run(
+            f"mkdir -p \"$(dirname {shlex.quote(path)})\" && "
+            f"echo {b64} | base64 -d > {shlex.quote(path)}"
+        )
 
     def _open_wt_tab(self, name):
         """Open a Windows Terminal tab attached to a tmux session.
@@ -823,6 +946,13 @@ class TmuxBridge:
             dict with status.
         """
         self._require_session(name)
+        # A console ttyd (§11 #29) would outlive its tmux session (it keeps
+        # serving and respawns `tmux attach` per client) — detach it first.
+        if name in self._console_attaches:
+            try:
+                self.console_detach(name)
+            except TmuxBridgeError:  # pragma: no cover - best effort
+                pass
         self._tmux(f"kill-session -t '{name}'")
         self._session_uuids.pop(name, None)
         # Best-effort: remove any per-agent launch config materialized for this
@@ -1239,6 +1369,159 @@ class TmuxBridge:
             return {"ok": False, "on": None, "reason": "unreadable"}
         return {"ok": state2 == target, "on": state2 == "on"}
 
+    # --- Console streaming attach (§7.13, §11 #29) ---
+    #
+    # The per-focused-agent live terminal: a ttyd process inside WSL attached to
+    # the agent's tmux session, consumed from Windows over a localhost WebSocket
+    # (WSL2's default relay — no port-forwarding; spike-proven,
+    # tests/test_console_stream_attach_live.py). The one coexistence hazard and
+    # its fix are geometry: with tmux's default `window-size latest` a live
+    # viewer RESIZES the pane and the change PERSISTS after it detaches,
+    # perturbing the sidecar's capture-pane coordination reads — so the pane is
+    # pinned via `window-size manual` BEFORE ttyd starts, which fully isolates
+    # the scraper (spike-proven). Interception stays on the JSONL transcript;
+    # nothing machine-reads this stream (§7.13).
+
+    def resolve_ttyd(self):
+        """Absolute ttyd path inside WSL, or None when not installed.
+
+        Spike-proven resolution: ``~/.local/bin/ttyd`` first, then PATH. $HOME
+        is resolved via ``cd ~ && pwd`` — bare ``$HOME`` interpolation
+        misbehaves through the bridge's non-login ``bash -c``.
+        """
+        home = self._run("cd ~ && pwd").strip()
+        cand = f"{home}/.local/bin/ttyd"
+        out = self._run(
+            f"if [ -x {cand} ]; then echo {cand}; "
+            f"elif command -v ttyd >/dev/null 2>&1; then command -v ttyd; "
+            f"else echo NO; fi").strip()
+        return None if (not out or out == "NO") else out
+
+    def _console_pid_alive(self, pid):
+        """True when a previously-started ttyd pid is still alive in WSL."""
+        if not pid:
+            return False
+        try:
+            return "ALIVE" in self._run(
+                f"kill -0 {int(pid)} 2>/dev/null && echo ALIVE || echo DEAD")
+        except (TmuxBridgeError, ValueError):
+            return False
+
+    def console_attach(self, name, port=None):
+        """Start (or return) the session's live-terminal attach (§7.13, §11 #29).
+
+        Pins the pane geometry FIRST (``window-size manual`` — the required
+        coexistence fix, see the section comment above), then starts a
+        **writable** ttyd attached to the tmux session
+        (``ttyd -p <port> -W tmux attach -t <name>`` — writable so the Console's
+        keystroke passthrough works), detached via the spike-proven
+        setsid/nohup-in-a-script pattern (an inline ``nohup … &`` is reaped when
+        the wsl.exe call returns). One attach per session: while the previous
+        ttyd is still alive a re-attach returns it (``reused: True``) instead of
+        stacking a second viewer server.
+
+        Args:
+            name: Session name.
+            port: Explicit port; when omitted the first free port in
+                ``CONSOLE_PORT_RANGE`` is picked (``ss -ltn`` + the in-process
+                allocation set).
+
+        Returns:
+            dict with ``port``, ``pid``, ``url`` (http, ttyd's built-in page),
+            ``ws_url`` (the WebSocket the xterm.js renderer consumes — ttyd's
+            ``tty`` subprotocol), and ``reused``.
+
+        Raises:
+            TmuxBridgeError: session missing, ttyd not installed, no free port,
+                or ttyd failed to start.
+        """
+        self._require_session(name)
+        existing = self._console_attaches.get(name)
+        if existing and self._console_pid_alive(existing.get("pid")):
+            return {**existing, "reused": True}
+
+        ttyd = self.resolve_ttyd()
+        if not ttyd:
+            raise TmuxBridgeError(
+                "ttyd is not installed in WSL (~/.local/bin/ttyd or PATH) — "
+                "the Console live stream needs it (apt: `sudo apt-get install ttyd`).")
+
+        # 1) Pin geometry BEFORE any viewer can connect (the coexistence fix).
+        #    `manual` freezes the window at its CURRENT size, so the sidecar's
+        #    capture-pane reads keep their exact geometry under any viewer.
+        self._run(f"tmux set-option -t {shlex.quote(name)} window-size manual")
+
+        # 2) Pick a port.
+        if port is None:
+            try:
+                ss = self._run("ss -ltn 2>/dev/null || true")
+            except TmuxBridgeError:
+                ss = ""
+            in_process = {i["port"] for i in self._console_attaches.values()}
+            port = pick_console_port(ss, taken=in_process)
+            if port is None:
+                raise TmuxBridgeError(
+                    f"no free console port in {CONSOLE_PORT_RANGE} — detach "
+                    "stale consoles first.")
+
+        # 3) Start ttyd detached (script pattern; kills any stale pidfile ttyd).
+        agent_dir = f"{WSL_AWL_DIR}/{name}"
+        script = (
+            "#!/usr/bin/env bash\n"
+            f"D={shlex.quote(agent_dir)}\n"
+            'if [ -f "$D/ttyd_console.pid" ]; then '
+            'kill "$(cat "$D/ttyd_console.pid")" 2>/dev/null || true; sleep 0.3; fi\n'
+            f'setsid nohup {shlex.quote(ttyd)} -p {int(port)} -W '
+            f"tmux attach -t {shlex.quote(name)} "
+            '</dev/null >"$D/ttyd_console.log" 2>&1 &\n'
+            'echo $! > "$D/ttyd_console.pid"\n'
+            "sleep 1.2\n"
+            'kill -0 "$(cat "$D/ttyd_console.pid")" 2>/dev/null '
+            "&& echo ALIVE || echo DEAD\n"
+        )
+        self._write_wsl_text(f"{agent_dir}/console_attach.sh", script)
+        out = self._run(f"bash {shlex.quote(agent_dir + '/console_attach.sh')}",
+                        timeout=20)
+        if "ALIVE" not in out:
+            raise TmuxBridgeError(
+                f"ttyd did not start for '{name}' on port {port}: {out[-200:]}")
+        try:
+            pid = int(self._run(
+                f"cat {shlex.quote(agent_dir + '/ttyd_console.pid')}").strip())
+        except (TmuxBridgeError, ValueError):
+            pid = None
+        info = {
+            "port": port,
+            "pid": pid,
+            "url": f"http://127.0.0.1:{port}/",
+            "ws_url": f"ws://127.0.0.1:{port}/ws",
+        }
+        self._console_attaches[name] = info
+        return {**info, "reused": False}
+
+    def console_detach(self, name):
+        """Kill the session's console ttyd (if any); idempotent.
+
+        ``window-size`` deliberately STAYS ``manual``: the pin is the §7.13
+        required protection and nothing needs ``latest`` back — the spike showed
+        the hazard is a viewer resizing a ``latest`` window (and the resize
+        persisting), so leaving the pane pinned is strictly safer between
+        attaches. Returns ``{status, name, port}`` (port None when no attach
+        was tracked).
+        """
+        info = self._console_attaches.pop(name, None)
+        agent_dir = f"{WSL_AWL_DIR}/{name}"
+        try:
+            self._run(
+                f'if [ -f {shlex.quote(agent_dir + "/ttyd_console.pid")} ]; then '
+                f'kill "$(cat {shlex.quote(agent_dir + "/ttyd_console.pid")})" '
+                f'2>/dev/null; rm -f {shlex.quote(agent_dir + "/ttyd_console.pid")}; '
+                "fi; true")
+        except TmuxBridgeError as e:  # pragma: no cover - best effort
+            log.debug("console_detach(%s) cleanup: %s", name, e)
+        return {"status": "detached", "name": name,
+                "port": (info or {}).get("port")}
+
     # --- Multi-Agent ---
 
     def batch_create(self, agents):
@@ -1449,6 +1732,75 @@ class TmuxBridge:
                 "The session may not have processed any messages yet."
             )
         return parse_transcript(self, transcript_path, last_n=last_n, types=types)
+
+    def poll_bundle(self, name, transcript_path=None, offset=0,
+                    state_lines=15, detail_lines=40):
+        """ONE WSL round-trip for a full driver poll cycle (§11 #34).
+
+        The pre-rework ``events()`` cycle cost ~5 WSL process spawns per agent
+        per second (``read_log`` = transcript re-resolve + ``cat``, plus a
+        ``status`` capture — each its own ``wsl.exe``), which is what made the
+        fleet degrade from N=1 (``test_polling_scale_ceiling_live``). This
+        batches the whole cycle into a single ``wsl bash -c`` invocation
+        emitting a sentinel-delimited envelope:
+
+          * the **state screen** — ``capture-pane -S -<state_lines>``, exactly
+            the slice ``status()`` classifies;
+          * the **detail screen** — ``capture-pane -S -<detail_lines>``, the
+            larger slice ``status()`` re-reads for permission-prompt detail;
+          * the **transcript tail** — the file's byte size, then the bytes
+            from ``offset`` onward, base64-wrapped (byte-exact through the
+            Windows text-mode pipe, immune to output stripping). The caller
+            advances its offset only past COMPLETE lines (see
+            ``transcript.consume_transcript_chunk``), so a mid-write read can
+            never tear an entry.
+
+        ``transcript_path`` is the already-resolved WSL path (the driver
+        persists it after first resolution); ``None``/missing file yields
+        ``size: -1`` with an empty chunk — the caller falls back to the
+        resolving ``read_log`` path.
+
+        Returns ``{"screen", "screen_detail", "size", "chunk"}`` (see
+        ``parse_bundle_envelope``).
+        """
+        sentinel = f"AWLPB-{uuid.uuid4().hex}"
+        qname = shlex.quote(name)
+        if transcript_path:
+            qpath = shlex.quote(transcript_path)
+            tail_part = (
+                f"if [ -f {qpath} ]; then wc -c < {qpath}; echo {sentinel}; "
+                f"tail -c +{int(offset) + 1} {qpath} | base64 -w0; echo; "
+                f"else echo -1; echo {sentinel}; fi"
+            )
+        else:
+            tail_part = f"echo -1; echo {sentinel}"
+        out = self._run(
+            f"tmux capture-pane -t {qname} -p -J -S -{int(state_lines)} "
+            f"2>/dev/null; echo {sentinel}; "
+            f"tmux capture-pane -t {qname} -p -J -S -{int(detail_lines)} "
+            f"2>/dev/null; echo {sentinel}; "
+            f"{tail_part}",
+            timeout=30,
+        )
+        return parse_bundle_envelope(out, sentinel)
+
+    def statusline_tail(self, name):
+        """Last captured statusLine payload line for a session, or None (§11 #31).
+
+        The bridge driver's per-agent settings install a statusLine command
+        that appends each render's JSON payload to
+        ``~/.awl-cc-dash-agents/<name>/statusline.jsonl`` (one line per render);
+        this is the cheap lazy read of its LAST line — a single ``tail -n 1``.
+        Missing file / empty tail → None (best-effort by design).
+        """
+        path = f"{WSL_AWL_DIR}/{name}/statusline.jsonl"
+        try:
+            out = self._run(f"tail -n 1 {shlex.quote(path)} 2>/dev/null || true",
+                            timeout=10)
+        except TmuxBridgeError:
+            return None
+        out = (out or "").strip()
+        return out or None
 
     # --- Configuration ---
 

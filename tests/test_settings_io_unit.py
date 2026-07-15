@@ -270,3 +270,136 @@ class TestAccountBand:
         p = tmp_path / "creds.json"
         p.write_text("{ broken", encoding="utf-8")
         assert settings_io.account_band(p) == {"signed_out": True}
+
+    def test_claude_json_tier_fields_are_not_plan(self, tmp_path):
+        # The §11 #33 boundary, single-file side: `.claude.json`'s tier-ish
+        # oauthAccount fields (organizationType/seatTier/organizationRateLimitTier/
+        # billingType) are NOT surfaced as "plan" by the single-file reader —
+        # the plan label comes only from the credentials file (split source).
+        p = tmp_path / "claude.json"
+        p.write_text(json.dumps({
+            "oauthAccount": {
+                "emailAddress": "a@b.com",
+                "organizationName": "Acme",
+                "organizationType": "claude_max",
+                "seatTier": None,
+                "organizationRateLimitTier": "default_claude_max_5x",
+                "billingType": "stripe_subscription",
+            }
+        }), encoding="utf-8")
+        band = settings_io.account_band(p)
+        assert band == {"email": "a@b.com", "org": "Acme"}
+        assert "plan" not in band
+
+
+# ---------------------------------------------------------------------------
+# account_band_split — the §11 #33 split-source reader (live-mapped boundary:
+# email/org from .claude.json oauthAccount; plan ONLY from .credentials.json
+# claudeAiOauth.subscriptionType; + rate_limit_tier and the read-only
+# auth_expiry signal, null when the creds expose no expiry)
+# ---------------------------------------------------------------------------
+
+def _write_claude_json(tmp_path, **overrides):
+    """A realistic .claude.json mirror (the real oauthAccount shape)."""
+    oauth = {
+        "emailAddress": "adam@example.com",
+        "organizationName": "adam@example.com's Organization",
+        "organizationType": "claude_max",
+        "organizationRateLimitTier": "default_claude_max_5x",
+        "billingType": "stripe_subscription",
+        "seatTier": None,
+    }
+    oauth.update(overrides)
+    p = tmp_path / "claude.json"
+    p.write_text(json.dumps({"oauthAccount": oauth}), encoding="utf-8")
+    return p
+
+
+def _write_credentials(tmp_path, *, expires_at=1784106632120, **overrides):
+    """A realistic .credentials.json mirror (the real claudeAiOauth shape,
+    token values elided)."""
+    oauth = {
+        "accessToken": "sk-elided",
+        "refreshToken": "sk-elided",
+        "subscriptionType": "max",
+        "rateLimitTier": "default_claude_max_20x",
+        "scopes": ["user:inference"],
+    }
+    if expires_at is not None:
+        oauth["expiresAt"] = expires_at
+    oauth.update(overrides)
+    p = tmp_path / "credentials.json"
+    p.write_text(json.dumps({"claudeAiOauth": oauth}), encoding="utf-8")
+    return p
+
+
+class TestAccountBandSplit:
+    def test_merges_email_org_from_claude_json_and_plan_from_creds(self, tmp_path):
+        cj = _write_claude_json(tmp_path)
+        cr = _write_credentials(tmp_path)
+        band = settings_io.account_band_split(cj, cr)
+        assert band["email"] == "adam@example.com"
+        assert band["org"] == "adam@example.com's Organization"
+        assert band["plan"] == "max"                     # creds, not org-type
+        assert band["rate_limit_tier"] == "default_claude_max_20x"
+        # epoch ms 1784106632120 == 2026-07-15T09:10:32Z
+        assert band["auth_expiry"] == "2026-07-15T09:10:32Z"
+
+    def test_creds_plan_wins_over_claude_json_org_type(self, tmp_path):
+        cj = _write_claude_json(tmp_path, organizationType="claude_enterprise")
+        cr = _write_credentials(tmp_path)
+        assert settings_io.account_band_split(cj, cr)["plan"] == "max"
+
+    def test_missing_creds_falls_back_to_org_type_honestly(self, tmp_path):
+        cj = _write_claude_json(tmp_path)
+        band = settings_io.account_band_split(cj, tmp_path / "nope.json")
+        assert band["email"] == "adam@example.com"
+        # The raw recorded value — never a synthesized label.
+        assert band["plan"] == "claude_max"
+        assert band["rate_limit_tier"] == "default_claude_max_5x"
+        assert band["auth_expiry"] is None
+
+    def test_missing_claude_json_still_yields_plan_and_expiry(self, tmp_path):
+        cr = _write_credentials(tmp_path)
+        band = settings_io.account_band_split(tmp_path / "nope.json", cr)
+        assert "email" not in band
+        assert band["plan"] == "max"
+        assert band["auth_expiry"] == "2026-07-15T09:10:32Z"
+
+    def test_absent_expiry_is_null_but_key_present(self, tmp_path):
+        cj = _write_claude_json(tmp_path)
+        cr = _write_credentials(tmp_path, expires_at=None)
+        band = settings_io.account_band_split(cj, cr)
+        assert "auth_expiry" in band and band["auth_expiry"] is None
+
+    def test_zero_or_bogus_expiry_is_null(self, tmp_path):
+        # A logged-out creds file zeroes expiresAt — null, not 1970.
+        cj = _write_claude_json(tmp_path)
+        cr = _write_credentials(tmp_path, expires_at=0)
+        assert settings_io.account_band_split(cj, cr)["auth_expiry"] is None
+        cr2 = tmp_path / "c2.json"
+        cr2.write_text(json.dumps(
+            {"claudeAiOauth": {"subscriptionType": "max",
+                               "expiresAt": "not-a-number"}}), encoding="utf-8")
+        assert settings_io.account_band_split(cj, cr2)["auth_expiry"] is None
+
+    def test_seconds_epoch_also_parses(self, tmp_path):
+        cj = _write_claude_json(tmp_path)
+        cr = _write_credentials(tmp_path, expires_at=1784106632)  # seconds
+        band = settings_io.account_band_split(cj, cr)
+        assert band["auth_expiry"] == "2026-07-15T09:10:32Z"
+
+    def test_both_missing_is_signed_out(self, tmp_path):
+        out = settings_io.account_band_split(
+            tmp_path / "a.json", tmp_path / "b.json")
+        assert out == {"signed_out": True}
+
+    def test_no_tier_info_anywhere_omits_plan_and_tier(self, tmp_path):
+        cj = tmp_path / "claude.json"
+        cj.write_text(json.dumps({"oauthAccount": {
+            "emailAddress": "x@y.com", "organizationName": "XY"}}),
+            encoding="utf-8")
+        band = settings_io.account_band_split(cj, tmp_path / "nope.json")
+        assert band["email"] == "x@y.com"
+        assert "plan" not in band and "rate_limit_tier" not in band
+        assert band["auth_expiry"] is None

@@ -14,10 +14,12 @@ an editable install of the bridge package.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
 import sys
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -361,6 +363,45 @@ def derive_subagents(entries: list[dict]) -> dict:
     return {"count": len(subagents), "subagents": subagents}
 
 
+class AdaptiveCadence:
+    """Adaptive poll cadence (§11 #34 → §4.3/§6.2): fast while active, coasting
+    while idle, snapping back instantly on any activity.
+
+    The rules: poll at ``active_interval`` (1 s) while the agent is running or
+    was active within the last ``idle_after`` seconds (30 s); back off to
+    ``idle_interval`` (5 s) once that window passes with no activity; any
+    ``nudge()`` — a send, an interrupt, a hook ingest, observed screen or
+    transcript activity — snaps the next interval back to active immediately.
+    The hook channel (§7.4) already PUSHES run-state on lifecycle events, so an
+    idle agent's poll can afford to coast: activity always arrives as a nudge
+    before staleness is visible.
+
+    Pure logic with an injectable ``clock`` so it unit-tests hermetically.
+    """
+
+    def __init__(self, active_interval: float = 1.0, idle_interval: float = 5.0,
+                 idle_after: float = 30.0, clock=time.monotonic) -> None:
+        self.active_interval = active_interval
+        self.idle_interval = idle_interval
+        self.idle_after = idle_after
+        self._clock = clock
+        self._last_activity = clock()
+
+    def nudge(self) -> None:
+        """Record activity — the next ``interval()`` snaps back to active."""
+        self._last_activity = self._clock()
+
+    def idle_for(self) -> float:
+        """Seconds since the last recorded activity."""
+        return self._clock() - self._last_activity
+
+    def interval(self) -> float:
+        """The sleep to use for the NEXT poll cycle."""
+        if self.idle_for() < self.idle_after:
+            return self.active_interval
+        return self.idle_interval
+
+
 def _entry_to_event(entry: dict) -> dict | None:
     """Convert a transcript JSONL entry into a frontend event, or None to skip.
 
@@ -422,7 +463,7 @@ class BridgeDriver(AgentDriver):
     CAPABILITIES = {
         "interrupt", "context", "permission", "resume",
         "set_model", "set_effort", "set_mode", "set_fast", "set_thinking",
-        "subagents", "set_display_name",
+        "subagents", "set_display_name", "context_breakdown", "cost",
     }
 
     def __init__(
@@ -457,6 +498,18 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
+        # §11 #34 — the batched, adaptive poll:
+        #   * _cadence: 1 s while running/recently active, coasting to 5 s
+        #     after ~30 s idle, snapped back by nudge() on any activity.
+        #   * _entries: the accumulated parsed transcript (the emit buffer;
+        #     _seen indexes into it). The legacy read_log path replaces it
+        #     wholesale; the poll_bundle path replaces on an offset-0 (full)
+        #     read and extends on incremental reads.
+        #   * _log_offset: transcript bytes consumed so far (complete lines
+        #     only — see consume_transcript_chunk).
+        self._cadence = AdaptiveCadence()
+        self._entries: list[dict] = []
+        self._log_offset = 0
         # Post-/clear transcript-rotation re-resolve (§7.13, §11 #35): set when a
         # Console /clear rotated the JSONL but the NEW <id>.jsonl hasn't appeared
         # yet (it may only be created on the first post-/clear turn). While
@@ -538,8 +591,41 @@ class BridgeDriver(AgentDriver):
             }
         }
 
+    def _build_statusline_settings(self) -> dict | None:
+        """Per-turn statusLine capture (§7.18 source 2, §11 #31).
+
+        A configured statusLine ``command`` receives Claude Code's status JSON
+        (incl. ``context_window`` — the freshest PER-TURN snapshot, a
+        boundary-emitted value, not a continuous mid-run gauge; boundary mapped
+        live by ``test_usage_context_sources_live``) on stdin each time the
+        status bar renders. The command appends each payload as ONE line to the
+        per-agent launch-config dir (``~/.awl-cc-dash-agents/<name>/
+        statusline.jsonl``, WSL-side — ``tr -d '\\n'`` collapses any payload
+        newlines so the file stays line-per-render), with a size guard that
+        keeps the tail when the file passes ~2 MB. The command's stdout (the
+        rendered status line) is a static ``awl-cc-dash`` marker — deliberately
+        inert so it can never confuse the screen-state classifier.
+
+        Best-effort: reading is lazy (``get_statusline_snapshot`` tails the
+        last line on demand) and an absent/failed capture degrades to
+        ``per_turn: null``. Set ``AWL_DISABLE_STATUSLINE=1`` to opt out
+        fleet-wide.
+        """
+        if os.environ.get("AWL_DISABLE_STATUSLINE") == "1":
+            return None
+        from bridge.paths import WSL_AWL_DIR  # type: ignore[import-not-found]
+        path = f"{WSL_AWL_DIR}/{self._name}/statusline.jsonl"
+        cmd = (
+            f"f='{path}'; mkdir -p \"$(dirname \"$f\")\"; "
+            "cat | tr -d '\\n' >> \"$f\"; echo >> \"$f\"; "
+            "if [ \"$(wc -c < \"$f\")\" -gt 2000000 ]; then "
+            "tail -n 500 \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; fi; "
+            "echo awl-cc-dash"
+        )
+        return {"statusLine": {"type": "command", "command": cmd, "padding": 0}}
+
     def _build_settings(self) -> dict:
-        """Per-agent --settings payload: retention pin + permission rules + plugins + hooks.
+        """Per-agent --settings payload: retention pin + permission rules + plugins + hooks + statusLine.
 
         Always carries ``cleanupPeriodDays`` (= ``TRANSCRIPT_RETENTION_DAYS``) — the
         §8.6 transcript-retention pin, so a settings file is written for EVERY agent
@@ -547,8 +633,9 @@ class BridgeDriver(AgentDriver):
         agents). On top of that: ``permission_rules`` {allow,deny,ask} ->
         ``permissions`` (deny is the reliable hard-block in all modes);
         ``enabled_plugins`` {"id": bool} -> ``enabledPlugins`` (per-agent plugin
-        enable/disable — live-verified); plus the hook-channel ``hooks`` block (the
-        inject channel).
+        enable/disable — live-verified); the hook-channel ``hooks`` block (the
+        inject channel); plus the ``statusLine`` per-turn capture command
+        (§11 #31, see ``_build_statusline_settings``).
         """
         settings: dict[str, Any] = {
             "cleanupPeriodDays": TRANSCRIPT_RETENTION_DAYS,
@@ -573,6 +660,9 @@ class BridgeDriver(AgentDriver):
         hooks = self._build_hook_settings()
         if hooks:
             settings.update(hooks)
+        statusline = self._build_statusline_settings()
+        if statusline:
+            settings.update(statusline)
         return settings
 
     def _build_mcp_config(self) -> dict | None:
@@ -691,7 +781,17 @@ class BridgeDriver(AgentDriver):
             "timestamp": datetime.now().isoformat(),
         })
 
+    def nudge(self) -> None:
+        """Snap the adaptive poll cadence back to active (§11 #34).
+
+        Called internally on send/interrupt/permission-answer and observed
+        activity; the sidecar also calls it on hook ingest and console runs —
+        the push channels that see activity before the poll does.
+        """
+        self._cadence.nudge()
+
     async def send(self, prompt: str) -> None:
+        self.nudge()
         await asyncio.to_thread(self._bridge.send, self._name, prompt)
 
     def _resolve_and_persist_transcript_path(self) -> None:
@@ -731,6 +831,11 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._transcript_path = None
         self._rotation_pending = False
+        # §11 #34: the incremental-read state resets with the conversation —
+        # the rotated file replays from byte 0 into a fresh buffer.
+        self._entries = []
+        self._log_offset = 0
+        self.nudge()
         if self._record is not None:
             self._record["claude_session_id"] = new_id
             self._record["transcript_path"] = None
@@ -769,6 +874,16 @@ class BridgeDriver(AgentDriver):
                 "pending": True}
 
     async def events(self) -> AsyncIterator[dict[str, Any]]:
+        # §11 #34 — the batched, adaptive poll loop. Once the transcript path
+        # is resolved, each cycle is ONE WSL round-trip (poll_bundle: both
+        # screen slices + the transcript's new bytes) instead of the ~5 spawns
+        # the read_log+status pair cost; before resolution (transcript only
+        # exists after the first turn) the legacy resolving path runs. The
+        # cycle sleep is the AdaptiveCadence interval — 1 s active, coasting
+        # to 5 s after ~30 s of no activity, snapped back by nudge().
+        from bridge.bridge import parse_permission_prompt  # type: ignore[import-not-found]
+        from bridge.transcript import consume_transcript_chunk  # type: ignore[import-not-found]
+
         while not self._closed:
             # 0) Pending post-/clear rotation: the rotated <id>.jsonl hadn't
             # appeared yet — retry the re-resolve (single immediate check) and
@@ -785,32 +900,87 @@ class BridgeDriver(AgentDriver):
                     logger.info("transcript rotated for %s -> %s (deferred)",
                                 self._name, new_id)
 
-            # 1) New transcript entries -> assistant/user events.
-            try:
-                if self._rotation_pending:
-                    entries = []  # old file is orphaned — don't read it
-                else:
-                    entries = await asyncio.to_thread(self._bridge.read_log, self._name)
-            except Exception:
-                entries = []  # transcript may not exist until the first turn
-            if entries and self._transcript_path is None:
-                # The transcript exists now — resolve + persist its verified
-                # path once (one extra WSL call per session lifetime).
-                await asyncio.to_thread(self._resolve_and_persist_transcript_path)
-            if len(entries) > self._seen:
-                for entry in entries[self._seen:]:
+            # 1) Read the cycle's inputs — transcript entries + screen state.
+            st: dict[str, Any] = {}
+            state: str | None = None
+            screen_read = False
+            if not self._rotation_pending and self._transcript_path:
+                # Batched path: ONE WSL spawn for screen + transcript delta.
+                try:
+                    bundle = await asyncio.to_thread(
+                        self._bridge.poll_bundle, self._name,
+                        self._transcript_path, self._log_offset)
+                except Exception:  # pragma: no cover - environment dependent
+                    bundle = None
+                if bundle is not None:
+                    start_offset = self._log_offset
+                    if bundle.get("size", -1) < 0:
+                        # The resolved file vanished (wipe/external rotation) —
+                        # fall back to the resolving path next cycle.
+                        self._transcript_path = None
+                        self._entries = []
+                        self._log_offset = 0
+                    else:
+                        new_entries, consumed = consume_transcript_chunk(
+                            bundle.get("chunk") or b"")
+                        if consumed:
+                            self._log_offset = start_offset + consumed
+                            if start_offset == 0:
+                                # Offset-0 read = a full-file snapshot —
+                                # REPLACE the buffer (never extend: the legacy
+                                # path may have pre-filled it).
+                                self._entries = new_entries
+                            else:
+                                self._entries.extend(new_entries)
+                    # Screen state from the same round-trip: the state slice
+                    # is exactly what status() classifies; the detail slice is
+                    # its permission re-read.
+                    state = self._bridge._detect_state(bundle.get("screen") or "")
+                    st = {"state": state}
+                    if state == "permission_prompt":
+                        parsed = parse_permission_prompt(
+                            bundle.get("screen_detail") or "")
+                        if parsed:
+                            st["permission"] = parsed
+                    screen_read = True
+            elif not self._rotation_pending:
+                # Legacy resolving path (no transcript yet): read_log resolves
+                # the file via the pinned session id.
+                try:
+                    entries = await asyncio.to_thread(
+                        self._bridge.read_log, self._name)
+                except Exception:
+                    entries = []  # transcript may not exist until the first turn
+                if entries and self._transcript_path is None:
+                    # The transcript exists now — resolve + persist its
+                    # verified path once; the buffer stays offset-0 so the
+                    # first bundle read re-snapshots (and replaces) it.
+                    await asyncio.to_thread(
+                        self._resolve_and_persist_transcript_path)
+                if entries:
+                    self._entries = entries
+
+            # 2) Emit new transcript entries -> assistant/user events.
+            if len(self._entries) > self._seen:
+                self.nudge()  # transcript activity — stay on the fast cadence
+                for entry in self._entries[self._seen:]:
                     event = _entry_to_event(entry)
                     if event:
                         yield event
-                self._seen = len(entries)
+                self._seen = len(self._entries)
 
-            # 2) Screen state -> status_change / permission events.
-            try:
-                st = await asyncio.to_thread(self._bridge.status, self._name)
-                state = st.get("state")
-            except Exception:
-                st, state = {}, None
+            # 3) Screen state -> status_change / permission events. (The
+            # legacy path — and a failed bundle — still uses status().)
+            if not screen_read:
+                try:
+                    st = await asyncio.to_thread(self._bridge.status, self._name)
+                    state = st.get("state")
+                except Exception:
+                    st, state = {}, None
+            if state and state != "idle":
+                self.nudge()  # generating / permission prompt = activity
             if state and state != self._last_state:
+                self.nudge()  # any state flip = activity
                 prev = self._last_state
                 self._last_state = state
                 if state == "permission_prompt":
@@ -836,9 +1006,10 @@ class BridgeDriver(AgentDriver):
                             "timestamp": datetime.now().isoformat(),
                         }
 
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(self._cadence.interval())
 
     async def interrupt(self) -> None:
+        self.nudge()
         try:
             await asyncio.to_thread(self._bridge.interrupt, self._name)
         except Exception as e:  # pragma: no cover - best effort
@@ -852,6 +1023,7 @@ class BridgeDriver(AgentDriver):
         offered — it was never verified live.
         """
         key = "Enter" if approve else "Escape"
+        self.nudge()
         await asyncio.to_thread(self._bridge.keys, self._name, key)
 
     async def get_context_usage(self) -> Any:
@@ -866,6 +1038,149 @@ class BridgeDriver(AgentDriver):
         except Exception:
             return None
         return derive_context_usage(entries)
+
+    async def get_statusline_snapshot(self) -> dict | None:
+        """The freshest per-turn statusLine payload (§7.18 source 2, §11 #31).
+
+        Lazily tails the last line of the per-agent ``statusline.jsonl`` the
+        launch-time statusLine command appends to (see
+        ``_build_statusline_settings``) and parses it as JSON. This is a
+        PER-TURN snapshot — the statusLine fires at turn boundaries, not
+        continuously mid-run (boundary mapped live by
+        ``test_usage_context_sources_live``) — so the value is the freshest
+        *boundary* number, fresher than post-hoc JSONL but never a live gauge.
+        Best-effort: absent file / torn or unparseable line → None (the
+        endpoint serves ``per_turn: null``).
+        """
+        try:
+            line = await asyncio.to_thread(
+                self._bridge.statusline_tail, self._name)
+        except Exception:
+            return None
+        if not line:
+            return None
+        try:
+            payload = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    # --- /context deep readout (§7.18 source 1, §11 #30) -----------------------
+
+    # Early-break bar for the bounded screen poll. The proving spike (2.1.198)
+    # required {system_prompt, free_space} + 4 rows, but CC 2.1.206's compact
+    # `/context` view lists ONLY NON-ZERO categories ("Estimated usage by
+    # category" — live-caught 2026-07-15), so a young session legitimately
+    # renders as few as 3 rows. `free_space` is the always-present anchor; a
+    # session with real usage still yields the full set in the same paint.
+    _BREAKDOWN_MIN_ROWS = 3
+    _BREAKDOWN_REQUIRED = frozenset({"free_space"})
+
+    async def get_context_breakdown(self) -> dict[str, Any]:
+        """Pull the per-category `/context` breakdown + compaction history.
+
+        The §7.18 on-demand deep readout (§11 #30): idle-gated (a slash command
+        typed mid-turn is held as typeahead and would fire at the boundary —
+        never blind-send), then ``/context`` via the console path with a bounded
+        wait + screen scrape (the spike mechanics: `/context` renders to the
+        screen, not a generating turn). If the screen parse misses the WORKS bar
+        the transcript's own markdown table (`/context` also records one — a
+        steadier read-back) is parsed as the fallback. Compaction history is
+        derived from ``compact_boundary`` transcript metadata (Lever B).
+
+        This is a point-in-time, idle-gated pull — the on-demand accordion
+        source, NEVER polled; the JSONL floor stays ``get_context_usage``.
+
+        Returns:
+            ``{"rows": [{key, tokens, percent, raw}, ...], "compact_history":
+            {"count", "boundaries"}}`` — rows in canonical category order,
+            empty when nothing parsed (honest miss).
+
+        Raises:
+            RuntimeError("busy") when the screen never reached idle (the
+            endpoint maps it to an honest 409).
+        """
+        from bridge.transcript import (  # type: ignore[import-not-found]
+            CONTEXT_CATEGORY_ORDER, compact_history, find_context_markdown,
+            parse_context_output,
+        )
+
+        def _pull() -> dict:
+            if not self._bridge._idle_gate(self._name, timeout=5.0):
+                raise RuntimeError("busy")
+            self._bridge.send(self._name, "/context")
+            parsed: dict = {}
+            for _ in range(10):
+                time.sleep(1.5)
+                screen = self._bridge.scrollback(
+                    self._name, max_lines=200)["content"]
+                parsed = parse_context_output(screen)
+                if len(parsed) >= self._BREAKDOWN_MIN_ROWS and \
+                        self._BREAKDOWN_REQUIRED <= set(parsed):
+                    break
+            return parsed
+
+        parsed = await asyncio.to_thread(_pull)
+        try:
+            entries = await asyncio.to_thread(self._bridge.read_log, self._name)
+        except Exception:
+            entries = []
+        if not (len(parsed) >= self._BREAKDOWN_MIN_ROWS and
+                self._BREAKDOWN_REQUIRED <= set(parsed)):
+            # Screen scrape missed — the transcript markdown table is the
+            # steadier secondary read-back (same line shape, same parser).
+            md = find_context_markdown(entries)
+            if md:
+                fallback = parse_context_output(md)
+                if len(fallback) > len(parsed):
+                    parsed = fallback
+        rows = [
+            {"key": key, **parsed[key]}
+            for key in CONTEXT_CATEGORY_ORDER if key in parsed
+        ]
+        return {"rows": rows, "compact_history": compact_history(entries)}
+
+    # --- Per-agent cost (§7.15, §11 #32) ---------------------------------------
+
+    async def get_cost(self) -> dict[str, Any]:
+        """Harvest this agent's per-session cost via the `/cost` console scrape.
+
+        The spike-proven path (§11 #32, ``test_per_agent_cost_live`` — WORKS,
+        overturning the old "honest blank"): `/cost` opens the unified Usage
+        dialog whose per-SESSION panel renders ``Total cost: $X`` plus a
+        per-model breakdown — Claude Code's OWN estimate, and for a bridge
+        agent the session IS that one agent. Idle-gated (a slash command typed
+        mid-turn misfires), point-in-time, on-demand — the endpoint is pulled
+        lazily, never on a poll loop. The dialog is dismissed with Escape.
+
+        Returns:
+            ``{"usd": float|None, "per_model": [floats], "raw": str}`` —
+            ``usd: None`` when no per-session Total-cost line rendered (the
+            honest miss, e.g. a build/account without the panel — never a
+            fabricated figure).
+
+        Raises:
+            RuntimeError("busy") when the screen never reached idle.
+        """
+        from bridge.bridge import parse_cost_output  # type: ignore[import-not-found]
+
+        def _pull() -> str:
+            if not self._bridge._idle_gate(self._name, timeout=5.0):
+                raise RuntimeError("busy")
+            self._bridge.send(self._name, "/cost")
+            time.sleep(3.0)  # the Usage dialog renders (not a generating turn)
+            screen = self._bridge.scrollback(self._name, max_lines=150)["content"]
+            try:
+                self._bridge.keys(self._name, "Escape")  # dismiss the dialog
+            except Exception as e:  # pragma: no cover - best effort
+                logger.debug("Escape after /cost failed for %s: %s", self._name, e)
+            return screen
+
+        screen = await asyncio.to_thread(_pull)
+        parsed = parse_cost_output(screen)
+        if parsed is None:
+            return {"usd": None, "per_model": [], "raw": screen[-1500:]}
+        return parsed
 
     async def get_subagents(self) -> Any:
         """Derive this agent's subagents from its transcript (see ``derive_subagents``).
