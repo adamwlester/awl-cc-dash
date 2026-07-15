@@ -1328,6 +1328,9 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     session = sessions[session_id]
     if not session.driver:
         raise HTTPException(status_code=503, detail="Session not connected yet")
+    # §11 #34: an inbound prompt is activity — even a QUEUED one must tighten
+    # the poll so the flush-on-idle transition is seen promptly.
+    _nudge_driver(session_id)
 
     # `inject` rides the hook channel, not the prompt queue: it's pushed to
     # the agent mid-turn at its next tool boundary (no stop). Queue it on the
@@ -1499,6 +1502,23 @@ def _surface_delivered_injects(agent_id: str, injects: list[dict[str, Any]]) -> 
             pass
 
 
+def _nudge_driver(agent_id: str) -> None:
+    """§11 #34: snap an agent's adaptive poll cadence back to active.
+
+    Called on the push channels that see activity BEFORE the poll does — hook
+    ingest (every internal-hook endpoint), sends, interrupts, and console
+    runs — so a coasted (5 s) idle poll returns to the 1 s cadence the moment
+    anything happens. Best-effort no-op for sessions/drivers without it.
+    """
+    session = sessions.get(agent_id)
+    drv = session.driver if session else None
+    if drv is not None and hasattr(drv, "nudge"):
+        try:
+            drv.nudge()
+        except Exception:  # pragma: no cover - never let a nudge break a hook
+            pass
+
+
 @app.post("/internal/hooks/post-tool-use/{agent}")
 async def hook_post_tool_use(agent: str, body: dict[str, Any] | None = None):
     """PostToolUse drain: hand back ALL pending injects (active + passive) as one
@@ -1513,6 +1533,7 @@ async def hook_post_tool_use(agent: str, body: dict[str, Any] | None = None):
     hook URL) — claude's http-hook client does not reliably forward a query
     string, so the id rides the path.
     """
+    _nudge_driver(agent)  # §11 #34: hook activity snaps the poll cadence
     runstate.ingest(agent, "PostToolUse", body)
     injects = hookbus.drain(agent)
     if injects:
@@ -1527,6 +1548,7 @@ async def hook_stop(agent: str, body: dict[str, Any] | None = None):
     `decision:"block"` so a pure-text turn still catches them at turn-end. Passive
     `context` injects are left pending (blocking Stop would force a continuation).
     Ingests the payload's run-state (phase → idle) into the arbiter (§7.4)."""
+    _nudge_driver(agent)  # §11 #34
     runstate.ingest(agent, "Stop", body)
     injects = hookbus.drain(agent, kinds={"inject"})
     if injects:
@@ -1543,6 +1565,7 @@ async def hook_run_state(agent: str, body: dict[str, Any] | None = None):
     it) and the arbiter keys per event. Always returns `{}` (never gates)."""
     event = (body or {}).get("hook_event_name") or \
             (body or {}).get("hookEventName") or "Notification"
+    _nudge_driver(agent)  # §11 #34
     runstate.ingest(agent, str(event), body)
     return {}
 
@@ -1554,6 +1577,7 @@ async def hook_subagent(agent: str, body: dict[str, Any] | None = None):
     active-vs-quiet signal, blended over the transcript-derived list."""
     event = (body or {}).get("hook_event_name") or \
             (body or {}).get("hookEventName") or "SubagentStart"
+    _nudge_driver(agent)  # §11 #34
     runstate.ingest_subagent(agent, str(event), body)
     return {}
 
@@ -1578,6 +1602,7 @@ async def debug_run_state(agent: str):
 # updatedInput is a fast-follow that needs its own live proof.)
 
 def _raise_plandecision(agent: str, body: dict[str, Any], itype: str) -> None:
+    _nudge_driver(agent)  # §11 #34: a Plan/Decision tool call is activity
     session = sessions.get(agent)
     tool_input = (body or {}).get("tool_input") or {}
     data = {"tool": (body or {}).get("tool_name"), "tool_input": tool_input}
@@ -2121,6 +2146,7 @@ async def console_run(session_id: str, req: ConsoleRunRequest):
     if drv is None or not hasattr(drv, "_bridge") or not hasattr(drv, "tmux_name"):
         raise HTTPException(status_code=400, detail="Console requires a bridge agent")
     interactive = console_catalog.is_interactive(req.command.split()[0] if req.command else "")
+    _nudge_driver(session_id)  # §11 #34: a console run is activity
     try:
         drv._bridge.send(drv.tmux_name, req.command)          # type: ignore[attr-defined]
         await asyncio.sleep(1.0)

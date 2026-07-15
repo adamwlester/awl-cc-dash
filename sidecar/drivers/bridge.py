@@ -498,6 +498,18 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
+        # §11 #34 — the batched, adaptive poll:
+        #   * _cadence: 1 s while running/recently active, coasting to 5 s
+        #     after ~30 s idle, snapped back by nudge() on any activity.
+        #   * _entries: the accumulated parsed transcript (the emit buffer;
+        #     _seen indexes into it). The legacy read_log path replaces it
+        #     wholesale; the poll_bundle path replaces on an offset-0 (full)
+        #     read and extends on incremental reads.
+        #   * _log_offset: transcript bytes consumed so far (complete lines
+        #     only — see consume_transcript_chunk).
+        self._cadence = AdaptiveCadence()
+        self._entries: list[dict] = []
+        self._log_offset = 0
         # Post-/clear transcript-rotation re-resolve (§7.13, §11 #35): set when a
         # Console /clear rotated the JSONL but the NEW <id>.jsonl hasn't appeared
         # yet (it may only be created on the first post-/clear turn). While
@@ -769,7 +781,17 @@ class BridgeDriver(AgentDriver):
             "timestamp": datetime.now().isoformat(),
         })
 
+    def nudge(self) -> None:
+        """Snap the adaptive poll cadence back to active (§11 #34).
+
+        Called internally on send/interrupt/permission-answer and observed
+        activity; the sidecar also calls it on hook ingest and console runs —
+        the push channels that see activity before the poll does.
+        """
+        self._cadence.nudge()
+
     async def send(self, prompt: str) -> None:
+        self.nudge()
         await asyncio.to_thread(self._bridge.send, self._name, prompt)
 
     def _resolve_and_persist_transcript_path(self) -> None:
@@ -809,6 +831,11 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._transcript_path = None
         self._rotation_pending = False
+        # §11 #34: the incremental-read state resets with the conversation —
+        # the rotated file replays from byte 0 into a fresh buffer.
+        self._entries = []
+        self._log_offset = 0
+        self.nudge()
         if self._record is not None:
             self._record["claude_session_id"] = new_id
             self._record["transcript_path"] = None
@@ -847,6 +874,16 @@ class BridgeDriver(AgentDriver):
                 "pending": True}
 
     async def events(self) -> AsyncIterator[dict[str, Any]]:
+        # §11 #34 — the batched, adaptive poll loop. Once the transcript path
+        # is resolved, each cycle is ONE WSL round-trip (poll_bundle: both
+        # screen slices + the transcript's new bytes) instead of the ~5 spawns
+        # the read_log+status pair cost; before resolution (transcript only
+        # exists after the first turn) the legacy resolving path runs. The
+        # cycle sleep is the AdaptiveCadence interval — 1 s active, coasting
+        # to 5 s after ~30 s of no activity, snapped back by nudge().
+        from bridge.bridge import parse_permission_prompt  # type: ignore[import-not-found]
+        from bridge.transcript import consume_transcript_chunk  # type: ignore[import-not-found]
+
         while not self._closed:
             # 0) Pending post-/clear rotation: the rotated <id>.jsonl hadn't
             # appeared yet — retry the re-resolve (single immediate check) and
@@ -863,32 +900,87 @@ class BridgeDriver(AgentDriver):
                     logger.info("transcript rotated for %s -> %s (deferred)",
                                 self._name, new_id)
 
-            # 1) New transcript entries -> assistant/user events.
-            try:
-                if self._rotation_pending:
-                    entries = []  # old file is orphaned — don't read it
-                else:
-                    entries = await asyncio.to_thread(self._bridge.read_log, self._name)
-            except Exception:
-                entries = []  # transcript may not exist until the first turn
-            if entries and self._transcript_path is None:
-                # The transcript exists now — resolve + persist its verified
-                # path once (one extra WSL call per session lifetime).
-                await asyncio.to_thread(self._resolve_and_persist_transcript_path)
-            if len(entries) > self._seen:
-                for entry in entries[self._seen:]:
+            # 1) Read the cycle's inputs — transcript entries + screen state.
+            st: dict[str, Any] = {}
+            state: str | None = None
+            screen_read = False
+            if not self._rotation_pending and self._transcript_path:
+                # Batched path: ONE WSL spawn for screen + transcript delta.
+                try:
+                    bundle = await asyncio.to_thread(
+                        self._bridge.poll_bundle, self._name,
+                        self._transcript_path, self._log_offset)
+                except Exception:  # pragma: no cover - environment dependent
+                    bundle = None
+                if bundle is not None:
+                    start_offset = self._log_offset
+                    if bundle.get("size", -1) < 0:
+                        # The resolved file vanished (wipe/external rotation) —
+                        # fall back to the resolving path next cycle.
+                        self._transcript_path = None
+                        self._entries = []
+                        self._log_offset = 0
+                    else:
+                        new_entries, consumed = consume_transcript_chunk(
+                            bundle.get("chunk") or b"")
+                        if consumed:
+                            self._log_offset = start_offset + consumed
+                            if start_offset == 0:
+                                # Offset-0 read = a full-file snapshot —
+                                # REPLACE the buffer (never extend: the legacy
+                                # path may have pre-filled it).
+                                self._entries = new_entries
+                            else:
+                                self._entries.extend(new_entries)
+                    # Screen state from the same round-trip: the state slice
+                    # is exactly what status() classifies; the detail slice is
+                    # its permission re-read.
+                    state = self._bridge._detect_state(bundle.get("screen") or "")
+                    st = {"state": state}
+                    if state == "permission_prompt":
+                        parsed = parse_permission_prompt(
+                            bundle.get("screen_detail") or "")
+                        if parsed:
+                            st["permission"] = parsed
+                    screen_read = True
+            elif not self._rotation_pending:
+                # Legacy resolving path (no transcript yet): read_log resolves
+                # the file via the pinned session id.
+                try:
+                    entries = await asyncio.to_thread(
+                        self._bridge.read_log, self._name)
+                except Exception:
+                    entries = []  # transcript may not exist until the first turn
+                if entries and self._transcript_path is None:
+                    # The transcript exists now — resolve + persist its
+                    # verified path once; the buffer stays offset-0 so the
+                    # first bundle read re-snapshots (and replaces) it.
+                    await asyncio.to_thread(
+                        self._resolve_and_persist_transcript_path)
+                if entries:
+                    self._entries = entries
+
+            # 2) Emit new transcript entries -> assistant/user events.
+            if len(self._entries) > self._seen:
+                self.nudge()  # transcript activity — stay on the fast cadence
+                for entry in self._entries[self._seen:]:
                     event = _entry_to_event(entry)
                     if event:
                         yield event
-                self._seen = len(entries)
+                self._seen = len(self._entries)
 
-            # 2) Screen state -> status_change / permission events.
-            try:
-                st = await asyncio.to_thread(self._bridge.status, self._name)
-                state = st.get("state")
-            except Exception:
-                st, state = {}, None
+            # 3) Screen state -> status_change / permission events. (The
+            # legacy path — and a failed bundle — still uses status().)
+            if not screen_read:
+                try:
+                    st = await asyncio.to_thread(self._bridge.status, self._name)
+                    state = st.get("state")
+                except Exception:
+                    st, state = {}, None
+            if state and state != "idle":
+                self.nudge()  # generating / permission prompt = activity
             if state and state != self._last_state:
+                self.nudge()  # any state flip = activity
                 prev = self._last_state
                 self._last_state = state
                 if state == "permission_prompt":
@@ -914,9 +1006,10 @@ class BridgeDriver(AgentDriver):
                             "timestamp": datetime.now().isoformat(),
                         }
 
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(self._cadence.interval())
 
     async def interrupt(self) -> None:
+        self.nudge()
         try:
             await asyncio.to_thread(self._bridge.interrupt, self._name)
         except Exception as e:  # pragma: no cover - best effort
@@ -930,6 +1023,7 @@ class BridgeDriver(AgentDriver):
         offered — it was never verified live.
         """
         key = "Enter" if approve else "Escape"
+        self.nudge()
         await asyncio.to_thread(self._bridge.keys, self._name, key)
 
     async def get_context_usage(self) -> Any:

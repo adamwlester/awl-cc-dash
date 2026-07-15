@@ -292,6 +292,49 @@ def parse_cost_output(content):
     return {"usd": float(m.group(1)), "per_model": per_model, "raw": raw}
 
 
+def parse_bundle_envelope(raw, sentinel):
+    """Parse one ``poll_bundle`` stdout into its delimited parts. Pure function.
+
+    The envelope is four sentinel-delimited sections (see ``poll_bundle``)::
+
+        <state screen (last ~15 rows)>   \n <sentinel>
+        <detail screen (last ~40 rows)>  \n <sentinel>
+        <transcript size in bytes | -1>  \n <sentinel>
+        <base64(transcript bytes from the offset)>
+
+    Base64 makes the transcript chunk immune to ``_run``'s trailing-strip and
+    any encoding mangling — the decoded bytes are byte-exact, so the caller's
+    offset arithmetic holds. A fresh uuid sentinel per call means screen
+    content can never fake a delimiter.
+
+    Returns:
+        ``{"screen": str, "screen_detail": str, "size": int, "chunk": bytes}``
+        — ``size`` is -1 when the transcript file is missing/unstated.
+
+    Raises:
+        TmuxBridgeError: when the envelope is corrupt (sentinels missing).
+    """
+    lines = (raw or "").split("\n")
+    idxs = [i for i, ln in enumerate(lines) if ln.strip() == sentinel]
+    if len(idxs) < 3:
+        raise TmuxBridgeError(
+            f"poll bundle envelope corrupt: {len(idxs)} sentinel(s) found")
+    screen = "\n".join(lines[:idxs[0]])
+    screen_detail = "\n".join(lines[idxs[0] + 1:idxs[1]])
+    size_text = "".join(ln.strip() for ln in lines[idxs[1] + 1:idxs[2]])
+    try:
+        size = int(size_text or "-1")
+    except ValueError:
+        size = -1
+    b64 = "".join(ln.strip() for ln in lines[idxs[2] + 1:])
+    try:
+        chunk = base64.b64decode(b64) if b64 else b""
+    except Exception:
+        chunk = b""
+    return {"screen": screen, "screen_detail": screen_detail,
+            "size": size, "chunk": chunk}
+
+
 def pick_console_port(ss_output, start=CONSOLE_PORT_RANGE[0],
                       end=CONSOLE_PORT_RANGE[1], taken=()):
     """Pick the first free console-attach port in ``[start, end]``.
@@ -1689,6 +1732,57 @@ class TmuxBridge:
                 "The session may not have processed any messages yet."
             )
         return parse_transcript(self, transcript_path, last_n=last_n, types=types)
+
+    def poll_bundle(self, name, transcript_path=None, offset=0,
+                    state_lines=15, detail_lines=40):
+        """ONE WSL round-trip for a full driver poll cycle (§11 #34).
+
+        The pre-rework ``events()`` cycle cost ~5 WSL process spawns per agent
+        per second (``read_log`` = transcript re-resolve + ``cat``, plus a
+        ``status`` capture — each its own ``wsl.exe``), which is what made the
+        fleet degrade from N=1 (``test_polling_scale_ceiling_live``). This
+        batches the whole cycle into a single ``wsl bash -c`` invocation
+        emitting a sentinel-delimited envelope:
+
+          * the **state screen** — ``capture-pane -S -<state_lines>``, exactly
+            the slice ``status()`` classifies;
+          * the **detail screen** — ``capture-pane -S -<detail_lines>``, the
+            larger slice ``status()`` re-reads for permission-prompt detail;
+          * the **transcript tail** — the file's byte size, then the bytes
+            from ``offset`` onward, base64-wrapped (byte-exact through the
+            Windows text-mode pipe, immune to output stripping). The caller
+            advances its offset only past COMPLETE lines (see
+            ``transcript.consume_transcript_chunk``), so a mid-write read can
+            never tear an entry.
+
+        ``transcript_path`` is the already-resolved WSL path (the driver
+        persists it after first resolution); ``None``/missing file yields
+        ``size: -1`` with an empty chunk — the caller falls back to the
+        resolving ``read_log`` path.
+
+        Returns ``{"screen", "screen_detail", "size", "chunk"}`` (see
+        ``parse_bundle_envelope``).
+        """
+        sentinel = f"AWLPB-{uuid.uuid4().hex}"
+        qname = shlex.quote(name)
+        if transcript_path:
+            qpath = shlex.quote(transcript_path)
+            tail_part = (
+                f"if [ -f {qpath} ]; then wc -c < {qpath}; echo {sentinel}; "
+                f"tail -c +{int(offset) + 1} {qpath} | base64 -w0; echo; "
+                f"else echo -1; echo {sentinel}; fi"
+            )
+        else:
+            tail_part = f"echo -1; echo {sentinel}"
+        out = self._run(
+            f"tmux capture-pane -t {qname} -p -J -S -{int(state_lines)} "
+            f"2>/dev/null; echo {sentinel}; "
+            f"tmux capture-pane -t {qname} -p -J -S -{int(detail_lines)} "
+            f"2>/dev/null; echo {sentinel}; "
+            f"{tail_part}",
+            timeout=30,
+        )
+        return parse_bundle_envelope(out, sentinel)
 
     def statusline_tail(self, name):
         """Last captured statusLine payload line for a session, or None (§11 #31).
