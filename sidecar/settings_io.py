@@ -51,6 +51,7 @@ __all__ = [
     "toggle_key",
     "remove_key",
     "account_band",
+    "account_band_split",
 ]
 
 PathLike = Union[str, "os.PathLike[str]", Path]
@@ -234,4 +235,82 @@ def account_band(creds_path: PathLike) -> dict:
 
     if not band:
         return {"signed_out": True}
+    return band
+
+
+def _epoch_to_iso(value: Any) -> str | None:
+    """A creds epoch timestamp (ms or s) → ISO-8601 UTC string, else None."""
+    if not isinstance(value, (int, float)) or value <= 0:
+        return None
+    from datetime import datetime, timezone
+    seconds = value / 1000.0 if value > 1e11 else float(value)
+    try:
+        return datetime.fromtimestamp(seconds, tz=timezone.utc) \
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def account_band_split(claude_json_path: PathLike, creds_path: PathLike) -> dict:
+    """The §11 #33 split-source account reader — email/org/plan from the RIGHT places.
+
+    The account identity is a **split source** (live-mapped,
+    ``test_usage_context_sources_live`` #21): email + org live in
+    ``.claude.json``'s ``oauthAccount`` (``emailAddress`` /
+    ``organizationName``), while the plan label lives ONLY in
+    ``.credentials.json``'s ``claudeAiOauth.subscriptionType`` — the
+    ``.claude.json`` tier-ish fields (``organizationType`` / ``seatTier`` /
+    ``organizationRateLimitTier`` / ``billingType``) are deliberately NOT
+    surfaced as "plan" by the single-file :func:`account_band`, so no single
+    file yields all three. This reads BOTH (read-only, tolerant), merging:
+
+      * ``email`` / ``org`` — ``.claude.json`` first, creds fallback.
+      * ``plan`` — creds ``subscriptionType`` first (e.g. ``"max"``); when the
+        creds file is missing/unreadable, the honest raw fallback is
+        ``.claude.json`` ``oauthAccount.organizationType`` (e.g.
+        ``"claude_max"``) — a real recorded value, never a synthesized label.
+      * ``rate_limit_tier`` — creds ``claudeAiOauth.rateLimitTier``, else
+        ``oauthAccount.organizationRateLimitTier`` (omitted when neither).
+      * ``auth_expiry`` — the creds token expiry (``claudeAiOauth.expiresAt``,
+        epoch ms) as an ISO-8601 UTC string; **absent → None** (the key is
+        always present, per the read-only auth-expiry contract).
+
+    Returns ``{"signed_out": True}`` when neither file yields any identity.
+    """
+    primary = account_band(claude_json_path)
+    creds = account_band(creds_path)
+    if primary.get("signed_out"):
+        primary = {}
+    if creds.get("signed_out"):
+        creds = {}
+
+    band: dict = {}
+    for key in ("email", "org"):
+        val = primary.get(key) if primary.get(key) is not None else creds.get(key)
+        if val is not None:
+            band[key] = val
+
+    oauth = read_json(claude_json_path).get("oauthAccount") or {}
+    if not isinstance(oauth, dict):
+        oauth = {}
+    claude_oauth = read_json(creds_path).get("claudeAiOauth") or {}
+    if not isinstance(claude_oauth, dict):
+        claude_oauth = {}
+
+    # Plan: the creds subscriptionType is the real label; organizationType is
+    # the honest raw fallback recorded in .claude.json.
+    plan = creds.get("plan")
+    if plan is None:
+        plan = oauth.get("organizationType") or None
+    if plan is not None:
+        band["plan"] = plan
+
+    tier = claude_oauth.get("rateLimitTier") or \
+        oauth.get("organizationRateLimitTier")
+    if tier:
+        band["rate_limit_tier"] = tier
+
+    if not band:
+        return {"signed_out": True}
+    band["auth_expiry"] = _epoch_to_iso(claude_oauth.get("expiresAt"))
     return band
