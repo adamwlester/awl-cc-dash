@@ -270,6 +270,7 @@ export function PromptPanel() {
                 { short: 'Language', sub: 'Tighten wording & tone', on: () => setScope('language'), sel: scope === 'language' },
                 { short: 'Refactor', sub: 'Restructure for clarity', on: () => setScope('refactor'), sel: scope === 'refactor' },
               ]} />
+            <ResponseFormat />
             <div className="flex-1" />
             <SplitButton kind="primary" label={timing[0].toUpperCase() + timing.slice(1)} actIcon="send-horizontal" actTitle="Send to target agents"
               onAct={send} busy={busy} menuRight
@@ -316,6 +317,28 @@ export function PromptPanel() {
         </div>
       )}
     </section>
+  )
+}
+
+// ---- Response-format control (visual parity; grouped presets are queued work) -----
+function ResponseFormat() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+  return (
+    <div data-comp="response-format-control" className="fmt" ref={ref}>
+      <button className={`fmt-btn`} title="Response format" onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
+        <Ic name="sliders-horizontal" className="ic" /><span className="fmt-lbl">Response</span>
+        <span data-comp="count-square" className="fmt-badge">0</span><Ic name="chevron-down" className="cv" />
+      </button>
+      <div data-comp="format-popover" className={`fmt-menu up left${open ? ' open' : ''}`}>
+        <div className="awl-empty" style={{ padding: 'var(--space-10)' }}>Response-format axes (style · behavior · pace) land with the format-preset pass — nothing overrides yet.</div>
+      </div>
+    </div>
   )
 }
 
