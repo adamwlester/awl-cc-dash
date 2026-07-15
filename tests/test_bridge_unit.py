@@ -1232,7 +1232,11 @@ class TestBuildLaunchConfig:
         from sidecar.drivers.bridge import TRANSCRIPT_RETENTION_DAYS
         assert TRANSCRIPT_RETENTION_DAYS == 3650
         bare = _driver()._build_settings()
-        assert bare == {"cleanupPeriodDays": 3650}
+        assert bare["cleanupPeriodDays"] == 3650
+        # Since §11 #31 every agent's settings also carry the per-turn
+        # statusLine capture command (contract pinned in test_readouts_unit) —
+        # and nothing else rides along uninvited on a bare agent.
+        assert set(bare) == {"cleanupPeriodDays", "statusLine"}
         configured = _driver(
             permission_rules={"deny": ["Bash"]},
         )._build_settings()

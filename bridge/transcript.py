@@ -192,6 +192,151 @@ def parse_transcript(bridge, filepath, last_n=None, types=None):
     return entries
 
 
+def consume_transcript_chunk(chunk):
+    """Parse complete JSONL lines out of a raw transcript byte chunk. Pure.
+
+    The §11 #34 incremental-read half: ``poll_bundle`` returns the transcript
+    bytes from a caller-tracked offset; this consumes only up to the LAST
+    newline — the partial trailing line (a write in progress, possibly cutting
+    a multi-byte character) is left unconsumed and re-read whole next poll, so
+    a torn entry can never be emitted or corrupt the offset arithmetic.
+    Unparseable complete lines are skipped but still consumed (mirroring
+    ``parse_transcript``'s drop-bad-lines behavior).
+
+    Args:
+        chunk: Raw bytes from the current offset (as from ``poll_bundle``).
+
+    Returns:
+        ``(entries, consumed_bytes)`` — parsed dict entries in order, and how
+        many bytes the caller's offset may advance.
+    """
+    if not chunk:
+        return [], 0
+    cut = chunk.rfind(b"\n")
+    if cut < 0:
+        return [], 0
+    consumed = cut + 1
+    entries = []
+    for line in chunk[:consumed].split(b"\n"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line.decode("utf-8", errors="replace")))
+        except json.JSONDecodeError:
+            continue
+    return entries, consumed
+
+
+# --------------------------------------------------------------------------- #
+# /context breakdown + compaction history (§7.18, §11 #30)
+# --------------------------------------------------------------------------- #
+
+# The per-category rows the context dropdown renders off `/context`. Aliases map
+# the rendered labels onto one stable key each — the parse target proven live by
+# tests/test_context_compact_live.py (Lever A), whose parser this lifts.
+CONTEXT_CATEGORY_ALIASES = {
+    "system prompt": "system_prompt",
+    "system tools": "system_tools",
+    "mcp tools": "mcp_tools",
+    "custom agents": "custom_agents",
+    "memory files": "memory",
+    "skills": "skills",
+    "messages": "messages",
+    "free space": "free_space",
+    "autocompact buffer": "autocompact_buffer",
+}
+# Canonical row order for serialization (a stable UI ordering).
+CONTEXT_CATEGORY_ORDER = tuple(CONTEXT_CATEGORY_ALIASES.values())
+
+
+def parse_context_output(text):
+    """Parse a `/context` screen (or its transcript markdown table) into rows.
+
+    Pure function (no live session), lifted from the proving spike
+    (``test_context_compact_live`` Lever A — WORKS on CC 2.1.198). Scans each
+    line for a known category label and pulls a token count (``12.3k``,
+    ``1,234``, ``1234 tokens``) and/or a percent (``(6.2%)`` / ``6.2%``) off the
+    same line. A category counts as parsed only if it yielded a numeric token OR
+    percent value. Works on the raw screen scrape AND on the markdown table
+    `/context` also records into the JSONL transcript (``| System prompt | 9k |
+    0.9% |`` — each row keeps label + numbers on one line).
+
+    Returns:
+        ``{stable_key: {"tokens": int|None, "percent": float|None, "raw": str}}``
+        — empty when nothing parsed (the honest miss, never a guess).
+    """
+    parsed = {}
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        low = line.lower()
+        for label, key in CONTEXT_CATEGORY_ALIASES.items():
+            if label not in low:
+                continue
+            pct_m = re.search(r"(\d+(?:\.\d+)?)\s*%", line)
+            tok_m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*([kKmM])?\s*(?:tokens?\b)?", line)
+            percent = float(pct_m.group(1)) if pct_m else None
+            tokens = None
+            if tok_m and tok_m.group(1):
+                num = float(tok_m.group(1).replace(",", ""))
+                suffix = (tok_m.group(2) or "").lower()
+                if suffix == "k":
+                    num *= 1_000
+                elif suffix == "m":
+                    num *= 1_000_000
+                tokens = int(num)
+            if percent is None and tokens is None:
+                continue
+            parsed.setdefault(key, {"tokens": tokens, "percent": percent, "raw": line})
+            break
+    return parsed
+
+
+def find_context_markdown(entries):
+    """The `/context` output ALSO lands in the JSONL as a local-command ``user``
+    entry rendered as a markdown table (spike bonus discovery — a steadier
+    read-back than the raw screen). Returns the newest such text, or None."""
+    for e in reversed(entries):
+        if not isinstance(e, dict) or e.get("type") != "user":
+            continue
+        content = (e.get("message") or {}).get("content")
+        text = content if isinstance(content, str) else str(content)
+        if "Context Usage" in text and "| System prompt" in text:
+            return text
+    return None
+
+
+def compact_history(entries):
+    """Derive the compaction history from transcript entries. Pure.
+
+    A real ``/compact`` writes a ``type:"system" subtype:"compact_boundary"``
+    entry carrying ``compactMetadata`` (trigger / preTokens / postTokens /
+    durationMs — live-proven, ``test_context_compact_live`` Lever B). This is
+    the §7.18 compaction history: count / type / when, plus the token deltas.
+
+    Returns:
+        ``{"count": N, "boundaries": [{"when", "type", "pre_tokens",
+        "post_tokens", "duration_ms"}, ...]}`` in transcript order
+        (``type`` = the trigger: ``"manual"`` | ``"auto"``).
+    """
+    boundaries = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        if e.get("type") == "system" and e.get("subtype") == "compact_boundary":
+            meta = e.get("compactMetadata") or {}
+            boundaries.append({
+                "when": e.get("timestamp"),
+                "type": meta.get("trigger"),
+                "pre_tokens": meta.get("preTokens"),
+                "post_tokens": meta.get("postTokens"),
+                "duration_ms": meta.get("durationMs"),
+            })
+    return {"count": len(boundaries), "boundaries": boundaries}
+
+
 def extract_messages(entries):
     """Extract a simplified conversation from transcript entries.
 
