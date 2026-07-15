@@ -146,6 +146,10 @@ def routing_path(project_key: str) -> Path | None:
     return _state_path(project_key, "routing.jsonl")
 
 
+def archive_path(project_key: str) -> Path | None:
+    return _state_path(project_key, "archive.json")
+
+
 # ---------------------------------------------------------------------------
 # Agent → project routing (persist hooks only get an agent id)
 # ---------------------------------------------------------------------------
@@ -232,6 +236,105 @@ def persist_retired_number(project_key: str, number: int) -> None:
         data["retired_numbers"] = sorted(nums)
         data.setdefault("agents", {})
         _write_json(p, data)
+
+
+# ---------------------------------------------------------------------------
+# Agent archive (archive.json) — Retire = deep-freeze, distinct-id records
+# ---------------------------------------------------------------------------
+#
+# The §11 #18 Agent archive: retiring an agent DEEP-FREEZES its record into a
+# sibling ``state/archive.json`` (a distinct-id table, keyed by ``archive_id``),
+# written through the same atomic write-replace + ``schema_version`` model as
+# ``agents.json``. Records are light — the transcript is REFERENCED in place,
+# never copied (§8.6). Delete stays a TRUE wipe (§7.12) distinct from archive;
+# ``remove_archive_record`` is the real delete of an archived row.
+
+
+def load_archive(project_key: str) -> dict[str, dict[str, Any]]:
+    """The project's archived agent records, keyed by distinct ``archive_id``."""
+    p = archive_path(project_key)
+    if p is None:
+        return {}
+    recs = _read_json(p).get("archived")
+    return recs if isinstance(recs, dict) else {}
+
+
+def get_archive_record(project_key: str, archive_id: str) -> dict[str, Any] | None:
+    """One archived record from a project by its distinct id (or ``None``)."""
+    return load_archive(project_key).get(archive_id)
+
+
+def save_archive_record(project_key: str, record: dict[str, Any]) -> None:
+    """Insert one archived record into the project archive (write-through).
+
+    Keyed by the record's distinct ``archive_id``. A no-op when the record has
+    no ``archive_id`` or the project has no on-disk home (cwd-less agents don't
+    archive — the archive is per-project, §8.2). Atomic write-replace + stamped
+    ``schema_version`` like every other state file.
+    """
+    aid = record.get("archive_id")
+    p = archive_path(project_key)
+    if not aid or p is None:
+        return
+    with _IO_LOCK:
+        data = _read_json(p)
+        archived = data.get("archived")
+        if not isinstance(archived, dict):
+            archived = {}
+        archived[aid] = record
+        data["archived"] = archived
+        _write_json(p, data)
+
+
+def remove_archive_record(project_key: str, archive_id: str) -> bool:
+    """TRUE-delete one archived record (§7.12) — a real wipe of the archive row.
+
+    Returns True when a row was removed, False when it was already absent.
+    """
+    p = archive_path(project_key)
+    if p is None:
+        return False
+    with _IO_LOCK:
+        data = _read_json(p)
+        archived = data.get("archived")
+        if not isinstance(archived, dict) or archive_id not in archived:
+            return False
+        del archived[archive_id]
+        data["archived"] = archived
+        _write_json(p, data)
+    return True
+
+
+def all_archived_records() -> list[dict[str, Any]]:
+    """Every archived record across every known project (project-first).
+
+    Mirrors ``runtime_store.all_records()`` for the live roster: aggregates the
+    archive of every project in the 🏠 projects index so the operator sees the
+    whole archive without a per-project call. Distinct ids never collide, so a
+    plain first-writer-wins de-dup is enough.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for key in known_projects():
+        for aid, rec in load_archive(key).items():
+            out.setdefault(aid, rec)
+    return list(out.values())
+
+
+def find_archive_record(archive_id: str) -> tuple[str, dict[str, Any]] | None:
+    """Locate an archived record by id across known projects → ``(key, record)``."""
+    for key in known_projects():
+        rec = get_archive_record(key, archive_id)
+        if rec is not None:
+            return key, rec
+    return None
+
+
+def delete_archived_anywhere(archive_id: str) -> bool:
+    """TRUE-delete an archived record wherever it lives (§7.12). True if removed."""
+    for key in known_projects():
+        if remove_archive_record(key, archive_id):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------

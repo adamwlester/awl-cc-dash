@@ -657,6 +657,14 @@ Files: sidecar/identity.py, bridge/bridge.py, sidecar/drivers/bridge.py, tests/t
 
 ---
 
+### 2026-07-15 16:01:58 — build-sprint Stage 5 #18: agent archive (retire = deep-freeze, delete = true wipe)
+
+Retiring an agent now deep-freezes it into a per-project archive by default instead of discarding it, while a hard Delete stays a true irreversible wipe (ARCHITECTURE §7.12/§8.4, §11 #18, HIGH — the operator states the system "is not useful without it"). The archive is a distinct-ID table of LIGHT records in `state/archive.json` (sibling of `agents.json`, atomic write-replace, `schema_version`-stamped): each record carries `archive_id` (`arc<12hex>`, never the session id), the identity snapshot, color/icon, created + retired timestamps, the transcript **referenced in place** (`{transcript_path, claude_session_id}` — never copied, §8.6), the per-agent git author/email from #19, light metadata (cwd/model/driver/permission_mode), and the reserved lineage fields (`parent`/`fork`/`handoff`, null — for #15/#19/#21 lineage work). New pure `deletion.build_archive_record()` + `state_store` archive CRUD (save/load/get/remove + cross-project `all_archived_records`/`find`/`delete` via the projects index). Wired into `close_session`: the soft-Retire branch writes the archive record before stopping the driver and returns `{archived:<id>}`; the hard-Delete branch returns earlier so Delete never archives (still wipes footprint + retires the number). Endpoints `GET /archive`, `GET /archive/{id}`, `DELETE /archive/{id}` (the §7.12 true-delete of an archived row). New hermetic `tests/test_archive_unit.py` (15 tests). Hermetic **809 passed** (794 + 15). ⚠ assumed (final report): endpoint namespace `/archive` (not the plan's `/agents/archive` — matches the `/sessions`,`/links` convention; no `/agents` collection exists); archiving is ADDITIVE (retire keeps the `agents.json` roster row for cold-restore — dropping it on retire ties to #17 load-past-agents + picker-first startup, deferred); nested `lineage {parent,fork,handoff}`. §11 #18 + #19 queue rows tombstoned in ARCHITECTURE. Built by a subagent; reviewed (close_session wiring + endpoints sound), tested, committed here.
+
+Files: sidecar/deletion.py, sidecar/state_store.py, sidecar/main.py, tests/test_archive_unit.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

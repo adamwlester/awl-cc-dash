@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
-from identity import assign_identity
+from identity import assign_identity, git_author
 import eventbus
 import hookbus
 import links
@@ -1214,11 +1214,22 @@ async def get_session(session_id: str):
 
 @app.delete("/sessions/{session_id}")
 async def close_session(session_id: str, hard: bool = False):
-    """Retire (soft, default) or — with ?hard=true — permanent **Delete**:
-    a hard wipe of the agent's private footprint (runtime record, tmux session,
-    on-disk transcript) while everything SHARED is tombstoned (links → inactive
+    """Retire (soft, default) or — with ?hard=true — permanent **Delete**.
+
+    **Retire (default) = deep-freeze, archived by default (§7.12, §11 #18):** the
+    live session is stopped and a LIGHT archive record is written into the
+    project's ``state/archive.json`` (distinct id, identity snapshot, created +
+    retired timestamps, the transcript **referenced in place** — never copied,
+    §8.6 — the per-agent git author/email from #19, and the reserved lineage
+    fields). Retire is reversible: the transcript is kept and the identity number
+    is NOT retired. This is a freeze, not a discard.
+
+    **Delete (?hard=true) = TRUE wipe (§7.12), distinct from archive:** a hard
+    wipe of the agent's private footprint (runtime record, tmux session, on-disk
+    transcript) while everything SHARED is tombstoned (links → inactive
     tombstones; feed/scratchpad history is kept and attributed). The agent's
-    number is retired (never reused). Queue + inbox (operational state) are dropped.
+    number is retired (never reused). Queue + inbox (operational state) are
+    dropped. A hard Delete is NOT archived.
     """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1303,7 +1314,37 @@ async def close_session(session_id: str, hard: bool = False):
         return {"status": "deleted", "session_id": session_id,
                 "wiped": plan["wipe"], "tombstoned": plan["tombstone"]}
 
-    # --- soft Retire (default) ---
+    # --- soft Retire (default) = deep-freeze, archived by default (§11 #18) ---
+    # Build the LIGHT archive record BEFORE closing, sourcing the transcript
+    # reference from the persisted roster record (referenced in place, never
+    # copied — §8.6). The archive is per-project; a cwd-less agent has no home,
+    # so save_archive_record is a no-op there and `archived` stays None.
+    archive_id = None
+    project_key = state_store.project_of(session_id) or storage.project_key(session.cwd)
+    if project_key:
+        rec = getattr(session.driver, "_record", None)
+        rec = rec if isinstance(rec, dict) else {}
+        archive_record = deletion.build_archive_record(
+            session_id,
+            identity=session.identity,
+            created_at=session.created_at,
+            transcript_path=rec.get("transcript_path"),
+            claude_session_id=rec.get("claude_session_id"),
+            cwd=session.cwd,
+            model=session.model,
+            driver=(session.driver.name if session.driver else session.driver_name),
+            permission_mode=session.permission_mode,
+            git_author=git_author(session.identity) if session.identity else None,
+        )
+        try:
+            state_store.save_archive_record(project_key, archive_record)
+            # Make the archive discoverable across projects (GET /archive reads
+            # the 🏠 projects index, like the live roster's all_records()).
+            state_store.touch_projects_index(project_key)
+            archive_id = archive_record["archive_id"]
+        except Exception as e:  # pragma: no cover - archive is best-effort
+            logger.warning("archive-on-retire failed for %s: %s", session_id, e)
+
     if session.driver:
         try:
             await session.driver.close()
@@ -1311,8 +1352,42 @@ async def close_session(session_id: str, hard: bool = False):
             pass
     session.status = "closed"
     del sessions[session_id]
-    logger.info(f"Closed session {session_id}")
-    return {"status": "closed", "session_id": session_id}
+    logger.info("Retired session %s (archived as %s)", session_id, archive_id)
+    return {"status": "closed", "session_id": session_id, "archived": archive_id}
+
+
+# ---------------------------------------------------------------------------
+# Agent archive (§11 #18) — the deep-freeze of retired agents. A separate table
+# from the live roster: `GET /sessions` stays live-only; retired agents land
+# here (written on Retire above). Records are light — the transcript is
+# referenced in place, never copied (§8.6).
+# ---------------------------------------------------------------------------
+
+@app.get("/archive")
+async def list_archive():
+    """List every archived agent record across known projects (§11 #18)."""
+    records = state_store.all_archived_records()
+    return {"archived": records, "count": len(records)}
+
+
+@app.get("/archive/{archive_id}")
+async def get_archive(archive_id: str):
+    """One archived record by its distinct id (404 when absent)."""
+    found = state_store.find_archive_record(archive_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Archived record not found")
+    return found[1]
+
+
+@app.delete("/archive/{archive_id}")
+async def delete_archive(archive_id: str):
+    """TRUE-delete an archived record (§7.12) — a real, irreversible wipe of the
+    archive row, distinct from Retire (which CREATES the record) and from a hard
+    agent Delete. Removes only the archived record; shared history is untouched.
+    """
+    if not state_store.delete_archived_anywhere(archive_id):
+        raise HTTPException(status_code=404, detail="Archived record not found")
+    return {"status": "deleted", "archive_id": archive_id}
 
 
 @app.post("/sessions/{session_id}/send")
