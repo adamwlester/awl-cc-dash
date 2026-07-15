@@ -20,9 +20,18 @@ import { toast } from '../lib/toast'
 
 interface ConLine { c: string; t: string }
 
+// Module-level echo cache so the in-column console and the expanded step-into
+// show the same feed for a session (the mockup shares one CON_FEED the same way).
+const LINE_CACHE = new Map<string, ConLine[]>()
+
 // ---- shared console session state (one per focused agent) -------------------
 export function useConsole(sessionId: string | null) {
-  const [lines, setLines] = useState<ConLine[]>([])
+  const [lines, setLinesRaw] = useState<ConLine[]>(() => (sessionId && LINE_CACHE.get(sessionId)) || [])
+  const setLines = useCallback((fn: (p: ConLine[]) => ConLine[]) => setLinesRaw(p => {
+    const next = fn(p)
+    if (sessionId) LINE_CACHE.set(sessionId, next)
+    return next
+  }), [sessionId])
   const [wsUrl, setWsUrl] = useState<string | null>(null)
   const [attachState, setAttachState] = useState<'trying' | 'ws' | 'degraded'>('trying')
   const [catalog, setCatalog] = useState<ConsoleCatalog | null>(null)
@@ -30,7 +39,7 @@ export function useConsole(sessionId: string | null) {
   useEffect(() => { api.consoleCatalog().then(c => { if (c) setCatalog(c) }) }, [])
 
   useEffect(() => {
-    setLines([])
+    setLinesRaw((sessionId && LINE_CACHE.get(sessionId)) || [])
     setWsUrl(null)
     setAttachState('trying')
     if (!sessionId) { setAttachState('degraded'); return }
@@ -40,7 +49,7 @@ export function useConsole(sessionId: string | null) {
       if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws') }
       else {
         setAttachState('degraded')
-        setLines([{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
+        setLines(p => p.length ? p : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
       }
     })
     return () => { cancelled = true }
@@ -53,7 +62,7 @@ export function useConsole(sessionId: string | null) {
     if (!r) { setLines(p => [...p, { c: 'l-sys', t: '⎿ command failed (sidecar rejected it)' }]); return }
     const screen = (r.screen || '').split('\n').filter(l => l.trim().length)
     setLines(p => [...p, ...screen.slice(-30).map(t => ({ c: 'l-out', t }))])
-  }, [sessionId])
+  }, [sessionId, setLines])
 
   return { lines, wsUrl, attachState, catalog, run }
 }

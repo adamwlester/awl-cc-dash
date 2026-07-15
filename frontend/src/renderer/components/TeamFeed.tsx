@@ -417,10 +417,21 @@ function TxCardView({ c, d, sel, open, flash, flt, blockSel, onSel, onOpen, onBl
 // ---- inbox section + cards ---------------------------------------------------------
 export function inboxTitle(it: InboxItem): string {
   const dt = it.data || {}
-  return dt.title || dt.question || dt.subtype && dt.message ? (dt.title || dt.question || `${dt.message}`.slice(0, 80)) : (dt.command || dt.tool_name || dt.plan_title || it.type)
+  if (dt.title) return dt.title
+  if (dt.question) return dt.question
+  if (it.type === 'response') return 'Run ended — final reply not yet reviewed'
+  if (it.type === 'permission') return dt.tool_name ? `Run ${dt.tool_name}` : 'Permission requested'
+  if (it.type === 'plan') return dt.plan_title || 'Plan ready for review'
+  if (it.type === 'warning') return dt.subtype ? `${dt.subtype} — attention needed` : 'Warning'
+  if (dt.message) return String(dt.message).slice(0, 90)
+  return dt.command || dt.tool_name || it.type
 }
 export function inboxBody(it: InboxItem): string {
   const dt = it.data || {}
+  if (it.type === 'response') {
+    const n = dt.runs || 1
+    return `${n === 1 ? 'A run' : `${n} runs`} ended with output you haven't reviewed. View jumps to the run's final reply in the Transcript and completes this item; Reply quotes it in the Editor (also completes). It clears only when completed — never on a glance.`
+  }
   return dt.message || dt.body || dt.plan || dt.detail || dt.raw || dt.command || ''
 }
 
@@ -529,6 +540,7 @@ function InboxCard({ it, d, sel, isOpen, flash, onSel, onOpen, resolve, replyToI
         <button className="fcard-exp msel-head" onClick={onSel} title="Select this request (Attach)">
           <IdentBadge a={a} />
           {subtype && <span data-comp="inbox-subtype-badge" className={`inbox-subtype${it.type === 'warning' ? ' inbox-subtype--warning' : ''}`}>{subtype}</span>}
+          {it.type === 'response' && (dt.runs || 1) > 1 && <span data-comp="inbox-runs-chip" className="inbox-runs" title={`${dt.runs} unseen runs coalesced — a new unseen run updates this card, never stacks`}>×{dt.runs} runs</span>}
           <span className="inbox-title">{inboxTitle(it)}</span>
           <span className="fcard-time">{clockTime(it.created_at)}</span>
         </button>

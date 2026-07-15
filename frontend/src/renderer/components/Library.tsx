@@ -11,7 +11,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type LibraryDoc, type DocMeta } from '../api'
 import { useDash } from '../store'
 import { Ic } from '../lib/icons'
-import { identOf, IdentBadge, USER_IDENT, type Ident } from '../lib/identity'
+import { identOf, IdentBadge, AgTile, USER_IDENT, type Ident } from '../lib/identity'
 import { ExportControl } from './ExportControl'
 import { toast } from '../lib/toast'
 
@@ -59,8 +59,9 @@ export function Library() {
         api.libraryReviews(d.projectCwd),
       ])
       if (cancelled) return
+      if (pl == null && dc == null && root == null) return   // sidecar unreachable — freeze on last-known (#38)
       const meta = (p: string): DocMeta | null => (reviews && (reviews[p] || reviews[p.replace(/\\/g, '/')])) || null
-      setPlans((pl || []).map(doc => ({ id: `plan-${doc.filename}`, doc, meta: meta(doc.path), kind: 'plan' as const })))
+      if (pl != null) setPlans(pl.map(doc => ({ id: `plan-${doc.filename}`, doc, meta: meta(doc.path), kind: 'plan' as const })))
       const seen = new Set<string>()
       const dd: Entry[] = []
       for (const doc of [...(dc || []), ...(root || [])]) {
@@ -68,7 +69,7 @@ export function Library() {
         seen.add(doc.path)
         dd.push({ id: `doc-${doc.filename}-${dd.length}`, doc, meta: meta(doc.path), kind: 'doc' })
       }
-      setDocs(dd)
+      if (dc != null || root != null) setDocs(dd)
     }
     load()
     const i = setInterval(load, 8000)
@@ -284,48 +285,51 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
         <div className="plan-body">
           <div className="plan-rev">
             <div className="plan-nav">
-              <div className="plan-nav-tabs">
-                <button className={`nav-tab${lens === 'toc' ? ' active' : ''}`} onClick={() => setLens('toc')}>TOC</button>
-                <button className={`nav-tab${lens === 'feedback' ? ' active' : ''}`} onClick={() => setLens('feedback')} title="Feedback"><Ic name="message-square" /><span className="nav-cnt">{comments.length}</span></button>
-                <button className={`nav-tab${lens === 'authors' ? ' active' : ''}`} onClick={() => setLens('authors')} title="Authors"><Ic name="users" /><span className="nav-cnt">{meta?.provenance ? 1 : 0}</span></button>
+              <div className="nav-tabs">
+                <button data-comp="nav-tab" className={`nav-tab nav-tab--ol${lens === 'toc' ? ' on' : ''}`} onClick={() => setLens('toc')} title="TOC — table of contents"><span className="nt-ic"><Ic name="list" /></span><span className="nt-lab">TOC</span></button>
+                <button data-comp="nav-tab" className={`nav-tab nav-tab--fb${lens === 'feedback' ? ' on' : ''}`} onClick={() => setLens('feedback')} title="Feedback"><span className="nt-ic"><Ic name="message-square" /></span><span className="nt-lab">Feedback</span>{comments.length > 0 && <span className="nav-cnt">{comments.length}</span>}</button>
+                <button data-comp="nav-tab" className={`nav-tab nav-tab--au${lens === 'authors' ? ' on' : ''}`} onClick={() => setLens('authors')} title="Authors"><span className="nt-ic"><Ic name="users" /></span><span className="nt-lab">Authors</span>{meta?.provenance && <span className="nav-cnt">1</span>}</button>
               </div>
-              <div className="plan-nav-body">
-                {lens === 'toc' && (
-                  <>
-                    <div className="ol-rhead"><span className="ol-rlab">Table of contents</span></div>
+              {lens === 'toc' && (
+                <div className="ol-scroll">
+                  <div className="ol-cap">Table of contents</div>
+                  <div className="ol-list">
                     {headings.map(h => (
-                      <button key={h.line} className="fb-card ol-row" style={{ paddingLeft: `${(h.level - 2) * 10 + 8}px` }}
+                      <button data-comp="outline-item" key={h.line} className="ol-item" data-hlevel={h.level}
                         onClick={() => setSel({ kind: 'section', line: h.line })}>
-                        <span className="docnav-name">{h.text}</span>
-                        <span className="nav-cnt" style={{ marginLeft: 'auto' }}>{h.line}</span>
+                        <span className={`ol-dot${commentsFor(h.text).some(c => /\[(revise)\]/.test(c.text)) ? ' d-revise' : ''}${commentsFor(h.text).some(c => /\[(block)\]/.test(c.text)) ? ' d-block' : ''}`} />
+                        <span className="ol-nm">{h.text}</span>
+                        <span className="ol-c" title={`line ${h.line}`}>{h.line}</span>
                       </button>
                     ))}
-                    {!headings.length && <div className="awl-empty">no sections</div>}
-                  </>
-                )}
-                {lens === 'feedback' && (
-                  <>
-                    {comments.map(c => (
-                      <div key={c.id} className="fb-card" role="button" onClick={() => {
-                        const h = headings.find(h2 => h2.text === c.anchor_heading)
-                        if (h) setSel({ kind: 'section', line: h.line })
-                      }}>
-                        <div className="flex items-center gap-1 w-full"><span className="docnav-name">{c.author}</span><span className="fcard-time" style={{ marginLeft: 'auto' }}>{(c.ts || '').slice(5, 16).replace('T', ' ')}</span></div>
-                        <div className="text-[10px] text-muted" style={{ width: '100%' }}>{c.text.slice(0, 90)}</div>
-                        {d.projectCwd && <button className="mini-link" onClick={async ev => { ev.stopPropagation(); await api.resolveComment({ cwd: d.projectCwd!, path: e.doc.path, comment_id: c.id }); toast('Comment resolved'); onChanged() }}>resolve</button>}
-                      </div>
-                    ))}
-                    {!comments.length && <div className="fb-empty">No feedback yet.</div>}
-                  </>
-                )}
-                {lens === 'authors' && (
-                  <>
-                    {meta?.provenance
-                      ? <div className="fb-card"><span className="docnav-name">{meta.provenance.created_by || 'unknown'}</span><span className="dbadge db-draft">Drafted</span></div>
-                      : <div className="fb-empty">No authorship recorded yet.</div>}
-                  </>
-                )}
-              </div>
+                    {!headings.length && <div className="fb-empty">no sections</div>}
+                  </div>
+                </div>
+              )}
+              {lens === 'feedback' && (
+                <div className="ol-scroll">
+                  <div className="ol-cap">Feedback</div>
+                  {comments.map(c => (
+                    <div key={c.id} className="fb-card" role="button" onClick={() => {
+                      const h = headings.find(h2 => h2.text === c.anchor_heading)
+                      if (h) setSel({ kind: 'section', line: h.line })
+                    }}>
+                      <div className="flex items-center gap-1 w-full"><span className="docnav-name">{c.author}</span><span className="fcard-time" style={{ marginLeft: 'auto' }}>{(c.ts || '').slice(5, 16).replace('T', ' ')}</span></div>
+                      <div className="text-[10px] text-muted" style={{ width: '100%' }}>{c.text.slice(0, 90)}</div>
+                      {d.projectCwd && <button className="mini-link" onClick={async ev => { ev.stopPropagation(); await api.resolveComment({ cwd: d.projectCwd!, path: e.doc.path, comment_id: c.id }); toast('Comment resolved'); onChanged() }}>resolve</button>}
+                    </div>
+                  ))}
+                  {!comments.length && <div className="fb-empty">No feedback yet.</div>}
+                </div>
+              )}
+              {lens === 'authors' && (
+                <div className="ol-scroll">
+                  <div className="ol-cap">Authors</div>
+                  {meta?.provenance
+                    ? <div className="fb-card"><span className="docnav-name">{meta.provenance.created_by || 'unknown'}</span><span data-comp="contribution-badge" className="dbadge au-act">Drafted</span></div>
+                    : <div className="fb-empty">No authorship recorded yet.</div>}
+                </div>
+              )}
             </div>
             <div className="plan-main">
               <div data-comp="editor-header" className="lib-edit-head">
@@ -423,28 +427,29 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
               },
               onAttach: () => d.replyTo(d.selectedId || '', { source: e.doc.path, text: `Read this file: ${e.doc.path}` }),
             }} />
-            <div data-comp="review-chip" className={`rev-chip${revOpen ? ' open' : ''}`} data-revchip>
-              <button className="rev-trig" type="button" onClick={() => setRevOpen(o => !o)} title="Pick a reviewer">
-                {reviewer
+            <div data-comp="review-chip" className="rev-chip" data-revchip>
+              <button className="rev-trig" type="button" onClick={() => setRevOpen(o => !o)} title="Choose the reviewer">
+                {reviewer && d.sessions.some(s => s.session_id === reviewer)
                   ? <IdentBadge a={identOf(d.sessions.find(s => s.session_id === reviewer)!)} />
-                  : <span className="msel-ph">Reviewer…</span>}
+                  : <span className="msel-ph" style={{ padding: '0 var(--space-8)' }}>Reviewer…</span>}
                 <Ic name="chevrons-up-down" className="picker-cv" />
               </button>
-              <button className="rev-send btn-secondary btn-sm" title="Send for review" onClick={sendReview}><Ic name="send-horizontal" className="w-3 h-3" /></button>
-              <div className={`rev-pop${revOpen ? ' open' : ''}`}>
-                <div className="aglist">
+              <div className={`src-pop rev-pop${revOpen ? ' open' : ''}`}>
+                <div className="src-pop-head"><span className="sec-h" style={{ margin: 0 }}>Reviewer</span></div>
+                <div className="aglist aglist-scroll" style={{ maxHeight: 220 }}>
                   {d.sessions.map(s => {
                     const a = identOf(s)
                     return (
                       <button key={s.session_id} className={`agrow${reviewer === s.session_id ? ' on' : ''}`} type="button"
                         onClick={() => { setReviewer(s.session_id); setRevOpen(false) }}>
-                        <IdentBadge a={a} /><Ic name="check" className="ag-ck" />
+                        <AgTile a={a} /><span className="ag-lab"><span className="ag-role">{a.role}</span><span className="ag-name">{a.name}</span></span><Ic name="check" className="ag-ck" />
                       </button>
                     )
                   })}
                   {!d.sessions.length && <div className="awl-empty">no agents</div>}
                 </div>
               </div>
+              <button className="rev-act" type="button" onClick={sendReview} title="Send this document for review"><Ic name="scan-search" /></button>
             </div>
             <div className="plan-foot-right">
               {meta?.verdict === 'approve' || meta?.state === 'approved'
