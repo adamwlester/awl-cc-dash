@@ -625,6 +625,14 @@ Files: dev/notes/2026-07-10-build-sprint-handoff.md, DEVLOG.md
 
 ---
 
+### 2026-07-15 14:53:22 — build-sprint Stage 3: ARCHITECTURE §11 marker sweep (#29–#34; code already merged)
+
+Cleared the stage-3 doc debt. The readouts/console/cost backend (§11 #29-backend, #30–#34) had merged to main at `509b5fc` but its ⚠ Today markers and §11 queue rows were never swept, so the doc still read as if the work were owed. Doc-only pass on [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): tombstoned §11.5 rows #30–#34 (built 2026-07-14, literal numbering kept) and rewrote #29 as a live row (backend attach shipped; the xterm.js renderer remains and rides #37); cleared the §5.2 Console-endpoint, §6.2 polling-scale (replaced with the re-measured one-spawn/~425 ms envelope + adaptive cadence), §7.15 account-split-source, and §7.18 context-breakdown/statusline ⚠ Today markers; kept §7.13 (backend attach built, xterm renderer remains) and §7.15 (cost endpoint built, on-card display rides #37) as reduced live markers; pruned the four fully-cleared §11.1 index rows and reduced the §7.13/§7.15 ones; and added the now-shipped `/context/breakdown` + `/cost` to the §5.2 Readouts endpoint row. No code touched — the implementation was already merged; this only trues the doc to reality. Verified the swept markers are gone, #30–#34 read as `*(built …)*` tombstones, #29 stays live, and every unrelated marker (#37/#38/#40/#20/#15 etc.) is untouched. Sweep done by a scoped subagent; reviewed, gap-filled, and committed here.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
