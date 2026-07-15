@@ -172,8 +172,11 @@ def test_per_agent_cost_harvest(shell_bridge, diag_dir):
                 f"usage dict unexpectedly carries a cost key: {sorted(usage)}"
             assert not any("cost" in str(k).lower() or "usd" in str(k).lower()
                            for k in usage), f"usage dict has a cost-like key: {sorted(usage)}"
-            # The driver does not advertise a cost capability at all.
-            assert "cost" not in BridgeDriver.CAPABILITIES, BridgeDriver.CAPABILITIES
+            # The driver NOW advertises the on-demand cost capability — §11 #32
+            # wired this spike's WORKS finding (driver.get_cost / GET
+            # /sessions/{id}/cost). The JSONL usage dict itself stays cost-free
+            # (asserted above): cost comes only from the /cost scrape.
+            assert "cost" in BridgeDriver.CAPABILITIES, BridgeDriver.CAPABILITIES
 
             # --- Path (b): `/cost` scraped via the console path. ---
             shell_bridge.send(tmux, "/cost")
