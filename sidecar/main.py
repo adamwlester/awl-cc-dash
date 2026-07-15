@@ -2138,6 +2138,60 @@ async def console_run(session_id: str, req: ConsoleRunRequest):
     return result
 
 
+def _require_bridge_console(session_id: str):
+    """Resolve a session to its bridge driver for the Console surfaces (404 on
+    an unknown session, 400 on a non-bridge driver — the Console is a bridge
+    feature: there is no terminal to attach for the sdk driver)."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    drv = sessions[session_id].driver
+    if drv is None or not hasattr(drv, "_bridge") or not hasattr(drv, "tmux_name"):
+        raise HTTPException(status_code=400, detail="Console requires a bridge agent")
+    return drv
+
+
+@app.post("/sessions/{session_id}/console/attach")
+async def console_attach_endpoint(session_id: str):
+    """Attach the focused agent's LIVE terminal stream (§7.13, §11 #29).
+
+    Starts (or reuses — one attach per session) a writable ttyd inside WSL
+    bound to the agent's tmux session, with the pane geometry pinned FIRST
+    (`window-size manual`) so a viewer can never perturb the sidecar's
+    capture-pane coordination reads. Returns the WebSocket endpoint the
+    xterm.js-class renderer consumes (ttyd's `tty` subprotocol; reachable from
+    Windows over localhost — WSL2's default relay, no port-forwarding).
+
+    Attach-on-open / detach-on-close is the FRONTEND's duty — the backend only
+    serves the contract. Interception stays on the JSONL transcript (§7.13):
+    nothing machine-reads this stream.
+    """
+    drv = _require_bridge_console(session_id)
+    try:
+        info = await asyncio.to_thread(
+            drv._bridge.console_attach, drv.tmux_name)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"console attach failed: {e}")
+    return {"ws_url": info["ws_url"], "url": info["url"],
+            "port": info["port"], "reused": info["reused"]}
+
+
+@app.post("/sessions/{session_id}/console/detach")
+async def console_detach_endpoint(session_id: str):
+    """Detach the focused agent's live terminal stream (kill its ttyd).
+
+    Idempotent — detaching an un-attached session is a no-op success. The
+    geometry pin stays in place (deliberate; see `TmuxBridge.console_detach`).
+    """
+    drv = _require_bridge_console(session_id)
+    try:
+        result = await asyncio.to_thread(
+            drv._bridge.console_detach, drv.tmux_name)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"console detach failed: {e}")
+    return {"status": result.get("status", "detached"),
+            "port": result.get("port")}
+
+
 # ============================================================================
 # Settings — interactive reads/writes (confirm-gated) + account/usage
 # ============================================================================
@@ -2156,7 +2210,18 @@ async def settings_read(path: str):
 
 
 @app.get("/settings/account")
-async def settings_account(creds_path: str):
+async def settings_account(creds_path: str, claude_json_path: str | None = None):
+    """The Usage tab's account band (read-only, §7.15).
+
+    With ``claude_json_path`` given this is the §11 #33 **split-source** read
+    (the live-mapped boundary: email/org from `.claude.json` `oauthAccount`,
+    plan from the credentials file's `claudeAiOauth.subscriptionType`, plus
+    `rate_limit_tier` and the read-only `auth_expiry` signal — null when the
+    creds expose no expiry). Without it, the legacy single-file read is served
+    unchanged.
+    """
+    if claude_json_path:
+        return settings_io.account_band_split(claude_json_path, creds_path)
     return settings_io.account_band(creds_path)
 
 
@@ -2493,6 +2558,16 @@ async def set_thinking(session_id: str, req: SetThinkingRequest):
 
 @app.get("/sessions/{session_id}/context")
 async def get_context_usage(session_id: str):
+    """The context readout floor + the per-turn snapshot (§7.18).
+
+    The body stays the JSONL-derived totals (source 3 — the fallback floor).
+    Bridge sessions additionally carry ``per_turn`` (§11 #31): the last
+    statusLine payload captured at a turn boundary — the freshest per-turn
+    number (source 2), incl. its ``context_window`` object. Best-effort:
+    ``per_turn: null`` when nothing was captured yet (fresh session, capture
+    disabled, torn line). The on-demand deep readout (source 1) is its own
+    endpoint: ``GET /sessions/{id}/context/breakdown``.
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
@@ -2502,9 +2577,83 @@ async def get_context_usage(session_id: str):
         return {}
     try:
         usage = await session.driver.get_context_usage()
-        return usage or {}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    result = dict(usage or {})
+    if hasattr(session.driver, "get_statusline_snapshot"):
+        try:
+            result["per_turn"] = await session.driver.get_statusline_snapshot()
+        except Exception:  # pragma: no cover - best-effort by contract
+            result["per_turn"] = None
+    return result
+
+
+@app.get("/sessions/{session_id}/context/breakdown")
+async def get_context_breakdown_endpoint(session_id: str):
+    """The §7.18 deep context readout (§11 #30) — ON-DEMAND ONLY.
+
+    Runs `/context` on the live TUI via the console path (idle-gated send +
+    bounded wait + screen scrape, the spike-proven mechanics) and parses the
+    per-category rows; compaction history (count / type / when + token deltas)
+    is derived from `compact_boundary` transcript metadata. This is the
+    "opening the accordion triggers a direct pull" contract — it is NOT on any
+    poll loop, and the JSONL-derived floor stays `GET /sessions/{id}/context`
+    (untouched). 409 `busy` when the agent's screen isn't idle (a slash
+    command can only land at an idle boundary); 400 for drivers without the
+    capability (an honest signal, never a fake readout).
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not session.driver:
+        raise HTTPException(status_code=503, detail="Not connected")
+    if not session.driver.supports("context_breakdown"):
+        raise HTTPException(status_code=400,
+                            detail="Driver has no context breakdown")
+    try:
+        result = await session.driver.get_context_breakdown()
+    except RuntimeError as e:
+        if str(e) == "busy":
+            raise HTTPException(status_code=409, detail="busy — agent is not idle")
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    result["fetched_at"] = datetime.now().isoformat()
+    return result
+
+
+@app.get("/sessions/{session_id}/cost")
+async def get_cost_endpoint(session_id: str):
+    """Per-agent cost — ON-DEMAND ONLY (§7.15, §11 #32).
+
+    Scrapes `/cost` on the live TUI (idle-gated send + ~3s dialog render +
+    scrollback parse + Escape — the spike-proven console path) and returns the
+    per-session ``Total cost: $X`` figure with its per-model breakdown:
+    Claude Code's OWN estimate, and for a bridge agent the session IS that one
+    agent. **Endpoint-only, deliberately NOT in `/usage`'s per-agent rows or
+    any poll loop** — each read costs a live TUI round-trip, so the frontend
+    pulls it lazily (card expand / periodic slow refresh). ``usd: null`` is
+    the honest miss (no panel rendered) — never a fabricated figure. 409
+    `busy` when the agent's screen isn't idle; 400 for drivers without the
+    capability.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not session.driver:
+        raise HTTPException(status_code=503, detail="Not connected")
+    if not session.driver.supports("cost"):
+        raise HTTPException(status_code=400, detail="Driver has no cost readout")
+    try:
+        result = await session.driver.get_cost()
+    except RuntimeError as e:
+        if str(e) == "busy":
+            raise HTTPException(status_code=409, detail="busy — agent is not idle")
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    result["fetched_at"] = datetime.now().isoformat()
+    return result
 
 
 @app.get("/sessions/{session_id}/subagents")
@@ -2669,10 +2818,14 @@ async def get_usage():
 
     Per-agent context (tokens/window/percent/work_steps/tool_total) from every
     driver that supports it, plus fleet totals. The window is model-aware now
-    (200K default, 1M for 1M-context models). Per-agent cost stays out of scope
-    (the bridge emits none). Plan / rate-limit windows are intentionally NOT here
-    — the clean source is the OAuth credentials + live API, not the transcript
-    (see the run's verify-and-report).
+    (200K default, 1M for 1M-context models). Per-agent COST is deliberately
+    NOT in these rows (§11 #32): it is harvestable, but only via a live-TUI
+    `/cost` scrape (idle-gated send + dialog render per read — far too heavy
+    for this polled aggregate), so it lives on its own ON-DEMAND endpoint,
+    `GET /sessions/{id}/cost`, pulled lazily by the frontend. Plan /
+    rate-limit windows are intentionally NOT here — the clean source is the
+    OAuth credentials + live API, not the transcript (see the run's
+    verify-and-report).
     """
     agents = []
     fleet_tokens = 0
