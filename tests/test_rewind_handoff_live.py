@@ -317,3 +317,111 @@ def test_handoff_fork_from_point(rewind_bridge):
                 log.debug("fork: close(%s) raised (non-fatal): %s", s, e)
         bridge._run(f"rm -rf {shlex.quote(diag)}")
         bridge._run(f"rm -rf {proj}")
+
+
+# --------------------------------------------------------------------------- #
+# The PRODUCT API (§11 #15): the same two proofs, but through the public
+# TmuxBridge.rewind() / TmuxBridge.fork() methods the sidecar calls — not the
+# ad-hoc keystroke helper above. These pin that the built API drives the proven
+# sequence end-to-end (and that the >= 2.1.191 version gate lets a modern build
+# through). Same isolation rules: own bridge, unique names, tab-less, per-session
+# close, never kill-server. The hermetic construction contract for both is
+# tests/test_rewind_fork_unit.py.
+# --------------------------------------------------------------------------- #
+
+def test_rewind_via_bridge_method(rewind_bridge):
+    """``TmuxBridge.rewind(name, to_prompt_index=1)`` genuinely truncates the
+    live conversation: after it, the agent knows ALPHA-1/2 but has LOST ALPHA-3
+    and the transcript still parses (the §4 rewind observable, via the product
+    method)."""
+    bridge = rewind_bridge
+    name = f"rewind-{uuid.uuid4().hex[:8]}"
+    diag = f"/home/lester/awl-rewind-{uuid.uuid4().hex[:8]}"
+    proj = _project_dir(diag)
+    bridge._run(f"mkdir -p {shlex.quote(diag)}")
+    try:
+        bridge.create(name, cwd=diag, model="sonnet", show=False)
+        _plant_codewords(bridge, name, 3)
+
+        # The new public method — version-gated (>= 2.1.191) + the proven
+        # /rewind menu drive, all inside one call.
+        bridge.rewind(name, to_prompt_index=1)
+
+        bridge.send(name, _INTERROGATE)
+        bridge.wait_idle(name, timeout=90)
+        time.sleep(1)
+        reply = _last_assistant_log(bridge, name)   # also proves transcript parses
+        log.debug("rewind(method): interrogation reply=%r", reply)
+        assert reply, "read_log returned no assistant message (transcript unreadable)"
+        assert "ALPHA-1" in reply and "ALPHA-2" in reply, (
+            f"rewind() lost the retained prefix (ALPHA-1/2): {reply!r}")
+        assert "ALPHA-3" not in reply, (
+            f"rewind() did NOT truncate — agent still remembers ALPHA-3: {reply!r}")
+    finally:
+        try:
+            bridge.close(name)
+        except Exception as e:
+            log.debug("rewind(method): close(%s) raised (non-fatal): %s", name, e)
+        bridge._run(f"rm -rf {shlex.quote(diag)}")
+        bridge._run(f"rm -rf {proj}")
+
+
+def test_fork_via_bridge_method(rewind_bridge):
+    """``TmuxBridge.fork(src, new, to_prompt_index=1)`` spawns an independent
+    ``--fork-session`` branch, discovers + registers its fresh id, and rewinds it
+    to before ALPHA-3 — the fork knows ALPHA-1/2 but not ALPHA-3, WHILE the source
+    stays intact (still knows ALPHA-1/2/3). Uses ``isolate=False`` so the fork
+    stays in the SAME diag dir: this test asserts the CONVERSATION fork; the
+    git-worktree file-state policy has its own (hermetic) coverage."""
+    bridge = rewind_bridge
+    src = f"rewind-src-{uuid.uuid4().hex[:8]}"
+    fork = f"rewind-fork-{uuid.uuid4().hex[:8]}"
+    diag = f"/home/lester/awl-rewind-{uuid.uuid4().hex[:8]}"
+    proj = _project_dir(diag)
+    bridge._run(f"mkdir -p {shlex.quote(diag)}")
+    try:
+        bridge.create(src, cwd=diag, model="sonnet", show=False)
+        _plant_codewords(bridge, src, 3)
+
+        # The new public method — version gate + --fork-session spawn + fresh-id
+        # discovery + rewind-in-fork, in one call (tab-less; isolate=False keeps
+        # the fork's cwd = diag so its transcript lands in the same project dir).
+        desc = bridge.fork(src, fork, model="sonnet", to_prompt_index=1,
+                           isolate=False)
+        log.debug("fork(method): descriptor=%r", desc)
+        assert desc["status"] == "forked"
+        assert desc["source_session_id"], "fork lost the source session id"
+
+        bridge.send(fork, _INTERROGATE)
+        bridge.wait_idle(fork, timeout=90)
+        time.sleep(1)
+        fork_reply = _last_reply_screen(bridge, fork)
+        log.debug("fork(method): fork reply=%r", fork_reply)
+        assert "ALPHA-1" in fork_reply and "ALPHA-2" in fork_reply, (
+            f"fork lost the shared prefix (ALPHA-1/2): {fork_reply!r}")
+        assert "ALPHA-3" not in fork_reply, (
+            f"fork was not rewound — still remembers ALPHA-3: {fork_reply!r}")
+
+        # The ORIGINAL session must be untouched: still knows all three codewords.
+        bridge.send(src, _INTERROGATE)
+        bridge.wait_idle(src, timeout=90)
+        time.sleep(1)
+        src_reply = _last_assistant_log(bridge, src)
+        log.debug("fork(method): source reply=%r", src_reply)
+        assert "ALPHA-3" in src_reply, (
+            f"fork() MUTATED the original — source lost ALPHA-3: {src_reply!r}")
+        assert "ALPHA-1" in src_reply and "ALPHA-2" in src_reply, src_reply
+    finally:
+        for s in (fork, src):
+            try:
+                for _ in range(2):
+                    bridge.keys(s, "Escape")
+                    time.sleep(0.2)
+            except Exception:
+                pass
+            try:
+                bridge.close(s)
+            except Exception as e:
+                log.debug("fork(method): close(%s) raised (non-fatal): %s", s, e)
+        bridge._run(f"rm -rf {shlex.quote(diag)}")
+        bridge._run(f"rm -rf {proj}")

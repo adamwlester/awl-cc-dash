@@ -1125,7 +1125,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §7.15 | Per-agent cost endpoint built but not yet shown on cards (renderer) | #37 |
 | §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
-| §7.19 | No rewind/fork endpoint or Timeline wiring | #15 |
+| §7.19 | Rewind/fork endpoints built; the Timeline renderer wiring remains | #37 |
 
 ### 11.2 Storage & persistence set (#1–11)
 
@@ -1148,7 +1148,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 12. *(built 2026-07-10 — the keys() levers wired end to end with read-back + honest 409/400; live-proven on CC 2.1.206, incl. the caught CLI drift: "manual mode on" indicator + /fast fallback opener; see DEVLOG)*
 13. *(backend built 2026-07-10 — launch pre-arming re-verified live on 2.1.206; `unreachable` is the honest un-armed signal. The Create-panel UI half rides #37.)*
 14. *(built 2026-07-10 — POST /sessions/{id}/identity + `claude --name` launch / `/rename` live-edit registration, live-proven with sessions-file read-back; see DEVLOG)*
-15. **Rewind / Fork (Timeline)** *(→ §7.19)* — implement `/rewind` (tmux-driven, conversation-restore) + `--fork-session` + `/rewind`-inside-the-fork for branch-from-N; an explicit per-fork **file-state isolation** policy (git worktree / code-checkpoint); a **≥ v2.1.191** version gate at session create. Where: [`bridge/bridge.py`](../bridge/bridge.py), [`sidecar/main.py`](../sidecar/main.py).
+15. *(built 2026-07-15 — bridge `rewind()` (idle-gated `/rewind` menu drive) + `fork()` (`--resume <src> --fork-session`, own identity + reserved lineage, git-worktree file-state isolation with honest fallback to shared cwd) behind `POST /sessions/{id}/rewind` and `POST /sessions/{id}/fork`; the fork is adopted as a live, restart-survivable agent; **≥2.1.191** gate enforced at the rewind/fork entry (unresolvable version = not-met, never a silent pass), honest 400/409. Timeline renderer wiring rides #37; worktree teardown on delete + fork per-agent-settings re-materialization are marked seams. See DEVLOG)*
 16. **Handoff artifacts** *(→ §7.19; DESIGN.md's explicit deferral)* — generate a summary/handoff report on Handoff, layered on the plain context-carry-over (which ships first, #15).
 17. **Load past agents** *(→ §9.9; gated on #8)* — load past agents by name, ID, or via file explorer. Fleet Setups save/load and startup auto-reconnect exist; still no on-demand per-agent resume (endpoint or UI).
 18. *(built 2026-07-15 — per-project `state/archive.json`, a distinct-ID (`arc…`) table of LIGHT records written through the atomic state-store; Retire = deep-freeze archived by default, Delete = true wipe (never archived), transcripts referenced in place (§8.6, never copied), reserved lineage fields (parent/fork/handoff), per-agent git author from #19; `GET /archive`, `GET /archive/{id}`, `DELETE /archive/{id}` (true-delete of a row). Archiving is additive — dropping the live-roster row on retire ties to #17/picker-first startup, deferred. See DEVLOG)*

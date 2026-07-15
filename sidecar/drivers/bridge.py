@@ -464,6 +464,8 @@ class BridgeDriver(AgentDriver):
         "interrupt", "context", "permission", "resume",
         "set_model", "set_effort", "set_mode", "set_fast", "set_thinking",
         "subagents", "set_display_name", "context_breakdown", "cost",
+        # Timeline (§7.19, §11 #15): in-place conversation rewind + fork-from-N.
+        "rewind", "fork",
     }
 
     def __init__(
@@ -1301,6 +1303,65 @@ class BridgeDriver(AgentDriver):
         if not name:
             return
         await asyncio.to_thread(self._bridge.send, self._name, f"/rename {name}")
+
+    # --- Timeline: Rewind / Fork (§7.19, §11 #15) ------------------------------
+    #
+    # Both drive the TUI-native path proven live (test_rewind_handoff_live) and
+    # gate on Claude Code >= 2.1.191. Failures are surfaced as RuntimeError(reason)
+    # like the other live levers so the endpoint maps them to honest HTTP codes:
+    #   * "version_unsupported" -> 400 (the CLI is too old / unresolvable);
+    #   * "busy"                -> 409 (the screen isn't idle for the /rewind menu);
+    #   * anything else         -> 500 (an unexpected bridge failure).
+
+    async def rewind(self, to_prompt_index: int = 1) -> dict:
+        """Rewind this session's conversation to an earlier prompt (in-place).
+
+        Wraps ``TmuxBridge.rewind`` (the ``/rewind`` menu driver). Raises
+        RuntimeError("version_unsupported" | "busy" | <message>) — never a fake
+        success — so the endpoint degrades honestly.
+        """
+        from bridge.bridge import (  # type: ignore[import-not-found]
+            TmuxBridgeError, VersionUnsupportedError,
+        )
+        try:
+            result = await asyncio.to_thread(
+                self._bridge.rewind, self._name, to_prompt_index)
+        except VersionUnsupportedError:
+            raise RuntimeError("version_unsupported")
+        except TmuxBridgeError as e:
+            raise RuntimeError("busy" if str(e).startswith("busy") else str(e))
+        self.nudge()
+        return result
+
+    async def fork(self, new_name: str, *, cwd: str | None = None,
+                   model: str | None = None, to_prompt_index: int | None = None,
+                   isolate: bool = True, git_author_name: str | None = None,
+                   git_author_email: str | None = None) -> dict:
+        """Branch a NEW tmux session from THIS one via ``--fork-session``.
+
+        Wraps ``TmuxBridge.fork`` (version gate + per-fork file-state policy +
+        ``--fork-session`` spawn + optional rewind-in-fork). ``new_name`` is the
+        fork's tmux session name (minted by the caller). Returns the bridge fork
+        descriptor (source id, the fork's fresh claude id, cwd, filestate,
+        rewound_to); the sidecar adopts it as a live SessionState. Raises
+        RuntimeError("version_unsupported" | "busy" | <message>) on failure.
+        """
+        from bridge.bridge import (  # type: ignore[import-not-found]
+            TmuxBridgeError, VersionUnsupportedError,
+        )
+        try:
+            result = await asyncio.to_thread(
+                lambda: self._bridge.fork(
+                    self._name, new_name, cwd=cwd, model=model,
+                    to_prompt_index=to_prompt_index, isolate=isolate,
+                    git_author_name=git_author_name,
+                    git_author_email=git_author_email))
+        except VersionUnsupportedError:
+            raise RuntimeError("version_unsupported")
+        except TmuxBridgeError as e:
+            raise RuntimeError("busy" if str(e).startswith("busy") else str(e))
+        self.nudge()
+        return result
 
     async def stop(self) -> None:
         """End the tmux session gracefully but KEEP the persisted record.

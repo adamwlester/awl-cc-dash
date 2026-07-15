@@ -1135,6 +1135,28 @@ class SetFastRequest(BaseModel):
 class SetThinkingRequest(BaseModel):
     on: bool
 
+class RewindRequest(BaseModel):
+    """Rewind the agent's conversation to an earlier prompt checkpoint (§7.19,
+    §11 #15). ``to_prompt_index`` = how many user-prompt checkpoints to roll back
+    from the current end (1 = discard only the latest prompt) — the count-from-end
+    the native ``/rewind`` menu navigates by ``Up`` × k. Absolute Timeline-turn
+    addressing is the per-turn-capture / renderer surface (§11 #46, #37)."""
+    to_prompt_index: int = 1
+
+class ForkRequest(BaseModel):
+    """Fork/Handoff a NEW agent from an existing session (§7.19, §11 #15).
+
+    ``--fork-session`` branches an independent session from the source (source
+    untouched); an optional ``to_prompt_index`` rewinds the fork to an earlier
+    prompt for branch-from-N. The fork is a first-class live agent through the
+    standard Create wiring (§9.2) with its own identity (and its own #19 git
+    attribution). Fields left None inherit from the source."""
+    to_prompt_index: int | None = None       # branch-from-N (None = fork at head)
+    model: str | None = None                 # fork's model (default: source's)
+    cwd: str | None = None                   # override fork cwd (default: source's)
+    isolate: bool = True                     # per-fork file-state policy: own git worktree
+    identity: IdentityInput | None = None    # fork identity overrides (else assigned)
+
 
 # ============================================================================
 # Endpoints
@@ -2655,6 +2677,201 @@ async def set_thinking(session_id: str, req: SetThinkingRequest):
         raise _lever_http_error(e, "set_thinking")
     return {"status": "ok",
             "thinking": result if isinstance(result, bool) else req.on}
+
+
+# --- Timeline: Rewind / Fork (§7.19, §11 #15) ------------------------------
+
+def _rewind_fork_http_error(e: RuntimeError, op: str) -> HTTPException:
+    """Map a rewind/fork lever failure to an honest HTTP error (§7.19, §11 #15).
+
+    The bridge driver raises RuntimeError(<reason>) when the Timeline op can't
+    proceed: "version_unsupported" (Claude Code < 2.1.191 or unresolvable — the
+    feature is genuinely unavailable) → 400; "busy" (the screen isn't idle for
+    the `/rewind` menu) → 409; anything else (an unexpected bridge failure) → 500
+    with the reason. Never a fake success.
+    """
+    reason = str(e) or "failed"
+    if reason == "version_unsupported":
+        need = ".".join(str(x) for x in _REWIND_FORK_MIN_VERSION)
+        return HTTPException(
+            status_code=400,
+            detail=f"{op} unavailable: requires Claude Code >= {need}")
+    if reason == "busy":
+        return HTTPException(status_code=409,
+                             detail=f"{op} failed: busy — agent is not idle")
+    return HTTPException(status_code=500, detail=f"{op} failed: {reason}")
+
+
+# Mirrors bridge.bridge.REWIND_FORK_MIN_VERSION for the 400 message (kept here so
+# the message renders even when the bridge package isn't importable in a test).
+_REWIND_FORK_MIN_VERSION = (2, 1, 191)
+
+
+@app.post("/sessions/{session_id}/rewind")
+async def rewind_session(session_id: str, req: RewindRequest):
+    """Rewind an agent's conversation to an earlier prompt checkpoint (§7.19, §11 #15).
+
+    Drives the native `/rewind` menu over tmux (the bridge driver) to restore the
+    CONVERSATION in-place — same session id; the agent genuinely loses the later
+    turns from its live context. Requires Claude Code >= 2.1.191: a too-old (or
+    unresolvable) CLI degrades to an honest 400, never a silent no-op. 409 `busy`
+    when the agent's screen isn't idle (a slash command can only land at an idle
+    boundary); 400 for drivers without the capability.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not (session.driver and session.driver.supports("rewind")):
+        raise HTTPException(status_code=400, detail="Driver has no rewind support")
+    try:
+        result = await session.driver.rewind(req.to_prompt_index)
+    except RuntimeError as e:
+        raise _rewind_fork_http_error(e, "rewind")
+    # Spread the driver's rewind detail (name, to_prompt_index) but keep the
+    # endpoint envelope's status "ok" (the driver's inner "rewound" must not
+    # clobber it).
+    return {**(result if isinstance(result, dict) else {}), "status": "ok"}
+
+
+async def _adopt_forked_session(descriptor: dict[str, Any], *,
+                                source: "SessionState", identity: dict[str, Any],
+                                model: str | None,
+                                permission_mode: str) -> "SessionState":
+    """Wire an already-spawned fork into a first-class live SessionState (§7.19, §9.2).
+
+    The fork's tmux session already exists (spawned by the source driver's bridge
+    via `--fork-session`); this adopts it — exactly like reconnect's warm-restore
+    — as a restart-survivable SessionState with its OWN resumed BridgeDriver
+    (bound to the fork's tmux name + discovered claude id) and its own dashboard
+    identity + #19 git attribution. The reserved lineage fields (§11 #18) record
+    the parent/fork provenance. Returns the new live SessionState.
+
+    ⚠ RUNTIME-WIRING SEAM (§11 #15 — flagged, NOT faked): the fork is spawned by
+    the raw `--fork-session` launch, so it does NOT yet re-materialize the
+    sidecar's PER-AGENT settings (the hook push-channel, the per-turn statusLine
+    capture, and the §8.6 transcript-retention pin — see `_build_settings`), which
+    are keyed to a sidecar session id that only exists at adoption. The fork IS a
+    first-class, tracked, resumable agent (transcript polling + events + restart
+    survival all work); wiring its per-agent settings onto the fork launch is the
+    open follow-up (it needs the fork's sidecar id minted BEFORE the spawn).
+    """
+    global _identity_ordinal
+    from drivers.bridge import BridgeDriver  # local import (mirrors reconnect)
+
+    new_sid = str(uuid.uuid4())[:8]
+    fork_tmux = descriptor["name"]
+    cwd = descriptor.get("cwd") or source.cwd
+    claude_sid = descriptor.get("session_id")
+    # Reserved lineage (§11 #18): the fork's parent + fork provenance, seeded into
+    # the persisted record so it survives restart and is available to later
+    # archive/graph work (#16/#18 own the archive-on-retire hookup).
+    lineage = {
+        "parent": source.session_id,
+        "fork": {
+            "source_session_id": source.session_id,
+            "source_claude_session_id": descriptor.get("source_session_id"),
+            "rewound_to": descriptor.get("rewound_to"),
+        },
+        "handoff": None,
+    }
+    state_store.load_project(cwd)
+    state_store.register_agent(new_sid, cwd)
+    session = SessionState(
+        session_id=new_sid,
+        agent_type=source.agent_type,
+        model=model,
+        permission_mode=permission_mode,
+        cwd=cwd,
+        system_prompt=source.system_prompt,
+        driver_name="bridge",
+        allowed_tools=source.allowed_tools,
+        disallowed_tools=source.disallowed_tools,
+        permission_rules=source.permission_rules,
+        enabled_plugins=source.enabled_plugins,
+        mcp_servers=source.mcp_servers,
+        identity=identity,
+    )
+    sessions[new_sid] = session
+    config = DriverConfig(
+        agent_type=source.agent_type,
+        model=model,
+        permission_mode=permission_mode,
+        cwd=cwd,
+        system_prompt=source.system_prompt,
+        allowed_tools=source.allowed_tools,
+        disallowed_tools=source.disallowed_tools,
+        permission_rules=source.permission_rules,
+        enabled_plugins=source.enabled_plugins,
+        mcp_servers=source.mcp_servers,
+        identity=identity,
+    )
+    driver = BridgeDriver(
+        config, session.handle_event,
+        resume_name=fork_tmux, session_id=new_sid,
+        claude_session_id=claude_sid, cold_restore=False,
+        persisted_record={"session_id": new_sid, "lineage": lineage},
+    )
+    session.driver = driver
+    try:
+        await driver.start()          # resume() rebinds the alive fork tmux
+        session.status = "idle"
+        session.listen_task = asyncio.create_task(_listen(session))
+    except Exception as e:  # pragma: no cover - environment dependent
+        logger.error("fork adopt failed for %s: %s", new_sid, e)
+        session.status = "error"
+    return session
+
+
+@app.post("/sessions/{session_id}/fork")
+async def fork_session(session_id: str, req: ForkRequest):
+    """Fork/Handoff a NEW agent from an existing session (§7.19, §9.2, §11 #15).
+
+    Branches an independent session from the source via `claude --resume <src>
+    --fork-session` (the source is never touched), optionally rewinds the fork to
+    an earlier prompt for branch-from-N (`to_prompt_index`), applies the per-fork
+    file-state policy (its own git worktree, honest fallback to the shared cwd),
+    and adopts the fork as a first-class live agent through the standard Create
+    wiring (§9.2) — its own dashboard identity + #19 git attribution + reserved
+    lineage. Returns the new agent's session dict enriched with the fork lineage
+    and the file-state result. Requires Claude Code >= 2.1.191 (400 below that);
+    409 `busy` if a rewind-in-fork can't reach idle; 400 for drivers without the
+    capability.
+    """
+    global _identity_ordinal
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    source = sessions[session_id]
+    if not (source.driver and source.driver.supports("fork")):
+        raise HTTPException(status_code=400, detail="Driver has no fork support")
+    # Assign the FORK's own dashboard identity (round-robin + retired-skip, like
+    # create_session) so the branch is a distinct agent, not a clone of the source.
+    identity = assign_identity(
+        req.identity.model_dump() if req.identity else None, _identity_ordinal)
+    _identity_ordinal += 1
+    if not (req.identity and req.identity.number is not None):
+        if deletion.is_retired(identity["number"]):
+            identity["number"] = deletion.next_free_number(identity["number"])
+            _identity_ordinal = max(_identity_ordinal, identity["number"])
+    # The fork's OWN #19 git attribution (its commits author under its identity).
+    git_name, git_email = git_author(identity)
+    fork_tmux = f"awl-{uuid.uuid4().hex[:8]}"
+    model = req.model or source.model
+    try:
+        descriptor = await source.driver.fork(
+            fork_tmux, cwd=req.cwd, model=model,
+            to_prompt_index=req.to_prompt_index, isolate=req.isolate,
+            git_author_name=git_name, git_author_email=git_email)
+    except RuntimeError as e:
+        raise _rewind_fork_http_error(e, "fork")
+    forked = await _adopt_forked_session(
+        descriptor, source=source, identity=identity,
+        model=model, permission_mode=source.permission_mode)
+    out = forked.to_dict()
+    out["forked_from"] = source.session_id
+    out["forked_from_session_id"] = descriptor.get("source_session_id")
+    out["rewound_to"] = descriptor.get("rewound_to")
+    out["filestate"] = descriptor.get("filestate")
+    return out
 
 
 @app.get("/sessions/{session_id}/context")

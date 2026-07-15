@@ -35,6 +35,31 @@ class TmuxBridgeError(Exception):
     pass
 
 
+class VersionUnsupportedError(TmuxBridgeError):
+    """Raised when the installed Claude CLI is too old for a requested feature.
+
+    Rewind/Fork (§7.19, §11 #15) require Claude Code ≥ 2.1.191 (the version that
+    allows rewinding past a ``/clear``). A distinct exception type — subclass of
+    ``TmuxBridgeError`` so existing ``except TmuxBridgeError`` handlers still
+    catch it — so the API layer can map an unmet version gate to an HONEST
+    capability-unavailable 400 rather than a generic failure. Never a silent
+    no-op: the feature degrades loudly.
+    """
+    pass
+
+
+# Rewind/Fork version gate (§7.19, §11 #15): the native `/rewind` conversation
+# restore can only rewind past a `/clear` on Claude Code ≥ 2.1.191, so both
+# rewind and fork require at least this build. Below it (or an unresolvable
+# version) the feature is unavailable and degrades honestly (see
+# ``require_rewind_fork_version`` / ``VersionUnsupportedError``).
+REWIND_FORK_MIN_VERSION = (2, 1, 191)
+
+# First MAJOR.MINOR.PATCH triple in `claude --version` output (e.g.
+# "2.1.198 (Claude Code)"). Pure-parsed by ``parse_claude_version``.
+_CLAUDE_VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+
+
 # Valid values for claude's `--permission-mode` launch flag (CC 2.1.x). An
 # unrecognized value is dropped rather than passed through, so a bad/empty mode
 # just launches the TUI in its default mode instead of erroring on startup.
@@ -354,6 +379,36 @@ def pick_console_port(ss_output, start=CONSOLE_PORT_RANGE[0],
     return None
 
 
+def parse_claude_version(text):
+    """Parse a ``(major, minor, patch)`` tuple from `claude --version` output.
+
+    Pure function (no live session) so the rewind/fork version gate is
+    hermetically unit-testable. Reads the first ``MAJOR.MINOR.PATCH`` triple in
+    the string (``"2.1.198 (Claude Code)"`` -> ``(2, 1, 198)``); returns ``None``
+    when the text is empty or carries no parseable version (an honest miss, never
+    a fabricated version).
+    """
+    if not text:
+        return None
+    m = _CLAUDE_VERSION_RE.search(text)
+    if not m:
+        return None
+    return tuple(int(g) for g in m.groups())
+
+
+def version_at_least(version, minimum):
+    """True when ``version`` (a parsed tuple) is >= ``minimum`` (a tuple).
+
+    Pure function. A falsy/unparseable ``version`` (e.g. ``None`` from
+    ``parse_claude_version``) is treated as NOT meeting the bar — so an
+    unresolvable CLI version degrades to "feature unavailable", never silently
+    passing the gate.
+    """
+    if not version:
+        return False
+    return tuple(version) >= tuple(minimum)
+
+
 class TmuxBridge:
     """Programmatic control of Claude Code TUI sessions in WSL2/tmux.
 
@@ -536,7 +591,8 @@ class TmuxBridge:
                permission_mode=None, allowed_tools=None, disallowed_tools=None,
                settings=None, mcp_config=None, session_id=None,
                resume_session_id=None, display_name=None,
-               git_author_name=None, git_author_email=None):
+               git_author_name=None, git_author_email=None,
+               fork_session=False):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -622,19 +678,38 @@ class TmuxBridge:
             git_author_email: The synthetic per-agent email paired with
                 ``git_author_name`` (see above). Both are required to inject the
                 git env prefix; passing only one is a no-op.
+            fork_session: Fork (§7.19, §11 #15): launch with
+                ``--resume <resume_session_id> --fork-session`` so the new
+                process BRANCHES a fresh session from the source conversation
+                instead of continuing it — the source stays untouched. Requires
+                ``resume_session_id`` (the source). Unlike a plain resume,
+                ``--fork-session`` MINTS A NEW session id, so this does NOT pin
+                ``--session-id`` and the new id is UNKNOWN at launch (returned as
+                ``session_id: None``); the caller (``fork()`` / the sidecar)
+                discovers + registers it post-launch. ``resumed_conversation``
+                and ``forked`` are both True. Higher-level branch-from-N (rewind
+                the fork to an earlier prompt) is ``fork()``'s job, not this flag.
 
         Returns:
-            dict with session info: name, cwd, pid, session_id, and
-            resumed_conversation (True only on a ``resume_session_id`` launch).
+            dict with session info: name, cwd, pid, session_id (None for a
+            ``fork_session`` launch — the fork's id is discovered afterward),
+            resumed_conversation (True on a ``resume_session_id`` launch), and
+            forked (True only on a ``fork_session`` launch).
 
         Raises:
             TmuxBridgeError: If the session already exists, both ``session_id``
-                and ``resume_session_id`` are given, or creation fails.
+                and ``resume_session_id`` are given, ``fork_session`` is set
+                without ``resume_session_id``, or creation fails.
         """
         if session_id and resume_session_id:
             raise TmuxBridgeError(
                 "Pass either session_id (pin a NEW conversation's id) or "
                 "resume_session_id (cold-restore a prior conversation), not both."
+            )
+        if fork_session and not resume_session_id:
+            raise TmuxBridgeError(
+                "fork_session requires resume_session_id (the source conversation "
+                "to fork from via --resume <src> --fork-session)."
             )
 
         # Check for duplicate
@@ -652,13 +727,22 @@ class TmuxBridge:
         # bash -> tmux -> sh layering intact.
         argv = [CLAUDE_BIN]
         if resume_session_id:
-            # Cold-restore (§9.9): resume the prior conversation. No --session-id
-            # — plain --resume reuses the SAME id and appends to the same
-            # `<id>.jsonl` (live-proven on CC 2.1.202; a fork would need the
-            # explicit --fork-session flag), so registering the given id keeps
-            # find_transcript resolving the same file.
-            claude_session_id = resume_session_id
             argv += ["--resume", resume_session_id]
+            if fork_session:
+                # Fork (§7.19, §11 #15): --fork-session BRANCHES a new session
+                # off the source and mints a FRESH id, so we do NOT pin
+                # --session-id and cannot know the fork's id at launch. Left None
+                # here; fork() discovers the fresh <id>.jsonl afterward and
+                # registers it (find_transcript's unknown-id newest-file fallback
+                # covers reads until then). The source stays untouched.
+                argv += ["--fork-session"]
+                claude_session_id = None
+            else:
+                # Cold-restore (§9.9): plain --resume reuses the SAME id and
+                # appends to the same `<id>.jsonl` (live-proven on CC 2.1.202),
+                # so registering the given id keeps find_transcript resolving the
+                # same file.
+                claude_session_id = resume_session_id
         else:
             # Pin a known session id so this agent's transcript is `<id>.jsonl`,
             # resolvable by find_transcript even when co-located agents share a dir.
@@ -727,8 +811,11 @@ class TmuxBridge:
             raise TmuxBridgeError(f"Session '{name}' was not created. Check WSL/tmux state.")
 
         # Remember the session id so find_transcript can resolve this agent's own
-        # transcript directly (it is `<session-id>.jsonl`).
-        self._session_uuids[name] = claude_session_id
+        # transcript directly (it is `<session-id>.jsonl`). A fork mints a fresh
+        # id we don't yet know (claude_session_id is None) — skip registering it
+        # here; fork() discovers + registers the real id post-launch.
+        if claude_session_id:
+            self._session_uuids[name] = claude_session_id
 
         # Open a visible Windows Terminal tab only when explicitly requested.
         # Auto-opening steals desktop focus and routes the user's keystrokes into
@@ -750,6 +837,7 @@ class TmuxBridge:
             "pid": sessions[name].get("pid"),
             "session_id": claude_session_id,
             "resumed_conversation": bool(resume_session_id),
+            "forked": bool(fork_session),
         }
 
     def session_id_for(self, name):
@@ -1555,6 +1643,307 @@ class TmuxBridge:
             log.debug("console_detach(%s) cleanup: %s", name, e)
         return {"status": "detached", "name": name,
                 "port": (info or {}).get("port")}
+
+    # --- Rewind / Fork — the Timeline (§7.19, §11 #15) -------------------------
+    #
+    # Rewind and Fork are the two TUI-native Timeline operations proven live by
+    # tests/test_rewind_handoff_live.py (CC 2.1.198):
+    #   * REWIND = drive the native `/rewind` menu over tmux to restore the
+    #     CONVERSATION to an earlier prompt checkpoint IN-PLACE (same session id;
+    #     old lines stay as history, the live model context drops the later
+    #     turns). Not, by itself, a fork.
+    #   * FORK = `claude --resume <src> --fork-session` spawns an INDEPENDENT new
+    #     session from the source (source untouched); `/rewind` inside the fork to
+    #     an earlier prompt is the branch-from-N mechanism.
+    # Both require Claude Code >= 2.1.191 (the rewind-past-/clear gate). The gate
+    # is enforced at the rewind/fork entry and degrades HONESTLY below it
+    # (VersionUnsupportedError -> an API 400), never a silent no-op.
+
+    def claude_version(self):
+        """Resolve the installed Claude CLI version as ``(major, minor, patch)``.
+
+        Probes ``claude --version`` inside WSL (via the absolute ``CLAUDE_BIN`` —
+        a bare ``claude`` isn't on tmux's non-login PATH) and parses the triple.
+        Best-effort: returns ``None`` when the probe fails or the output carries
+        no parseable version — the honest miss the version gate treats as "not
+        met" (see ``require_rewind_fork_version``).
+        """
+        try:
+            out = self._run(f"{shlex.quote(CLAUDE_BIN)} --version", timeout=15)
+        except TmuxBridgeError:
+            return None
+        return parse_claude_version(out)
+
+    def require_rewind_fork_version(self):
+        """Enforce the rewind/fork ``>= 2.1.191`` version gate (§7.19, §11 #15).
+
+        Reads the live CLI version and raises ``VersionUnsupportedError`` when it
+        is older than ``REWIND_FORK_MIN_VERSION`` OR cannot be resolved — so the
+        feature is unavailable and fails LOUDLY (mapped to an honest API 400),
+        never faked. Returns the resolved version tuple on success.
+        """
+        version = self.claude_version()
+        if not version_at_least(version, REWIND_FORK_MIN_VERSION):
+            got = ".".join(str(x) for x in version) if version else "unknown"
+            need = ".".join(str(x) for x in REWIND_FORK_MIN_VERSION)
+            raise VersionUnsupportedError(
+                f"rewind/fork requires Claude Code >= {need} "
+                f"(installed: {got}) — the feature is unavailable on this build."
+            )
+        return version
+
+    def rewind(self, name, to_prompt_index=1, *, check_version=True,
+               idle_timeout=5.0, menu_wait=3.0, step_delay=1.0, confirm_wait=2.0):
+        """Rewind a live session's CONVERSATION to an earlier prompt checkpoint.
+
+        Drives the native ``/rewind`` menu over tmux — the exact keystroke
+        sequence proven live (``test_rewind_handoff_live``, CC 2.1.198): open
+        ``/rewind``; press ``Up`` × ``to_prompt_index`` to highlight "the point
+        before the k-th-from-last prompt"; ``Enter`` to open the confirm dialog;
+        ``Enter`` to perform Restore-conversation (the default); ``Ctrl-U`` to
+        clear the restored prompt out of the input box. Restore-conversation
+        rewinds IN-PLACE on the SAME session id — no new ``<id>.jsonl`` — so the
+        agent genuinely loses the later turns from its live context while the
+        transcript keeps them as history.
+
+        ``to_prompt_index`` is the number of user-prompt checkpoints to roll back
+        from the current end (``1`` = discard only the latest prompt). This is
+        the count-from-end the ``/rewind`` menu navigates by ``Up`` × k; absolute
+        Timeline-turn addressing (mapping a rendered Timeline row to a checkpoint)
+        is the per-turn-capture / renderer surface (§11 #46, #37), not wired here.
+
+        Requires Claude Code >= 2.1.191 (``require_rewind_fork_version``); refuses
+        below that with ``VersionUnsupportedError``. Idle-gated — a slash command
+        typed mid-turn is held as typeahead and misfires, so a non-idle screen
+        raises ``TmuxBridgeError("busy — …")`` (mapped to a 409). An absent
+        ``/rewind`` menu or confirm dialog raises ``TmuxBridgeError`` — an honest
+        failure, never a silent no-op.
+        """
+        if to_prompt_index is None or int(to_prompt_index) < 1:
+            raise TmuxBridgeError(
+                "rewind: to_prompt_index must be >= 1 (prompt checkpoints to roll back).")
+        if check_version:
+            self.require_rewind_fork_version()
+        self._require_session(name)
+        if not self._idle_gate(name, timeout=idle_timeout):
+            raise TmuxBridgeError(
+                "busy — session is not idle (a /rewind typed mid-turn misfires).")
+        self.send(name, "/rewind")
+        time.sleep(menu_wait)
+        screen = self.read(name, lines=45)["content"]
+        if "Rewind" not in screen or "Restore the code" not in screen:
+            raise TmuxBridgeError(
+                f"rewind: the /rewind menu did not render as expected:\n{screen[-400:]}")
+        # Up × k -> "the point before the k-th-from-last prompt".
+        for _ in range(int(to_prompt_index)):
+            self.keys(name, "Up")
+            time.sleep(step_delay)
+        self.keys(name, "Enter")           # open the confirm dialog
+        time.sleep(confirm_wait)
+        confirm = self.read(name, lines=45)["content"]
+        if "Confirm you want to restore" not in confirm:
+            raise TmuxBridgeError(
+                f"rewind: the confirm dialog did not appear:\n{confirm[-400:]}")
+        self.keys(name, "Enter")           # confirm — default = Restore conversation
+        time.sleep(step_delay)
+        self.keys(name, "C-u")             # clear the restored prompt from the input
+        return {"status": "rewound", "name": name,
+                "to_prompt_index": int(to_prompt_index)}
+
+    def prepare_fork_filestate(self, src_cwd, new_name, *, policy="worktree",
+                               branch=None, isolate=True):
+        """Resolve the fork's working copy per the per-fork FILE-STATE policy.
+
+        A conversation fork does NOT isolate filesystem state (the §7.19 caveat) —
+        two sessions sharing one cwd would clobber each other's edits. The decided
+        policy (⚠ assumed, doc-consistent — §11 #15) is a **git worktree**: the
+        fork gets its own working copy on its own branch, so its file edits never
+        collide with the parent's and its commits (via #19's per-agent git
+        identity) land on the fork's branch. ``git worktree add`` is intentionally
+        un-gated for the product (this is the PRODUCT creating a runtime worktree,
+        distinct from a dev agent branching — see ``.claude/settings.json``).
+
+        Returns ``{"cwd", "policy", "isolated", "worktree", "branch", "note"}``.
+        The returned ``cwd`` is the worktree when isolation succeeds, else the
+        source cwd. When the source is not a git repo, ``isolate`` is False, or
+        the worktree add fails, it degrades HONESTLY to the shared cwd
+        (``isolated: False`` + a ``note``) — never a silent or faked isolation.
+
+        ⚠ RUNTIME-WIRING SEAM (§11 #15 — a decided policy + live create, with the
+        teardown edge deferred, NOT faked): worktree/branch **teardown** (removing
+        the worktree and pruning the fork branch when the fork is retired/deleted)
+        is not wired here — it belongs on the deletion path (§7.12), which #18
+        owns. The worktree is created live; only its lifecycle cleanup is the open
+        runtime edge, and it is flagged rather than pretended-complete.
+        """
+        resolved = self._resolve_cwd(src_cwd)
+        result = {"cwd": resolved, "policy": policy, "isolated": False,
+                  "worktree": None, "branch": None, "note": None}
+        if not isolate or policy != "worktree" or not resolved:
+            result["note"] = "file-state shared with source (isolation not requested)"
+            return result
+        try:
+            inside = self._run(
+                f"cd {shlex.quote(resolved)} && "
+                "git rev-parse --is-inside-work-tree 2>/dev/null || echo no"
+            ).strip()
+        except TmuxBridgeError:
+            inside = "no"
+        if inside != "true":
+            result["note"] = "source is not a git repo — file-state shared with source"
+            return result
+        branch = branch or f"fork/{new_name}"
+        worktree = f"{resolved.rstrip('/')}-fork-{new_name}"
+        try:
+            self._run(
+                f"cd {shlex.quote(resolved)} && "
+                f"git worktree add -b {shlex.quote(branch)} {shlex.quote(worktree)} 2>&1",
+                timeout=60,
+            )
+        except TmuxBridgeError as e:
+            result["note"] = (
+                f"git worktree add failed ({e}); file-state shared with source")
+            return result
+        result.update(cwd=worktree, isolated=True, worktree=worktree,
+                      branch=branch,
+                      note="fork isolated in its own git worktree + branch")
+        return result
+
+    def _session_cwd(self, name):
+        """The WSL cwd of a live tmux session (``pane_current_path``), or None."""
+        try:
+            out = self._tmux(
+                f"display-message -t {shlex.quote(name)} -p '#{{pane_current_path}}'")
+        except TmuxBridgeError:
+            return None
+        return out.strip() or None
+
+    def _project_jsonl_ids(self, cwd):
+        """The set of ``<id>`` basenames of the ``*.jsonl`` in cwd's project dir.
+
+        Empty set when the project dir can't be resolved / listed (best-effort).
+        """
+        from .transcript import _resolve_project_dir
+        project_dir = _resolve_project_dir(self, cwd) if cwd else None
+        if not project_dir:
+            return set()
+        try:
+            out = self._run(
+                f"ls -1 {shlex.quote(project_dir)}/*.jsonl 2>/dev/null | "
+                "xargs -n1 basename 2>/dev/null || echo")
+        except TmuxBridgeError:
+            return set()
+        return {x[: -len(".jsonl")] for x in out.split() if x.endswith(".jsonl")}
+
+    def _discover_forked_session_id(self, cwd, exclude=(), timeout=20.0,
+                                    interval=0.5):
+        """Poll cwd's project dir for the fork's fresh ``<id>.jsonl`` (not excluded).
+
+        ``--fork-session`` mints a NEW id, unknown at launch; the fork's
+        transcript appears once the fork TUI resumes the source prefix. Best-effort
+        — returns the newest fresh id, or ``None`` when none appears within
+        ``timeout`` (``find_transcript``'s unknown-id newest-file fallback then
+        covers reads until a turn lands). A single immediate check when
+        ``timeout <= 0`` (used by the hermetic construction tests).
+        """
+        exclude = set(exclude)
+        deadline = time.time() + max(0.0, timeout)
+        while True:
+            fresh = self._project_jsonl_ids(cwd) - exclude
+            if len(fresh) == 1:
+                return next(iter(fresh))
+            if fresh:
+                # More than one new file (a co-located sibling raced) — take the
+                # newest fresh id by mtime.
+                from .transcript import _resolve_project_dir
+                project_dir = _resolve_project_dir(self, cwd)
+                if project_dir:
+                    try:
+                        newest = self._run(
+                            f"ls -t {shlex.quote(project_dir)}/*.jsonl 2>/dev/null")
+                    except TmuxBridgeError:
+                        newest = ""
+                    for line in newest.split():
+                        if not line.endswith(".jsonl"):
+                            continue
+                        cand = line.rsplit("/", 1)[-1][: -len(".jsonl")]
+                        if cand in fresh:
+                            return cand
+                return sorted(fresh)[-1]
+            if time.time() >= deadline:
+                return None
+            time.sleep(interval)
+
+    def fork(self, src_name, new_name, cwd=None, model=None,
+             to_prompt_index=None, *, isolate=True, worktree_branch=None,
+             check_version=True, git_author_name=None, git_author_email=None,
+             show=False, resolve_timeout=20.0, **create_kwargs):
+        """Branch a NEW tmux session from an existing one via ``--fork-session``.
+
+        The Fork/Handoff half of §7.19 (proven live, ``test_rewind_handoff_live``):
+        resolves the source's claude session id, spawns
+        ``claude --resume <src> --fork-session`` as a fresh, TAB-LESS tmux session
+        named ``new_name``, discovers + registers the fork's fresh id, and — when
+        ``to_prompt_index`` is given — rewinds the fork to that earlier prompt for
+        branch-from-N. The SOURCE session is never touched.
+
+        Steps:
+          1. ``require_rewind_fork_version`` gate (>= 2.1.191), unless
+             ``check_version=False``.
+          2. Per-fork file-state policy (``prepare_fork_filestate`` — git
+             worktree, honest fallback to the shared cwd).
+          3. ``create(new_name, resume_session_id=<src id>, fork_session=True,
+             …)`` — the ``--fork-session`` launch, carrying the fork's own #19 git
+             identity (``git_author_name``/``git_author_email``) and staying
+             tab-less (``show`` defaults False).
+          4. Discover + register the fork's fresh claude session id.
+          5. Optional ``rewind(new_name, to_prompt_index, check_version=False)``
+             for branch-from-N (the version gate already ran in step 1).
+
+        Only bridge-created / -registered SOURCE sessions can be forked (the
+        source's claude id must be known — ``session_id_for``). Returns a fork
+        descriptor: ``{status, name, source, source_session_id, session_id
+        (the fork's fresh id, or None if undiscovered), cwd, filestate,
+        rewound_to}``.
+        """
+        if check_version:
+            self.require_rewind_fork_version()
+        src_sid = self.session_id_for(src_name)
+        if not src_sid:
+            raise TmuxBridgeError(
+                f"cannot fork '{src_name}': its claude session id is unknown — "
+                "only bridge-created or -registered sessions can be forked.")
+        # Per-fork file-state policy (git worktree; honest fallback to shared cwd).
+        fork_src_cwd = cwd if cwd is not None else self._session_cwd(src_name)
+        filestate = self.prepare_fork_filestate(
+            fork_src_cwd, new_name, branch=worktree_branch, isolate=isolate)
+        fork_cwd = filestate["cwd"]
+        # Snapshot existing transcript ids so the fork's fresh id is discoverable.
+        ids_before = self._project_jsonl_ids(fork_cwd)
+        self.create(
+            new_name, cwd=fork_cwd, model=model,
+            resume_session_id=src_sid, fork_session=True, show=show,
+            git_author_name=git_author_name, git_author_email=git_author_email,
+            **create_kwargs)
+        # Discover + register the fork's fresh claude session id (best-effort).
+        forked_sid = self._discover_forked_session_id(
+            fork_cwd, exclude=ids_before | {src_sid}, timeout=resolve_timeout)
+        if forked_sid:
+            self.register_session_id(new_name, forked_sid)
+        # Branch-from-N: rewind the fork to the chosen earlier prompt. The source
+        # stays intact (the rewind happens IN the fork). Version already gated.
+        if to_prompt_index:
+            self.rewind(new_name, to_prompt_index, check_version=False)
+        return {
+            "status": "forked",
+            "name": new_name,
+            "source": src_name,
+            "source_session_id": src_sid,
+            "session_id": forked_sid,
+            "cwd": fork_cwd,
+            "filestate": filestate,
+            "rewound_to": to_prompt_index,
+        }
 
     # --- Multi-Agent ---
 
