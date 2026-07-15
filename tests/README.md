@@ -43,6 +43,8 @@ durable part. Keep this table current when you add/remove/rename test files (see
 | `test_marquee_unit.py` | `marquee.py` (transcript tail marquee) | ~25 |
 | `test_library_unit.py` | `library.py` (doc/plan render; per-doc `.meta.json` sidecars §8.5 — review/comments/anchors/provenance, atomic writes, pair-rename, orphan re-link, legacy `plan-reviews.json` migration, store-scoped create/delete guards) | ~83 |
 | `test_checklist_unit.py` | `checklist.py` (run-strip completion parser + barber-pole floor) | ~19 |
+| `test_runstate_unit.py` | `runstate.py` (run-state arbiter §7.4 — authoritative-when-fresh merge, event-specific `permission_mode`, concurrent-load ordering/dedup, subagent registry, env-guarded debug capture) | ~19 |
+| `test_clear_reresolve_unit.py` | Console `/clear` transcript re-resolve (§11 #35) — `main.py` `_is_clear_command`, `bridge` `reresolve_session_id` re-pin, driver adopt / pending / deferred-resolve paths | ~16 |
 | `test_watermark_unit.py` | `watermark.py` (read-watermark deltas) | ~17 |
 | `test_templates_store_unit.py` | `templates_store.py` (prompt templates, placeholder extraction) | ~17 |
 | `test_deletion_unit.py` | `deletion.py` (retire/delete modeling) | ~17 |
@@ -68,6 +70,8 @@ it encodes — read that docstring first; it is the spec.
 | `test_mode_control_wired_live.py` | The **wired live mode/thinking/fast controls** (§11 #12) — the production `BridgeDriver.set_mode/set_thinking/set_fast` path (what `POST /sessions/{id}/{mode,thinking,fast}` calls): Shift+Tab ring cycle with status-line read-back, the `Meta+T` modal read-first toggle, and the Fast panel (`Meta+O`, or `/fast` on CC ≥ 2.1.206) with the **credit-gate honest degrade** accepted as a valid outcome | ~1 |
 | `test_cold_restore_live.py` | The §9.9 **cold-restore** contract: `create(resume_session_id=…)` relaunches a DEAD agent's conversation via `claude --resume` — same session id, same `<id>.jsonl`, memory retained (same-id-vs-fork verdict recorded in `log/cold_restore_findings_latest.txt`) | ~1 |
 | `test_identity_rename_live.py` | The §7.5 **name-registration** contract: `create(display_name=…)` launches with `claude --name`, `/rename <name>` over `send()` renames the LIVE session (idle + still answering), and `~/.claude/sessions/<pid>.json` reads the registered name back (verdict in `log/identity_rename_findings_latest.txt`) | ~1 |
+| `test_hook_ingest_live.py` | The §11 #21 **live half**: the production hook set really POSTs run-state back through the WSL gateway into the arbiter (`run_state.source == "push"` + mode over `GET /sessions/{id}`), prompt_id presence on the installed build, and ~30 synthetic concurrent hook POSTs stay coherent (findings in `log/hook_ingest_findings_latest.txt`) | ~1 |
+| `test_console_clear_reresolve_live.py` | The §11 #35 **acceptance**: after a Console `/clear` (via `POST /sessions/{id}/console/run`) the sidecar re-resolves the rotated transcript, so post-/clear turns still reach the feed (immediate-vs-deferred path recorded in `log/clear_reresolve_findings_latest.txt`) | ~1 |
 
 ### Feasibility spikes (opt-in, live) — engine-capability evidence
 
@@ -102,7 +106,7 @@ INFEASIBLE tails live in §10's Decided omissions.
 | `test_oneclick_launch_live.py` | …have the app own the sidecar lifecycle without killing agents? | ✅ FEASIBLE (modeled in Python; real Electron POC still owed) |
 | `tests/ui/test_ui_slice_live.py` | …drive the whole live loop from a browser speaking only `api.ts`? | ✅ FEASIBLE |
 | `test_system_fault_harvest_live.py` | …read machine signals for System faults (rate/usage cap, auth, MCP)? | ⚠ PARTIAL — MCP + auth OK; **usage-cap wording not matched** |
-| `test_console_clear_transcript_live.py` | …survive a Console `/clear` without orphaning the transcript? | ⚠ HAZARD — `/clear` **orphans** new turns (`/compact` is safe) |
+| `test_console_clear_transcript_live.py` | …survive a Console `/clear` without orphaning the transcript? | ⚠ HAZARD — `/clear` **orphans** new turns (`/compact` is safe); the sidecar-level fix (§11 #35 re-resolve) is proven by `test_console_clear_reresolve_live.py` |
 | `test_polling_scale_ceiling_live.py` | …scale the ~1s per-agent poll to a fleet? | ⚠ FEASIBLE test, bad curve — **degrades from N=1** (needs rework) |
 | `test_inject_tail_live.py` | …deliver an Inject *mid-turn*, earlier than the tool/turn boundary? | ❌ INFEASIBLE — typeahead is held to the turn boundary → pure Next/Queue (ARCHITECTURE §7.3 / §10 Decided omissions) |
 | `test_runstrip_tail_live.py` | …get a real work-completion % (a denominator) from the engine? | ❌ INFEASIBLE — engine emits numerators only, no denominator (ARCHITECTURE §7.10 / §10 Decided omissions) |
@@ -119,7 +123,7 @@ INFEASIBLE tails live in §10's Decided omissions.
 |------|---------|
 | `conftest.py` | Shared fixtures (`bridge`, `live_session`) + per-run timestamped DEBUG log setup. Adds the repo root to `sys.path`. |
 | `run.ps1` | Convenience runner — resolves the local `.venv` and passes all args through to pytest. |
-| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. The cold-restore test writes `cold_restore_findings_*.txt` (+ `_latest`) — its same-id-vs-fork verdict. The identity-rename test writes `identity_rename_findings_*.txt` (+ `_latest`) — its `--name`/`/rename` registration + read-back verdict. |
+| `log/` | Per-run artifacts (gitignored): timestamped DEBUG logs (`tmux_bridge_*.log`, pruned to the newest 20) **and** durable results records (`results_*.xml` JUnit + `results_*.txt` summary + `results_latest.txt`). The workflow probe also writes `workflow_probe_findings_*.txt` (+ `_latest`) here, and the workflow-approval probe writes `workflow_approval_findings_*.txt` (+ `_latest`) — their plain-language answers to the workflow open questions. The Console streaming-attach spike writes `console_stream_findings_*.txt` (+ `_latest`) — its streaming-vs-polled latency numbers. The cold-restore test writes `cold_restore_findings_*.txt` (+ `_latest`) — its same-id-vs-fork verdict. The identity-rename test writes `identity_rename_findings_*.txt` (+ `_latest`) — its `--name`/`/rename` registration + read-back verdict. The hook-ingest live verify writes `hook_ingest_findings_*.txt` (+ `_latest`) — which hook events fired on the installed CLI + the prompt_id verdict; the /clear re-resolve acceptance writes `clear_reresolve_findings_*.txt` (+ `_latest`) — its immediate-vs-deferred rotation path. |
 
 ---
 

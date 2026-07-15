@@ -1558,6 +1558,17 @@ async def hook_subagent(agent: str, body: dict[str, Any] | None = None):
     return {}
 
 
+@app.get("/internal/debug/run-state/{agent}")
+async def debug_run_state(agent: str):
+    """Env-guarded (``AWL_RUNSTATE_DEBUG=1``) read-back of every hook delivery
+    the arbiter ingested for an agent — event name, arbiter-relevant fields, and
+    the raw payload key set. A live-test observability aid (§11 #21's verify
+    reads exactly which events the installed CLI fired); 404 unless enabled."""
+    if os.environ.get("AWL_RUNSTATE_DEBUG") != "1":
+        raise HTTPException(status_code=404, detail="Not enabled")
+    return {"agent": agent, "deliveries": runstate.debug_log(agent)}
+
+
 # --- Plan/Decision detection via the PreToolUse hook channel ---
 # The agent's ExitPlanMode (Plan) and AskUserQuestion (Decision) tool calls are
 # visible to hooks even when the screen isn't. The spike confirmed the hook
@@ -2082,12 +2093,27 @@ class ConsoleRunRequest(BaseModel):
     command: str
 
 
+def _is_clear_command(command: str) -> bool:
+    """True when a Console command is a ``/clear`` — the one slash-command that
+    rotates the agent's JSONL transcript and orphans the pinned resolution
+    (§7.13; ``/compact`` annotates the same file and is safe). Keyed on the
+    first token so arguments/whitespace don't dodge the detection."""
+    parts = (command or "").strip().split()
+    return bool(parts) and parts[0].lower() == "/clear"
+
+
 @app.post("/sessions/{session_id}/console/run")
 async def console_run(session_id: str, req: ConsoleRunRequest):
     """Route a slash-command to the focused agent over the bridge (send/keys), then
     read the screen back. Interactive commands (e.g. /model, /clear) drop the agent
     into a sub-prompt — flagged so the caller drives the follow-on rather than
-    blind-sending."""
+    blind-sending.
+
+    A ``/clear`` additionally triggers the post-rotation transcript re-resolve
+    (§7.13, §11 #35): the driver re-pins the rotated ``<new-id>.jsonl`` (or arms a
+    pending retry until it appears) so post-/clear turns are never lost to the
+    sidecar. The result rides back as ``transcript_rotation``.
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
@@ -2101,7 +2127,15 @@ async def console_run(session_id: str, req: ConsoleRunRequest):
         screen = drv._bridge.read(drv.tmux_name, lines=40)["content"]  # type: ignore[attr-defined]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"console run failed: {e}")
-    return {"command": req.command, "interactive": interactive, "screen": screen}
+    result = {"command": req.command, "interactive": interactive, "screen": screen}
+    if _is_clear_command(req.command) and hasattr(drv, "handle_transcript_rotation"):
+        try:
+            result["transcript_rotation"] = await drv.handle_transcript_rotation()
+        except Exception as e:  # pragma: no cover - never fail the console reply
+            logger.warning("post-/clear transcript re-resolve failed: %s", e)
+            result["transcript_rotation"] = {"rotated": False, "pending": True,
+                                             "error": str(e)}
+    return result
 
 
 # ============================================================================

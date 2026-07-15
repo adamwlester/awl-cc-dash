@@ -29,7 +29,11 @@
       "Skill",
       "Skill(*)",
       "Skill(claude-api)",
-      "Skill(claude-api:*)"
+      "Skill(claude-api:*)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'merge: #21 live hook-ingest verify + #35 /clear transcript re-resolve + #36 parser audit *)",
+      "Bash(git worktree *)",
+      "Bash(git push *)"
     ],
     "deny": [
       "Read(./.vscode/claude-prompts.code-snippets)",

@@ -503,6 +503,26 @@ class TestDeriveSubagents:
         entries = [self._spawn("toolu_1", name="Task"), self._result("toolu_1")]
         assert derive_subagents(entries)["count"] == 1
 
+    def test_dual_spawn_names_pin_both_end_to_end(self):
+        """#36 pinning (ARCHITECTURE §11 #36): the transcript parser keys on BOTH
+        subagent spawn-tool names — "Agent" (current CC builds; renamed from
+        "Task" in v2.1.63) and "Task" (Agent SDK / older builds) — in ONE
+        transcript, end-to-end through derive_subagents. If a future edit drops
+        either name from _SUBAGENT_TOOLS / _TOOL_CATEGORY, this fails."""
+        entries = [
+            self._spawn("toolu_a", name="Agent"), self._result("toolu_a"),
+            self._spawn("toolu_t", name="Task"),
+            self._result("toolu_t", agent_id="task-spawned"),
+        ]
+        out = derive_subagents(entries)
+        assert out["count"] == 2
+        assert [s["id"] for s in out["subagents"]] == ["s1", "s2"]
+        assert [s["agent_id"] for s in out["subagents"]] == \
+            ["acbbfd9edd81f32fc", "task-spawned"]
+        assert all(s["status"] == "done" for s in out["subagents"])
+        # Both names also bucket to the "subagent" Turns category.
+        assert classify_tool("Agent") == classify_tool("Task") == "subagent"
+
     def test_multiple_spawns_get_ordinal_ids(self):
         entries = [
             self._spawn("toolu_1"), self._result("toolu_1"),

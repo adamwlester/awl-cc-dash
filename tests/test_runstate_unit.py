@@ -103,7 +103,40 @@ class TestEffective:
         eff = runstate.effective("ghost", "running")
         assert eff == {"source": "poll", "age_s": None, "phase": "running",
                        "permission_mode": None, "current_tool": None,
-                       "prompt_id": None}
+                       "prompt_id": None, "last_event": None}
+
+    def test_last_event_exposed(self):
+        # Observability: effective() names the hook event the freshness rides.
+        runstate.ingest("a1", "UserPromptSubmit", {})
+        assert runstate.effective("a1", "idle")["last_event"] == "UserPromptSubmit"
+
+
+class TestDebugCapture:
+    def test_disabled_by_default(self):
+        runstate.ingest("a1", "PreToolUse", {"tool_name": "Bash"})
+        assert runstate.debug_log("a1") == []
+
+    def test_env_guarded_capture_records_deliveries(self, monkeypatch):
+        monkeypatch.setenv("AWL_RUNSTATE_DEBUG", "1")
+        runstate.ingest("a1", "PreToolUse", {
+            "tool_name": "Bash", "tool_use_id": "t1", "prompt_id": "p1",
+            "permission_mode": "default", "cwd": "/x",
+        })
+        # Deduped redeliveries are still CAPTURED (the capture records what
+        # arrived, the arbiter decides what applies).
+        runstate.ingest("a1", "PreToolUse", {
+            "tool_name": "Bash", "tool_use_id": "t1", "prompt_id": "p1",
+        })
+        log = runstate.debug_log("a1")
+        assert len(log) == 2
+        assert log[0]["event"] == "PreToolUse"
+        assert log[0]["permission_mode"] == "default"
+        assert log[0]["tool_name"] == "Bash"
+        assert log[0]["prompt_id"] == "p1"
+        assert "cwd" in log[0]["payload_keys"]
+        # drop_agent forgets the capture too.
+        runstate.drop_agent("a1")
+        assert runstate.debug_log("a1") == []
 
 
 class TestConcurrency:
@@ -155,18 +188,29 @@ class TestSubagents:
     def test_start_stop_registry(self):
         runstate.ingest_subagent("parent", "SubagentStart", {
             "agent_id": "sub-1", "agent_type": "Explore",
-            "transcript_path": "/home/u/.claude/projects/x/sub-1.jsonl",
         })
         live = runstate.subagents_live("parent")
         assert live[0]["status"] == "running"
         assert live[0]["type"] == "Explore"
         runstate.ingest_subagent("parent", "SubagentStop", {
             "agent_id": "sub-1", "last_assistant_message": "done!",
+            "agent_transcript_path":
+                "/home/u/.claude/projects/x/p-uuid/subagents/agent-sub-1.jsonl",
         })
         live = runstate.subagents_live("parent")
         assert live[0]["status"] == "stopped"
         assert live[0]["last_assistant_message"] == "done!"
-        assert live[0]["transcript_path"].endswith("sub-1.jsonl")
+        assert live[0]["transcript_path"].endswith("agent-sub-1.jsonl")
+
+    def test_parent_transcript_path_never_pins_the_subagent(self):
+        # Live-mapped (CC 2.1.206): every payload's plain `transcript_path` is
+        # the PARENT session's transcript; only `agent_transcript_path` names
+        # the subagent's own file. The plain key must never land on the record.
+        runstate.ingest_subagent("parent", "SubagentStart", {
+            "agent_id": "sub-1",
+            "transcript_path": "/home/u/.claude/projects/x/parent-uuid.jsonl",
+        })
+        assert runstate.subagents_live("parent")[0]["transcript_path"] is None
 
     def test_subagent_push_counts_as_parent_freshness(self):
         runstate.ingest_subagent("parent", "SubagentStart", {"agent_id": "s"})
