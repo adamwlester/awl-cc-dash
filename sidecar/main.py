@@ -50,6 +50,7 @@ import marquee
 import console_catalog
 import settings_io
 import utility_llm
+import handoff
 import subagents_naming
 
 logging.basicConfig(level=logging.INFO)
@@ -1156,6 +1157,39 @@ class ForkRequest(BaseModel):
     cwd: str | None = None                   # override fork cwd (default: source's)
     isolate: bool = True                     # per-fork file-state policy: own git worktree
     identity: IdentityInput | None = None    # fork identity overrides (else assigned)
+    # §11 #16 — Handoff artifacts: when true, layer a generated summary/handoff
+    # report on the plain context carry-over (a utility-LLM pass over the source's
+    # recent transcript, stored as a Library doc the Create payload references).
+    handoff: bool = False
+    handoff_model: str | None = None         # model for the handoff-summary pass
+
+
+class ResumeRequest(BaseModel):
+    """Select ONE past agent to resume on demand (§9.9, §11 #17).
+
+    The missing piece over #8's startup cold-restore: load a SPECIFIC past agent
+    à la carte — by its original sidecar ``session_id``, its identity ``name``, or
+    an ``archive_id`` from the Agent archive (§11 #18, a retired/deep-frozen
+    agent). Exactly one selector is used; precedence is ``archive_id`` →
+    ``session_id`` → ``name``. The resume relaunches ``claude --resume
+    <claude_session_id>`` in the agent's cwd (the same conversation, same id — the
+    live-proven §9.9 cold path), adopting it back as a first-class live agent."""
+    session_id: str | None = None
+    name: str | None = None
+    archive_id: str | None = None
+
+
+class HandoffReportRequest(BaseModel):
+    """Generate a standalone Handoff artifact for a live session (§7.19, §11 #16).
+
+    A concise summary/handoff report (what the agent was doing / key decisions /
+    current state) distilled from the agent's recent transcript via the utility
+    LLM and persisted as a Library doc (§8.4). ``cwd`` overrides where the doc
+    lands (default the source agent's own project home); ``target_session_id``
+    records which agent the handoff is FOR (provenance only)."""
+    target_session_id: str | None = None
+    model: str | None = None
+    cwd: str | None = None
 
 
 # ============================================================================
@@ -1225,6 +1259,259 @@ async def create_session(req: CreateSessionRequest):
 @app.get("/sessions")
 async def list_sessions_endpoint():
     return [s.to_dict() for s in sessions.values()]
+
+
+# ---------------------------------------------------------------------------
+# Load past agents — on-demand per-agent resume (§9.9, §11 #17)
+#
+# #8 built cold-restore-on-startup + Fleet-Setup load; what was missing is
+# loading ONE specific past agent à la carte. These two endpoints add it, riding
+# the SAME live-proven cold path (`claude --resume <id>`): enumerate the
+# resumable roster + archive records, then resume a chosen one back into a live
+# session. NOTE: `GET /sessions/past` is declared BEFORE `GET /sessions/{id}` so
+# the literal `past` segment isn't swallowed by the `{session_id}` route.
+# ---------------------------------------------------------------------------
+
+def _resumable_from_roster(rec: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a persisted roster record (runtime_store) into a resume descriptor."""
+    ident = rec.get("identity") if isinstance(rec.get("identity"), dict) else None
+    return {
+        "session_id": rec.get("session_id"),
+        "claude_session_id": rec.get("claude_session_id"),
+        "cwd": rec.get("cwd"),
+        "model": rec.get("model"),
+        "permission_mode": rec.get("permission_mode", "acceptEdits"),
+        "identity": ident,
+        "name": (ident or {}).get("name"),
+        "transcript_path": rec.get("transcript_path"),
+        "allowed_tools": rec.get("allowed_tools"),
+        "disallowed_tools": rec.get("disallowed_tools"),
+        "permission_rules": rec.get("permission_rules"),
+        "enabled_plugins": rec.get("enabled_plugins"),
+        "mcp_servers": rec.get("mcp_servers"),
+        "created_at": rec.get("created_at"),
+        "retired_at": None,
+        "source": "roster",
+        "archive_id": None,
+    }
+
+
+def _resumable_from_archive(arc: dict[str, Any]) -> dict[str, Any]:
+    """Normalize an archived record (§11 #18, LIGHT — transcript referenced in
+    place) into a resume descriptor. The transcript pointer lives under
+    ``transcript.{claude_session_id, transcript_path}``; the light record carries
+    no per-agent launch config, so those resume as None (the resumed conversation
+    is what matters — §9.9)."""
+    ident = arc.get("identity") if isinstance(arc.get("identity"), dict) else None
+    tr = arc.get("transcript") if isinstance(arc.get("transcript"), dict) else {}
+    return {
+        "session_id": arc.get("session_id"),
+        "claude_session_id": tr.get("claude_session_id"),
+        "cwd": arc.get("cwd"),
+        "model": arc.get("model"),
+        "permission_mode": arc.get("permission_mode", "acceptEdits"),
+        "identity": ident,
+        "name": arc.get("name") or (ident or {}).get("name"),
+        "transcript_path": tr.get("transcript_path"),
+        "allowed_tools": None,
+        "disallowed_tools": None,
+        "permission_rules": None,
+        "enabled_plugins": None,
+        "mcp_servers": None,
+        "created_at": arc.get("created_at"),
+        "retired_at": arc.get("retired_at"),
+        "source": "archive",
+        "archive_id": arc.get("archive_id"),
+    }
+
+
+def _past_summary(d: dict[str, Any], live_ids: set[str]) -> dict[str, Any]:
+    """One `GET /sessions/past` row: identity/cwd/model + resume eligibility.
+
+    ``resumable`` = has a conversation id to resume AND isn't already live."""
+    sid = d.get("session_id")
+    live = sid in live_ids
+    return {
+        "session_id": sid,
+        "name": d.get("name"),
+        "identity": d.get("identity"),
+        "cwd": d.get("cwd"),
+        "model": d.get("model"),
+        "claude_session_id": d.get("claude_session_id"),
+        "created_at": d.get("created_at"),
+        "retired_at": d.get("retired_at"),
+        "source": d.get("source"),
+        "archive_id": d.get("archive_id"),
+        "live": live,
+        "resumable": bool(d.get("claude_session_id")) and not live,
+    }
+
+
+@app.get("/sessions/past")
+async def list_past_agents():
+    """Enumerate resumable past agents — the persisted roster + the archive (§11 #17).
+
+    Aggregates every persisted roster record (``runtime_store.all_records()``,
+    project-first) that ISN'T currently live, plus every archived (retired) record
+    (§11 #18). Currently-live agents are excluded — they're already in
+    ``GET /sessions``. Each row carries a ``resumable`` flag (has a
+    ``claude_session_id`` to resume, and isn't live) and a ``source``
+    (``roster`` | ``archive``), so a UI can offer load-by-name/ID/archive."""
+    import runtime_store
+    live_ids = set(sessions)
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for rec in runtime_store.all_records():
+        sid = rec.get("session_id")
+        if not sid or sid in live_ids:
+            continue          # live agents belong to GET /sessions, not "past"
+        out.append(_past_summary(_resumable_from_roster(rec), live_ids))
+        seen.add(sid)
+    for arc in state_store.all_archived_records():
+        sid = arc.get("session_id")
+        if sid and sid in live_ids:
+            continue
+        if sid and sid in seen:
+            continue          # a roster record already covers this id
+        out.append(_past_summary(_resumable_from_archive(arc), live_ids))
+    return {"past": out, "count": len(out)}
+
+
+def _resolve_resume_target(req: "ResumeRequest") -> dict[str, Any] | None:
+    """Resolve a ResumeRequest to a resume descriptor (or None = not found).
+
+    Precedence archive_id → session_id → name. An id/name is matched against BOTH
+    the live-capable roster AND the archive (a retired agent lives only in the
+    archive), so "load past agent by name or ID" reaches deep-frozen agents too."""
+    import runtime_store
+    if req.archive_id:
+        found = state_store.find_archive_record(req.archive_id)
+        return _resumable_from_archive(found[1]) if found else None
+    if req.session_id:
+        for rec in runtime_store.all_records():
+            if rec.get("session_id") == req.session_id:
+                return _resumable_from_roster(rec)
+        for arc in state_store.all_archived_records():
+            if arc.get("session_id") == req.session_id:
+                return _resumable_from_archive(arc)
+        return None
+    if req.name:
+        target = req.name.strip().lower()
+        for rec in runtime_store.all_records():
+            nm = ((rec.get("identity") or {}).get("name") or "").strip().lower()
+            if nm and nm == target:
+                return _resumable_from_roster(rec)
+        for arc in state_store.all_archived_records():
+            nm = (arc.get("name") or (arc.get("identity") or {}).get("name")
+                  or "").strip().lower()
+            if nm and nm == target:
+                return _resumable_from_archive(arc)
+        return None
+    return None
+
+
+async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
+    """Relaunch a past agent from a resume descriptor into a live SessionState.
+
+    Mirrors ``reconnect_sessions()``'s COLD branch (§9.9): a fresh tmux session
+    launched with ``claude --resume <claude_session_id>`` in the agent's cwd — the
+    SAME conversation, rebuilt from its transcript, continuing on the SAME sidecar
+    session id (so it's THE agent returning, not a clone/fork). ``start()``
+    re-persists the roster record, bringing the agent back to the live roster."""
+    global _identity_ordinal
+    from drivers.bridge import BridgeDriver  # local import (mirrors reconnect)
+
+    sid = d.get("session_id") or str(uuid.uuid4())[:8]
+    cwd = d.get("cwd")
+    claude_sid = d.get("claude_session_id")
+    identity = d.get("identity")
+    # Keep the round-robin counter ahead of a restored agent's number (as reconnect).
+    if isinstance(identity, dict) and isinstance(identity.get("number"), int):
+        _identity_ordinal = max(_identity_ordinal, identity["number"])
+    state_store.load_project(cwd)
+    state_store.register_agent(sid, cwd)
+    session = SessionState(
+        session_id=sid,
+        agent_type=None,
+        model=d.get("model"),
+        permission_mode=d.get("permission_mode", "acceptEdits"),
+        cwd=cwd,
+        system_prompt=None,
+        driver_name="bridge",
+        allowed_tools=d.get("allowed_tools"),
+        disallowed_tools=d.get("disallowed_tools"),
+        permission_rules=d.get("permission_rules"),
+        enabled_plugins=d.get("enabled_plugins"),
+        mcp_servers=d.get("mcp_servers"),
+        identity=identity,
+    )
+    sessions[sid] = session
+    config = DriverConfig(
+        agent_type=None,
+        model=d.get("model"),
+        permission_mode=d.get("permission_mode", "acceptEdits"),
+        cwd=cwd,
+        system_prompt=None,
+        allowed_tools=d.get("allowed_tools"),
+        disallowed_tools=d.get("disallowed_tools"),
+        permission_rules=d.get("permission_rules"),
+        enabled_plugins=d.get("enabled_plugins"),
+        mcp_servers=d.get("mcp_servers"),
+        identity=identity,
+    )
+    driver = BridgeDriver(
+        config, session.handle_event,
+        session_id=sid, claude_session_id=claude_sid, cold_restore=True,
+        transcript_path=d.get("transcript_path"),
+        persisted_record={"session_id": sid, "cwd": cwd},
+    )
+    session.driver = driver
+    try:
+        await driver.start()          # cold create: `claude --resume <id>`
+        session.status = "idle"
+        session.listen_task = asyncio.create_task(_listen(session))
+    except Exception as e:  # pragma: no cover - environment dependent
+        logger.error("on-demand resume failed for %s: %s", sid, e)
+        session.status = "error"
+    return session
+
+
+@app.post("/sessions/resume")
+async def resume_past_session(req: ResumeRequest):
+    """Resume ONE past agent on demand, back into a live session (§9.9, §11 #17).
+
+    Selects by ``archive_id`` / ``session_id`` / ``name`` (that precedence) across
+    the roster + archive, then relaunches it on the §9.9 cold path (same
+    conversation, same id). Honest failures: **404** when nothing matches; **409**
+    when the target is already live; **400** when no selector is given or the
+    target has no conversation id to resume. Resuming from the archive un-retires
+    it — the deep-freeze row is removed once it's live again (§7.12 reversibility)."""
+    if not (req.archive_id or req.session_id or req.name):
+        raise HTTPException(status_code=400,
+                            detail="Provide one of: archive_id, session_id, name")
+    d = _resolve_resume_target(req)
+    if d is None:
+        raise HTTPException(status_code=404, detail="No matching past agent to resume")
+    sid = d.get("session_id")
+    if sid and sid in sessions:
+        raise HTTPException(status_code=409, detail=f"Agent {sid} is already live")
+    if not d.get("claude_session_id"):
+        raise HTTPException(status_code=400,
+                            detail="Target has no resumable conversation id")
+    session = await _resume_agent_from_descriptor(d)
+    # Un-retire: a successful resume from the archive removes the deep-freeze row
+    # (§7.12 — Retire is reversible; the agent is live again). Best-effort.
+    if d.get("source") == "archive" and d.get("archive_id") \
+            and session.status != "error":
+        try:
+            state_store.delete_archived_anywhere(d["archive_id"])
+        except Exception:  # pragma: no cover - best effort
+            pass
+    out = session.to_dict()
+    out["resumed_from"] = d.get("source")
+    out["archive_id"] = d.get("archive_id")
+    out["claude_session_id"] = d.get("claude_session_id")
+    return out
 
 
 @app.get("/sessions/{session_id}")
@@ -2871,7 +3158,67 @@ async def fork_session(session_id: str, req: ForkRequest):
     out["forked_from_session_id"] = descriptor.get("source_session_id")
     out["rewound_to"] = descriptor.get("rewound_to")
     out["filestate"] = descriptor.get("filestate")
+    # §11 #16 — Handoff artifact: layer a generated summary/handoff report on the
+    # plain context carry-over. Distilled from the SOURCE's recent transcript and
+    # stored as a Library doc under the FORK's project home; the Create payload
+    # references it (§9.2). Non-fatal — a fork still succeeds if generation fails
+    # (the failure is reported honestly on the payload, never faked).
+    if req.handoff:
+        try:
+            out["handoff"] = await _generate_handoff_artifact(
+                source, cwd=forked.cwd, target_session_id=forked.session_id,
+                model=req.handoff_model)
+        except Exception as e:  # pragma: no cover - live/env dependent
+            logger.warning("handoff artifact failed for fork of %s: %s",
+                           source.session_id, e)
+            out["handoff"] = {"error": str(e)}
     return out
+
+
+async def _generate_handoff_artifact(source: "SessionState", *, cwd: str | None,
+                                     target_session_id: str | None,
+                                     model: str | None) -> dict[str, Any]:
+    """Distill + persist a handoff report from ``source``'s recent transcript (§11 #16).
+
+    The transcript excerpt is lifted from the source session's already fanned-out
+    events (assistant/user text); the utility-LLM pass + Library write live in
+    :mod:`handoff`. Returns the artifact dict (filename / path / summary / …)."""
+    excerpt = handoff.transcript_text_from_events(source.events)
+    return await handoff.generate_and_store_handoff(
+        cwd, excerpt,
+        source_session_id=source.session_id,
+        source_identity=source.identity,
+        target_session_id=target_session_id,
+        model=model,
+    )
+
+
+@app.post("/sessions/{session_id}/handoff-report")
+async def handoff_report_endpoint(session_id: str, req: HandoffReportRequest):
+    """Generate a standalone Handoff artifact for a live session (§7.19, §11 #16).
+
+    The dedicated seam (the fork ``handoff`` flag rides the same generator): a
+    utility-LLM pass over the agent's recent transcript → a short structured
+    report (what was being done / key decisions / current state & pending) →
+    persisted as a Library doc (§8.4) under the agent's project ``docs/`` with
+    provenance. ``cwd`` overrides where the doc lands; ``target_session_id``
+    records who it's for. 404 unknown session; 400 when there's no project home to
+    store the doc; 502 when the generation pass fails (honest, never a fake doc)."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    cwd = req.cwd or session.cwd
+    if not cwd:
+        raise HTTPException(status_code=400,
+                            detail="Agent has no project home to store the handoff doc")
+    try:
+        return await _generate_handoff_artifact(
+            session, cwd=cwd, target_session_id=req.target_session_id,
+            model=req.model)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"handoff report failed: {e}")
 
 
 @app.get("/sessions/{session_id}/context")

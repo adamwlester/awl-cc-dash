@@ -1,10 +1,12 @@
-"""Utility-LLM passes (Revise / Summarize) — the `sdk`-driver carve-out.
+"""Utility-LLM passes (Revise / Summarize / Handoff report) — the `sdk`-driver carve-out.
 
-Exactly **two** consumers use the `sdk` engine: **Revise** (scope chip
-Grammar · Language · Refactor, default Grammar) and **Summarize**. Both run as
-non-interactive **one-shot** passes via the in-process Claude Agent SDK `query()`
-— NOT the bridge. Everything else multi-agent (stream, queue, hooks, console,
-scratchpad, linking, Plan/Decision detection) stays on the bridge.
+A small, closed set of consumers use the `sdk` engine: **Revise** (scope chip
+Grammar · Language · Refactor, default Grammar), **Summarize**, and the
+**Handoff report** (§11 #16 — the structured summary layered on Handoff's plain
+context carry-over). All run as non-interactive **one-shot** passes via the
+in-process Claude Agent SDK `query()` — NOT the bridge. Everything else
+multi-agent (stream, queue, hooks, console, scratchpad, linking, Plan/Decision
+detection) stays on the bridge.
 """
 from __future__ import annotations
 
@@ -21,6 +23,23 @@ REVISE_SYSTEMS = {
 }
 SUMMARIZE_SYSTEM = ("You are a concise summarizer. Summarize the following "
                     "faithfully and briefly. Return ONLY the summary — no preamble.")
+
+# Handoff report (§11 #16): a utility-LLM pass over an agent's recent transcript
+# that distills a short, structured hand-off — what the agent was doing, the key
+# decisions it made, and the current state / what's still pending — so a forked
+# or picking-up agent (or the operator) can continue without re-reading the whole
+# conversation. Structured markdown (⚠ assumed format, doc-consistent with the
+# operator's TL;DR style, §7.14). Return ONLY the report body — no preamble.
+HANDOFF_SYSTEM = (
+    "You are writing a concise HANDOFF report for another agent (or a human) who "
+    "will pick up this work. From the transcript excerpt, produce SHORT structured "
+    "markdown with exactly these three sections and nothing else:\n"
+    "## What was being done\n"
+    "## Key decisions\n"
+    "## Current state & what's pending\n"
+    "Use terse bullet points. Be faithful — do not invent facts not in the "
+    "transcript. Return ONLY the report body, starting at the first heading — no "
+    "preamble, no closing commentary.")
 
 DEFAULT_SCOPE = "grammar"
 
@@ -66,3 +85,11 @@ async def revise(text: str, scope: str = DEFAULT_SCOPE, model: str | None = None
 
 async def summarize(text: str, model: str | None = None) -> str:
     return await _one_shot(text, SUMMARIZE_SYSTEM, model)
+
+
+async def handoff_report(text: str, model: str | None = None) -> str:
+    """Distill a short structured handoff report from a transcript excerpt (§11 #16).
+
+    A third utility-LLM consumer alongside Revise / Summarize — the summary that
+    layers on Handoff's plain context carry-over (#15). Returns the report body."""
+    return await _one_shot(text, HANDOFF_SYSTEM, model)

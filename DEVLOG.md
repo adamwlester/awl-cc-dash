@@ -673,6 +673,14 @@ Files: bridge/bridge.py, sidecar/drivers/bridge.py, sidecar/main.py, tests/test_
 
 ---
 
+### 2026-07-15 16:47:26 — build-sprint Stage 5 #17 + #16: on-demand resume + handoff artifacts
+
+**#17 Load past agents (§9.9):** on-demand per-agent resume — `GET /sessions/past` enumerates every dead roster record (`runtime_store.all_records()`, project-first) not currently live plus every archived record (#18), each tagged `source` (`roster`/`archive`) + `resumable`; `POST /sessions/resume {session_id|name|archive_id}` resolves across both and relaunches on the exact #8 cold path (`claude --resume <claude_session_id>`, same conversation + same sidecar id, `cold_restore=True`), returning the live session + `resumed_from`/`archive_id`. The `past` route is declared before `GET /sessions/{id}` so the literal segment isn't swallowed. Honest 404 (no match) / 409 (already live) / 400 (no selector or no conversation id). **Resume-from-archive un-retires** (`delete_archived_anywhere` on success, kept on error) — realizing §7.12/#18's reversible-Retire, so an agent is live XOR archived, never both. 13 hermetic tests (`tests/test_resume_past_unit.py`; live relaunch stubbed, proven by `test_cold_restore_live`). **#16 Handoff artifacts (§7.19):** on Handoff, a utility-LLM pass (`utility_llm.handoff_report`, a third one-shot `sdk` consumer beside Revise/Summarize) over the source's recent transcript → a short 3-section markdown doc (*what was being done / key decisions / current state + pending*), composed + stored in the project Library (`docs/`) with provenance by the new pure-seam `sidecar/handoff.py` (`transcript_text_from_events`/`compose_handoff_doc`/`build_handoff_filename`/`generate_and_store_handoff`). Wired both as a `handoff` flag on `POST /sessions/{id}/fork` (non-fatal — a fork still succeeds, error reported on the payload) and a standalone `POST /sessions/{id}/handoff-report` (404/400/502). 17 hermetic tests (`tests/test_handoff_artifact_unit.py`; live generation stubbed/injected). Hermetic **890 passed** (860 + 13 + 17). ⚠ assumed: #17 un-retire-on-resume (reversible Retire — alternative kept-as-history is a 1-line change); #16 3-section format + `docs/` storage + payload-reference rather than live-inject into the fork's first turn. §11 #16/#17 tombstoned. Batch-built by one subagent (sequential), reviewed, tested, committed here.
+
+Files: sidecar/main.py, sidecar/utility_llm.py, sidecar/handoff.py, tests/test_resume_past_unit.py, tests/test_handoff_artifact_unit.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
