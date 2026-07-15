@@ -1,0 +1,6 @@
+/* Tailwind layers — compiled equivalent of the mockup's CDN runtime.
+   Import order in main.tsx: tokens.css → this → design/styles.css → design/app.css,
+   matching the mockup's cascade (CDN utilities land before the styles.css link). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

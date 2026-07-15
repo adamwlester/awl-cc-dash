@@ -1,0 +1,41 @@
+/* ============================================================================
+   Renderer-only shims over the verbatim design CSS (renderer rebuild #37).
+   The design system stays untouched in tokens.css / styles.css (verbatim
+   copies); everything app-specific lives here.
+   ============================================================================ */
+
+/* --- Fill the window (the ONE sanctioned divergence from the mockup frame) ---
+   The mockup pins a fixed dev window (--win-w × --win-h); the real app fills
+   its Electron window. Column proportions + splitters are unchanged. */
+html, body, #root { height: 100%; margin: 0; }
+.app { width: 100vw; height: 100vh; }
+
+/* --- Degraded mode (§11 #38) — sidecar unreachable -------------------------
+   Panels freeze on their last-known values and are visibly marked stale; the
+   title-bar connector-health badge carries the state (Offline red). */
+.app.awl-offline .three,
+.app.awl-offline .footbar { filter: grayscale(0.5) opacity(0.82); pointer-events: auto; }
+.awl-stale-note { display: none; }
+.app.awl-offline .awl-stale-note {
+  display: flex; align-items: center; gap: var(--space-6);
+  position: absolute; left: 50%; top: 44px; transform: translateX(-50%); z-index: 60;
+  background: var(--danger); color: var(--icon-fg); border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-base); box-shadow: var(--shadow-sm);
+  padding: var(--space-4) var(--space-10); font-size: 10px; font-weight: 800;
+  font-family: var(--font-mono); white-space: nowrap;
+}
+
+/* --- Empty states (live data can be empty where the mockup never was) ------ */
+.awl-empty {
+  padding: var(--space-14); text-align: center; color: var(--muted-2);
+  font-size: 11px; font-weight: 600;
+}
+
+/* --- xterm console feed -----------------------------------------------------
+   The live terminal mounts inside the mockup's .con-feed surface (the --term-*
+   palette exception); xterm draws its own text so we only size the host. */
+.con-feed .awl-xterm-host { position: absolute; inset: 6px; }
+.con-feed.awl-xterm { position: relative; overflow: hidden; padding: 0; }
+.xterm .xterm-viewport { background-color: transparent !important; }
+
+/* Focused-agent context pull shimmer reuses the loading strip from styles.css. */
