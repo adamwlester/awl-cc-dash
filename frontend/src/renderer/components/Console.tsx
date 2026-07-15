@@ -205,7 +205,7 @@ export function ConsoleView() {
       <div className="con-head">
         <span className="con-title"><Ic name="terminal" />Console</span>
         {a && <span className="badge badge-c con-head-agent"><AgTile a={a} /><span className="b-lab"><span className="b-role">{a.role}</span><span className="b-name">{a.name}</span></span></span>}
-        <span className="con-live"><i className="con-dot" />{con.attachState === 'ws' ? 'raw feed' : 'catalog only'}</span>
+        <span className="con-live"><i className="con-dot" />{con.attachState === 'ws' ? 'raw feed' : con.attachState === 'trying' ? 'attaching…' : 'catalog only'}</span>
         <button className="btn con-close" onClick={() => d.setConsoleExpanded(false)}><Ic name="x" className="w-3 h-3" />Close</button>
       </div>
       <div className="con-body">

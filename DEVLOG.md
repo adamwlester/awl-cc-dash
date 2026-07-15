@@ -633,6 +633,22 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-15 15:20:00 — build-sprint Stage 5: buildable implementation plan for §11 items #15–#20, #23/#24/#28, #44–#49
+
+Wrote the Stage-5 build plan a planning pass produced for the orchestrator to fan out to parallel lanes. New note [dev/notes/2026-07-15-stage5-build-plan.md](dev/notes/2026-07-15-stage5-build-plan.md): per-item detail (goal/priority, decided contract with ARCHITECTURE citation, exact real files+signatures, governing `test_*_unit.py` docstring, open decisions, deps/ordering, parallelizability) for the 17 Stage-5 items, grouped into two waves. Two serial edges only (#16→#15; #47/#48→#19); the two HIGH anchors are #19 per-agent git identity and #15 rewind/fork; #18 (HIGH) archive schema reserves the lineage fields #19 populates. Resolved four genuinely-open calls to the most doc-consistent option, each marked ⚠ assumed: #18 schema → distinct-IDs in a sibling `state/archive.json`; #28 destination order → agent-to-agent first (engine covers all three); #19 synthetic email → `<name>-<n>@agents.awl-cc-dash.invalid`; #19 attribution → per-launch `GIT_AUTHOR_*` env injection (not repo-local config, which collides across agents sharing one repo). Flagged the three high-conflict shared files (`sidecar/main.py`, `sidecar/drivers/bridge.py`, `bridge/bridge.py`) and the two clean isolated lanes (#20 frontend-TS-only, #49 agent-def). Planning only — no product code, ARCHITECTURE.md, or TODO.md touched.
+
+Files: dev/notes/2026-07-15-stage5-build-plan.md, DEVLOG.md
+
+---
+
+### 2026-07-15 15:33:17 — build-sprint Stage 4: renderer #37 recovered + verified headed; two fixes from the pass
+
+Recovered the stranded renderer rebuild #37 onto main (clean merge `dce54bb`, which landed without its own DEVLOG entry — logged here) and verified it headed via [dev/tools/ui-verify/](dev/tools/ui-verify/) against a live sidecar. Result: every renderer surface (frame, TeamGraph, AgentPanel, TeamFeed, PromptPanel, Library, SettingsView, Console, LinkDrawer, ExportControl) PASSES with no uncaught JS errors; live agent creation works end to end (POST /sessions → 200, real bridge create); and the HIGH-priority Console streams LIVE — expanding it fires POST /sessions/{id}/console/attach → `ws://127.0.0.1:{port}/ws`, opens the `tty`-subprotocol WebSocket, and the xterm renders the agent's real tmux screen (a live Claude Code permission prompt + the tmux status bar). Vertical splitters drag correctly; the horizontal side columns are pinned by design (`tokens.css` `--col-left`/`--col-right` min==max), not a bug. Two clear renderer bugs from the pass fixed here: (1) the 2s roster poll bundled the slow `/usage` screen-scrape into one `Promise.all`, so agents didn't appear until it resolved (cold-load showed "0 agents" for ~7s) — split `/usage` onto its own 4s cadence with an in-flight guard so the roster paints immediately ([store.tsx](frontend/src/renderer/store.tsx)); (2) the expanded Console live badge read "catalog only" during the 2–4s attach window (reading as degraded) — added an "attaching…" state ([Console.tsx](frontend/src/renderer/components/Console.tsx)). Build green (electron-vite ✓ 761ms), renderer type-checks clean (only pre-existing main/preload node-global tsc noise, `preload/index.ts` wasn't touched). Full findings + 34 screenshots in `.scratch/stage4-verify/`. Deferred to a final renderer-wiring pass after the Stage-5 backend (re-verified headed at the final e2e): stage-3 endpoint display (#30 context breakdown, #32 cost-on-cards), #38 degraded-mode/backoff + a narrow-width clamp (below ~1130px the middle column collapses — ties to the Electron min-window #20), the #39–#41 UI halves; plus sidecar `/settings` read-path gaps (MCP/Plugins/config empty) flagged for the backend lane.
+
+Files: frontend/src/renderer/store.tsx, frontend/src/renderer/components/Console.tsx, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

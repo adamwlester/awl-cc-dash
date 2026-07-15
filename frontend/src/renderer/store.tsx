@@ -207,25 +207,45 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; clearTimeout(timer) }
   }, [])
 
-  // ---- roster + usage + inbox + links (2s; frozen while offline) -----------
+  // ---- roster + inbox + links (2s; frozen while offline) -------------------
   useEffect(() => {
     let cancelled = false
     const poll = async () => {
       if (!healthyRef.current && healthFails.current > 0) return   // attempt at startup; freeze only when known-down (#38)
-      const [ss, us, ib, lk] = await Promise.all([api.sessions(), api.usage(), api.inbox(), api.links()])
+      const [ss, ib, lk] = await Promise.all([api.sessions(), api.inbox(), api.links()])
       if (cancelled) return
       if (ss) setSessions(ss)
-      if (us) {
-        const by: Record<string, UsageAgent> = {}
-        for (const a of us.agents) by[a.session_id] = a
-        setUsageBy(by)
-        setTokenPill(us.token_pill || 0)
-      }
       if (ib) setInbox(ib)
       if (lk) setLinks(lk)
     }
     poll()
     const i = setInterval(poll, 2000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [])
+
+  // ---- usage — polled on its OWN cadence, off the roster critical path ------
+  // /usage aggregates a screen-scrape and can lag several seconds; bundling it
+  // into the 2s roster Promise.all made the agents not appear until it resolved
+  // (cold-load showed "0 agents" for ~7s). Poll it separately, with an in-flight
+  // guard so a slow scrape can't pile up requests. (#38 — decouple slow reads.)
+  useEffect(() => {
+    let cancelled = false
+    let inflight = false
+    const poll = async () => {
+      if (!healthyRef.current && healthFails.current > 0) return
+      if (inflight) return
+      inflight = true
+      try {
+        const us = await api.usage()
+        if (cancelled || !us) return
+        const by: Record<string, UsageAgent> = {}
+        for (const a of us.agents) by[a.session_id] = a
+        setUsageBy(by)
+        setTokenPill(us.token_pill || 0)
+      } finally { inflight = false }
+    }
+    poll()
+    const i = setInterval(poll, 4000)
     return () => { cancelled = true; clearInterval(i) }
   }, [])
 
