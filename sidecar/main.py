@@ -2243,25 +2243,48 @@ async def set_model(session_id: str, req: SetModelRequest):
     return {"status": "ok", "model": req.model}
 
 
+def _lever_http_error(e: RuntimeError, lever: str) -> HTTPException:
+    """Map a live-control lever failure to an honest HTTP error.
+
+    The bridge driver raises RuntimeError(<reason>) when a mode/fast/thinking
+    control could not be applied on the running TUI (§11 #12): "busy" (screen
+    not idle — retryable) → 409; anything else — "unreachable" (an un-armed
+    Bypass/Auto segment, silently absent from the Shift+Tab ring, §7.11),
+    "credit_gated" (Fast without usage credits), "unreadable" (panel/status
+    scrape failed) — → 400 with the reason in the detail.
+    """
+    reason = str(e) or "failed"
+    code = 409 if reason == "busy" else 400
+    return HTTPException(status_code=code, detail=f"{lever} failed: {reason}")
+
+
 @app.post("/sessions/{session_id}/mode")
 async def set_mode(session_id: str, req: SetModeRequest):
-    """Set the permission mode on a live session — honestly.
+    """Set the permission mode on a live session — with read-back.
 
-    The bridge driver cannot set the permission mode on a running TUI (it only
-    cycles via Shift+Tab, with no reliable absolute set), so it does NOT advertise
-    `set_mode`; this returns a 400 rather than falsely reporting success (matching
-    `set_fast` / `set_thinking`). The *initial* mode is applied at launch via the
-    `--permission-mode` flag (see the bridge driver). Mid-run mode change is under
-    separate research and intentionally not attempted here.
+    Bridge driver (§11 #12): cycles the proven Shift+Tab ring at a known-idle
+    screen and reads the resulting mode back from the status line; the response
+    carries that READ-BACK mode, never an echo of the request. An un-armed
+    Bypass/Auto segment is silently absent from the ring (§7.11), so the driver
+    raises "unreachable" → an honest 400 (arming is a launch-time choice — the
+    Create panel's `--permission-mode` pre-arm, §11 #13); a non-idle screen →
+    409 "busy". The *initial* mode is still applied at launch via the
+    `--permission-mode` flag (see the bridge driver).
     """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
     if not (session.driver and session.driver.supports("set_mode")):
         raise HTTPException(status_code=400, detail="Driver has no mode control")
-    await session.driver.set_mode(req.mode)
-    session.permission_mode = req.mode
-    return {"status": "ok", "mode": req.mode}
+    try:
+        result = await session.driver.set_mode(req.mode)
+    except RuntimeError as e:
+        raise _lever_http_error(e, "set_mode")
+    # The bridge driver returns the read-back mode; the sdk driver returns None
+    # (its control API applies the requested mode directly).
+    mode = result if isinstance(result, str) else req.mode
+    session.permission_mode = mode
+    return {"status": "ok", "mode": mode}
 
 
 class IdentityUpdateRequest(BaseModel):
@@ -2374,24 +2397,42 @@ async def set_effort(session_id: str, req: SetEffortRequest):
 
 @app.post("/sessions/{session_id}/fast")
 async def set_fast(session_id: str, req: SetFastRequest):
+    """Set Fast mode on a live session — with read-back (§11 #12).
+
+    Bridge driver: the `Meta+O` panel + `Space` toggle, state read back off the
+    panel's "Fast mode OFF/ON" line. A credit-gated account degrades honestly —
+    400 "credit_gated", never a faked toggle; a non-idle screen → 409 "busy".
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
     if not (session.driver and session.driver.supports("set_fast")):
         raise HTTPException(status_code=400, detail="Driver has no fast control")
-    await session.driver.set_fast(req.on)
-    return {"status": "ok", "fast": req.on}
+    try:
+        result = await session.driver.set_fast(req.on)
+    except RuntimeError as e:
+        raise _lever_http_error(e, "set_fast")
+    return {"status": "ok", "fast": result if isinstance(result, bool) else req.on}
 
 
 @app.post("/sessions/{session_id}/thinking")
 async def set_thinking(session_id: str, req: SetThinkingRequest):
+    """Set extended thinking on a live session — with read-back (§11 #12).
+
+    Bridge driver: the `Meta+T` modal — current state read first (the ✔ option),
+    toggled only if needed, result read back. Non-idle screen → 409 "busy".
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
     if not (session.driver and session.driver.supports("set_thinking")):
         raise HTTPException(status_code=400, detail="Driver has no thinking control")
-    await session.driver.set_thinking(req.on)
-    return {"status": "ok", "thinking": req.on}
+    try:
+        result = await session.driver.set_thinking(req.on)
+    except RuntimeError as e:
+        raise _lever_http_error(e, "set_thinking")
+    return {"status": "ok",
+            "thinking": result if isinstance(result, bool) else req.on}
 
 
 @app.get("/sessions/{session_id}/context")
