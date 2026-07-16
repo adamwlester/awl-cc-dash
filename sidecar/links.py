@@ -24,7 +24,8 @@ wanting both relationships between the same two agents = **two links**):
   one exchange, so End-After binds one-way links at full rate; on a **two-way**
   link an exchange stays one message each direction (``messages ÷ 2``).
 
-This module is the **pure store + cap logic** (hermetically testable). The
+This module is the **pure store + cap logic** (hermetically testable), plus the
+**queue-awareness front-matter helper** (``queue_awareness_note``, §11 #24). The
 serialized reply-to ENGINE (record who an agent is answering → on its
 generating→idle, fire that turn's output back to the inbound's source) and the
 shared-context fire live in ``main`` where the session/queue/hook machinery is,
@@ -194,6 +195,47 @@ def pending_piggyback(target: str) -> list[dict[str, Any]]:
 def take_piggyback(target: str) -> list[dict[str, Any]]:
     """Drain the target's parked payloads (consumed exactly once, at delivery)."""
     return _PIGGYBACK.pop(target, [])
+
+
+# ---------------------------------------------------------------------------
+# Queue awareness (§7.3 / §7.6, §11 #24)
+# ---------------------------------------------------------------------------
+
+def queue_awareness_note(source: str, queued: list[dict[str, Any]]) -> str | None:
+    """The queue-awareness front-matter note for a link-delivered message
+    (§7.3/§7.6, §11 #24): when the target agent has one or more OTHER queued
+    items **from a different source** still waiting at delivery time, the
+    delivered message leads with ONE bounded attributed line (the same
+    bracketed attributed-block style the piggyback ride uses) telling the
+    recipient more mail is already waiting, so it can choose to wait rather
+    than answer stale.
+
+    ``source`` is who this delivery is from; ``queued`` is the snapshot of the
+    target's **remaining** ``prompt_queue`` at delivery (flush) time — the mail
+    that will still be waiting when the recipient reads this message, i.e. the
+    queue *after* this entry is popped, never the queue as it stood at enqueue
+    (a tail-appended entry's enqueue-time snapshot counts only items delivered
+    *before* it, which would make the note false by the time it is read).
+    Entries are dicts carrying ``source`` — a missing source reads as the
+    operator, ``"user"``. Items from the SAME source never trigger the note (a
+    sender's own backlog is not "someone else is talking to you"), and with
+    nothing else queued the return is ``None`` — the caller leaves the delivery
+    **byte-for-byte unchanged**. Held items don't count: they never auto-flush,
+    so they are not "already queued" mail.
+    """
+    others = [it for it in queued
+              if isinstance(it, dict) and str(it.get("source") or "user") != source]
+    if not others:
+        return None
+    srcs = sorted({str(it.get("source") or "user") for it in others})
+    if len(others) == 1:
+        head = f"another message (from {srcs[0]}) is"
+        tail = "wait for it"
+    else:
+        head = f"{len(others)} other messages (from {', '.join(srcs)}) are"
+        tail = "wait for them"
+    return (f"[Queue awareness — {head} already queued for you; "
+            f"you may choose to {tail} rather than answer stale]")
 
 
 def reset() -> None:

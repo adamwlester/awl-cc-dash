@@ -16,6 +16,14 @@ THE DECIDED CONTRACT (ARCHITECTURE §7.6, the §11 #25 model fixes):
   * **Exchange counting is direction-aware** — on a one-way link (a2b/b2a)
     every fire = one exchange (End-After binds at full rate); on a two-way link
     an exchange stays one message each direction (messages ÷ 2).
+  * **Queue awareness (§7.3/§7.6, §11 #24)** — ``queue_awareness_note`` renders
+    the ONE bounded attributed front-matter line a link-delivered message leads
+    with when the target still has queued items **from a different source**
+    waiting at DELIVERY time — the caller (``_flush_queue``) passes the queue
+    remaining after the entry's pop, so the note is true when read (so the
+    recipient can choose to wait rather than answer stale); items from the
+    SAME source never trigger it, and with nothing else queued it returns
+    ``None`` so the delivery stays byte-for-byte unchanged.
 
 The serialized reply-to ENGINE (the on-idle relay) and the shared-context fire
 are exercised separately against the sidecar (test_sidecar_unit.py) + live.
@@ -292,3 +300,45 @@ def test_reset_clears_piggyback_store():
 def test_default_trigger_helper():
     assert links.default_trigger("direct") == "queue"
     assert links.default_trigger("shared") == "piggyback"
+
+
+# -----------------------------------------------------------------------------
+# Queue-awareness front matter (§7.3/§7.6, §11 #24)
+# -----------------------------------------------------------------------------
+
+def test_queue_awareness_note_none_when_nothing_queued():
+    # Nothing queued for the target -> None -> delivery byte-for-byte unchanged.
+    assert links.queue_awareness_note("A", []) is None
+
+
+def test_queue_awareness_note_none_when_only_same_source_queued():
+    # A sender's own backlog is not "someone else is talking to you".
+    q = [{"prompt": "x", "source": "A"}, {"prompt": "y", "source": "A"}]
+    assert links.queue_awareness_note("A", q) is None
+
+
+def test_queue_awareness_note_single_other_source():
+    note = links.queue_awareness_note("A", [{"prompt": "x", "source": "C"}])
+    assert note is not None
+    # ONE bounded attributed line (the piggyback-style bracketed block).
+    assert note.startswith("[Queue awareness — ") and note.endswith("]")
+    assert "\n" not in note
+    assert "(from C)" in note and "queued" in note
+
+
+def test_queue_awareness_note_counts_and_lists_other_sources_sorted():
+    q = [{"prompt": "x", "source": "user"},
+         {"prompt": "y", "source": "C"},
+         {"prompt": "z", "source": "A"}]      # same-source item excluded
+    note = links.queue_awareness_note("A", q)
+    assert note is not None
+    assert "2 other messages" in note
+    assert "(from C, user)" in note            # sorted, deduped attribution
+
+
+def test_queue_awareness_note_missing_source_reads_as_user():
+    # A sourceless entry is the operator's ("user") — it triggers the note for
+    # an agent sender but never for the operator's own deliveries.
+    assert links.queue_awareness_note("user", [{"prompt": "x"}]) is None
+    note = links.queue_awareness_note("A", [{"prompt": "x"}])
+    assert note is not None and "(from user)" in note

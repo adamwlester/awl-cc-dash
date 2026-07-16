@@ -433,11 +433,24 @@ async def _flush_queue(session: "SessionState") -> None:
     they never initiate a turn of their own. The parked block is prepended to
     the prompt (one bounded block; parking was already watermark-deduped per
     source→target at fire time, so nothing delivers twice).
+
+    Queue awareness (§7.3/§7.6, §11 #24): a link-delivered entry (flagged
+    ``queue_awareness`` at its enqueue point — relay, shared queue-family fire,
+    kickoff) leads with the ONE attributed front-matter note when OTHER-source
+    mail is still queued behind it at this pop — computed HERE, at delivery
+    time, so the note is true when the recipient reads it (an enqueue-time
+    snapshot of a tail-appended entry counts only mail delivered before it).
+    Order when both ride: piggyback block, then the note, then the message.
     """
     if session.status == "running" or not session.prompt_queue or not session.driver:
         return
     entry = session.prompt_queue.popleft()
     prompt = entry["prompt"]
+    if entry.get("queue_awareness"):
+        note = links.queue_awareness_note(
+            str(entry.get("source") or "user"), list(session.prompt_queue))
+        if note:
+            prompt = note + "\n\n" + prompt
     rides = links.take_piggyback(session.session_id)
     if rides:
         prompt = _render_piggyback(rides) + "\n\n" + prompt
@@ -590,6 +603,12 @@ def _maybe_relay_reply(session: "SessionState",
         "id": str(uuid.uuid4())[:8], "prompt": text,
         "source": session.session_id, "recipients": [src],
         "disposition": trigger, "enqueued_at": datetime.now().isoformat(),
+        # Queue awareness (§11 #24): mark this as a link delivery so
+        # _flush_queue renders the attributed front-matter note at DELIVERY
+        # time, against the mail still waiting behind it — never here at
+        # enqueue, where a tail-appended entry would count only items delivered
+        # before it (a note false by the time it is read).
+        "queue_awareness": True,
     }
     target.enqueue(entry, trigger)
     if trigger == "hold":
@@ -753,6 +772,10 @@ def _fire_shared_context(session: "SessionState",
             "id": str(uuid.uuid4())[:8], "prompt": text,
             "source": src_id, "recipients": [dst],
             "disposition": trigger, "enqueued_at": datetime.now().isoformat(),
+            # Queue awareness (§11 #24): link delivery — the attributed
+            # front-matter note renders in _flush_queue at delivery time,
+            # against the mail still waiting behind this entry.
+            "queue_awareness": True,
         }
         target.enqueue(entry, trigger)
         if trigger == "hold":
@@ -3129,7 +3152,10 @@ async def delete_link(link_id: str):
 async def kickoff_link(link_id: str, req: LinkKickoffRequest):
     """Start a reply-to conversation over a link: deliver `prompt` to `to_agent`
     and record that its reply routes back to `from_agent`. The relay then
-    alternates automatically until the End-After cap."""
+    alternates automatically until the End-After cap. Queue awareness (§11 #24):
+    if other-source mail is still queued for the target when the kickoff is
+    DELIVERED (the _flush_queue pop), the prompt leads with the attributed
+    front-matter note; else it is byte-for-byte unchanged."""
     lk = links.get_link(link_id)
     if not lk:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -3146,6 +3172,7 @@ async def kickoff_link(link_id: str, req: LinkKickoffRequest):
         "id": str(uuid.uuid4())[:8], "prompt": req.prompt,
         "source": req.from_agent, "recipients": [req.to_agent],
         "disposition": lk.trigger, "enqueued_at": datetime.now().isoformat(),
+        "queue_awareness": True,  # §11 #24: note renders at flush, not here
     }
     target.enqueue(entry, lk.trigger if lk.trigger in ("now", "next", "queue") else "queue")
     await _flush_queue(target)

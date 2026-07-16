@@ -28,7 +28,17 @@ functions are called directly via ``asyncio.run``). Proves:
     until ``POST /inbox/{agent}/{item}/resolve`` answers it (approve → the
     spike's PreToolUse ``allow`` shape, reject → ``deny``); the bounded hold
     times out to ``{}`` (the on-pane-dialog fallback), stamping the card
-    ``timed_out``.
+    ``timed_out``;
+  * **queue awareness (§7.3/§7.6, §11 #24)** — every link-delivered entry
+    (the reply relay, the shared-context queue-trigger fire, and the kickoff)
+    is flagged at enqueue and the ONE attributed front-matter note renders at
+    DELIVERY time (the _flush_queue pop) when queued items from a DIFFERENT
+    source still wait behind it — never against the enqueue-time queue, whose
+    items a tail-appended entry only follows (they'd be gone when read) — so
+    the recipient can truthfully choose to wait rather than answer stale; an
+    empty or same-source-only remaining queue leaves the delivery byte-for-byte
+    unchanged, operator sends never carry it, and the note never appears twice
+    (flush order when a piggyback block also rides: piggyback, note, message).
 
 These carry neither the ``integration`` nor the ``slow`` mark.
 """
@@ -766,6 +776,250 @@ class TestSharedContextFire:
             assert b.driver.sent[1] == "second send"
         finally:
             main.sessions.pop("B", None)
+
+
+# ---------------------------------------------------------------------------
+# Queue-awareness front matter on link deliveries (§7.3/§7.6, §11 #24)
+# ---------------------------------------------------------------------------
+
+class TestQueueAwarenessFrontMatter:
+    """A link-delivered entry (flagged ``queue_awareness`` at its enqueue point)
+    leads with the ONE attributed front-matter note — exactly once — when
+    OTHER-source mail still waits behind it at DELIVERY time (the _flush_queue
+    pop), so the recipient can truthfully choose to wait rather than answer
+    stale. The note is never baked at enqueue: a tail-appended entry's
+    enqueue-time queue holds only mail delivered BEFORE it, so a note computed
+    there is always false when read. An empty or same-source-only remaining
+    queue leaves the delivery byte-for-byte unchanged; operator sends never
+    carry the note; with a piggyback block the order is piggyback → note →
+    message."""
+
+    NOTE_PREFIX = "[Queue awareness — "
+
+    def test_relay_flags_entry_and_never_bakes_note_at_enqueue(self):
+        # The review-flagged inversion: mail queued AHEAD of the relay is
+        # delivered before it, so the relay must NOT claim it is "already
+        # queued" — no baked note at enqueue, and no note at either delivery.
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"     # keep A's queue visible (no auto-flush)
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            # A already has operator mail waiting AHEAD of the relay.
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "fresh reply")
+            main._maybe_relay_reply(b)
+            assert a.prompt_queue[-1]["prompt"] == "fresh reply"   # unbaked
+            assert a.prompt_queue[-1].get("queue_awareness") is True
+            # Deliver both: the operator mail flushes first (no note — it is
+            # not a link delivery), then the relay with NOTHING behind it —
+            # byte-for-byte, no stale claim about already-delivered mail.
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            assert a.driver.sent == ["operator ask", "fresh reply"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_flush_prepends_note_once_when_other_source_mail_remains(self):
+        # The truthful case §11 #24 targets: the relay is DELIVERED while the
+        # operator's message still waits behind it in the queue.
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "fresh reply")
+            main._maybe_relay_reply(b)                    # relay lands first
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")     # mail queued BEHIND it
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            sent = a.driver.sent[0]
+            assert sent.startswith(self.NOTE_PREFIX)
+            assert sent.count(self.NOTE_PREFIX) == 1      # exactly once
+            assert "(from user)" in sent                  # attributed
+            assert sent.endswith("\n\nfresh reply")       # payload intact after it
+            # ...and the referenced mail really is still queued at read time.
+            assert [e["prompt"] for e in a.prompt_queue] == ["operator ask"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_next_trigger_note_true_at_delivery(self):
+        # next/now insert at the HEAD, ahead of the waiting mail — the note is
+        # true at delivery there too (the counted items stay behind the entry).
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="next")
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "jumped ahead")
+            main._maybe_relay_reply(b)                    # head-insert
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            sent = a.driver.sent[0]
+            assert sent.startswith(self.NOTE_PREFIX) and "(from user)" in sent
+            assert sent.endswith("\n\njumped ahead")
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_relay_byte_for_byte_unchanged_when_nothing_else_queued(self):
+        a, b = _agent("A"), _agent("B")
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "plain reply")
+            main._maybe_relay_reply(b)
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            assert a.driver.sent == ["plain reply"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_same_source_remaining_mail_does_not_trigger_note(self):
+        # Mail still waiting FROM THE SAME sender is its own backlog — the
+        # note is about someone ELSE's message, so it must not appear.
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "first from B")
+            main._maybe_relay_reply(b)
+            a.enqueue({"id": "b2", "prompt": "second from B", "source": "B",
+                       "recipients": ["A"]}, "queue")     # same source, behind
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            assert a.driver.sent == ["first from B"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_operator_delivery_never_carries_note(self):
+        # Scope is link deliveries: an operator send flushes unchanged even
+        # with agent mail waiting behind it (no queue_awareness flag).
+        a = _agent("A")
+        a.status = "running"
+        main.sessions["A"] = a
+        try:
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")
+            a.enqueue({"id": "b1", "prompt": "from B", "source": "B",
+                       "recipients": ["A"]}, "queue")
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            assert a.driver.sent == ["operator ask"]
+        finally:
+            main.sessions.pop("A", None)
+
+    def test_hold_entry_parks_flagged_and_unbaked(self):
+        # A held relay parks with the flag and NO baked note — the note (if
+        # any) renders fresh at whatever later delivery releases it, never
+        # from a queue snapshot gone stale by manual release.
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="hold")
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "held reply")
+            main._maybe_relay_reply(b)
+            assert a.held[0]["prompt"] == "held reply"
+            assert a.held[0].get("queue_awareness") is True
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_flush_order_piggyback_then_note_then_message(self):
+        a, b = _agent("A"), _agent("B")
+        a.status = "running"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            b.answering_source, b.answering_link = "A", lk.id
+            _finish_turn(b, "fresh reply")
+            main._maybe_relay_reply(b)
+            a.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["A"]}, "queue")
+            links.park_piggyback("A", source="P", link_id="x", text="the ride")
+            a.status = "idle"
+            asyncio.run(main._flush_queue(a))
+            sent = a.driver.sent[0]
+            pb = sent.index("[Shared context from linked agents")
+            note = sent.index(self.NOTE_PREFIX)
+            msg = sent.index("fresh reply")
+            assert pb < note < msg
+            assert sent.count(self.NOTE_PREFIX) == 1
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_shared_fire_queue_trigger_note_renders_at_flush(self):
+        import inbox
+        inbox.reset()
+        a, b = _agent("A"), _agent("B")
+        b.status = "running"     # keep the enqueued share visible (no auto-flush)
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            links.add_link(a="A", b="B", relationship="shared", trigger="queue")
+            _complete_turn(a, "queued share")             # share lands first
+            assert b.prompt_queue[-1]["prompt"] == "queued share"   # unbaked
+            assert b.prompt_queue[-1].get("queue_awareness") is True
+            b.enqueue({"id": "u1", "prompt": "operator ask", "source": "user",
+                       "recipients": ["B"]}, "queue")     # mail queued BEHIND it
+            b.status = "idle"
+            asyncio.run(main._flush_queue(b))
+            sent = b.driver.sent[0]
+            assert sent.startswith(self.NOTE_PREFIX)
+            assert sent.count(self.NOTE_PREFIX) == 1
+            assert "(from user)" in sent
+            assert sent.endswith("\n\nqueued share")
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+            inbox.reset()
+
+    def test_kickoff_note_renders_at_flush_not_enqueue(self):
+        a, b = _agent("A"), _agent("B")
+        b.status = "running"     # kickoff's flush no-ops; the entry stays queued
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            asyncio.run(main.kickoff_link(lk.id, main.LinkKickoffRequest(
+                from_agent="A", to_agent="B", prompt="kick it off")))
+            assert b.prompt_queue[-1]["prompt"] == "kick it off"    # unbaked
+            assert b.prompt_queue[-1].get("queue_awareness") is True
+            b.enqueue({"id": "c1", "prompt": "from C", "source": "C",
+                       "recipients": ["B"]}, "queue")     # mail queued BEHIND it
+            b.status = "idle"
+            asyncio.run(main._flush_queue(b))
+            sent = b.driver.sent[0]
+            assert sent.startswith(self.NOTE_PREFIX)
+            assert sent.count(self.NOTE_PREFIX) == 1
+            assert "(from C)" in sent
+            assert sent.endswith("\n\nkick it off")
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
+
+    def test_kickoff_byte_for_byte_unchanged_when_queue_empty(self):
+        a, b = _agent("A"), _agent("B")
+        b.status = "idle"
+        main.sessions["A"], main.sessions["B"] = a, b
+        try:
+            lk = links.add_link(a="A", b="B", relationship="direct", trigger="queue")
+            asyncio.run(main.kickoff_link(lk.id, main.LinkKickoffRequest(
+                from_agent="A", to_agent="B", prompt="just go")))
+            # Nothing else queued -> the flushed send is the prompt, unchanged.
+            assert b.driver.sent == ["just go"]
+        finally:
+            main.sessions.pop("A", None); main.sessions.pop("B", None)
 
 
 # ---------------------------------------------------------------------------

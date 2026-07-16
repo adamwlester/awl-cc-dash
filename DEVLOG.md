@@ -777,6 +777,16 @@ Files: sidecar/import_context.py (new), sidecar/main.py, tests/test_import_conte
 
 ---
 
+### 2026-07-16 03:12:37 — §11 #24 built: queue-awareness front matter on link deliveries (rendered at delivery time)
+
+Built #24: a link-delivered message now leads with ONE bounded attributed front-matter note (`[Queue awareness — another message (from X) is already queued for you; …]`) when the recipient still has other-source mail queued, so the agent can choose to wait rather than answer stale. Mechanism after integration review: the pure formatter `queue_awareness_note(source, queued)` lives in [links.py](sidecar/links.py); the three link enqueue points in [main.py](sidecar/main.py) — `_maybe_relay_reply`, `_fire_shared_context` (queue-family triggers), `kickoff_link` — only FLAG the entry (`queue_awareness: True`), and `_flush_queue` renders the note at the pop, against the queue REMAINING behind the entry (order when a piggyback block also rides: piggyback → note → message).
+Adversarial review (2 findings, one root cause — both confirmed, applied): the implementer computed the note at ENQUEUE time and baked it into the prompt, but a tail-appended `queue`-trigger entry (the §7.6 direct-link default) only sits BEHIND the items it counted — every one of them is delivered and answered before it flushes, so the note was false at read time in 100% of default-trigger cases (and the truthful 3-agent case — mail arriving behind a queued link delivery — got no note at all; hold-trigger notes went stale by manual release). Fix = the flag + flush-time computation above; the six enqueue-time tests that pinned the inverted semantics were replaced with eleven delivery-time tests (unbaked-at-enqueue + both-flushes-clean regression, truthful note when mail remains behind, next-trigger truth, byte-for-byte no-mail/same-source/operator cases, hold parks unbaked, piggyback→note→message order, shared-fire + kickoff at-flush).
+Assumed calls (implementer, kept): threshold = ≥1 queued item from a DIFFERENT source (same-source backlog never triggers); missing `source` reads as `user`; held items never count; exact wording tune-later (tests pin prefix/attribution/boundedness, not the sentence). Hermetic tier: **1157 passed** (links unit 5 + sidecar unit 11 for this item). ARCHITECTURE: #24 tombstoned; the settled behavior woven into §7.6 (Triggers).
+
+Files: sidecar/links.py, sidecar/main.py, tests/test_links_unit.py, tests/test_sidecar_unit.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
