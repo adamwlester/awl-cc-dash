@@ -114,6 +114,34 @@ app.add_middleware(
 # Session State
 # ============================================================================
 
+# The Shift+Tab mode ring WITHOUT any launch pre-arm (the launch-matrix spike,
+# `test_bypass_auto_preconditions_live`, re-verified CC 2.1.206): default →
+# acceptEdits → plan → auto → wrap. Bypass is launch-gated — it joins only via
+# `--permission-mode bypassPermissions` (arm AND activate) or
+# `--allow-dangerously-skip-permissions` (arm without activate, the
+# CreateSessionRequest `arm_bypass` flag). Auto is account-eligibility-
+# dependent in general (in the default ring on this account); the mode
+# endpoint's honest 400 "unreachable" stays the live corrector, and the
+# renderer keeps that 400 as its teaching backstop.
+BASE_MODE_RING = ("default", "acceptEdits", "plan", "auto")
+
+
+def armed_modes_for(permission_mode: str | None, arm_bypass: bool) -> list[str]:
+    """The armed permission-mode set for a session's launch config (§7.11).
+
+    Derived, never guessed per-click: the base ring plus Bypass when the
+    launch pre-armed it (either pre-arm form). Defensive floor: the launch
+    mode itself is always reachable, so an off-ring spelling (e.g. ``dontAsk``)
+    appends rather than vanishing.
+    """
+    armed = list(BASE_MODE_RING)
+    if arm_bypass or permission_mode == "bypassPermissions":
+        armed.append("bypassPermissions")
+    if permission_mode and permission_mode not in armed:
+        armed.append(permission_mode)
+    return armed
+
+
 class SessionState:
     def __init__(self, session_id: str, agent_type: str | None, model: str | None,
                  permission_mode: str, cwd: str | None, system_prompt: str | None,
@@ -125,7 +153,8 @@ class SessionState:
                  mcp_servers: list[str] | None = None,
                  identity: dict[str, Any] | None = None,
                  response_preset: str | None = None,
-                 attached_docs: list[str] | None = None):
+                 attached_docs: list[str] | None = None,
+                 arm_bypass: bool = False):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
@@ -139,6 +168,13 @@ class SessionState:
         self.permission_rules = permission_rules
         self.enabled_plugins = enabled_plugins
         self.mcp_servers = mcp_servers
+        # §7.11/§11 #13 — the launch-armed permission-mode set. `arm_bypass`
+        # is the arm-without-activate flag (`--allow-dangerously-skip-
+        # permissions`, persisted in the roster record); `armed_modes` is
+        # DERIVED from it + the launch mode so the Details ring is exact for
+        # sessions created outside the renderer and across restarts.
+        self.arm_bypass = bool(arm_bypass)
+        self.armed_modes = armed_modes_for(permission_mode, self.arm_bypass)
         # Per-agent reply-format preset (§7.14, §11 #39). Applied at launch via
         # `--append-system-prompt` (the bridge driver resolves the instruction);
         # persisted in the roster record so it survives a restart.
@@ -230,6 +266,11 @@ class SessionState:
             # Dashboard-owned identity (role/number/name/color/icon) — the UI
             # renders agent cards and the Agent panel from this everywhere.
             "identity": self.identity,
+            # The launch-armed permission-mode set (§7.11): the segments this
+            # session's Shift+Tab ring actually contains. The renderer hides
+            # un-armed segments from the Details ring; the live 400
+            # "unreachable" stays the account-dependence backstop (Auto).
+            "armed_modes": self.armed_modes,
             # The arbitrated run-state (§7.4): hook-pushed fields when fresh
             # (source="push"), the screen-poll floor otherwise. Additive —
             # `status` above stays the poll-driven enum.
@@ -248,6 +289,9 @@ class SessionState:
                 "response_preset": self.response_preset,
                 # Attached Library docs (§11 #44); None/[] = nothing attached.
                 "attached_docs": self.attached_docs,
+                # Arm-without-activate (§7.11 #13): Bypass pre-armed at launch
+                # without being the launch mode.
+                "arm_bypass": self.arm_bypass,
             },
         }
 
@@ -976,6 +1020,7 @@ async def start_session(session: SessionState):
         identity=session.identity,
         response_preset=session.response_preset,
         attached_docs=session.attached_docs,
+        arm_bypass=session.arm_bypass,
     )
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
@@ -1009,6 +1054,15 @@ async def _listen(session: SessionState):
     except Exception as e:
         logger.error(f"Session {session.session_id} listener error: {e}")
         session.status = "error"
+        # Died-at stamp (§11 #17 / #50 residual): the event pump failing is the
+        # sidecar observing the agent die — persist the moment on the roster
+        # record so the Past tab can render an honest "died …" stamp.
+        marker = getattr(session.driver, "mark_stopped", None)
+        if callable(marker):
+            try:
+                marker()
+            except Exception:  # pragma: no cover - stamp is best-effort
+                pass
         session.push_event({
             "type": "error", "error": str(e),
             "timestamp": datetime.now().isoformat(),
@@ -1018,8 +1072,12 @@ async def _listen(session: SessionState):
 async def reconnect_sessions(project_key: str | None = None):
     """Restore bridge sessions that outlived a previous sidecar process (§9.9).
 
-    With ``project_key`` set, only that project's records restore (the §9.1
-    open flow); without it, every persisted record restores (startup).
+    With ``project_key`` set, only that project's records restore — the §9.1
+    open flow (``POST /projects/open`` calls this), which is the NORMAL
+    restore point: startup is picker-first and restores nothing by default
+    (see ``_on_startup``). Without a key, every persisted record restores —
+    the restore-everything sweep the ``AWL_STARTUP_RESTORE=all`` escape hatch
+    (and tests) use.
 
     Two cases per persisted record:
 
@@ -1094,6 +1152,7 @@ async def reconnect_sessions(project_key: str | None = None):
             identity=identity,
             response_preset=rec.get("response_preset"),
             attached_docs=rec.get("attached_docs"),
+            arm_bypass=rec.get("arm_bypass", False),
         )
         sessions[sid] = session
         config = DriverConfig(
@@ -1110,6 +1169,7 @@ async def reconnect_sessions(project_key: str | None = None):
             identity=identity,
             response_preset=rec.get("response_preset"),
             attached_docs=rec.get("attached_docs"),
+            arm_bypass=rec.get("arm_bypass", False),
         )
         try:
             driver = BridgeDriver(
@@ -1202,8 +1262,19 @@ async def _cap_poll_loop():
 
 @app.on_event("startup")
 async def _on_startup():
+    """Sidecar startup — picker-first, restoring NOTHING by default (§9.1).
+
+    The decided §3.1/§9.1 flow: startup lands on the empty state and the
+    operator picks a project — the restore point is ``POST /projects/open``,
+    which runs ``reconnect_sessions(project_key=…)`` for exactly that project
+    (§9.9 warm-rebind + cold-restore). Startup itself never silently restores
+    ALL persisted records any more. Escape hatch: ``AWL_STARTUP_RESTORE=all``
+    (or ``1``) keeps the old restore-everything-at-boot behavior for tests and
+    one-sidecar-per-project setups.
+    """
     state_store.install_hooks()   # write-through persistence (§8.3)
-    await reconnect_sessions()
+    if os.environ.get("AWL_STARTUP_RESTORE", "").lower() in ("all", "1", "true"):
+        await reconnect_sessions()
     asyncio.create_task(_cap_poll_loop())
     asyncio.create_task(_system_probe_loop())
 
@@ -1234,6 +1305,12 @@ class CreateSessionRequest(BaseModel):
     permission_rules: dict[str, list[str]] | None = None  # {allow,deny,ask}
     enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
     mcp_servers: list[str] | None = None                   # subset; None = global
+    # Arm-without-activate (§7.11, §11 #13): pass
+    # `--allow-dangerously-skip-permissions` at launch so Bypass joins the
+    # Shift+Tab mode ring while the agent still LAUNCHES in `permission_mode`
+    # (launching in bypassPermissions arms it implicitly). Persisted in the
+    # roster record; drives the session's `armed_modes` read.
+    arm_bypass: bool = False
     identity: IdentityInput | None = None                  # dashboard-owned id fields
     response_preset: str | None = None                     # reply-format preset id (§11 #39)
     # Library docs attached at launch (§7.16, §11 #44): store/project doc paths
@@ -1273,7 +1350,12 @@ class SetModelRequest(BaseModel):
     model: str
 
 class SetModeRequest(BaseModel):
-    mode: Literal["default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"]
+    # `auto` is the Auto segment's canonical spelling (the launch path and the
+    # status-line indicator both use it); `dontAsk` is the CLI's alias for the
+    # same segment — accepted and folded to `auto` by the bridge's cycle lever
+    # (see bridge.bridge._MODE_TARGET_ALIASES).
+    mode: Literal["default", "acceptEdits", "plan", "auto",
+                  "bypassPermissions", "dontAsk"]
 
 class AnswerPermissionRequest(BaseModel):
     # approve = Yes (Enter); deny = No (Escape). Always-allow is unsupported
@@ -1476,6 +1558,7 @@ async def create_session(req: CreateSessionRequest):
         identity=identity,
         response_preset=req.response_preset,
         attached_docs=req.attached_docs,
+        arm_bypass=req.arm_bypass,
     )
     session.max_turns = req.max_turns                  # notify-only caps
     session.max_context_pct = req.max_context_pct
@@ -1514,6 +1597,10 @@ def _resumable_from_roster(rec: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": rec.get("session_id"),
         "claude_session_id": rec.get("claude_session_id"),
+        # The agent's original tmux session name: resume reuses it so the
+        # per-agent launch-config dir (turns.jsonl / statusline.jsonl) —
+        # keyed by tmux name — re-attaches instead of starting empty (§7.19).
+        "tmux_name": rec.get("tmux_name"),
         "cwd": rec.get("cwd"),
         "model": rec.get("model"),
         "permission_mode": rec.get("permission_mode", "acceptEdits"),
@@ -1526,7 +1613,16 @@ def _resumable_from_roster(rec: dict[str, Any]) -> dict[str, Any]:
         "enabled_plugins": rec.get("enabled_plugins"),
         "mcp_servers": rec.get("mcp_servers"),
         "attached_docs": rec.get("attached_docs"),
+        "arm_bypass": rec.get("arm_bypass", False),
+        # Fork provenance (§11 #18): carried so a resume re-seeds the driver's
+        # record with it — otherwise one resume→retire cycle would archive
+        # lineage: null and lose the fork graph edge.
+        "lineage": rec.get("lineage") if isinstance(rec.get("lineage"), dict) else None,
         "created_at": rec.get("created_at"),
+        # When the sidecar observed this agent stop/die (§11 #17): stamped by
+        # the driver's stop()/mark_stopped(); absent for legacy records and
+        # unwitnessed deaths (reboot) — the row falls back to created_at.
+        "died_at": rec.get("stopped_at"),
         "retired_at": None,
         "source": "roster",
         "archive_id": None,
@@ -1544,6 +1640,9 @@ def _resumable_from_archive(arc: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": arc.get("session_id"),
         "claude_session_id": tr.get("claude_session_id"),
+        # Archived (§11 #18) so a resume re-attaches the same per-agent
+        # launch-config dir (turns.jsonl Timeline) — absent on older records.
+        "tmux_name": arc.get("tmux_name"),
         "cwd": arc.get("cwd"),
         "model": arc.get("model"),
         "permission_mode": arc.get("permission_mode", "acceptEdits"),
@@ -1556,7 +1655,17 @@ def _resumable_from_archive(arc: dict[str, Any]) -> dict[str, Any]:
         "enabled_plugins": None,
         "mcp_servers": None,
         "attached_docs": None,
+        # Pre-armed Bypass (§7.11) is a LIGHT launch fact the archive keeps
+        # alongside permission_mode, so an un-retired agent relaunches with
+        # the ring it was created with (False for pre-field rows — the cold
+        # relaunch and the derived ring then agree honestly).
+        "arm_bypass": bool(arc.get("arm_bypass", False)),
+        # Fork provenance (§11 #18) — un-retiring must not shed it: the
+        # resume re-seeds the driver's record, and the NEXT retire re-archives
+        # the same lineage.
+        "lineage": arc.get("lineage") if isinstance(arc.get("lineage"), dict) else None,
         "created_at": arc.get("created_at"),
+        "died_at": None,
         "retired_at": arc.get("retired_at"),
         "source": "archive",
         "archive_id": arc.get("archive_id"),
@@ -1577,6 +1686,9 @@ def _past_summary(d: dict[str, Any], live_ids: set[str]) -> dict[str, Any]:
         "model": d.get("model"),
         "claude_session_id": d.get("claude_session_id"),
         "created_at": d.get("created_at"),
+        # §11 #17: the observed stop/death stamp (roster rows; None when the
+        # death was unwitnessed — the UI falls back to created_at).
+        "died_at": d.get("died_at"),
         "retired_at": d.get("retired_at"),
         "source": d.get("source"),
         "archive_id": d.get("archive_id"),
@@ -1651,11 +1763,19 @@ def _resolve_resume_target(req: "ResumeRequest") -> dict[str, Any] | None:
 async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
     """Relaunch a past agent from a resume descriptor into a live SessionState.
 
-    Mirrors ``reconnect_sessions()``'s COLD branch (§9.9): a fresh tmux session
-    launched with ``claude --resume <claude_session_id>`` in the agent's cwd — the
-    SAME conversation, rebuilt from its transcript, continuing on the SAME sidecar
-    session id (so it's THE agent returning, not a clone/fork). ``start()``
-    re-persists the roster record, bringing the agent back to the live roster."""
+    Mirrors ``reconnect_sessions()`` (§9.9): warm-rebind when the descriptor's
+    persisted ``tmux_name`` is still alive (the agent never died — a duplicate
+    relaunch would orphan the running conversation), else the COLD branch — a
+    tmux session relaunched with ``claude --resume <claude_session_id>`` in the
+    agent's cwd — the SAME conversation, rebuilt from its transcript,
+    continuing on the SAME sidecar session id (so it's THE agent returning,
+    not a clone/fork). The persisted ``tmux_name`` is REUSED for the relaunch
+    (§7.19 Timeline persistence): the per-agent launch-config dir
+    (``turns.jsonl`` / ``statusline.jsonl``) is keyed by tmux name, so a
+    fresh name would silently orphan the agent's Timeline on every
+    retire→resume round-trip. Only a descriptor with no ``tmux_name`` (legacy
+    /pre-#18 archive rows) falls back to a fresh name. ``start()`` re-persists
+    the roster record, bringing the agent back to the live roster."""
     global _identity_ordinal
     from drivers.bridge import BridgeDriver  # local import (mirrors reconnect)
 
@@ -1663,6 +1783,21 @@ async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
     cwd = d.get("cwd")
     claude_sid = d.get("claude_session_id")
     identity = d.get("identity")
+    tmux_name = d.get("tmux_name") or None
+    # Warm-vs-cold: reuse reconnect's liveness read — in a worker thread, so
+    # the wsl.exe→tmux roundtrip never stalls the event loop (SSE feeds and
+    # hook ingestion keep flowing while it runs). Unreadable tmux (or no
+    # persisted name) reads as not-alive — the cold create then answers
+    # honestly if the name is somehow still taken.
+    alive = False
+    if tmux_name:
+        def _live_tmux_names() -> set[str]:
+            from bridge import TmuxBridge  # type: ignore[import-not-found]
+            return {s["name"] for s in TmuxBridge().list()}
+        try:
+            alive = tmux_name in await asyncio.to_thread(_live_tmux_names)
+        except Exception:  # pragma: no cover - environment dependent
+            alive = False
     # Keep the round-robin counter ahead of a restored agent's number (as reconnect).
     if isinstance(identity, dict) and isinstance(identity.get("number"), int):
         _identity_ordinal = max(_identity_ordinal, identity["number"])
@@ -1683,6 +1818,7 @@ async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
         mcp_servers=d.get("mcp_servers"),
         identity=identity,
         attached_docs=d.get("attached_docs"),
+        arm_bypass=d.get("arm_bypass", False),
     )
     sessions[sid] = session
     config = DriverConfig(
@@ -1698,16 +1834,29 @@ async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
         mcp_servers=d.get("mcp_servers"),
         identity=identity,
         attached_docs=d.get("attached_docs"),
+        arm_bypass=d.get("arm_bypass", False),
     )
+    # The driver's record BASE (start() re-persists on top of it): carry the
+    # fields start() does not itself rewrite — today the fork lineage (§11
+    # #18) — so a resume→retire round-trip re-archives the same provenance
+    # instead of shedding it (reconnect passes the FULL record for the same
+    # reason).
+    persisted: dict[str, Any] = {"session_id": sid, "cwd": cwd}
+    if isinstance(d.get("lineage"), dict):
+        persisted["lineage"] = d["lineage"]
     driver = BridgeDriver(
         config, session.handle_event,
-        session_id=sid, claude_session_id=claude_sid, cold_restore=True,
+        resume_name=tmux_name,          # reuse the launch-config home (§7.19)
+        session_id=sid, claude_session_id=claude_sid,
+        cold_restore=not alive,
         transcript_path=d.get("transcript_path"),
-        persisted_record={"session_id": sid, "cwd": cwd},
+        persisted_record=persisted,
     )
     session.driver = driver
     try:
-        await driver.start()          # cold create: `claude --resume <id>`
+        # Warm: resume() rebinds the alive tmux. Cold: a full create with
+        # `claude --resume <id>` on the SAME tmux name.
+        await driver.start()
         session.status = "idle"
         session.listen_task = asyncio.create_task(_listen(session))
     except Exception as e:  # pragma: no cover - environment dependent
@@ -1806,10 +1955,17 @@ async def close_session(session_id: str, hard: bool = False):
             session_id, transcript_path=transcript_path,
             subagent_paths=subagent_paths, link_ids=link_ids,
             identity_number=number)
-        # interrupt + close the live tmux session
+        # interrupt + close the live tmux session. TRUE wipe (§7.12): the
+        # bridge driver also purges the per-agent launch-config dir
+        # (turns.jsonl Timeline + statusline.jsonl) — nothing can resume a
+        # hard-deleted agent, so the standing stores go with it. (Retire and
+        # stop keep that dir so a resume re-attaches the Timeline, §7.19.)
         if drv is not None:
             try:
-                await drv.close()
+                if hasattr(drv, "_bridge"):
+                    await drv.close(purge_config=True)  # type: ignore[call-arg]
+                else:
+                    await drv.close()
             except Exception:
                 pass
         # erase the on-disk transcript(s). The bridge writes them inside WSL, so a
@@ -1884,6 +2040,13 @@ async def close_session(session_id: str, hard: bool = False):
             driver=(session.driver.name if session.driver else session.driver_name),
             permission_mode=session.permission_mode,
             git_author=git_author(session.identity) if session.identity else None,
+            lineage=rec.get("lineage") if isinstance(rec.get("lineage"), dict) else None,
+            # §7.19: archived so a resume re-attaches the same turns.jsonl
+            # Timeline (the launch-config dir is keyed by tmux name).
+            tmux_name=rec.get("tmux_name") or getattr(session.driver, "tmux_name", None),
+            # §7.11: the pre-armed-Bypass launch fact, kept beside
+            # permission_mode so an un-retire re-arms the same ring.
+            arm_bypass=bool(rec.get("arm_bypass", session.arm_bypass)),
         )
         try:
             state_store.save_archive_record(project_key, archive_record)
@@ -1932,10 +2095,23 @@ async def get_archive(archive_id: str):
 async def delete_archive(archive_id: str):
     """TRUE-delete an archived record (§7.12) — a real, irreversible wipe of the
     archive row, distinct from Retire (which CREATES the record) and from a hard
-    agent Delete. Removes only the archived record; shared history is untouched.
+    agent Delete. Removes the archived record and — best-effort — the agent's
+    per-agent launch-config dir (the turns.jsonl Timeline + statusline.jsonl the
+    row's ``tmux_name`` keys, §7.19): nothing can resume the row afterwards, so
+    keeping the standing stores would only leak them. Shared history is untouched.
     """
+    found = state_store.find_archive_record(archive_id)
     if not state_store.delete_archived_anywhere(archive_id):
         raise HTTPException(status_code=404, detail="Archived record not found")
+    tmux_name = (found[1] or {}).get("tmux_name") if found else None
+    if tmux_name:
+        try:
+            from bridge import TmuxBridge  # type: ignore[import-not-found]
+            await asyncio.to_thread(
+                lambda: TmuxBridge().purge_launch_config(tmux_name))
+        except Exception:  # pragma: no cover - purge is best-effort
+            logger.warning("launch-config purge failed for archive %s (tmux %s)",
+                           archive_id, tmux_name)
     return {"status": "deleted", "archive_id": archive_id}
 
 
@@ -2616,9 +2792,12 @@ class ProjectCloseRequest(BaseModel):
 @app.get("/projects")
 async def list_projects():
     """The Projects picker feed (§3.2): known canonical roots from the 🏠 index
-    (name, path, last-opened, agent count) plus which project is open (if any)."""
+    (name, path, last-opened, agent count) plus which project is open (if any).
+    Only OPERATOR-registered roots list — an index row auto-created by record
+    routing (e.g. a fork's git-worktree cwd, §7.19) is bookkeeping, not a known
+    project, until the operator registers/opens it."""
     entries = [_project_entry(key, meta)
-               for key, meta in state_store.known_projects().items()]
+               for key, meta in state_store.registered_projects().items()]
     entries.sort(key=lambda e: e.get("last_used") or "", reverse=True)
     return {"open": _open_project, "projects": entries}
 
@@ -2632,7 +2811,7 @@ async def register_project(req: ProjectPathRequest):
         raise HTTPException(status_code=400, detail="path required")
     if not Path(key).is_dir():
         raise HTTPException(status_code=400, detail=f"not a directory: {key}")
-    state_store.touch_projects_index(key)
+    state_store.touch_projects_index(key, register=True)
     return _project_entry(key, state_store.known_projects().get(key, {}))
 
 
@@ -2654,9 +2833,12 @@ async def open_project(req: ProjectPathRequest):
             status_code=409,
             detail=f"another project is open ({_open_project}); close it first")
     state_store.load_project(key)
+    # §9.1: project-open IS the restore point — warm-rebind the still-alive
+    # tmux sessions and cold-restore the dead ones for THIS project (startup
+    # restores nothing by default; see _on_startup).
     await reconnect_sessions(project_key=key)
     _open_project = key
-    state_store.touch_projects_index(key)
+    state_store.touch_projects_index(key, register=True)
     return {"status": "open", **_project_entry(key, state_store.known_projects().get(key, {}))}
 
 
@@ -3710,6 +3892,10 @@ async def _adopt_forked_session(descriptor: dict[str, Any], *,
         # driver's fork() passes the docs preamble on the --fork-session
         # launch), so this persisted field and the fork's behavior agree.
         attached_docs=source.attached_docs,
+        # §7.11: the fork rides the raw --fork-session spawn, which does not
+        # carry the arm flag — its ring is the un-armed base ring, so the
+        # honest readback is arm_bypass=False (never inherited-but-untrue).
+        arm_bypass=False,
     )
     sessions[new_sid] = session
     config = DriverConfig(
@@ -3725,6 +3911,7 @@ async def _adopt_forked_session(descriptor: dict[str, Any], *,
         mcp_servers=source.mcp_servers,
         identity=identity,
         attached_docs=source.attached_docs,
+        arm_bypass=False,
     )
     driver = BridgeDriver(
         config, session.handle_event,
@@ -4019,34 +4206,18 @@ async def get_subagents(session_id: str):
         if subs:
             result["subagents"] = subagents_naming.assign_names([subs])
         # Blend the hook-fed registry over the transcript-derived list (§7.17):
-        # SubagentStart/Stop pushes are the authoritative active-vs-quiet signal
-        # — matched by the subagent's engine agent_id; unmatched hook records
-        # (start seen before the transcript catches up) are appended.
+        # SubagentStart/Stop pushes are the authoritative active-vs-quiet
+        # signal. The blend (`subagents_naming.blend_live`) matches by engine
+        # agent_id (exact/prefix), pairs a RUNNING hook record in order with
+        # the id-less running spawn its result hasn't named yet (the fix for
+        # the {id: null} double-count), keeps still-running hook-only records
+        # with an honest minted id, and drops stopped hook-only leftovers
+        # (the engine's internal helper agents — never a transcript row).
         live = runstate.subagents_live(session_id)
         if live:
-            by_id = {s.get("agent_id"): s for s in result.get("subagents", [])
-                     if s.get("agent_id")}
-            extra = []
-            for rec in live:
-                target = by_id.get(rec["agent_id"])
-                if target is not None:
-                    target["live_status"] = rec["status"]
-                    target["transcript_path"] = rec.get("transcript_path")
-                    if rec.get("type") and not target.get("type"):
-                        target["type"] = rec["type"]
-                else:
-                    extra.append({
-                        "id": None, "tool_use_id": None,
-                        "agent_id": rec["agent_id"], "type": rec.get("type"),
-                        "description": None, "prompt": None,
-                        "status": "running" if rec["status"] == "running" else "done",
-                        "live_status": rec["status"],
-                        "transcript_path": rec.get("transcript_path"),
-                        "usage": None,
-                    })
-            if extra:
-                result["subagents"] = list(result.get("subagents", [])) + extra
-                result["count"] = len(result["subagents"])
+            result["subagents"] = subagents_naming.blend_live(
+                result.get("subagents", []), live)
+            result["count"] = len(result["subagents"])
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -4244,6 +4415,25 @@ async def library_list_assets(cwd: str):
                 for rec in attachments.list_assets(cwd)]
 
     return await asyncio.to_thread(_rows)
+
+
+@app.delete("/library/assets/{asset_id}")
+async def library_delete_asset(asset_id: str, cwd: str):
+    """Delete one ingested asset — bytes dir + ``.meta.json`` sidecar (§7.16,
+    the Assets preview's Remove; #50 residual). Traversal-safe (plain-segment
+    id resolved strictly inside the store's ``assets/`` dir); an unknown /
+    unsafe / loose-file id is an honest 404, a failed removal an honest 500.
+    400 when ``cwd`` resolves no project store."""
+    if not storage.project_root(cwd):
+        raise HTTPException(status_code=400, detail="cwd required")
+    try:
+        # The removal leg may shell into WSL — keep the event loop free.
+        removed = await asyncio.to_thread(attachments.delete_asset, cwd, asset_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if not removed:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"status": "deleted", "asset_id": asset_id}
 
 
 @app.get("/assets/{asset_id}/{filename}")

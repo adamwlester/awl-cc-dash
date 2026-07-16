@@ -30,8 +30,9 @@ and would kill sibling agents' live sessions); each agent's tmux session is
 uniquely named ``plandec-<uuid8>`` (== its sidecar session id / inbox key);
 teardown closes ONLY our own session + throwaway dir and terminates our own
 sidecar subprocess. NEVER ``kill-server``. The sidecar subprocess runs with an
-EMPTY ``AWL_SIDECAR_RUNTIME`` so its startup ``reconnect_sessions()`` never
-rebinds any real/sibling tmux session.
+EMPTY ``AWL_SIDECAR_RUNTIME`` so no real/sibling record is ever visible to it
+(startup itself restores nothing by default — §9.1 picker-first — so this
+isolates the on-open restore point and every roster read, not a boot sweep).
 
 Run::
 
@@ -118,9 +119,11 @@ def _inbox_ok():
 def sidecar_proc():
     """Start the REAL sidecar (sidecar/main.py, exactly as start-dashboard.bat
     does) bound to 0.0.0.0:7690 so in-WSL agents' hooks reach it over the host
-    gateway. Isolated with an EMPTY AWL_SIDECAR_RUNTIME so startup reconnect never
-    rebinds a real/sibling tmux session. Yields the base URL; terminates on
-    teardown. Never touches the tmux server."""
+    gateway. Isolated with an EMPTY AWL_SIDECAR_RUNTIME so no real/sibling
+    record is visible to it (startup restores nothing by default — §9.1; the
+    empty runtime isolates every roster read and the on-open restore point).
+    Yields the base URL; terminates on teardown. Never touches the tmux
+    server."""
     SCRATCH.mkdir(parents=True, exist_ok=True)
 
     # Refuse to run Approach A if a FOREIGN server already holds :7690 — reading
@@ -135,7 +138,7 @@ def sidecar_proc():
 
     runtime_dir = tempfile.mkdtemp(prefix="awl-plandec-rt-")
     env = os.environ.copy()
-    env["AWL_SIDECAR_RUNTIME"] = runtime_dir      # empty -> no startup reconnect
+    env["AWL_SIDECAR_RUNTIME"] = runtime_dir      # empty -> isolated records (no boot restore by default, §9.1)
     env["AWL_SIDECAR_HOST"] = "0.0.0.0"           # WSL-reachable (the default)
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"

@@ -534,6 +534,48 @@ def asset_file_path(cwd: str | None, asset_id: str, filename: str) -> Path | Non
     return resolved
 
 
+def delete_asset(cwd: str | None, asset_id: str) -> bool:
+    """Remove one ingested asset — its bytes AND its ``.meta.json`` sidecar.
+
+    The §7.16 asset-delete (the Assets preview's Remove): the whole
+    ``assets/<asset_id>/`` dir goes, since the ingest layout gives every asset
+    its own id-keyed dir holding exactly the bytes + sidecar. Traversal-safe
+    like the serve path: ``asset_id`` must be a plain segment and the
+    ``resolve()``d dir must live strictly inside the store's ``assets/`` dir —
+    anything else (and a missing/loose-file id) returns ``False``, which the
+    endpoint answers as an honest 404. The removal leg matches the write leg
+    (:func:`store_kind`): plain ``shutil.rmtree`` for Windows-drive stores,
+    an in-distro ``rm -rf`` for WSL-internal ones. Returns ``True`` when the
+    asset dir was removed; raises :class:`RuntimeError` when the removal
+    itself fails (an honest 500, never a silent partial delete).
+    """
+    base = storage.assets_dir(cwd)
+    if base is None or not _safe_segment(asset_id):
+        return False
+    try:
+        target = (base / asset_id).resolve()
+        base_resolved = base.resolve()
+    except OSError:
+        return False
+    if base_resolved not in target.parents or not target.is_dir():
+        return False
+    kind, distro = store_kind(cwd)
+    if kind == "wsl":
+        base_wsl = storage.doc_path_wsl(base)
+        if not base_wsl or not base_wsl.startswith("/"):
+            raise RuntimeError(
+                f"cannot derive a WSL path for the store assets dir: {base}")
+        _wsl_run(distro or "", f"rm -rf {shlex.quote(f'{base_wsl}/{asset_id}')}")
+    else:
+        import shutil
+        try:
+            shutil.rmtree(target)
+        except OSError as e:
+            raise RuntimeError(f"asset delete failed: {e}")
+    logger.info("asset deleted: %s/%s (%s leg)", _ASSETS_SUBDIR, asset_id, kind)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Per-receiver path rendering (Option A: absolute paths are renderings,
 # never stored state)

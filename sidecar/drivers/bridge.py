@@ -817,6 +817,11 @@ class BridgeDriver(AgentDriver):
             git_author_name=git_author_name,
             git_author_email=git_author_email,
             append_system_prompt=append_system_prompt,
+            # Arm-without-activate (§7.11, §11 #13): Bypass joins the mode ring
+            # without being the launch mode. Re-applies on cold restore too —
+            # this method IS the cold-restore launch (§9.9), so a restored
+            # agent keeps the ring it was created with.
+            allow_skip_permissions=bool(self.config.arm_bypass),
             **kwargs,
         )
         # Remember the launched claude session id so it can be persisted for
@@ -882,6 +887,10 @@ class BridgeDriver(AgentDriver):
                 "permission_rules": self.config.permission_rules,
                 "enabled_plugins": self.config.enabled_plugins,
                 "mcp_servers": self.config.mcp_servers,
+                # Arm-without-activate flag (§7.11, §11 #13) — persisted so a
+                # reconnect/resume re-derives the same armed mode ring and a
+                # cold restore re-applies the launch flag.
+                "arm_bypass": bool(self.config.arm_bypass),
                 # Dashboard-owned identity, persisted so it survives restart.
                 "identity": self.config.identity,
                 # Per-agent reply-format preset id (§11 #39), persisted so the
@@ -897,6 +906,11 @@ class BridgeDriver(AgentDriver):
                 # launched with, not the current knob.
                 "workflow_hook_timeout": self._workflow_hook_timeout,
             })
+            # A (re)started agent is by definition not dead: drop any stale
+            # `stopped_at` the persisted base carried (stop → reopen restores
+            # the agent alive; serving the OLD death stamp later would be a
+            # provably-false "died …" on the Past tab — §11 #17).
+            record.pop("stopped_at", None)
             self._record = record
             try:
                 _save_record(self._record)
@@ -928,12 +942,39 @@ class BridgeDriver(AgentDriver):
         self._pending_turn = True
         self._saw_reply_since_send = False
 
+    # A claude session id is a uuid — the transcript file is `<uuid>.jsonl`, so
+    # a resolved path's stem IS the conversation id (used by the fork-id
+    # adoption below; anything non-uuid-shaped is never adopted).
+    _UUID_RE = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        re.IGNORECASE)
+
     def _resolve_and_persist_transcript_path(self) -> None:
         """Resolve this agent's transcript path once and persist it (§8.6/#4).
 
         Called (in a thread) after the first successful transcript read — the
         file provably exists then — so the verified path lands in the roster
         record and the mapping survives restarts and scheme drift.
+
+        Fork-id adoption (§7.19, #50 residual): a `--fork-session` launch mints
+        a NEW claude session id that is unknown at spawn, and the fork-time
+        discovery is best-effort — when it missed, this driver runs id-less
+        (`find_transcript`'s newest-file fallback) and the roster record
+        carries `claude_session_id: null`, leaving the fork permanently
+        non-cold-restorable (reconnect PRUNES id-less dead records, and a
+        retire archives a non-resumable row). The transcript filename IS the
+        id (`<uuid>.jsonl`), so the moment the fork's own transcript resolves
+        here, the uuid stem is adopted: registered with the bridge (upgrading
+        resolution to the collision-proof pinned path) and persisted through
+        the roster record — exactly what a normal create persists.
+
+        Ownership guard: the id-less fallback resolution is newest-.jsonl-in-
+        project-dir, which in a SHARED-cwd fork (isolate=False, or the honest
+        non-git-root fallback) is typically the SOURCE's actively-written
+        transcript. A stem that names another agent's conversation — the fork
+        lineage's source id, or any other roster record's claude_session_id —
+        is therefore never adopted, pinned, or persisted; the read simply
+        retries next poll until the fork's own transcript resolves.
         """
         try:
             from bridge.transcript import find_transcript  # type: ignore[import-not-found]
@@ -942,13 +983,68 @@ class BridgeDriver(AgentDriver):
             path = None
         if not path:
             return
+        if not self._claude_session_id:
+            stem = str(path).replace("\\", "/").rsplit("/", 1)[-1]
+            if stem.endswith(".jsonl"):
+                stem = stem[: -len(".jsonl")]
+            if self._UUID_RE.match(stem):
+                if self._is_foreign_claude_id(stem):
+                    # A sibling's conversation — adopting would permanently
+                    # pin this driver (and a later cold restore's `claude
+                    # --resume`) to the WRONG conversation. Leave everything
+                    # unpinned; the next poll re-resolves.
+                    logger.info(
+                        "not adopting claude session id %s for %s — it names "
+                        "another agent's conversation (shared-cwd sibling)",
+                        stem, self._name)
+                    return
+                self._claude_session_id = stem
+                try:
+                    self._bridge.register_session_id(self._name, stem)
+                except Exception:  # pragma: no cover - best effort
+                    pass
+                logger.info("adopted discovered claude session id %s for %s",
+                            stem, self._name)
         self._transcript_path = path
         if self._record is not None:
             self._record["transcript_path"] = path
+            if self._claude_session_id and \
+                    not self._record.get("claude_session_id"):
+                self._record["claude_session_id"] = self._claude_session_id
             try:
                 _save_record(self._record)
             except Exception as e:  # pragma: no cover - best effort
                 logger.warning("could not refresh runtime record: %s", e)
+
+    def _is_foreign_claude_id(self, stem: str) -> bool:
+        """True when ``stem`` names ANOTHER agent's conversation (never adopt).
+
+        Two sources of known-foreign ids, both best-effort: the fork lineage's
+        ``source_claude_session_id`` (seeded into the persisted record at fork
+        adoption — always available for forks, even when the roster read
+        fails), and every OTHER persisted roster record's ``claude_session_id``
+        (covers co-located siblings generally, across sidecar restarts).
+        """
+        low = stem.lower()
+        lin = (self._record or {}).get("lineage")
+        fork = lin.get("fork") if isinstance(lin, dict) else None
+        src = fork.get("source_claude_session_id") if isinstance(fork, dict) else None
+        if isinstance(src, str) and src.lower() == low:
+            return True
+        try:
+            try:
+                from runtime_store import all_records  # sidecar dir on sys.path
+            except ImportError:  # pragma: no cover - package import (tests)
+                from ..runtime_store import all_records  # type: ignore[no-redef]
+            for rec in all_records():
+                if rec.get("session_id") == self._session_id:
+                    continue
+                cid = rec.get("claude_session_id")
+                if isinstance(cid, str) and cid.lower() == low:
+                    return True
+        except Exception:  # pragma: no cover - roster read is best-effort
+            pass
+        return False
 
     def _apply_rotation(self, new_id: str) -> None:
         """Adopt a rotated claude session id (post-/clear, §7.13/§11 #35).
@@ -1712,14 +1808,48 @@ class BridgeDriver(AgentDriver):
         persists, and the roster record survives so a later project open can
         cold-restore the same conversation (§9.9). Contrast ``close()``, the
         retire path, which also removes the record.
+
+        The kept record gains a ``stopped_at`` stamp (§11 #17 / #50 residual):
+        the moment this agent's process ended, surfaced by ``GET
+        /sessions/past`` as the row's ``died_at`` (the mockup's "died …"
+        stamp). Best-effort — a failed persist never blocks the stop.
+
+        The per-agent launch-config dir (turns.jsonl Timeline +
+        statusline.jsonl, keyed by tmux name) is deliberately KEPT — a later
+        cold restore on the same name re-attaches it (§7.19).
         """
         self._closed = True
+        self.mark_stopped()
         try:
             await asyncio.to_thread(self._bridge.close, self._name)
         except Exception:  # pragma: no cover - best effort
             pass
 
-    async def close(self) -> None:
+    def mark_stopped(self) -> None:
+        """Stamp ``stopped_at`` (now) on the persisted roster record.
+
+        Called by ``stop()`` and by the sidecar when it observes the agent die
+        (listener failure). Best-effort and idempotent-enough: the newest stamp
+        wins, which is the honest "last seen alive" reading.
+        """
+        if self._record is None:
+            return
+        self._record["stopped_at"] = datetime.now().isoformat()
+        try:
+            _save_record(self._record)
+        except Exception as e:  # pragma: no cover - best effort
+            logger.warning("could not stamp stopped_at for %s: %s",
+                           self._session_id, e)
+
+    async def close(self, purge_config: bool = False) -> None:
+        """End the tmux session and remove the roster record (the Retire path).
+
+        The per-agent launch-config dir (turns.jsonl Timeline +
+        statusline.jsonl, keyed by tmux name) is KEPT by default so a resume
+        from the archive row — which persists the tmux name — re-attaches the
+        same Timeline store (§7.19). ``purge_config=True`` is the hard-Delete
+        (§7.12 TRUE-wipe) form: it also removes that dir.
+        """
         self._closed = True
         if self._session_id:
             try:
@@ -1727,6 +1857,7 @@ class BridgeDriver(AgentDriver):
             except Exception:  # pragma: no cover - best effort
                 pass
         try:
-            await asyncio.to_thread(self._bridge.close, self._name)
+            await asyncio.to_thread(self._bridge.close, self._name,
+                                    purge_config=purge_config)
         except Exception:  # pragma: no cover - best effort
             pass

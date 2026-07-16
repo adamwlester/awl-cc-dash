@@ -385,6 +385,7 @@ function AssetsTab() {
   const d = useDash()
   const [assets, setAssets] = useState<AssetRecord[] | null>(null)
   const [selId, setSelId] = useState<string | null>(null)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)   // asset id awaiting the inline confirm
 
   useEffect(() => {
     let cancelled = false
@@ -410,6 +411,22 @@ function AssetsTab() {
     if (!rec.id) { toast('Loose file — not byte-addressable; re-add it via Attach to materialize it'); return }
     d.attachToCompose([{ id: rec.id, filename: rec.filename, kind: 'asset' }])
     toast(`Attached ${rec.filename} — chip added to Compose`)
+  }
+
+  // Remove (§7.16, DELETE /library/assets/{id}): bytes dir + .meta.json
+  // sidecar; honest 404/400/500 details verbatim. Behind the inline danger
+  // confirm (the Past-tab archive-delete pattern).
+  const doDelete = async (rec: AssetRecord) => {
+    setConfirmDel(null)
+    if (!rec.id || !d.projectCwd) return
+    const r = await api.deleteAsset(rec.id, d.projectCwd)
+    if (r.ok) {
+      toast(`Removed ${rec.filename} — bytes and metadata deleted from the project store`)
+      setSelId(null)
+      setAssets(prev => (prev || []).filter(a => a.id !== rec.id))
+    } else {
+      toast(`Remove failed: ${r.detail || 'sidecar error'}`)
+    }
   }
 
   return (
@@ -445,6 +462,16 @@ function AssetsTab() {
                 ? <span className="ap-img" style={{ background: 'var(--surface-3)' }}><img className="awl-asset-thumb" style={{ objectFit: 'contain' }} src={`${API}${sel.http_url}`} alt={sel.filename} /></span>
                 : <span className="ap-img" style={{ background: 'var(--surface-3)' }}><Ic name={isImageFile(sel.filename) ? 'image' : fileTypeIcon(sel.filename)} style={{ color: 'var(--muted)' }} /></span>}
             </div>
+            {confirmDel === sel.id && sel.id && (
+              // flexWrap: the assets preview column gets very narrow at the
+              // 1180 floor — the buttons wrap under the message instead of
+              // squeezing the text into a one-word-per-line column.
+              <div data-comp="inline-confirm" className="tl-confirm foot-confirm--danger" style={{ display: 'flex', flexWrap: 'wrap' }}>
+                <span style={{ flex: '1 1 14ch' }}>Remove {sel.filename} forever? Bytes + metadata are deleted from the store.</span>
+                <button className="btn btn-sm ml-auto" onClick={() => setConfirmDel(null)}>Cancel</button>
+                <button className="btn-danger-solid btn-sm" onClick={() => doDelete(sel)}><Ic name="trash-2" className="w-3.5 h-3.5" />Remove</button>
+              </div>
+            )}
             <div className="doc-foot">
               <ExportControl a={{
                 enabled: !!sel.id,          // Assets are Attach-only (whole-file)
@@ -455,8 +482,9 @@ function AssetsTab() {
                 onAttach: () => attach(sel),
               }} />
               <span className="flex-1" />
-              <button data-comp="button" className="btn-danger btn-sm" disabled
-                title="Remove isn't wired yet — the sidecar exposes no asset-delete endpoint (backend gap, reported)">
+              <button data-comp="button" className="btn-danger btn-sm" disabled={!sel.id}
+                title={sel.id ? 'Remove this asset — deletes its bytes and metadata from the project store' : 'Loose file (no asset id) — not managed by the store; remove it on disk'}
+                onClick={() => sel.id && setConfirmDel(sel.id)}>
                 <Ic name="trash-2" className="w-3 h-3" />Remove
               </button>
             </div>

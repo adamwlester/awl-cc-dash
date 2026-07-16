@@ -1836,3 +1836,138 @@ class TestWorkflowApprovalGate:
         card = inbox.items_for("a1")[0]
         assert card["data"]["timed_out"] is True
         assert card["data"]["hold_deadline"]  # the honest live-window stamp
+
+
+# ---------------------------------------------------------------------------
+# Armed permission modes (§7.11, §11 #13/#50 residual) — the session exposes
+# its launch-armed mode set (derived from the launch mode + the arm_bypass
+# flag) so the Details ring is exact for sessions created outside the renderer
+# and across restarts; the live set-mode endpoint accepts the `auto` spelling.
+# ---------------------------------------------------------------------------
+
+class TestArmedModes:
+    def test_base_ring_without_prearm(self):
+        # No pre-arm: the spike-proven default ring — Bypass absent.
+        assert main.armed_modes_for("acceptEdits", False) == \
+            ["default", "acceptEdits", "plan", "auto"]
+
+    def test_bypass_launch_mode_arms_bypass(self):
+        assert "bypassPermissions" in main.armed_modes_for(
+            "bypassPermissions", False)
+
+    def test_arm_bypass_flag_arms_without_activation(self):
+        armed = main.armed_modes_for("default", True)
+        assert "bypassPermissions" in armed
+        assert armed[:4] == ["default", "acceptEdits", "plan", "auto"]
+
+    def test_off_ring_launch_mode_appends_defensively(self):
+        # The launch mode is by definition reachable — an off-ring spelling
+        # (the CLI's dontAsk alias) appends rather than vanishing.
+        assert "dontAsk" in main.armed_modes_for("dontAsk", False)
+
+    def test_session_dict_exposes_armed_modes_and_arm_flag(self):
+        s = SessionState(
+            session_id="s-armed", agent_type=None, model=None,
+            permission_mode="acceptEdits", cwd=None, system_prompt=None,
+            driver_name="bridge", arm_bypass=True)
+        d = s.to_dict()
+        assert d["armed_modes"] == main.armed_modes_for("acceptEdits", True)
+        assert "bypassPermissions" in d["armed_modes"]
+        assert d["launch_config"]["arm_bypass"] is True
+
+    def test_unarmed_session_dict_has_no_bypass(self):
+        d = _session().to_dict()
+        assert "bypassPermissions" not in d["armed_modes"]
+        assert d["launch_config"]["arm_bypass"] is False
+
+    def test_create_request_carries_arm_bypass(self):
+        # The CreateSessionRequest field exists and defaults off.
+        assert main.CreateSessionRequest().arm_bypass is False
+        assert main.CreateSessionRequest(arm_bypass=True).arm_bypass is True
+
+    def test_setmode_accepts_auto_spelling(self):
+        # The live path's Literal now carries `auto` (the launch path always
+        # accepted it); `dontAsk` stays accepted as the CLI alias.
+        assert main.SetModeRequest(mode="auto").mode == "auto"
+        assert main.SetModeRequest(mode="dontAsk").mode == "dontAsk"
+
+    def test_setmode_auto_reaches_driver_and_reads_back(self):
+        class _AutoDriver:
+            name = "bridge"
+
+            def __init__(self):
+                self.calls = []
+
+            def supports(self, cap):
+                return cap == "set_mode"
+
+            async def set_mode(self, mode):
+                self.calls.append(mode)
+                return "auto"          # the status-line read-back spelling
+        s = _session()
+        s.driver = _AutoDriver()
+        main.sessions["s1"] = s
+        try:
+            out = asyncio.run(main.set_mode(
+                "s1", main.SetModeRequest(mode="auto")))
+            assert out == {"status": "ok", "mode": "auto"}
+            assert s.permission_mode == "auto"
+            assert s.driver.calls == ["auto"]
+        finally:
+            main.sessions.pop("s1", None)
+
+
+# ---------------------------------------------------------------------------
+# Startup restore policy (§9.1 picker-first) — sidecar startup restores
+# NOTHING by default; the restore point is POST /projects/open
+# (reconnect_sessions(project_key=…)). AWL_STARTUP_RESTORE=all keeps the old
+# restore-everything-at-boot behavior for tests / one-project setups.
+# ---------------------------------------------------------------------------
+
+class TestStartupRestorePolicy:
+    def _run_startup(self, monkeypatch):
+        calls = []
+
+        async def _fake_reconnect(project_key=None):
+            calls.append(project_key)
+
+        async def _noop():
+            return None
+
+        monkeypatch.setattr(main, "reconnect_sessions", _fake_reconnect)
+        monkeypatch.setattr(main, "_cap_poll_loop", _noop)
+        monkeypatch.setattr(main, "_system_probe_loop", _noop)
+        asyncio.run(main._on_startup())
+        return calls
+
+    def test_startup_restores_nothing_by_default(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        monkeypatch.delenv("AWL_STARTUP_RESTORE", raising=False)
+        assert self._run_startup(monkeypatch) == []
+
+    def test_escape_hatch_restores_everything(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        monkeypatch.setenv("AWL_STARTUP_RESTORE", "all")
+        assert self._run_startup(monkeypatch) == [None]
+
+    def test_open_project_is_the_restore_point(self, monkeypatch, tmp_path):
+        # POST /projects/open reconnects exactly that project's records.
+        import state_store as _ss
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        _ss.reset()
+        calls = []
+
+        async def _fake_reconnect(project_key=None):
+            calls.append(project_key)
+
+        monkeypatch.setattr(main, "reconnect_sessions", _fake_reconnect)
+        monkeypatch.setattr(main, "_open_project", None)
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        try:
+            asyncio.run(main.open_project(
+                main.ProjectPathRequest(path=str(proj))))
+            assert calls == [storage.project_key(str(proj))]
+        finally:
+            main._open_project = None
+            _ss.reset()

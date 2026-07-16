@@ -257,3 +257,319 @@ class TestResumeErrors:
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.resume_past_session(main.ResumeRequest(session_id="s2")))
         assert ei.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Died-at (§11 #17 / #50 residual) — the roster record's `stopped_at` stamp
+# surfaces as the past row's `died_at` (the mockup's "died …" stamp); legacy
+# records without it fall back to nothing (the UI renders created_at).
+# ---------------------------------------------------------------------------
+
+class TestDiedAtStamp:
+    def test_past_row_surfaces_stopped_at_as_died_at(self, tmp_path):
+        cwd = _proj(tmp_path)
+        rec = _seed_roster(cwd, "s1", claude_id="c1", name="nova")
+        rec["stopped_at"] = "2026-07-14T22:10:00"
+        runtime_store.save_record(rec)
+        out = asyncio.run(main.list_past_agents())
+        row = next(r for r in out["past"] if r["session_id"] == "s1")
+        assert row["died_at"] == "2026-07-14T22:10:00"
+
+    def test_legacy_record_has_null_died_at(self, tmp_path):
+        cwd = _proj(tmp_path)
+        _seed_roster(cwd, "s2", claude_id="c2")
+        out = asyncio.run(main.list_past_agents())
+        row = next(r for r in out["past"] if r["session_id"] == "s2")
+        assert row["died_at"] is None
+
+    def test_driver_stop_stamps_stopped_at(self, monkeypatch):
+        # BridgeDriver.stop() (the §3.4 "Close & stop agents" path) stamps the
+        # KEPT roster record with the moment the process ended.
+        from drivers.bridge import BridgeDriver
+        from drivers.base import DriverConfig
+        import drivers.bridge as db
+        saved = []
+        monkeypatch.setattr(db, "_save_record", lambda rec: saved.append(dict(rec)))
+        d = BridgeDriver(DriverConfig(), lambda e: None,
+                         session_id="s-stop",
+                         persisted_record={"session_id": "s-stop"})
+
+        class _Closable:
+            def close(self, name):
+                return None
+        d._bridge = _Closable()
+        asyncio.run(d.stop())
+        assert saved and saved[-1]["stopped_at"]
+        assert saved[-1]["session_id"] == "s-stop"
+
+
+# ---------------------------------------------------------------------------
+# Timeline persistence across retire→resume (§7.19 / #50 residual) — the
+# per-agent turns.jsonl lives in the launch-config dir KEYED BY TMUX NAME, so
+# the resume must reuse the persisted tmux_name (fresh names silently orphan
+# the Timeline). Warm-vs-cold mirrors reconnect: alive tmux → warm rebind,
+# dead → a full cold create on the SAME name.
+# ---------------------------------------------------------------------------
+
+class _CapturingResumeDriver:
+    instances: list = []
+
+    def __init__(self, config, on_event, **kwargs):
+        self.config = config
+        self.kwargs = kwargs
+        type(self).instances.append(self)
+
+    async def start(self):
+        return None
+
+    async def events(self):
+        return
+        yield  # pragma: no cover — empty async generator
+
+
+class TestResumeReattachesTimelineStore:
+    @pytest.fixture(autouse=True)
+    def _drv(self, monkeypatch):
+        import drivers.bridge as db
+        _CapturingResumeDriver.instances = []
+        monkeypatch.setattr(db, "BridgeDriver", _CapturingResumeDriver)
+        yield
+        _CapturingResumeDriver.instances = []
+
+    def _patch_tmux(self, monkeypatch, alive_names, calls=None):
+        import bridge as bridge_pkg
+
+        class _FakeTmux:
+            def list(self):
+                if calls is not None:
+                    calls.append("list")
+                return [{"name": n} for n in alive_names]
+        monkeypatch.setattr(bridge_pkg, "TmuxBridge", _FakeTmux)
+
+    def test_descriptor_carries_tmux_name(self, tmp_path):
+        cwd = _proj(tmp_path)
+        rec = _seed_roster(cwd, "s5", claude_id="c5")
+        d = main._resumable_from_roster(rec)
+        assert d["tmux_name"] == "awl-s5"
+
+    def test_archive_descriptor_lifts_tmux_name(self):
+        arc = deletion.build_archive_record(
+            "s6", archive_id="arc6", cwd="/p", claude_session_id="c6",
+            tmux_name="awl-s6")
+        assert arc["tmux_name"] == "awl-s6"
+        assert main._resumable_from_archive(arc)["tmux_name"] == "awl-s6"
+
+    def test_dead_tmux_cold_restores_on_same_name(self, tmp_path, monkeypatch):
+        self._patch_tmux(monkeypatch, alive_names=[])
+        cwd = _proj(tmp_path)
+        d = {"session_id": "s5", "cwd": cwd, "claude_session_id": "c5",
+             "tmux_name": "awl-s5"}
+        asyncio.run(main._resume_agent_from_descriptor(d))
+        kw = _CapturingResumeDriver.instances[-1].kwargs
+        assert kw["resume_name"] == "awl-s5"     # SAME launch-config home
+        assert kw["cold_restore"] is True
+
+    def test_alive_tmux_warm_rebinds(self, tmp_path, monkeypatch):
+        self._patch_tmux(monkeypatch, alive_names=["awl-s5"])
+        cwd = _proj(tmp_path)
+        d = {"session_id": "s5", "cwd": cwd, "claude_session_id": "c5",
+             "tmux_name": "awl-s5"}
+        asyncio.run(main._resume_agent_from_descriptor(d))
+        kw = _CapturingResumeDriver.instances[-1].kwargs
+        assert kw["resume_name"] == "awl-s5"
+        assert kw["cold_restore"] is False       # warm: never a duplicate spawn
+
+    def test_no_tmux_name_falls_back_to_fresh_name(self, tmp_path, monkeypatch):
+        # Legacy/pre-#18 rows: no persisted name → the old fresh-name cold
+        # path, and the liveness probe is never taken.
+        calls = []
+        self._patch_tmux(monkeypatch, alive_names=["anything"], calls=calls)
+        cwd = _proj(tmp_path)
+        d = {"session_id": "s7", "cwd": cwd, "claude_session_id": "c7"}
+        asyncio.run(main._resume_agent_from_descriptor(d))
+        kw = _CapturingResumeDriver.instances[-1].kwargs
+        assert kw["resume_name"] is None
+        assert kw["cold_restore"] is True
+        assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Integrator fixes on the §7.19/§11 #17 batch — the Timeline store must
+# actually SURVIVE stop/retire (keeping the tmux name is useless if close()
+# rm -rf's the launch-config dir), a restored agent must shed a stale death
+# stamp, and fork lineage + the arm_bypass launch fact must survive the
+# resume→retire round-trip.
+# ---------------------------------------------------------------------------
+
+
+class _CloseCaptureBridge:
+    """Records bridge.close calls (name, purge_config) without any tmux."""
+
+    def __init__(self):
+        self.closed = []
+
+    def close(self, name, purge_config=False):
+        self.closed.append((name, purge_config))
+
+
+class _WarmStubBridge:
+    """Minimal bridge stub for the warm-resume start() path."""
+
+    def register_session_id(self, name, sid):
+        pass
+
+    def resume(self, name, cwd=None, model=None, resume_session_id=None):
+        pass
+
+    def wait_idle(self, name, timeout, poll):
+        pass
+
+
+class TestTimelineStoreSurvivesStopAndRetire:
+    def _driver(self, monkeypatch):
+        from drivers.base import DriverConfig
+        from drivers.bridge import BridgeDriver
+        import drivers.bridge as db
+        monkeypatch.setattr(db, "_save_record", lambda rec: None)
+        monkeypatch.setattr(db, "_remove_record", lambda sid: None)
+        d = BridgeDriver(DriverConfig(), lambda e: None, session_id="s-keep",
+                         persisted_record={"session_id": "s-keep"})
+        b = _CloseCaptureBridge()
+        d._bridge = b
+        return d, b
+
+    def test_stop_keeps_the_launch_config_dir(self, monkeypatch):
+        # "Close & stop agents": the roster record survives for cold restore —
+        # the same-name relaunch must find turns.jsonl still there (§7.19).
+        d, b = self._driver(monkeypatch)
+        asyncio.run(d.stop())
+        assert b.closed == [(d.tmux_name, False)]
+
+    def test_retire_close_keeps_the_launch_config_dir(self, monkeypatch):
+        # Retire archives a resumable row carrying tmux_name — purging the
+        # dir here would hand every resume an EMPTY Timeline.
+        d, b = self._driver(monkeypatch)
+        asyncio.run(d.close())
+        assert b.closed == [(d.tmux_name, False)]
+
+    def test_hard_delete_close_purges(self, monkeypatch):
+        # §7.12 TRUE wipe: the opt-in form destroys the standing stores too.
+        d, b = self._driver(monkeypatch)
+        asyncio.run(d.close(purge_config=True))
+        assert b.closed == [(d.tmux_name, True)]
+
+
+class TestRestoreClearsStaleDeathStamp:
+    def test_start_pops_stale_stopped_at(self, monkeypatch):
+        # stop() stamped T1 → project reopen restores the agent ALIVE: the
+        # re-persisted record must NOT keep the old stamp (a later unwitnessed
+        # death would render a provably-false "died <T1>" on the Past tab).
+        from drivers.base import DriverConfig
+        from drivers.bridge import BridgeDriver
+        import drivers.bridge as db
+        saved = []
+        monkeypatch.setattr(db, "_save_record",
+                            lambda rec: saved.append(dict(rec)))
+        d = BridgeDriver(DriverConfig(), lambda e: None,
+                         resume_name="awl-back", session_id="s-back",
+                         claude_session_id="c-back",
+                         persisted_record={"session_id": "s-back",
+                                           "stopped_at": "2026-07-14T22:10:00"})
+        d._bridge = _WarmStubBridge()
+        asyncio.run(d.start())
+        assert saved
+        assert "stopped_at" not in saved[-1]
+
+
+class TestResumeCarriesLineage:
+    @pytest.fixture(autouse=True)
+    def _drv(self, monkeypatch):
+        import drivers.bridge as db
+        _CapturingResumeDriver.instances = []
+        monkeypatch.setattr(db, "BridgeDriver", _CapturingResumeDriver)
+        yield
+        _CapturingResumeDriver.instances = []
+
+    LINEAGE = {"parent": "src1",
+               "fork": {"source_session_id": "src1",
+                        "source_claude_session_id": "c-src",
+                        "rewound_to": None},
+               "handoff": None}
+
+    def test_roster_descriptor_carries_lineage(self, tmp_path):
+        cwd = _proj(tmp_path)
+        rec = _seed_roster(cwd, "s8", claude_id="c8")
+        rec["lineage"] = dict(self.LINEAGE)
+        runtime_store.save_record(rec)
+        d = main._resumable_from_roster(rec)
+        assert d["lineage"] == self.LINEAGE
+
+    def test_archive_descriptor_carries_lineage_and_arm_bypass(self):
+        arc = deletion.build_archive_record(
+            "s9", archive_id="arc9", cwd="/p", claude_session_id="c9",
+            lineage=dict(self.LINEAGE), arm_bypass=True)
+        d = main._resumable_from_archive(arc)
+        assert d["lineage"]["fork"]["source_claude_session_id"] == "c-src"
+        assert d["arm_bypass"] is True
+
+    def test_archive_row_defaults_arm_bypass_false(self):
+        # Pre-field archive rows resume un-armed — honest: the cold relaunch
+        # passes no arm flag, so the derived ring and reality agree.
+        arc = deletion.build_archive_record(
+            "s10", archive_id="arc10", cwd="/p", claude_session_id="c10")
+        assert main._resumable_from_archive(arc)["arm_bypass"] is False
+
+    def test_resume_seeds_the_driver_record_with_lineage(self, tmp_path,
+                                                         monkeypatch):
+        # One resume→retire cycle must re-archive the SAME lineage — start()
+        # re-persists on the record base, so the base must carry it.
+        import bridge as bridge_pkg
+
+        class _NoTmux:
+            def list(self):
+                return []
+        monkeypatch.setattr(bridge_pkg, "TmuxBridge", _NoTmux)
+        cwd = _proj(tmp_path)
+        d = {"session_id": "s8", "cwd": cwd, "claude_session_id": "c8",
+             "tmux_name": "awl-s8", "lineage": dict(self.LINEAGE)}
+        asyncio.run(main._resume_agent_from_descriptor(d))
+        kw = _CapturingResumeDriver.instances[-1].kwargs
+        assert kw["persisted_record"]["lineage"] == self.LINEAGE
+        assert kw["persisted_record"]["session_id"] == "s8"
+
+
+class TestArchiveTrueDeletePurgesLaunchConfig:
+    def test_delete_archive_purges_the_named_dir(self, tmp_path, monkeypatch):
+        # DELETE /archive/{id} is the TRUE-delete: nothing can resume the row
+        # afterwards, so its tmux-name-keyed Timeline store goes with it.
+        import bridge as bridge_pkg
+        purged = []
+
+        class _PurgeTmux:
+            def purge_launch_config(self, name):
+                purged.append(name)
+        monkeypatch.setattr(bridge_pkg, "TmuxBridge", _PurgeTmux)
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        rec = deletion.build_archive_record(
+            "s11", archive_id="arc11", cwd=cwd, claude_session_id="c11",
+            tmux_name="awl-s11")
+        state_store.save_archive_record(key, rec)
+        state_store.touch_projects_index(key)
+        out = asyncio.run(main.delete_archive("arc11"))
+        assert out["status"] == "deleted"
+        assert purged == ["awl-s11"]
+        assert state_store.find_archive_record("arc11") is None
+
+    def test_row_without_tmux_name_deletes_without_purge(self, tmp_path,
+                                                         monkeypatch):
+        import bridge as bridge_pkg
+
+        class _Boom:
+            def purge_launch_config(self, name):  # pragma: no cover - guard
+                raise AssertionError("must not purge without a tmux_name")
+        monkeypatch.setattr(bridge_pkg, "TmuxBridge", _Boom)
+        cwd = _proj(tmp_path)
+        _seed_archive(cwd, "s12", aid="arc12", claude_id="c12")
+        out = asyncio.run(main.delete_archive("arc12"))
+        assert out["status"] == "deleted"

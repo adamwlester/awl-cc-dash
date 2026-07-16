@@ -34,6 +34,9 @@ export interface LaunchConfig {
   mcp_servers: string[] | null
   // Per-agent reply-format preset id (§11 #39); null = the agent's default style.
   response_preset?: string | null
+  // Arm-without-activate (§7.11/#13): Bypass pre-armed at launch via
+  // --allow-dangerously-skip-permissions without being the launch mode.
+  arm_bypass?: boolean
 }
 
 // Response-format preset menu (§7.14/§11 #39). The instruction text is a launch
@@ -74,6 +77,10 @@ export interface Session {
   has_pending_permission: boolean
   permission_request: PermissionDetail | null
   identity: Identity | null
+  // The launch-armed permission-mode set (§7.11): exactly the segments this
+  // session's Shift+Tab ring contains — the Details ring hides the rest. The
+  // live 400 "unreachable" stays the account-dependence backstop (Auto).
+  armed_modes?: string[] | null
   run_state?: RunState
   launch_config: LaunchConfig
 }
@@ -302,6 +309,10 @@ export interface PastAgent {
   model: string | null
   claude_session_id: string | null
   created_at: string | null
+  // When the sidecar observed the agent stop/die (#17): roster rows only;
+  // null for legacy records / unwitnessed deaths — the row falls back to
+  // its created stamp.
+  died_at?: string | null
   retired_at: string | null
   source: 'roster' | 'archive'
   archive_id: string | null
@@ -426,6 +437,10 @@ export interface CreatePayload {
   // Chosen reply-format preset id (§11 #39) — injected at launch. Omit for the
   // agent's default style.
   response_preset?: string | null
+  // Arm Bypass without activating it (§7.11/#13): maps to
+  // --allow-dangerously-skip-permissions at launch — Bypass joins the mode
+  // ring while the agent still launches in permission_mode.
+  arm_bypass?: boolean
 }
 
 export type Disposition = 'now' | 'next' | 'queue' | 'hold' | 'inject'
@@ -732,6 +747,10 @@ export const api = {
     cwd: string; filename?: string; content_base64?: string; source_path?: string
     created_by?: string; session?: string; citation?: { doc?: string; location?: string } | null
   }) => reqJSON<{ asset: AssetRecord; agent_path: string | null; http_url: string | null }>('POST', '/library/assets', body),
+  // Delete one ingested asset — bytes dir + sidecar (§7.16 Remove). Status-
+  // aware: 404 unknown/loose id · 400 no store · 500 failed removal, verbatim.
+  deleteAsset: (id: string, cwd: string) =>
+    reqJSON<{ status: string; asset_id: string }>('DELETE', `/library/assets/${encodeURIComponent(id)}${qs({ cwd })}`),
   // The renderer's byte URL for an asset (localhost HTTP — the recommended
   // render path; http_url from the records is the same, sidecar-relative).
   assetUrl: (rec: AssetRecord): string | null => (rec.http_url ? `${API}${rec.http_url}` : null),

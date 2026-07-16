@@ -592,8 +592,11 @@ class TestValidPermissionModes:
         })
 
     def test_covers_sidecar_setmode_enum(self):
-        # Every mode the sidecar's SetModeRequest accepts must be launchable.
-        for mode in ("default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"):
+        # Every mode the sidecar's SetModeRequest accepts must be launchable
+        # (incl. `auto` — the Auto segment's canonical spelling, added so a
+        # live switch to an armed Auto stops 400ing; `dontAsk` is its alias).
+        for mode in ("default", "acceptEdits", "plan", "auto",
+                     "bypassPermissions", "dontAsk"):
             assert mode in VALID_PERMISSION_MODES
 
 
@@ -687,6 +690,23 @@ class TestCreateResumeLaunch:
         with pytest.raises(TmuxBridgeError):
             b.create("conflicted", session_id="a" * 36,
                      resume_session_id=self.RESUME_ID)
+
+    def test_allow_skip_permissions_arms_without_activating(self, monkeypatch):
+        # §7.11 #13 arm-without-activate: the flag rides the argv (the spike's
+        # exact spelling) while the launch mode stays whatever was asked —
+        # Bypass joins the ring without the agent starting in it.
+        b, captured = self._patched_bridge(monkeypatch, "armed")
+        b.create("armed", cwd="/tmp/x", permission_mode="default",
+                 allow_skip_permissions=True)
+        cmd = self._launch_cmd(captured)
+        assert "--allow-dangerously-skip-permissions" in cmd
+        assert "--permission-mode default" in cmd
+
+    def test_allow_skip_permissions_defaults_off(self, monkeypatch):
+        b, captured = self._patched_bridge(monkeypatch, "plain")
+        b.create("plain", cwd="/tmp/x", permission_mode="default")
+        assert "--allow-dangerously-skip-permissions" \
+            not in self._launch_cmd(captured)
 
     def test_display_name_passes_name_flag(self, monkeypatch):
         # §7.5 name registration: the identity name doubles as the Claude Code
@@ -1806,6 +1826,22 @@ class TestSetPermissionModeCycle:
         assert out == {"ok": True, "mode": "bypassPermissions"}
         assert b.keys_sent.count("BTab") == 3
 
+    def test_auto_reached_by_cycling(self):
+        # §7.11 #50 residual: Auto is a real ring segment — the cycle reaches
+        # it and reads back the indicator's `auto` spelling.
+        b = _FakeRingBridge(["default", "acceptEdits", "plan", "auto"])
+        out = b.set_permission_mode("s", "auto", step_delay=0, idle_timeout=0)
+        assert out == {"ok": True, "mode": "auto"}
+        assert b.keys_sent.count("BTab") == 3
+
+    def test_dontask_alias_folds_to_auto(self):
+        # The CLI's `dontAsk` alias names the SAME segment the status line
+        # renders "auto mode on" — without the fold the cycle lands ON Auto
+        # and still reports "unreachable" (the live-caught 400).
+        b = _FakeRingBridge(["default", "acceptEdits", "plan", "auto"])
+        out = b.set_permission_mode("s", "dontAsk", step_delay=0, idle_timeout=0)
+        assert out == {"ok": True, "mode": "auto"}
+
     def test_busy_screen_refuses_without_keys(self):
         b = _FakeRingBridge(["default", "acceptEdits"], state="generating")
         out = b.set_permission_mode("s", "acceptEdits", step_delay=0, idle_timeout=0)
@@ -1998,3 +2034,53 @@ class TestSetFast:
         out = b.set_fast("s", True, idle_timeout=0, poll_interval=0)
         assert out == {"ok": False, "on": None, "reason": "busy"}
         assert b.keys_sent == []
+
+
+# -----------------------------------------------------------------------------
+# close() vs the per-agent launch-config dir (§7.19 Timeline persistence) — the
+# dir holds turns.jsonl/statusline.jsonl KEYED BY TMUX NAME, so a resumable
+# stop/retire must KEEP it (a same-name resume re-attaches the Timeline) and
+# only the deliberate TRUE-wipe paths (hard Delete, archive true-delete) purge.
+# -----------------------------------------------------------------------------
+
+
+class _FakeCloseBridge(TmuxBridge):
+    """Records tmux/shell commands instead of running them."""
+
+    def __init__(self):
+        super().__init__()
+        self.tmux_cmds = []
+        self.run_cmds = []
+
+    def _require_session(self, name):
+        pass
+
+    def _tmux(self, cmd, **_kw):
+        self.tmux_cmds.append(cmd)
+        return ""
+
+    def _run(self, cmd, **_kw):
+        self.run_cmds.append(cmd)
+        return ""
+
+
+class TestCloseKeepsLaunchConfigDir:
+    def test_default_close_kills_session_but_keeps_the_dir(self):
+        # Retire/stop path: the tmux session dies, the Timeline store survives.
+        b = _FakeCloseBridge()
+        out = b.close("awl-keep")
+        assert out == {"status": "closed", "name": "awl-keep"}
+        assert any("kill-session" in c for c in b.tmux_cmds)
+        assert not any("rm -rf" in c for c in b.run_cmds)
+
+    def test_purge_config_removes_the_dir(self):
+        # TRUE-wipe path: opt-in only.
+        b = _FakeCloseBridge()
+        b.close("awl-wipe", purge_config=True)
+        assert any("rm -rf" in c and "awl-wipe" in c for c in b.run_cmds)
+
+    def test_purge_launch_config_targets_the_agent_dir(self):
+        b = _FakeCloseBridge()
+        b.purge_launch_config("awl-x")
+        assert len(b.run_cmds) == 1
+        assert "rm -rf" in b.run_cmds[0] and "awl-x" in b.run_cmds[0]

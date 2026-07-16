@@ -19,19 +19,13 @@ import {
 
 const EVENT_CAP = 4000
 
-// ---- §7.17 — client-side repair of the subagents blend ----------------------
-// GET /sessions/{id}/subagents appends hook-registry records the sidecar could
-// not match to a transcript row as {id: null, agent_id, …} "extras". The blend
-// matches only on the transcript result's agentId, which lands when the
-// subagent FINISHES — so every RUNNING subagent arrives twice: its transcript
-// spawn row (id "s1", agent_id null) plus its own hook record (id null,
-// agent_id set). Verified live 2026-07-16 (agent cb106b61: s1 running +
-// {id:null, agent_id:"a09f42…", live_status:"running"} side by side; the
-// finished s2 was correctly merged). Raw nulls rendered blank badges, colliding
-// `${sid}:null` selection keys (React duplicate-key errors), and an inflated
-// count/activity split. Merge what can be proven or safely paired, and mint an
-// honest display id from the engine agent_id for anything left. A sidecar-side
-// blend fix would supersede this (backend gap, reported).
+// ---- §7.17 — client-side normalization of the subagents blend ----------------
+// The sidecar now blends server-side (subagents_naming.blend_live: exact/
+// prefix engine-id merge, in-order running pairing, stopped hook-only
+// leftovers dropped), so rows normally arrive already merged with non-null
+// ids. This normalization stays as a HARMLESS backstop — a no-op on blended
+// input — covering an older sidecar and any transient {id: null} extra
+// (running-pair rules mirror the server's; verified live 2026-07-16).
 type WireSubagent = Omit<Subagent, 'id'> & { id: string | null }
 export function normalizeSubs(raw: WireSubagent[]): Subagent[] {
   const named = raw.filter(s => s.id != null) as Subagent[]

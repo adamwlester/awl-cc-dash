@@ -585,6 +585,61 @@ class TestAssetEndpoints:
                 asyncio.run(main.serve_asset(aid, name, str(proj)))
             assert e.value.status_code == 404
 
+    # --- DELETE /library/assets/{id} (§7.16, the Assets preview Remove) -----
+
+    def test_delete_removes_bytes_and_meta(self, tmp_path):
+        proj = _proj(tmp_path)
+        rec = _ingest(proj)
+        asset_dir = proj / ".awl-cc-dash" / "assets" / rec["id"]
+        assert asset_dir.is_dir()
+        out = asyncio.run(main.library_delete_asset(rec["id"], cwd=str(proj)))
+        assert out == {"status": "deleted", "asset_id": rec["id"]}
+        assert not asset_dir.exists()                       # bytes + sidecar gone
+        assert asyncio.run(main.library_list_assets(cwd=str(proj))) == []
+
+    def test_delete_unknown_id_is_404(self, tmp_path):
+        proj = _proj(tmp_path)
+        _ingest(proj)
+        with pytest.raises(HTTPException) as e:
+            asyncio.run(main.library_delete_asset("nosuchid", cwd=str(proj)))
+        assert e.value.status_code == 404
+
+    def test_delete_traversal_is_404_and_touches_nothing(self, tmp_path):
+        proj = _proj(tmp_path)
+        _ingest(proj)
+        (proj / "victim").mkdir()
+        for bad in ("..", "../victim", "..\\victim", "a/b", "."):
+            with pytest.raises(HTTPException) as e:
+                asyncio.run(main.library_delete_asset(bad, cwd=str(proj)))
+            assert e.value.status_code == 404
+        assert (proj / "victim").is_dir()                   # never escaped
+        assert (proj / ".awl-cc-dash" / "assets").is_dir()
+
+    def test_delete_no_cwd_is_400(self):
+        with pytest.raises(HTTPException) as e:
+            asyncio.run(main.library_delete_asset("abc123", cwd=""))
+        assert e.value.status_code == 400
+
+    def test_delete_loose_file_id_is_404(self, tmp_path):
+        # A loose hand-dropped file lists with id: null and is NOT deletable
+        # through the endpoint (it is not an ingested asset dir).
+        proj = _proj(tmp_path)
+        assets = proj / ".awl-cc-dash" / "assets"
+        assets.mkdir(parents=True)
+        (assets / "loose.png").write_bytes(PAYLOAD)
+        with pytest.raises(HTTPException) as e:
+            asyncio.run(main.library_delete_asset("loose.png", cwd=str(proj)))
+        assert e.value.status_code == 404
+        assert (assets / "loose.png").is_file()
+
+    def test_delete_only_targets_its_own_asset(self, tmp_path):
+        proj = _proj(tmp_path)
+        keep = _ingest(proj, name="keep.png")
+        drop = _ingest(proj, name="drop.png")
+        asyncio.run(main.library_delete_asset(drop["id"], cwd=str(proj)))
+        rows = asyncio.run(main.library_list_assets(cwd=str(proj)))
+        assert [r["id"] for r in rows] == [keep["id"]]
+
 
 # ---------------------------------------------------------------------------
 # Send-flow wiring — attachments ride the delivered text (§7.3/§7.14)

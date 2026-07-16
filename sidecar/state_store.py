@@ -341,8 +341,29 @@ def delete_archived_anywhere(archive_id: str) -> bool:
 # Projects index (🏠 projects.json, §3.5) — known roots + last-used
 # ---------------------------------------------------------------------------
 
-def touch_projects_index(project_key: str) -> None:
-    """Upsert a canonical root into the known-projects index (cold discovery)."""
+def touch_projects_index(project_key: str, *, register: bool | None = None) -> None:
+    """Upsert a canonical root into the known-projects index (cold discovery).
+
+    Two kinds of rows (§3.5 / the §7.19 fork-worktree fix): **registered** rows
+    are the operator's known projects — created only by the explicit acts
+    (``POST /projects/register`` / ``POST /projects/open`` pass
+    ``register=True``) and the ones the Projects picker shows. **Unregistered**
+    rows (``registered: False``) are record-routing bookkeeping: an implicit
+    touch (a roster/archive write for some cwd — e.g. a fork's git-worktree
+    cwd) must keep the root ENUMERABLE (``known_projects`` powers
+    ``all_records`` / the archive / ``remove_record``, so the fork stays
+    cold-restorable and retireable) without surfacing it as a known project
+    the operator never opened. Rules:
+
+    * ``register=True`` — mark the row registered (and refresh ``last_used``).
+    * ``register=None``/``False`` on an EXISTING row — refresh ``last_used``
+      only; the row's registration state is never downgraded. A pre-existing
+      row without the flag (written before the flag existed) stays visible —
+      readers treat a MISSING flag as registered (grandfathered).
+    * ``register=None``/``False`` on a NEW row — create it explicitly
+      ``registered: False`` (hidden from the picker until the operator
+      registers/opens it).
+    """
     from datetime import datetime
     path = storage.projects_index_path()
     with _IO_LOCK:
@@ -351,17 +372,37 @@ def touch_projects_index(project_key: str) -> None:
         if not isinstance(projects, dict):
             projects = {}
         entry = projects.get(project_key)
+        is_new = not isinstance(entry, dict)
         entry = dict(entry) if isinstance(entry, dict) else {}
         entry["last_used"] = datetime.now().isoformat()
+        if register:
+            entry["registered"] = True
+        elif is_new:
+            entry["registered"] = False
         projects[project_key] = entry
         data["projects"] = projects
         _write_json(path, data)
 
 
 def known_projects() -> dict[str, dict[str, Any]]:
-    """The known-projects index: canonical root -> {last_used, …}."""
+    """The known-projects index: canonical root -> {last_used, …}.
+
+    Includes UNregistered (record-routing) rows — this is the enumeration seam
+    ``all_records``/the archive ride. The Projects picker filters to
+    registered rows via :func:`registered_projects`."""
     projects = _read_json(storage.projects_index_path()).get("projects")
     return projects if isinstance(projects, dict) else {}
+
+
+def registered_projects() -> dict[str, dict[str, Any]]:
+    """Only the operator-registered index rows (the §3.2 picker feed).
+
+    A row with ``registered: False`` was auto-created by record routing (e.g.
+    a fork's worktree cwd) and is NOT a known project until the operator
+    registers/opens it; a row with no flag predates the flag and stays
+    visible (grandfathered)."""
+    return {k: v for k, v in known_projects().items()
+            if not isinstance(v, dict) or v.get("registered", True)}
 
 
 # ---------------------------------------------------------------------------

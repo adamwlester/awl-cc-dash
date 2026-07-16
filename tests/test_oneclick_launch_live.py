@@ -153,6 +153,10 @@ def _spawn_sidecar(runtime_dir, log_path):
     env["AWL_SIDECAR_RUNTIME"] = str(runtime_dir)
     env["AWL_SIDECAR_HOST"] = "127.0.0.1"
     env["AWL_DISABLE_HOOKS"] = "1"
+    # §9.1 picker-first: startup restores NOTHING by default now — this spike
+    # deliberately exercises the restore-at-boot sweep, so opt into the
+    # escape hatch (the same knob a one-project setup would use).
+    env["AWL_STARTUP_RESTORE"] = "all"
     env["PYTHONPATH"] = str(_REPO_ROOT)
     env["PYTHONIOENCODING"] = "utf-8"
     logf = open(log_path, "w", encoding="utf-8")

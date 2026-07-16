@@ -92,6 +92,14 @@ MODE_INDICATORS = (
 # target yields an honest "unreachable", never an infinite loop.
 MODE_RING_MAX = 5
 
+# Target-spelling aliases for set_permission_mode (§7.11, §11 #13): the CLI's
+# `--permission-mode` accepts BOTH `auto` and `dontAsk` for the Auto segment,
+# but the status line renders it as "auto mode on" → parse_mode_indicator
+# reports "auto". A `dontAsk` target therefore folds to "auto" before the
+# read-back comparison — without the fold the cycle can land ON the Auto
+# segment and still report it "unreachable" (the live-caught 400).
+_MODE_TARGET_ALIASES = {"dontAsk": "auto"}
+
 # The `Meta+T` "Toggle thinking mode" modal (live-verified,
 # test_thinking_toggle_live) and the `Meta+O` "↯ Fast mode (research preview)"
 # panel (live-verified, test_fast_mode_toggle_live).
@@ -592,7 +600,8 @@ class TmuxBridge:
                settings=None, mcp_config=None, session_id=None,
                resume_session_id=None, display_name=None,
                git_author_name=None, git_author_email=None,
-               fork_session=False, append_system_prompt=None):
+               fork_session=False, append_system_prompt=None,
+               allow_skip_permissions=False):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -695,6 +704,14 @@ class TmuxBridge:
                 replaces, so the agent keeps all built-in capabilities and only
                 its reply FORMAT is shaped. ``None``/empty adds nothing. Rides the
                 argv directly (short, shell-quoted), no per-agent file.
+            allow_skip_permissions: Arm-without-activate (§7.11, §11 #13): pass
+                ``--allow-dangerously-skip-permissions`` so the Bypass segment is
+                ADDED to the session's Shift+Tab mode ring without launching in
+                it (the launch-matrix spike's alternate pre-arm,
+                ``tests/test_bypass_auto_preconditions_live.py`` — the agent
+                starts in ``permission_mode`` and can be cycled into Bypass
+                mid-run). ``--permission-mode bypassPermissions`` remains the
+                arm-AND-activate form; this flag is the arm-only one.
 
         Returns:
             dict with session info: name, cwd, pid, session_id (None for a
@@ -768,6 +785,11 @@ class TmuxBridge:
                 "Ignoring unknown permission_mode %r for session '%s' "
                 "(launching in default mode).", permission_mode, name,
             )
+        if allow_skip_permissions:
+            # Arm-without-activate (§7.11): Bypass joins the mode ring without
+            # being the launch mode (spike-proven spelling; the startup-gate
+            # clearer below handles any warning gate it raises).
+            argv += ["--allow-dangerously-skip-permissions"]
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
         if disallowed_tools:
@@ -1070,13 +1092,24 @@ class TmuxBridge:
         self._open_wt_tab(name)
         return {"status": "shown", "name": name}
 
-    def close(self, name):
+    def close(self, name, purge_config=False):
         """Kill a tmux session.
 
         The WT tab (if any) closes automatically when the session dies.
 
+        The per-agent launch-config dir (``~/.awl-cc-dash-agents/<name>``) is
+        KEPT by default: besides the launch ``--settings``/``--mcp-config``
+        files it holds the agent's standing data stores (``turns.jsonl``
+        Timeline + ``statusline.jsonl``), keyed by this tmux name — a later
+        resume/cold-restore on the same name re-attaches them (§7.19). Pass
+        ``purge_config=True`` only on a deliberate, irreversible wipe (the
+        dashboard's hard Delete / archive true-delete), never on a
+        stop/retire that stays resumable.
+
         Args:
             name: Session name to kill.
+            purge_config: Also remove the per-agent launch-config dir
+                (destroys turns.jsonl/statusline.jsonl). Default False.
 
         Returns:
             dict with status.
@@ -1091,13 +1124,24 @@ class TmuxBridge:
                 pass
         self._tmux(f"kill-session -t '{name}'")
         self._session_uuids.pop(name, None)
-        # Best-effort: remove any per-agent launch config materialized for this
-        # session (no-op when none was written).
-        try:
-            self._run(f"rm -rf {shlex.quote(f'{WSL_AWL_DIR}/{name}')}")
-        except TmuxBridgeError:
-            pass
+        if purge_config:
+            try:
+                self.purge_launch_config(name)
+            except TmuxBridgeError:
+                pass
         return {"status": "closed", "name": name}
+
+    def purge_launch_config(self, name):
+        """Remove the per-agent launch-config dir (``~/.awl-cc-dash-agents/<name>``).
+
+        Destroys the launch ``--settings``/``--mcp-config`` files AND the
+        standing per-agent data stores (``turns.jsonl`` Timeline +
+        ``statusline.jsonl``). Deliberate-destruction paths only (hard Delete,
+        archive true-delete) — a resumable stop/retire must keep the dir so a
+        same-name resume re-attaches the Timeline (§7.19). No-op when the dir
+        was never written.
+        """
+        self._run(f"rm -rf {shlex.quote(f'{WSL_AWL_DIR}/{name}')}")
 
     def shutdown(self):
         """Kill all tmux sessions and clean up.
@@ -1343,8 +1387,10 @@ class TmuxBridge:
             "reason": "unreachable"}`` when the target is not in this session's
             armed ring (the launch pre-arm — ``--permission-mode`` /
             ``--allow-dangerously-skip-permissions`` — is a create()-time
-            choice).
+            choice). A ``dontAsk`` target folds to the ``auto`` indicator
+            spelling before comparison (``_MODE_TARGET_ALIASES``).
         """
+        target_mode = _MODE_TARGET_ALIASES.get(target_mode, target_mode)
         if not self._idle_gate(name, timeout=idle_timeout):
             return {"ok": False, "mode": self.permission_mode(name),
                     "reason": "busy"}

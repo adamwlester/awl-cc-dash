@@ -25,19 +25,18 @@ const DEFAULT_MAX_TURNS = 50
 const CTX_CUTOFF = 80
 
 // ---- §7.11/#13 — launch-gated permission modes -------------------------------
-// The CLI pre-arm IS the launch mode (`--permission-mode`, main.py's honest
-// 400 "unreachable" for anything absent from the live Shift+Tab ring). The
-// sidecar exposes no armed-set read, so the renderer keeps the honest client
-// view: modes PROVEN or KNOWN un-armed per session — seeded at create (a
-// session not launched in Bypass has no Bypass segment) and extended whenever
-// the mode endpoint answers 400 "unreachable". A segment in this set is
-// silently absent from the Details ring (§7.11 — never a control that no-ops).
+// The sidecar now derives + persists each session's armed set (its
+// `armed_modes` field — launch mode + the arm_bypass flag, exact for sessions
+// created outside the renderer and across restarts): the Details ring renders
+// exactly those segments. The client-side un-armed set below stays as the
+// live-400 TEACHING BACKSTOP only — Auto's presence is account-eligibility-
+// dependent, so a 400 "unreachable" read-back still drops a segment honestly.
 const UNARMED_LIVE: Record<string, Set<string>> = {}
 function markUnarmed(sid: string, label: string) {
   ;(UNARMED_LIVE[sid] = UNARMED_LIVE[sid] || new Set()).add(label)
 }
-// Launch spelling for `--permission-mode` (differs from the live set-mode
-// SetModeRequest Literal: launch accepts `auto`, the live endpoint doesn't).
+// The `--permission-mode` launch spelling per UI label (`auto` is the Auto
+// segment's canonical spelling — launch, live set-mode, and indicator agree).
 const LAUNCH_MODE_VALUE: Record<string, string> = {
   Plan: 'plan', Ask: 'default', Edit: 'acceptEdits', Auto: 'auto', Bypass: 'bypassPermissions',
 }
@@ -248,11 +247,13 @@ function ModeBlock({ s, isOpus, live }: { s?: Session | null; isOpus: boolean; l
   const [fast, setFast] = useState<boolean>(!!(s as any)?.fast_mode)
   const [think, setThink] = useState<boolean>(!!(s as any)?.thinking)
   const [, setUnarmedTick] = useState(0)   // re-render after an unreachable verdict drops a segment
-  // §7.11/#13 — un-armed segments are ABSENT from the ring: the client-known
-  // un-armed set (seeded at create, extended by honest 400 "unreachable"
-  // read-backs). An `armed_modes` field from the sidecar would supersede this
-  // when it exists; none does today.
-  const armed: string[] | null = ((s as any)?.armed_modes || (s?.launch_config as any)?.armed_modes) ?? null
+  // §7.11/#13 — un-armed segments are ABSENT from the ring. The sidecar's
+  // `armed_modes` (derived from the launch mode + arm_bypass, persisted on
+  // the roster record) is the ring's source of truth — exact for sessions
+  // created outside the renderer and across restarts. The client-known
+  // un-armed set stays as the live-400 "unreachable" teaching backstop
+  // (Auto's presence is account-eligibility-dependent).
+  const armed: string[] | null = s?.armed_modes ?? null
   const unarmed = (s && UNARMED_LIVE[s.session_id]) || new Set<string>()
   const shown = (armed
     ? MODES.filter(m => armed.some(a => modeLabelOf(a) === m || a.toLowerCase() === m.toLowerCase()))
@@ -896,9 +897,11 @@ function CreateTab() {
     setBusy(true)
     const payload: CreatePayload = {
       model: model === 'inherit' ? null : model,
-      // The arm flags express through the launch mode itself — the CLI pre-arm
-      // IS `--permission-mode` (§7.11; the live launch-matrix finding). `auto`
-      // is the live-proven launch spelling for the Auto segment.
+      // Arming (§7.11/#13): launching IN a mode arms it (`--permission-mode`);
+      // the Bypass switch additionally maps to the backend's arm-without-
+      // activate flag (`arm_bypass` → --allow-dangerously-skip-permissions)
+      // when Bypass is armed but not the launch pick — Bypass joins the ring
+      // without the agent starting in it.
       permission_mode: LAUNCH_MODE_VALUE[mode] || 'default',
       cwd: d.projectCwd,
       identity: { role: role.trim() || 'agent', number: parseInt(num, 10) || undefined, name: name.trim() || undefined, color, icon },
@@ -906,18 +909,16 @@ function CreateTab() {
       disallowed_tools: deny.length ? deny : null,
       max_turns: maxTurns, max_context_pct: maxCtx,
     }
+    if (armBypass && mode !== 'Bypass') payload.arm_bypass = true
     if (mcp.length) payload.mcp_servers = mcp
     if (plugins.length) payload.enabled_plugins = Object.fromEntries(plugins.map(p => [p, true]))
     if (respPreset && respPreset !== 'default') payload.response_preset = respPreset
     const s = await api.create(payload)
     setBusy(false)
     if (s) {
-      // Seed the honest un-armed set (§7.11): Bypass exists on the live ring
-      // only when the agent LAUNCHED in it — no separate arm flag reaches the
-      // backend, so any other launch mode leaves Bypass unreachable. Auto sits
-      // in the default ring on this account (account-dependent; a live 400
-      // "unreachable" would drop it honestly).
-      if (mode !== 'Bypass') markUnarmed(s.session_id, 'Bypass')
+      // The Details ring seeds from the session's server-derived `armed_modes`
+      // (§7.11) — no client-side seeding needed; the live 400 "unreachable"
+      // stays the account-dependence backstop (Auto).
       toast(`Created ${role} · ${s.identity?.name || name || s.session_id}`)
       d.select(s.session_id)
       d.setAgentTab('details')
@@ -995,12 +996,14 @@ function CreateTab() {
                 title={armBypass ? 'Armed — Bypass joins the mode ring at launch' : 'Un-armed — Bypass is absent from the mode ring'} />
             </div>
           </div>
-          {/* The honest-limit note covers BOTH arm switches (§7.11 — never a
-              control that silently no-ops): an armed mode that isn't also the
-              launch Mode transmits nothing today. */}
-          {((armBypass && mode !== 'Bypass') || (armAuto && mode !== 'Auto')) && (
+          {/* Honest-limit note (§7.11 — never a control that silently
+              no-ops): Bypass arming now transmits for real (`arm_bypass` →
+              --allow-dangerously-skip-permissions), so the note only covers
+              what remains genuinely unreachable — there is NO arm-without-
+              activate flag for Auto; its availability is the account's. */}
+          {armAuto && mode !== 'Auto' && (
             <div className="text-[10px] text-muted-2 mt-1 normal-case font-semibold">
-              Honest limit: the CLI pre-arm rides the launch mode itself (<span className="font-mono">--permission-mode</span>) — pick <b>{[armAuto && mode !== 'Auto' ? 'Auto' : null, armBypass && mode !== 'Bypass' ? 'Bypass' : null].filter(Boolean).join(' / ')}</b> as the launch Mode to actually arm it. Arm-without-activate (<span className="font-mono">--allow-dangerously-skip-permissions</span>) isn&#8217;t carried by the backend yet.{armAuto && mode !== 'Auto' ? <> Auto may already sit in this account&#8217;s default ring regardless (account-dependent) — a live 400 &#8220;unreachable&#8221; drops it honestly.</> : null}
+              Honest limit: Auto has no arm-without-activate flag — pick <b>Auto</b> as the launch Mode (<span className="font-mono">--permission-mode auto</span>) to launch armed-and-active, or rely on the account: Auto sits in eligible accounts&#8217; default ring regardless, and a live 400 &#8220;unreachable&#8221; drops it honestly.
             </div>
           )}
         </div>
@@ -1156,7 +1159,11 @@ function PastTab() {
         <div data-comp="past-agent-picker" className="aglist past-list">
           {rows.map(p => {
             const b = pastIdentBits(p.identity, p.name, p.session_id)
-            const stamp = p.source === 'archive' ? `retired ${pastStampFmt(p.retired_at)}` : `created ${pastStampFmt(p.created_at)}`
+            // Roster rows carry the mockup's "died …" stamp when the sidecar
+            // witnessed the stop/death (#17 died_at); legacy records and
+            // unwitnessed deaths (reboot) fall back to the created stamp.
+            const stamp = p.source === 'archive' ? `retired ${pastStampFmt(p.retired_at)}`
+              : p.died_at ? `died ${pastStampFmt(p.died_at)}` : `created ${pastStampFmt(p.created_at)}`
             const key = p.archive_id || p.session_id || b.display
             return (
               <div key={key} data-comp="past-agent-row" className={`agrow past-row${p.resumable ? '' : ' past-row--norez'}`}

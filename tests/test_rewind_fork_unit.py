@@ -730,3 +730,136 @@ class TestRewindForkEndpoints:
         assert "git_author_name" in fork_call[2]
         assert fork_call[2]["git_author_email"].endswith(
             "@agents.awl-cc-dash.invalid")
+
+
+# -----------------------------------------------------------------------------
+# Fork claude-session-id adoption (§7.19 / #50 residual) — a --fork-session
+# launch mints a NEW id unknown at spawn, and the fork-time discovery is
+# best-effort; when it missed, the driver must adopt the id from the resolved
+# transcript filename (`<uuid>.jsonl`) and persist it EXACTLY like a normal
+# create, so a fork is cold-restorable and a retired fork's archive row stays
+# resumable (fork→retire→resume must not be a dead end).
+# -----------------------------------------------------------------------------
+
+import sidecar.drivers.bridge as _db  # noqa: E402
+
+FORK_UUID = "3f2b8c1d-9a4e-4f6b-8c2d-1e5f7a9b0c3d"
+
+
+class _RegisterCapture:
+    def __init__(self):
+        self.registered = []
+
+    def register_session_id(self, name, sid):
+        self.registered.append((name, sid))
+
+
+class TestForkClaudeIdAdoption:
+    def _driver(self, monkeypatch, *, claude_id=None, transcript_stem=FORK_UUID):
+        d = BridgeDriver(DriverConfig(), lambda e: None,
+                         session_id="fk1",
+                         claude_session_id=claude_id,
+                         persisted_record={"session_id": "fk1"})
+        d._bridge = _RegisterCapture()
+        saved = []
+        monkeypatch.setattr(_db, "_save_record",
+                            lambda rec: saved.append(dict(rec)))
+        monkeypatch.setattr(
+            "bridge.transcript.find_transcript",
+            lambda bridge, name: f"/home/u/.claude/projects/enc/{transcript_stem}.jsonl")
+        return d, saved
+
+    def test_idless_driver_adopts_uuid_stem_and_persists(self, monkeypatch):
+        d, saved = self._driver(monkeypatch)
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id == FORK_UUID
+        assert d._bridge.registered == [(d.tmux_name, FORK_UUID)]
+        assert saved and saved[-1]["claude_session_id"] == FORK_UUID
+        assert saved[-1]["transcript_path"].endswith(f"{FORK_UUID}.jsonl")
+
+    def test_known_id_never_overwritten(self, monkeypatch):
+        # A normally-created agent already carries its id — adoption is only
+        # for the id-less (fork-discovery-missed) case.
+        d, saved = self._driver(monkeypatch, claude_id="existing-id")
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id == "existing-id"
+        assert d._bridge.registered == []
+
+    def test_non_uuid_stem_is_not_adopted(self, monkeypatch):
+        # A weird filename must never be trusted as a conversation id.
+        d, saved = self._driver(monkeypatch, transcript_stem="not-a-uuid")
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id is None
+        assert d._bridge.registered == []
+        # The verified path still persists (the pre-existing behavior).
+        assert saved and saved[-1]["transcript_path"].endswith("not-a-uuid.jsonl")
+        assert not saved[-1].get("claude_session_id")
+
+
+# -----------------------------------------------------------------------------
+# The adoption OWNERSHIP guard (integrator fix on the batch above): the id-less
+# fallback resolution is newest-.jsonl-in-project-dir, which in a SHARED-cwd
+# fork (isolate=False / the honest non-git fallback) is typically the SOURCE's
+# actively-written transcript. Adopting that stem would permanently pin the
+# fork's reads — and a later cold restore's `claude --resume` — to the WRONG
+# conversation, so a stem naming another agent's id is never adopted, pinned,
+# or persisted; the read simply retries next poll.
+# -----------------------------------------------------------------------------
+
+SOURCE_UUID = "aaaaaaaa-1111-4222-8333-bbbbbbbbcccc"
+
+
+class TestForkAdoptionOwnershipGuard:
+    def _driver(self, monkeypatch, *, persisted_record, roster=()):
+        import runtime_store
+        d = BridgeDriver(DriverConfig(), lambda e: None,
+                         session_id="fk1",
+                         persisted_record=persisted_record)
+        d._bridge = _RegisterCapture()
+        saved = []
+        monkeypatch.setattr(_db, "_save_record",
+                            lambda rec: saved.append(dict(rec)))
+        monkeypatch.setattr(runtime_store, "all_records",
+                            lambda: [dict(r) for r in roster])
+        monkeypatch.setattr(
+            "bridge.transcript.find_transcript",
+            lambda bridge, name:
+                f"/home/u/.claude/projects/enc/{SOURCE_UUID}.jsonl")
+        return d, saved
+
+    def test_lineage_source_id_is_never_adopted(self, monkeypatch):
+        # The resolved stem IS the fork source's conversation id (known from
+        # the lineage seeded at fork adoption) — refuse, pin nothing.
+        rec = {"session_id": "fk1",
+               "lineage": {"parent": "src", "handoff": None,
+                           "fork": {"source_session_id": "src",
+                                    "source_claude_session_id": SOURCE_UUID,
+                                    "rewound_to": None}}}
+        d, saved = self._driver(monkeypatch, persisted_record=rec)
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id is None
+        assert d._bridge.registered == []
+        assert d._transcript_path is None      # next poll re-resolves
+        assert saved == []                     # nothing persisted
+
+    def test_sibling_roster_id_is_never_adopted(self, monkeypatch):
+        # The stem names a co-located sibling's persisted conversation id.
+        d, saved = self._driver(
+            monkeypatch, persisted_record={"session_id": "fk1"},
+            roster=[{"session_id": "other", "claude_session_id": SOURCE_UUID}])
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id is None
+        assert d._bridge.registered == []
+        assert d._transcript_path is None
+        assert saved == []
+
+    def test_own_stale_record_does_not_block_adoption(self, monkeypatch):
+        # A record keyed by THIS driver's own session id never counts as
+        # foreign — only OTHER agents' ids block.
+        d, saved = self._driver(
+            monkeypatch, persisted_record={"session_id": "fk1"},
+            roster=[{"session_id": "fk1", "claude_session_id": SOURCE_UUID}])
+        d._resolve_and_persist_transcript_path()
+        assert d._claude_session_id == SOURCE_UUID
+        assert d._bridge.registered == [(d.tmux_name, SOURCE_UUID)]
+        assert saved and saved[-1]["claude_session_id"] == SOURCE_UUID

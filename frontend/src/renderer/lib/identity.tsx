@@ -114,9 +114,12 @@ export function modeLabel(mode: string | null | undefined): string {
   if (m === 'auto' || m === 'dontask' || m.includes('acceptall')) return 'Auto'
   return 'Ask'
 }
-/** UI label → the CLI permission-mode value the sidecar accepts. */
+/** UI label → the CLI permission-mode value the sidecar accepts. `auto` is
+ * the Auto segment's canonical spelling — the launch flag, the live set-mode
+ * endpoint, and the status-line indicator all use it (the old `dontAsk`
+ * alias made the live switch 400 "unreachable" even with Auto in the ring). */
 export const MODE_VALUE: Record<string, string> = {
-  Plan: 'plan', Ask: 'default', Edit: 'acceptEdits', Auto: 'dontAsk', Bypass: 'bypassPermissions',
+  Plan: 'plan', Ask: 'default', Edit: 'acceptEdits', Auto: 'auto', Bypass: 'bypassPermissions',
 }
 
 /** Short model label ("opus 4.8" from "claude-opus-4-8" etc.). */

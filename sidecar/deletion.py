@@ -117,6 +117,8 @@ def build_archive_record(
     git_author: Optional[tuple[str, str]] = None,
     lineage: Optional[dict[str, Any]] = None,
     archive_id: Optional[str] = None,
+    tmux_name: Optional[str] = None,
+    arm_bypass: bool = False,
 ) -> dict[str, Any]:
     """Build a LIGHT Agent-archive record — Retire = deep-freeze (§7.12, §11 #18).
 
@@ -161,6 +163,15 @@ def build_archive_record(
         "model": model,
         "driver": driver,
         "permission_mode": permission_mode,
+        # The agent's tmux session name (§7.19 Timeline persistence): the
+        # per-agent launch-config dir (turns.jsonl / statusline.jsonl) is
+        # keyed by it, so a resume that reuses the name re-attaches the same
+        # Timeline store instead of orphaning it.
+        "tmux_name": tmux_name,
+        # Pre-armed Bypass (§7.11 arm-without-activate) — a light launch fact
+        # like permission_mode, kept so an un-retire relaunches with the ring
+        # the operator armed.
+        "arm_bypass": bool(arm_bypass),
     }
     if git_author is not None:
         rec["git_author_name"], rec["git_author_email"] = git_author

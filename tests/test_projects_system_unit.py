@@ -240,3 +240,86 @@ class TestPlanVerdict:
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.plan_verdict("ghost", main.PlanVerdictRequest(verdict="approve")))
         assert ei.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Projects-index registration (§3.5 / the §7.19 fork-worktree fix): an index
+# row auto-created by record routing (e.g. a fork's git-worktree cwd) is
+# bookkeeping — enumerable for the roster/archive sweeps but NOT a known
+# project in the picker until the operator registers/opens it. Rows written
+# before the flag existed stay visible (grandfathered).
+# ---------------------------------------------------------------------------
+
+class TestProjectsIndexRegistration:
+    def test_implicit_touch_is_hidden_from_picker_but_enumerable(self, tmp_path):
+        worktree = tmp_path / "proj-fork-awl-x"
+        worktree.mkdir()
+        key = storage.project_key(str(worktree))
+        # The record-routing path (runtime_store.save_record / load_project)
+        # touches the index WITHOUT register — the fork-worktree scenario.
+        state_store.touch_projects_index(key)
+        assert key in state_store.known_projects()          # enumeration seam
+        listing = asyncio.run(main.list_projects())
+        assert key not in [p["path"] for p in listing["projects"]]
+
+    def test_roster_record_save_does_not_register_project(self, tmp_path):
+        # End-to-end through the real routing: persisting a fork's roster
+        # record into its worktree store must not mint a picker row.
+        import runtime_store
+        worktree = tmp_path / "proj-fork-awl-y"
+        worktree.mkdir()
+        runtime_store.save_record({
+            "session_id": "fk1", "tmux_name": "awl-fk1",
+            "cwd": str(worktree), "claude_session_id": "cid-fk1",
+        })
+        key = storage.project_key(str(worktree))
+        assert key in state_store.known_projects()
+        # The record stays reachable (cold-restore / Past tab / retire).
+        assert any(r.get("session_id") == "fk1"
+                   for r in runtime_store.all_records())
+        listing = asyncio.run(main.list_projects())
+        assert key not in [p["path"] for p in listing["projects"]]
+
+    def test_register_endpoint_makes_row_visible(self, tmp_path):
+        proj = tmp_path / "projX"
+        proj.mkdir()
+        key = storage.project_key(str(proj))
+        state_store.touch_projects_index(key)              # implicit first
+        assert key not in [p["path"] for p in
+                           asyncio.run(main.list_projects())["projects"]]
+        asyncio.run(main.register_project(main.ProjectPathRequest(path=str(proj))))
+        assert key in [p["path"] for p in
+                       asyncio.run(main.list_projects())["projects"]]
+
+    def test_open_endpoint_registers_too(self, tmp_path):
+        proj = tmp_path / "projY"
+        proj.mkdir()
+        key = storage.project_key(str(proj))
+        state_store.touch_projects_index(key)              # implicit first
+        asyncio.run(main.open_project(main.ProjectPathRequest(path=str(proj))))
+        assert key in [p["path"] for p in
+                       asyncio.run(main.list_projects())["projects"]]
+        asyncio.run(main.close_project(main.ProjectCloseRequest()))
+
+    def test_legacy_rows_without_flag_stay_visible(self, tmp_path):
+        # A pre-flag projects.json row (no `registered` key) is grandfathered.
+        import json
+        proj = tmp_path / "legacy"
+        proj.mkdir()
+        key = storage.project_key(str(proj))
+        path = storage.projects_index_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(
+            {"projects": {key: {"last_used": "2026-07-01T00:00:00"}}}),
+            encoding="utf-8")
+        listing = asyncio.run(main.list_projects())
+        assert key in [p["path"] for p in listing["projects"]]
+
+    def test_implicit_touch_never_downgrades_registration(self, tmp_path):
+        proj = tmp_path / "projZ"
+        proj.mkdir()
+        key = storage.project_key(str(proj))
+        asyncio.run(main.register_project(main.ProjectPathRequest(path=str(proj))))
+        state_store.touch_projects_index(key)              # e.g. a record save
+        assert key in [p["path"] for p in
+                       asyncio.run(main.list_projects())["projects"]]

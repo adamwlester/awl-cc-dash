@@ -56,6 +56,11 @@ class DriverConfig:
     permission_rules: Optional[dict[str, list[str]]] = None
     enabled_plugins: Optional[dict[str, bool]] = None
     mcp_servers: Optional[list[str]] = None
+    # Arm-without-activate (§7.11, §11 #13): pass
+    # `--allow-dangerously-skip-permissions` at launch so the Bypass segment
+    # joins the Shift+Tab mode ring WITHOUT being the launch mode. The bridge
+    # driver forwards it to TmuxBridge.create; other drivers ignore it.
+    arm_bypass: bool = False
     # Dashboard-owned agent identity (role/number/name/color/icon), assigned at
     # create time. Not a launch flag — it rides along so the bridge driver can
     # persist it in the runtime record for restart-survival. Drivers ignore it.
