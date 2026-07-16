@@ -60,6 +60,7 @@ durable part. Keep this table current when you add/remove/rename test files (see
 | `test_subagents_naming_unit.py` | `subagents_naming.py` (subagent identity/naming) | ~13 |
 | `test_hookbus_unit.py` | `hookbus.py` (hook-boundary Inject, hook delivery) | ~12 |
 | `test_links_unit.py` | `links.py` (the §7.6 one-relationship link model, per-relationship trigger defaults incl. Piggyback, direction-aware End-After exchange counting, legacy list-relationship restore degrade, the piggyback park-store) | ~28 |
+| `test_prompt_library_unit.py` | Prompt/UI-text markdown library (§7.14, §8.2, §11 #45) — `prompt_library.py`: the ##/### parser + canonical renderer, the shipped-defaults seed at `assets/prompts/` (verbatim vs the in-code catalogs), project-overrides-defaults precedence (`<project>/.awl-cc-dash/docs/prompts/`), in-code fallback when both scopes lack an item, consumer resolution (#39 preset instructions incl. the hard `default` no-op + the driver's cwd-aware launch injection; Revise/Summarize systems; the attached-docs lead), the project-scope `write_item` (atomic, project-first file inference, structure/encoding guards, one-file-per-item purge), best-effort skip of undecodable files, and the `GET`/`POST /prompt-library` endpoints + the utility endpoints' `cwd` pass-through | ~61 |
 | `test_scratchpad_unit.py` | `scratchpad.py` (+ `watermark.py`) | ~8 |
 | `test_utility_llm_unit.py` | `utility_llm.py` (Revise/Summarize passes) | ~6 |
 

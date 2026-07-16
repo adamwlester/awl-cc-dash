@@ -653,11 +653,26 @@ def attached_docs_wsl(cwd: str | None, refs: list[str] | None) -> list[str]:
     return out
 
 
+def _attached_docs_lead(cwd: str | None) -> str:
+    """The preamble's lead line, resolved through the §11 #45 prompt library.
+
+    Group ``attached-docs``, item ``lead`` (shipped default seeded verbatim in
+    ``assets/prompts/actions.md``; project scope overrides). Falls back to the
+    in-code :data:`ATTACHED_DOCS_LEAD` when neither scope has a non-empty item
+    or the library is unavailable — never raises into a launch."""
+    try:
+        import prompt_library  # sidecar dir on sys.path — lazy, fault-isolated
+        return prompt_library.resolve("attached-docs", "lead", cwd) or ATTACHED_DOCS_LEAD
+    except Exception:
+        return ATTACHED_DOCS_LEAD
+
+
 def attached_docs_preamble(cwd: str | None, refs: list[str] | None) -> str:
     """The short launch preamble listing an agent's attached docs (§11 #44).
 
-    One lead line (:data:`ATTACHED_DOCS_LEAD` — consult these when relevant)
-    followed by one ``- <wsl path>`` bullet per resolved doc. ``""`` when no
+    One lead line (:func:`_attached_docs_lead` — consult these when relevant;
+    library-resolved with :data:`ATTACHED_DOCS_LEAD` as the fallback) followed
+    by one ``- <wsl path>`` bullet per resolved doc. ``""`` when no
     reference resolves (no docs → no preamble — nothing is appended to the
     agent's system prompt). The bridge driver composes this with the
     response-preset instruction (§11 #39) at launch; automatic relevance
@@ -666,7 +681,7 @@ def attached_docs_preamble(cwd: str | None, refs: list[str] | None) -> str:
     paths = attached_docs_wsl(cwd, refs)
     if not paths:
         return ""
-    return "\n".join([ATTACHED_DOCS_LEAD] + [f"- {p}" for p in paths])
+    return "\n".join([_attached_docs_lead(cwd)] + [f"- {p}" for p in paths])
 
 
 # ---------------------------------------------------------------------------

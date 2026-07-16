@@ -54,6 +54,7 @@ import settings_io
 import utility_llm
 import handoff
 import subagents_naming
+import prompt_library
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -2970,19 +2971,23 @@ async def settings_write(req: SettingsWriteRequest):
 # ============================================================================
 
 class ReviseRequest(BaseModel):
+    # `cwd` scopes the system-prompt text to a project's prompt-library copy
+    # (§11 #45); omitted -> the shipped defaults / in-code fallback apply.
     text: str
     scope: Literal["grammar", "language", "refactor"] = "grammar"
     model: str | None = None
+    cwd: str | None = None
 
 class SummarizeRequest(BaseModel):
     text: str
     model: str | None = None
+    cwd: str | None = None  # §11 #45 project scoping, like ReviseRequest
 
 
 @app.post("/utility/revise")
 async def utility_revise(req: ReviseRequest):
     try:
-        return {"scope": req.scope, "result": await utility_llm.revise(req.text, req.scope, req.model)}
+        return {"scope": req.scope, "result": await utility_llm.revise(req.text, req.scope, req.model, req.cwd)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"revise pass failed: {e}")
 
@@ -2990,9 +2995,69 @@ async def utility_revise(req: ReviseRequest):
 @app.post("/utility/summarize")
 async def utility_summarize(req: SummarizeRequest):
     try:
-        return {"result": await utility_llm.summarize(req.text, req.model)}
+        return {"result": await utility_llm.summarize(req.text, req.model, req.cwd)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"summarize pass failed: {e}")
+
+
+# ============================================================================
+# Prompt / UI-text markdown library (§7.14, §8.2, §8.4; §11 #45) — scope-aware
+# canned text: shipped defaults in-repo (assets/prompts/) + a per-project copy
+# (<project>/.awl-cc-dash/docs/prompts/), project-overrides-defaults.
+# ============================================================================
+
+class PromptLibraryWriteRequest(BaseModel):
+    """Upsert ONE item into the PROJECT scope (§11 #45). The shipped defaults
+    are repo source files — never written through the API. ``file`` names the
+    target ``.md`` (basename); omitted, it is inferred from where the group
+    lives in the shipped defaults."""
+    cwd: str
+    group: str
+    key: str
+    text: str
+    file: str | None = None
+
+
+@app.get("/prompt-library")
+async def get_prompt_library(scope: str = "resolved", cwd: str | None = None):
+    """The prompt/UI-text library as ``{scope, cwd, groups}`` (§11 #45).
+
+    ``scope=defaults`` reads the shipped in-repo files; ``scope=project`` reads
+    the project copy under ``cwd``'s store (400 without a ``cwd``; ``{}`` when
+    the project has none); ``scope=resolved`` (the default) is the merged view —
+    project overrides defaults item-wise, and without a ``cwd`` it is exactly
+    the defaults (no project in play). 400 on an unknown scope.
+    """
+    if scope not in ("resolved", "defaults", "project"):
+        raise HTTPException(status_code=400,
+                            detail="scope must be resolved|defaults|project")
+    if scope == "defaults":
+        groups = prompt_library.load_defaults()
+    elif scope == "project":
+        if not cwd:
+            raise HTTPException(status_code=400,
+                                detail="project scope requires cwd")
+        groups = prompt_library.load_project(cwd)
+    else:
+        groups = prompt_library.resolved(cwd)
+    return {"scope": scope, "cwd": cwd, "groups": groups}
+
+
+@app.post("/prompt-library")
+async def write_prompt_library(req: PromptLibraryWriteRequest):
+    """Write one item into the PROJECT prompt-library scope (§11 #45).
+
+    Writes only ``<project>/.awl-cc-dash/docs/prompts/`` (atomic re-render of
+    the target file; sibling groups/items preserved) — the shipped defaults are
+    edited as repo source, never through here. 400 on an invalid write (no
+    project home, unknown group with no explicit ``file``, unsafe file name,
+    or item text that would re-parse as ``##``/``###`` structure)."""
+    try:
+        return {"status": "written",
+                **prompt_library.write_item(req.cwd, req.group, req.key,
+                                            req.text, file=req.file)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================================================

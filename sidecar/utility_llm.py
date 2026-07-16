@@ -7,6 +7,16 @@ context carry-over). All run as non-interactive **one-shot** passes via the
 in-process Claude Agent SDK `query()` — NOT the bridge. Everything else
 multi-agent (stream, queue, hooks, console, scratchpad, linking, Plan/Decision
 detection) stays on the bridge.
+
+System-prompt texts resolve through the scope-aware prompt/UI-text markdown
+library (§11 #45, :mod:`prompt_library`): the shipped defaults at
+``assets/prompts/actions.md`` (groups ``revise`` / ``summarize``, seeded
+VERBATIM from the constants below) with a per-project override at
+``<project>/.awl-cc-dash/docs/prompts/``, and the in-code constants as the
+fallback when neither scope has the item — the library must never be the
+reason a utility pass fails. The **handoff-report system text is the deliberate
+exception**: its body embeds ``## `` heading lines the ##/### file convention
+cannot hold, so it stays in-code only.
 """
 from __future__ import annotations
 
@@ -44,9 +54,34 @@ HANDOFF_SYSTEM = (
 DEFAULT_SCOPE = "grammar"
 
 
-def revise_system(scope: str | None) -> str:
-    """The system prompt for a Revise scope (defaults to Grammar for unknown)."""
-    return REVISE_SYSTEMS.get((scope or DEFAULT_SCOPE).lower(), REVISE_SYSTEMS[DEFAULT_SCOPE])
+def _library_text(group: str, key: str, cwd: str | None) -> str | None:
+    """The §11 #45 markdown-library text for ``group``/``key``, or ``None``.
+
+    ``None`` when no scope carries the item OR the library is unavailable —
+    never raises (a broken/missing library degrades to the in-code constants)."""
+    try:
+        import prompt_library  # sidecar dir on sys.path — lazy, fault-isolated
+        return prompt_library.resolve(group, key, cwd)
+    except Exception:
+        return None
+
+
+def revise_system(scope: str | None, cwd: str | None = None) -> str:
+    """The system prompt for a Revise scope (defaults to Grammar for unknown).
+
+    Resolves through the §11 #45 prompt library (group ``revise``, item = the
+    scope key; project scope for ``cwd``, then the shipped defaults), with the
+    in-code ``REVISE_SYSTEMS`` constant as the non-empty fallback."""
+    key = (scope or DEFAULT_SCOPE).lower()
+    if key not in REVISE_SYSTEMS:
+        key = DEFAULT_SCOPE
+    return _library_text("revise", key, cwd) or REVISE_SYSTEMS[key]
+
+
+def summarize_system(cwd: str | None = None) -> str:
+    """The Summarize system prompt (§11 #45: group ``summarize``, item
+    ``system``; in-code ``SUMMARIZE_SYSTEM`` as the non-empty fallback)."""
+    return _library_text("summarize", "system", cwd) or SUMMARIZE_SYSTEM
 
 
 def _text_of(message) -> list[str]:
@@ -79,12 +114,14 @@ async def _one_shot(prompt: str, system_prompt: str, model: str | None = None) -
     return "".join(parts).strip()
 
 
-async def revise(text: str, scope: str = DEFAULT_SCOPE, model: str | None = None) -> str:
-    return await _one_shot(text, revise_system(scope), model)
+async def revise(text: str, scope: str = DEFAULT_SCOPE, model: str | None = None,
+                 cwd: str | None = None) -> str:
+    return await _one_shot(text, revise_system(scope, cwd), model)
 
 
-async def summarize(text: str, model: str | None = None) -> str:
-    return await _one_shot(text, SUMMARIZE_SYSTEM, model)
+async def summarize(text: str, model: str | None = None,
+                    cwd: str | None = None) -> str:
+    return await _one_shot(text, summarize_system(cwd), model)
 
 
 async def handoff_report(text: str, model: str | None = None) -> str:

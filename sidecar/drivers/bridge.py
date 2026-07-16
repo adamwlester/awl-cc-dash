@@ -777,11 +777,14 @@ class BridgeDriver(AgentDriver):
         # reply-format instruction and append it to the agent's system prompt at
         # launch, so every reply the agent writes follows the format. Empty for
         # the default / none / unknown preset -> nothing appended (natural style).
+        # The text resolves scope-aware through the §11 #45 prompt library (the
+        # agent's project copy overrides the shipped defaults; in-code fallback).
         try:
             import response_presets as _presets  # sidecar dir on sys.path (runtime)
         except ImportError:  # pragma: no cover - package import (tests)
             from .. import response_presets as _presets  # type: ignore[no-redef]
-        preset_text = _presets.instruction_for(self.config.response_preset) or ""
+        preset_text = _presets.instruction_for(
+            self.config.response_preset, cwd=self.config.cwd) or ""
         # Attached docs (§7.16, §11 #44): resolve the agent's attached Library
         # doc references to WSL-reachable absolute paths and render the short
         # consult-these-docs preamble. COMPOSED with the preset instruction —
