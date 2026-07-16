@@ -548,6 +548,14 @@ class BridgeDriver(AgentDriver):
         # another writer persisted.
         self._record: dict[str, Any] | None = \
             dict(persisted_record) if persisted_record else None
+        # The PreToolUse(Workflow) hook-client timeout this agent LAUNCHED
+        # with (§11 #23) — set when the hook settings build (create / cold
+        # restore), seeded from the persisted record on warm resume (the agent
+        # keeps its launch-time --settings; resume does not relaunch). The
+        # sidecar clamps each gate's hold to it (main._workflow_hold_s) so an
+        # operator knob-raise can never hold a gate past the client's patience.
+        self._workflow_hook_timeout: float | None = \
+            (persisted_record or {}).get("workflow_hook_timeout")
 
     def bind_session_id(self, session_id: str) -> None:
         """Associate the sidecar session id (used for the runtime record)."""
@@ -557,10 +565,19 @@ class BridgeDriver(AgentDriver):
     def tmux_name(self) -> str:
         return self._name
 
-    def _build_hook_settings(self) -> dict | None:
-        """Hook channel — the per-agent PostToolUse + Stop HTTP hooks.
+    @property
+    def workflow_hook_timeout(self) -> float | None:
+        """The Workflow hook-client timeout baked into this agent's launch
+        --settings (§11 #23), or None when unknown (hook-less agent / a record
+        from before the field existed — the sidecar then holds unclamped)."""
+        return self._workflow_hook_timeout
 
-        Points each agent at the sidecar's inbox-drain endpoints (keyed by THIS
+    def _build_hook_settings(self) -> dict | None:
+        """Hook channel — the per-agent HTTP hook set (inject drain, inbox
+        detection incl. the §11 #23 Workflow approval gate, run-state push,
+        subagent lifecycle).
+
+        Points each agent at the sidecar's hook endpoints (keyed by THIS
         agent's sidecar session id) over the WSL-reachable host gateway URL — the
         spike-proven path that delivers a queued inject mid-turn. PostToolUse
         drains at the next tool boundary; Stop backstops the no-tool-call turn.
@@ -577,12 +594,27 @@ class BridgeDriver(AgentDriver):
         if not base:
             return None
         agent = self._session_id
+        try:
+            import inbox  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import inbox  # type: ignore[no-redef]
+        # The workflow gate's hook client must outlive the sidecar's bounded
+        # hold (§11 #23): hold + margin, so the sidecar's answer (verdict or
+        # the {} timeout fallback) always lands before the client gives up.
+        # Remembered on the driver + persisted in the runtime record (start()),
+        # because this value is BAKED into the agent's --settings at launch
+        # while the sidecar re-reads the knob per gate — the sidecar clamps
+        # each hold to THIS launch-time value so the invariant survives the
+        # knob changing under a long-lived agent (main._workflow_hold_s).
+        wf_timeout = int(inbox.workflow_approval_timeout_s()
+                         + inbox.WORKFLOW_CLIENT_MARGIN_S)
+        self._workflow_hook_timeout = wf_timeout
         # agent id rides the PATH (claude's http-hook client doesn't reliably
         # forward a query string — verified in the hook-channel spike).
-        def _http(url_suffix: str) -> dict:
+        def _http(url_suffix: str, timeout: int = 5) -> dict:
             return {"type": "http",
                     "url": f"{base}/internal/hooks/{url_suffix}/{agent}",
-                    "timeout": 5}
+                    "timeout": timeout}
         return {
             "hooks": {
                 "PostToolUse": [{"matcher": "", "hooks": [_http("post-tool-use")]}],
@@ -593,9 +625,16 @@ class BridgeDriver(AgentDriver):
                 # The "" catch-all rides alongside for the run-state channel
                 # (§7.4) — all matching PreToolUse hooks fire, so plan/decision
                 # detection and run-state ingestion coexist.
+                # The Workflow matcher is the §11 #23 approval gate
+                # (spike-proven, tests/workflow_approval_probe/): the sidecar
+                # HOLDS its response until the operator resolves the Review
+                # card — allow launches, deny aborts, and on hold-timeout the
+                # {} answer falls back to the built-in on-pane dialog.
                 "PreToolUse": [
                     {"matcher": "ExitPlanMode", "hooks": [_http("plan")]},
                     {"matcher": "AskUserQuestion", "hooks": [_http("decision")]},
+                    {"matcher": "Workflow",
+                     "hooks": [_http("workflow", timeout=wf_timeout)]},
                     {"matcher": "", "hooks": [_http("run-state")]},
                 ],
                 # Run-state push channel (§7.4, Option C hybrid): lifecycle events
@@ -653,7 +692,9 @@ class BridgeDriver(AgentDriver):
         ``permissions`` (deny is the reliable hard-block in all modes);
         ``enabled_plugins`` {"id": bool} -> ``enabledPlugins`` (per-agent plugin
         enable/disable — live-verified); the hook-channel ``hooks`` block (the
-        inject channel); plus the ``statusLine`` per-turn capture command
+        inject channel) with its rider ``skipWorkflowUsageWarning: false`` pin
+        (§11 #23 — keeps the built-in workflow dialog armed as the hook-timeout
+        fallback); plus the ``statusLine`` per-turn capture command
         (§11 #31, see ``_build_statusline_settings``).
         """
         settings: dict[str, Any] = {
@@ -679,6 +720,16 @@ class BridgeDriver(AgentDriver):
         hooks = self._build_hook_settings()
         if hooks:
             settings.update(hooks)
+            # §11 #23: pin the workflow popup switch PER-SESSION (spike-proven
+            # honored in the agent's --settings) to False — the built-in
+            # 'Run a dynamic workflow?' dialog stays ARMED as the honest
+            # fallback when the held workflow hook times out ({}), while an
+            # answered hook verdict preempts it (spike: the hook is the sole
+            # gate even with the popup switch on). Pinned per-session so a
+            # WSL-global "don't ask again" can never silently remove the
+            # fallback gate. Rides only alongside hooks: a hook-less agent
+            # keeps whatever gate its global config gives it.
+            settings["skipWorkflowUsageWarning"] = False
         statusline = self._build_statusline_settings()
         if statusline:
             settings.update(statusline)
@@ -814,6 +865,11 @@ class BridgeDriver(AgentDriver):
                 # Per-agent reply-format preset id (§11 #39), persisted so the
                 # choice survives a restart (reconnect reads it back).
                 "response_preset": self.config.response_preset,
+                # The Workflow hook-client timeout baked into this agent's
+                # launch --settings (§11 #23) — persisted so a restarted
+                # sidecar clamps gate holds to the value the agent actually
+                # launched with, not the current knob.
+                "workflow_hook_timeout": self._workflow_hook_timeout,
             })
             self._record = record
             try:

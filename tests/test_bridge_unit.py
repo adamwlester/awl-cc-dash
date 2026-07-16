@@ -1247,6 +1247,74 @@ class TestBuildLaunchConfig:
         assert _driver()._build_mcp_config() is None
 
 
+class TestWorkflowGateLaunchConfig:
+    """§11 #23 — the workflow-approval gate's launch-config side (governing
+    live proof: tests/workflow_approval_probe/). Every hooked agent carries a
+    PreToolUse ``Workflow`` matcher pointed at
+    ``/internal/hooks/workflow/{agent}`` whose hook-client timeout OUTLIVES the
+    sidecar's bounded hold (so the verdict — or the {} timeout fallback —
+    always lands before the client gives up), plus the per-session
+    ``skipWorkflowUsageWarning: false`` pin that keeps the built-in
+    'Run a dynamic workflow?' dialog armed as the hold-timeout fallback. A
+    hook-less agent gets neither: without the hook gate the popup switch must
+    stay whatever the agent's own config says."""
+
+    def _hooked_driver(self, monkeypatch):
+        monkeypatch.delenv("AWL_DISABLE_HOOKS", raising=False)
+        d = _driver()
+        d.bind_session_id("sid-1")
+        monkeypatch.setattr(d._bridge, "sidecar_hook_base_url",
+                            lambda: "http://gw:7690")
+        return d
+
+    def test_pretooluse_carries_workflow_matcher_with_long_timeout(self, monkeypatch):
+        monkeypatch.delenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", raising=False)
+        d = self._hooked_driver(monkeypatch)
+        pre = d._build_settings()["hooks"]["PreToolUse"]
+        wf = [m for m in pre if m["matcher"] == "Workflow"]
+        assert len(wf) == 1
+        hook = wf[0]["hooks"][0]
+        assert hook["type"] == "http"
+        assert hook["url"] == "http://gw:7690/internal/hooks/workflow/sid-1"
+        assert hook["timeout"] == 630          # default 600 s hold + 30 s margin
+        # The other PreToolUse hooks keep their short answer-now timeout.
+        run_state = [m for m in pre if m["matcher"] == ""][0]["hooks"][0]
+        assert run_state["timeout"] == 5
+
+    def test_hold_knob_scales_the_hook_client_timeout(self, monkeypatch):
+        d = self._hooked_driver(monkeypatch)
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "60")
+        pre = d._build_settings()["hooks"]["PreToolUse"]
+        wf = [m for m in pre if m["matcher"] == "Workflow"][0]["hooks"][0]
+        assert wf["timeout"] == 90             # 60 s hold + 30 s margin
+
+    def test_popup_pin_rides_with_hooks_only(self, monkeypatch):
+        d = self._hooked_driver(monkeypatch)
+        assert d._build_settings()["skipWorkflowUsageWarning"] is False
+        # No session id bound -> no hooks -> no pin.
+        assert "skipWorkflowUsageWarning" not in _driver()._build_settings()
+
+    def test_launch_time_client_timeout_remembered_and_restored(self, monkeypatch):
+        """The workflow hook-client timeout an agent LAUNCHED with is
+        remembered on the driver when the hook settings build, and a warm
+        resume seeds it from the persisted record rather than the CURRENT
+        knob — the sidecar clamps each gate's hold to this launch-time value
+        (main._workflow_hold_s), so a knob raise across a sidecar restart can
+        never hold a gate past the client's patience."""
+        monkeypatch.delenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", raising=False)
+        d = self._hooked_driver(monkeypatch)
+        assert d.workflow_hook_timeout is None   # nothing built yet
+        d._build_settings()
+        assert d.workflow_hook_timeout == 630    # what the agent launched with
+        # Warm resume under a RAISED knob: the persisted launch-time value
+        # wins (resume does not relaunch, the old --settings still apply).
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "3600")
+        r = BridgeDriver(DriverConfig(), lambda e: None,
+                         resume_name="awl-warm", session_id="s1",
+                         persisted_record={"workflow_hook_timeout": 630})
+        assert r.workflow_hook_timeout == 630
+
+
 # -----------------------------------------------------------------------------
 # Display-name registration (§7.5 / §11 #14) — the identity NAME doubles as the
 # Claude Code session display name: `claude --name` at launch (from
@@ -1343,6 +1411,8 @@ class TestBridgeDriverWarmResume:
         "cwd": "/mnt/c/proj", "claude_session_id": "cid-123",
         "transcript_path": "/home/u/.claude/projects/x/cid-123.jsonl",
         "identity": {"number": 3},
+        # The workflow hook-client timeout this agent launched with (§11 #23).
+        "workflow_hook_timeout": 630,
         # A field some OTHER writer persisted into the roster record — a
         # record refresh must carry it forward, never drop it.
         "notes": "another-writers-field",
@@ -1375,6 +1445,9 @@ class TestBridgeDriverWarmResume:
         assert saved["transcript_path"] == self._REC["transcript_path"]
         assert saved["notes"] == "another-writers-field"
         assert saved["claude_session_id"] == "cid-123"
+        # The launch-time workflow hook-client timeout rode through the
+        # resume's record refresh (the gate-hold clamp reads it, §11 #23).
+        assert saved["workflow_hook_timeout"] == 630
 
     def test_warm_resume_carries_cold_restore_fallback_args(self, monkeypatch):
         d, fake = self._resumed(monkeypatch, {})

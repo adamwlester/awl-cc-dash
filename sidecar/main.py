@@ -21,7 +21,7 @@ import re
 import shlex
 import uuid
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -2160,6 +2160,146 @@ async def hook_decision(agent: str, body: dict[str, Any] | None = None):
     return {}
 
 
+# --- Workflow approval via the Inbox (§11 #23) ---
+# The PreToolUse(Workflow) hook fires with the FULL script preview in
+# tool_input.script, a deny verdict aborts / allow launches, and the hook
+# verdict preempts the built-in dialog — all spike-proven
+# (tests/workflow_approval_probe/). Unlike plan/decision (detect-and-surface,
+# return {}), this hook HOLDS its HTTP response on an asyncio.Future until the
+# operator resolves the Review card, then answers with the verdict. The hold is
+# bounded (inbox.workflow_approval_timeout_s, default 600 s — clamped per gate
+# to the agent's launch-time hook-client timeout, _workflow_hold_s): on timeout
+# it returns {} so Claude Code falls back to its own on-pane
+# 'Run a dynamic workflow?' dialog — the documented honest fallback (the
+# per-agent settings pin skipWorkflowUsageWarning:false so that dialog stays
+# armed; see BridgeDriver._build_settings).
+
+# Pending workflow gates: (agent, item_id) -> the Future the held hook awaits.
+_workflow_gates: dict[tuple[str, str], asyncio.Future] = {}
+
+
+def _workflow_verdict(answer: Any) -> str:
+    """Normalize a Review card's resolve answer to 'approve' | 'reject'.
+
+    Accepts the bare string ("approve") or the dict form ({"verdict":
+    "approve"}); only an explicit approve/allow maps to approve — anything
+    else denies (deny is the safe default for a launch gate)."""
+    verdict = answer.get("verdict") if isinstance(answer, dict) else answer
+    if str(verdict or "").strip().lower() in ("approve", "approved", "allow"):
+        return "approve"
+    return "reject"
+
+
+def _workflow_hold_s(driver: Any) -> float:
+    """The bounded hold for ONE workflow gate: the current knob
+    (inbox.workflow_approval_timeout_s), clamped so the sidecar always answers
+    before the agent's hook client gives up. The client's timeout was baked
+    into the agent's --settings at LAUNCH (hold-at-launch + margin,
+    BridgeDriver._build_hook_settings) while the knob is re-read per gate — so
+    without the clamp, an agent launched before a knob raise (bridge agents
+    outlive sidecar restarts, §9.9) would be held past its client's patience
+    and the operator could "approve" into a connection nobody is waiting on.
+    An unknown launch-time value (hook-less driver, pre-field record) leaves
+    the knob unclamped — the constant-knob behavior."""
+    hold = inbox.workflow_approval_timeout_s()
+    client = getattr(driver, "workflow_hook_timeout", None)
+    try:
+        client_s = float(client) if client is not None else None
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        client_s = None
+    if client_s is not None:
+        hold = min(hold, max(client_s - inbox.WORKFLOW_CLIENT_MARGIN_S, 0.0))
+    return hold
+
+
+@app.post("/internal/hooks/workflow/{agent}")
+async def hook_workflow(agent: str, body: dict[str, Any] | None = None):
+    """PreToolUse(Workflow) — the workflow approval gate. Raises a Review
+    inbox card carrying the parsed script preview (name / description / phases
+    recovered from ``tool_input.script``) and HOLDS this response until the
+    operator resolves the card: approve → PreToolUse ``allow`` (launches),
+    reject → ``deny`` (aborts the Workflow call). After the bounded hold
+    (default 600 s) it returns ``{}`` — the on-pane-dialog fallback — and
+    marks the still-open card ``timed_out``."""
+    _nudge_driver(agent)  # §11 #34: a Workflow tool call is activity
+    body = body or {}
+    session = sessions.get(agent)
+    # Bounded hold: the knob, clamped to the client timeout the agent actually
+    # launched with (see _workflow_hold_s) — computed up front so the card can
+    # honestly say when its live window closes.
+    hold = _workflow_hold_s(session.driver if session else None)
+    tool_input = body.get("tool_input") or {}
+    script = tool_input.get("script") if isinstance(tool_input, dict) else None
+    script_path = tool_input.get("scriptPath") \
+        if isinstance(tool_input, dict) else None
+    if not script and script_path:
+        # scriptPath launch shape (file-stored workflows — the Library's
+        # editing model, and a shape the spike's capture treats as first-class
+        # alongside inline `script`): best-effort read of the file so the
+        # approval card still carries a real preview, not an empty one.
+        script = inbox.read_script_for_preview(script_path)
+    preview = inbox.parse_workflow_script(script)
+    if script_path:
+        preview["script_path"] = script_path  # always show WHAT file launches
+    data = {
+        "tool": body.get("tool_name") or "Workflow",
+        "tool_input": tool_input,
+        "preview": preview,
+        # When the hold lapses unanswered the gate falls back to the on-pane
+        # dialog — stamp WHEN so the card is honest about its live window.
+        "hold_deadline": (datetime.now() + timedelta(seconds=hold)).isoformat(),
+    }
+    tool_use_id = body.get("tool_use_id")
+    item = inbox.raise_item(
+        agent, "review", data,
+        dedup_key=f"review:{tool_use_id}" if tool_use_id else None)
+    if session:
+        try:
+            session.push_event({
+                "type": "review", "data": data,
+                "timestamp": datetime.now().isoformat(),
+                "source": agent, "recipients": ["user"],
+            })
+        except Exception:  # pragma: no cover
+            pass
+
+    key = (agent, item["id"])
+    # A redelivered gate (hook retry on the same tool_use_id dedups onto the
+    # same card) supersedes any stale hold: release the old waiter with the
+    # {} fallback so it never dangles until timeout.
+    prev = _workflow_gates.pop(key, None)
+    if prev is not None and not prev.done():
+        prev.set_result(None)
+    fut: asyncio.Future = asyncio.get_running_loop().create_future()
+    _workflow_gates[key] = fut
+    try:
+        verdict = await asyncio.wait_for(fut, timeout=hold)
+    except asyncio.TimeoutError:
+        # Honest fallback: hand the gate back to the TUI's own dialog. The
+        # card stays open (the operator should still see it) but says so.
+        inbox.update_item_data(agent, item["id"], {"timed_out": True})
+        logger.info("workflow gate timed out agent=%s item=%s — falling back "
+                    "to the on-pane dialog", agent, item["id"])
+        return {}
+    finally:
+        if _workflow_gates.get(key) is fut:
+            _workflow_gates.pop(key, None)
+    if verdict == "approve":
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+        }}
+    if verdict == "reject":
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason":
+                "Workflow launch rejected from the dashboard Inbox "
+                "(Review card).",
+        }}
+    return {}  # superseded by a redelivered gate — the fresh hold owns the verdict
+
+
 # ============================================================================
 # Inbox — the merged "needs you" surface across all five typed sections.
 # ============================================================================
@@ -2184,9 +2324,17 @@ async def get_inbox():
 
 @app.post("/inbox/{agent}/{item_id}/resolve")
 async def resolve_inbox_item(agent: str, item_id: str, body: dict[str, Any] | None = None):
-    ok = inbox.resolve_item(agent, item_id, answer=(body or {}).get("answer"))
+    """Resolve an inbox item. Resolving a `review` card additionally completes
+    the HELD workflow hook (§11 #23): the answer's verdict maps approve → allow
+    (launch) / anything else → deny (abort). A review card whose hold already
+    lapsed (timed out) still resolves normally — the gate just isn't waiting."""
+    answer = (body or {}).get("answer")
+    ok = inbox.resolve_item(agent, item_id, answer=answer)
     if not ok:
         raise HTTPException(status_code=404, detail="Inbox item not found")
+    gate = _workflow_gates.pop((agent, item_id), None)
+    if gate is not None and not gate.done():
+        gate.set_result(_workflow_verdict(answer))
     return {"status": "resolved", "agent": agent, "item_id": item_id}
 
 

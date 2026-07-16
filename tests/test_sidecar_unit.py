@@ -21,7 +21,14 @@ functions are called directly via ``asyncio.run``). Proves:
   * **the live mode/fast/thinking control endpoints (§11 #12)** — POST
     ``/sessions/{id}/{mode,fast,thinking}`` return the driver's READ-BACK state
     and map the honest RuntimeError reasons to 409 (``busy``) / 400
-    (``unreachable`` / ``credit_gated``).
+    (``unreachable`` / ``credit_gated``);
+  * **the workflow approval gate (§11 #23)** — ``POST
+    /internal/hooks/workflow/{agent}`` raises a ``review`` inbox card carrying
+    the parsed script preview and HOLDS its response on an asyncio primitive
+    until ``POST /inbox/{agent}/{item}/resolve`` answers it (approve → the
+    spike's PreToolUse ``allow`` shape, reject → ``deny``); the bounded hold
+    times out to ``{}`` (the on-pane-dialog fallback), stamping the card
+    ``timed_out``.
 
 These carry neither the ``integration`` nor the ``slow`` mark.
 """
@@ -1351,3 +1358,224 @@ class TestScratchEndpointsLazyLoad:
         proj, _sp = self._board(tmp_path, ["- **ada** (t): hello"])
         got = asyncio.run(main.get_scratch(str(proj)))
         assert [p["text"] for p in got["posts"]] == ["hello"]
+
+
+# ---------------------------------------------------------------------------
+# Workflow approval via the Inbox (§11 #23) — the held PreToolUse(Workflow)
+# gate. Governing live proof: tests/workflow_approval_probe/ (8/8 green: the
+# hook fires with the full script preview, deny aborts / allow launches, the
+# verdict preempts the built-in dialog). These hermetic tests pin the sidecar
+# side of that contract: the hook endpoint raises a `review` card carrying the
+# parsed preview and HOLDS the HTTP response on an asyncio.Future; resolving
+# the card completes the hold (approve → allow, reject → deny); the bounded
+# hold times out to {} — the honest on-pane-dialog fallback.
+# ---------------------------------------------------------------------------
+
+import inbox  # noqa: E402
+
+# A compacted Workflow script with the same meta shape the live spike's
+# subject_workflow.js carries (mixed quoting on purpose).
+_WF_SCRIPT = (
+    "export const meta = { name: 'demo-flow', "
+    'description: "reviews a thing before it runs", '
+    "phases: [ { title: 'Solo', agents: 1 } ] }; "
+    "export default async function run() {}"
+)
+
+# The PreToolUse hook payload shape the spike recorded (findings: keys include
+# tool_name / tool_input / tool_use_id / hook_event_name / permission_mode).
+def _wf_body(tool_use_id="tu-1"):
+    return {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Workflow",
+        "tool_use_id": tool_use_id,
+        "tool_input": {"script": _WF_SCRIPT},
+        "session_id": "cc-uuid",
+        "permission_mode": "default",
+    }
+
+
+class TestWorkflowApprovalGate:
+    @pytest.fixture(autouse=True)
+    def _clean_gate_state(self):
+        inbox.reset()
+        main._workflow_gates.clear()
+        yield
+        inbox.reset()
+        main._workflow_gates.clear()
+
+    def test_hook_raises_review_card_and_holds_until_approve(self):
+        """The workflow hook raises ONE `review` card carrying the parsed
+        script preview (name/description/phases recovered from
+        tool_input.script), holds its response while the card is open, and an
+        `approve` resolve completes the hold with the spike's PreToolUse
+        allow shape."""
+        async def scenario():
+            task = asyncio.create_task(main.hook_workflow("a1", _wf_body()))
+            await asyncio.sleep(0)  # run the endpoint up to its held await
+            cards = [i for i in inbox.items_for("a1") if i["type"] == "review"]
+            assert len(cards) == 1
+            card = cards[0]
+            assert card["data"]["tool"] == "Workflow"
+            assert card["data"]["preview"]["name"] == "demo-flow"
+            assert card["data"]["preview"]["description"] == \
+                "reviews a thing before it runs"
+            assert card["data"]["preview"]["phase_titles"] == ["Solo"]
+            # The HTTP response is HELD — not answered until the operator acts.
+            assert not task.done()
+            out = await main.resolve_inbox_item(
+                "a1", card["id"], {"answer": "approve"})
+            assert out["status"] == "resolved"
+            return await task, card["id"]
+
+        result, card_id = asyncio.run(scenario())
+        assert result == {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "allow"}}
+        # The card is resolved with the operator's answer recorded.
+        card = inbox.get_item("a1", card_id)
+        assert card["resolved"] is True and card["answer"] == "approve"
+        assert main._workflow_gates == {}  # nothing left waiting
+
+    @pytest.mark.parametrize("answer", [
+        "reject",                      # bare string form
+        {"verdict": "reject"},         # dict form
+        None,                          # no answer at all -> deny-safe default
+        "whatever",                    # unrecognized -> deny-safe default
+    ])
+    def test_reject_maps_to_deny(self, answer):
+        """A non-approve resolve completes the held hook with the PreToolUse
+        deny shape (which aborts the Workflow call — spike-proven), carrying a
+        human-readable permissionDecisionReason. Anything that is not an
+        explicit approve denies: deny is the safe default for a launch gate."""
+        async def scenario():
+            task = asyncio.create_task(main.hook_workflow("a1", _wf_body()))
+            await asyncio.sleep(0)
+            card = inbox.items_for("a1")[0]
+            await main.resolve_inbox_item("a1", card["id"], {"answer": answer})
+            return await task
+
+        result = asyncio.run(scenario())
+        hso = result["hookSpecificOutput"]
+        assert hso["hookEventName"] == "PreToolUse"
+        assert hso["permissionDecision"] == "deny"
+        assert hso["permissionDecisionReason"]
+
+    def test_timeout_returns_empty_fallback_and_marks_card(self, monkeypatch):
+        """After the bounded hold (AWL_WORKFLOW_APPROVAL_TIMEOUT, default
+        600 s) lapses unanswered, the hook returns {} — Claude Code then falls
+        back to its own on-pane 'Run a dynamic workflow?' dialog (the
+        documented honest fallback). The card stays OPEN but is stamped
+        timed_out, and resolving it afterwards still works (it just no longer
+        answers any gate)."""
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "0.05")
+        out = asyncio.run(main.hook_workflow("a1", _wf_body()))
+        assert out == {}
+        cards = [i for i in inbox.items_for("a1") if i["type"] == "review"]
+        assert len(cards) == 1 and cards[0]["data"]["timed_out"] is True
+        assert main._workflow_gates == {}  # the lapsed waiter is gone
+        # A late resolve is a normal card-resolve, not an error.
+        out2 = asyncio.run(main.resolve_inbox_item(
+            "a1", cards[0]["id"], {"answer": "approve"}))
+        assert out2["status"] == "resolved"
+
+    def test_refired_gate_supersedes_stale_hold(self):
+        """A redelivered gate (same tool_use_id → dedups onto the same card)
+        supersedes the stale hold: the first hook call is released with {} (the
+        fallback) instead of dangling to timeout, and the operator's verdict
+        answers the FRESH hold."""
+        async def scenario():
+            first = asyncio.create_task(main.hook_workflow("a1", _wf_body()))
+            await asyncio.sleep(0)
+            second = asyncio.create_task(main.hook_workflow("a1", _wf_body()))
+            await asyncio.sleep(0)
+            # Still ONE card (dedup on tool_use_id), and the first hold was
+            # released with the {} fallback.
+            cards = [i for i in inbox.items_for("a1") if i["type"] == "review"]
+            assert len(cards) == 1
+            assert await first == {}
+            assert not second.done()
+            await main.resolve_inbox_item(
+                "a1", cards[0]["id"], {"answer": "approve"})
+            return await second
+
+        result = asyncio.run(scenario())
+        assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+    def test_resolve_nonreview_cards_untouched_by_gate_wiring(self):
+        """Resolving an ordinary (non-review) card goes through the unchanged
+        path: resolves fine with no gate side effects, and an unknown item
+        still 404s."""
+        from fastapi import HTTPException
+        it = inbox.raise_item("a1", "warning", {"subtype": "max_turns"})
+        out = asyncio.run(main.resolve_inbox_item("a1", it["id"], {}))
+        assert out["status"] == "resolved"
+        with pytest.raises(HTTPException) as ei:
+            asyncio.run(main.resolve_inbox_item("a1", "nope", {}))
+        assert ei.value.status_code == 404
+
+    def test_scriptpath_launch_builds_preview_from_file(self, tmp_path,
+                                                        monkeypatch):
+        """A Workflow({scriptPath}) launch (the file-stored shape — the
+        Library's editing model; review finding) still yields a REAL preview:
+        the sidecar best-effort reads the file for the meta parse and always
+        stamps the raw path into the preview. An unreachable path degrades to
+        the empty preview but keeps the path visible."""
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "0.05")
+        wf = tmp_path / "flow.js"
+        wf.write_text(_WF_SCRIPT, encoding="utf-8")
+        body = _wf_body()
+        body["tool_input"] = {"scriptPath": str(wf)}
+        assert asyncio.run(main.hook_workflow("a1", body)) == {}
+        card = inbox.items_for("a1")[0]
+        assert card["data"]["preview"]["name"] == "demo-flow"
+        assert card["data"]["preview"]["phase_titles"] == ["Solo"]
+        assert card["data"]["preview"]["script_path"] == str(wf)
+        # Unreachable path: empty preview, but the path still shows.
+        body2 = _wf_body(tool_use_id="tu-2")
+        body2["tool_input"] = {"scriptPath": str(tmp_path / "gone.js")}
+        assert asyncio.run(main.hook_workflow("a1", body2)) == {}
+        card2 = [i for i in inbox.items_for("a1") if i["id"] != card["id"]][0]
+        assert card2["data"]["preview"]["name"] is None
+        assert card2["data"]["preview"]["script_path"] == str(tmp_path / "gone.js")
+
+    def test_hold_clamped_to_launch_time_client_timeout(self, monkeypatch):
+        """The per-gate hold is min(current knob, launch-time hook-client
+        timeout − margin) — so raising AWL_WORKFLOW_APPROVAL_TIMEOUT after an
+        agent launched (bridge agents outlive sidecar restarts, §9.9) can
+        never hold a gate past the patience its hook client was launched with
+        (review finding: the operator would approve into a dead connection)."""
+        class _Drv:
+            def __init__(self, t):
+                self.workflow_hook_timeout = t
+        monkeypatch.delenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", raising=False)
+        assert main._workflow_hold_s(None) == 600.0          # no driver: knob
+        assert main._workflow_hold_s(_Drv(None)) == 600.0    # pre-field record
+        assert main._workflow_hold_s(_Drv(630)) == 600.0     # constant knob
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "3600")
+        # The review's exact scenario: knob raised to 3600 across a restart,
+        # agent launched at the 600 s default (client 630) -> hold stays 600.
+        assert main._workflow_hold_s(_Drv(630)) == 600.0
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "60")
+        assert main._workflow_hold_s(_Drv(630)) == 60.0      # knob LOWER wins
+        assert main._workflow_hold_s(_Drv(10)) == 0.0        # floor, not negative
+
+    def test_endpoint_uses_clamped_hold_and_stamps_deadline(self, monkeypatch):
+        """hook_workflow actually holds for the CLAMPED duration: with the knob
+        at 600 s but a launch-time client timeout barely above the margin, the
+        gate times out (to {} + timed_out) almost immediately instead of
+        holding 600 s — and every card carries its hold_deadline stamp."""
+        class _StubDriver:
+            workflow_hook_timeout = 30.05    # margin + 0.05 -> hold 0.05 s
+
+        class _StubSession:
+            driver = _StubDriver()
+
+            def push_event(self, ev):
+                pass
+        monkeypatch.setenv("AWL_WORKFLOW_APPROVAL_TIMEOUT", "600")
+        monkeypatch.setitem(main.sessions, "a1", _StubSession())
+        out = asyncio.run(main.hook_workflow("a1", _wf_body()))
+        assert out == {}                     # clamped hold lapsed, not 600 s
+        card = inbox.items_for("a1")[0]
+        assert card["data"]["timed_out"] is True
+        assert card["data"]["hold_deadline"]  # the honest live-window stamp

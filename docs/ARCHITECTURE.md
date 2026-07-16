@@ -480,9 +480,7 @@ dropped — it always lands in the queue.
 
 ### 7.4 The hook channel
 
-Every bridge agent launches with `PostToolUse` + `Stop` + `PreToolUse(ExitPlanMode|AskUserQuestion)` HTTP
-hooks pointed at the sidecar's `/internal/hooks/{post-tool-use,stop,plan,decision}/{agent}` endpoints (via
-the WSL gateway URL, §6.4):
+Every bridge agent launches with `PostToolUse` + `Stop` + `PreToolUse(ExitPlanMode|AskUserQuestion|Workflow)` HTTP hooks pointed at the sidecar's `/internal/hooks/{post-tool-use,stop,plan,decision,workflow}/{agent}` endpoints (via the WSL gateway URL, §6.4):
 
 - **PostToolUse** drains any pending inject for that agent and returns it as `additionalContext` — a
   running agent receives it **mid-turn at the next safe tool boundary, without stopping**. Delivery is
@@ -493,6 +491,7 @@ the WSL gateway URL, §6.4):
   is **proven** (`test_plan_decision_hooks_live`, live, 2026-07-02): the cards raise, and plan-approve
   resumes the agent via a **`keys()` Enter on the pane** — not a hook `updatedInput` response; the
   approve→resume wiring is queued (§11 #22).
+- **Workflow** (built §11 #23, 2026-07-16; spike-proven — [`tests/workflow_approval_probe/`](../tests/workflow_approval_probe/)) — the **workflow approval gate**: unlike the detect-and-return hooks above, the sidecar raises a **Review** card (§7.8) carrying the parsed script preview and **HOLDS** the hook's HTTP response until the operator resolves the card — approve → PreToolUse `allow` (launches), reject → `deny` (aborts). The bounded hold (default 600 s, `AWL_WORKFLOW_APPROVAL_TIMEOUT`, clamped per gate to the hook-client timeout the agent launched with so the answer always lands before the client gives up) times out to `{}`, honestly falling back to the built-in on-pane dialog, which each agent's per-session `skipWorkflowUsageWarning: false` settings pin keeps armed.
 
 Beyond inject and Plan/Decision, the hook channel is also the **run-state push channel** (Option C hybrid, built §11 #21, 2026-07-10): every agent's lifecycle hooks (`UserPromptSubmit`, `PreToolUse` catch-all, `PostToolUse`, `Stop`, `Notification`, `SubagentStart`/`SubagentStop`) POST run-state (`permission_mode`, current tool, `prompt_id`) to `/internal/hooks/run-state|subagent/{agent}`, ingested by the per-agent **arbiter** ([`sidecar/runstate.py`](../sidecar/runstate.py)) — **authoritative-when-fresh** with screen-polling as the watchdog floor (HTTP-hook failures are silent, so a pure-push replacement is unsafe). `permission_mode` is **event-specific** — `Notification` lacks it and never sets/clears the mode. Ordering/dedup under concurrent load is lock-serialized with exact-redelivery dedup — **live-verified, not assumed** (`test_hook_ingest_live`, 2026-07-10, CC 2.1.206: the production hook set really POSTs through the WSL gateway; ~30 concurrent synthetic posts stay coherent; **`prompt_id` is present on every genuine event** — the v2.1.196+ floor holds). `SubagentStart`/`SubagentStop` ride the same channel as the roster's subagent signal (§7.17); on 2.1.206 `SubagentStart` fires (it did not on the 2.1.198 spike). `GET /sessions/{id}` carries the arbitrated `run_state` beside the poll-driven `status`.
 
@@ -568,10 +567,7 @@ The scratchpad is an **always-current, auto-read** channel: agents do not have t
 
 ### 7.8 Inbox
 
-The Inbox is the operator's action surface: typed cards, **one card per blocked agent**, raised over two
-distinct mechanisms — bridge **screen-state** (Permission; Error/stall) and the **hook channel** (Plan via
-`ExitPlanMode`, Decision via `AskUserQuestion` — §7.4). Endpoints: `GET /inbox`,
-`POST /inbox/{agent}/{item}/resolve`.
+The Inbox is the operator's action surface: typed cards, **one card per blocked agent**, raised over two distinct mechanisms — bridge **screen-state** (Permission; Error/stall) and the **hook channel** (Plan via `ExitPlanMode`, Decision via `AskUserQuestion`, Review via the held `Workflow` gate — §7.4). Endpoints: `GET /inbox`, `POST /inbox/{agent}/{item}/resolve`.
 
 The type set is **open-ended, not a closed enum** — `type` is stored as a string. The current vocabulary:
 
@@ -584,6 +580,7 @@ The type set is **open-ended, not a closed enum** — `type` is stored as a stri
   card per agent** (every completed turn updates the open card's unreviewed-runs count —
   `_raise_response_card()` in [`sidecar/main.py`](../sidecar/main.py)); completable (**View / Reply**),
   with **no dismiss and no read-tracking**.
+- **Review** — the workflow approval gate (built §11 #23, 2026-07-16): a held `PreToolUse(Workflow)` hook (§7.4) raises the card with the parsed script preview (name / description / phase titles, plus the raw `scriptPath` when that's the launch shape); Approve/Reject completes the held hook (approve → launch, reject → abort), and a lapsed hold stamps the still-open card `timed_out`. Card UI rides #50.
 
 Items persist write-through to the project's `state/inbox.json` (§8.3); the pending permission stays a
 derived synthetic card.
@@ -1149,7 +1146,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 21. *(built 2026-07-10 — runstate.py arbiter + full hook set + subagent registry, live-verified on CC 2.1.206: prompt_id present on every genuine event (the v2.1.196+ floor holds), concurrent-load coherent, SubagentStart fires, subagent transcript rides `agent_transcript_path`; see DEVLOG)*
 22. *(built 2026-07-10 — `POST /sessions/{id}/plan/verdict` (approve = the proven `keys()` Enter; revise = Escape + queued feedback, ⚠ assumed leg pending the e2e drive) + `PUT /library/document` edit-in-place; see DEVLOG)*
-23. **Workflow approval via the Inbox** *(→ §7.3, §7.11; spike-proven — [`tests/workflow_approval_probe/`](../tests/workflow_approval_probe/))* — intercept a `Workflow` tool call with a **PreToolUse hook** and surface it as an Inbox **Review** card (the renamed Plans-&-Docs section) with an Approve/Reject round-trip. Proven live: the hook fires with the **full script preview** in `tool_input.script` (name / description / phases recoverable for the card content), deny aborts / allow launches, and the hook verdict **preempts** the built-in dialog (the dashboard can be the sole gate; the on-pane dialog stays the fallback). Workflow subagents are headless/one-shot — a future Subagents tab is read-only *tracking*, not control; workflow editing reuses the Library editor. Card design is the design lane's.
+23. *(built 2026-07-16 — PreToolUse(Workflow) hook HELD at `/internal/hooks/workflow/{agent}` raising a Review inbox card with the parsed script preview (inline `script` or best-effort `scriptPath` read); resolve maps approve→allow / anything-else→deny, and the bounded hold (default 600 s, clamped to the agent's launch-time hook-client timeout) times out to `{}` — the on-pane dialog stays the fallback via the per-session `skipWorkflowUsageWarning:false` pin. Card UI rides #50. See DEVLOG.)*
 24. **Queue awareness** *(→ §7.3, §7.6)* — for >2 linked agents, share in message front matter that another agent's message is queued, so an agent can decide whether to wait.
 25. *(built 2026-07-10 — one relationship per link, Piggyback trigger + park-store + §7.6 defaults, direction-aware exchange counting, and the shared-context fire itself; see DEVLOG)*
 26. *(built 2026-07-10 — the Projects system surface: `GET /projects` + register/open/close with the §9.1/§9.8 flows and record-keeping stop; picker/chip/dialog UI rides #37; see DEVLOG)*
