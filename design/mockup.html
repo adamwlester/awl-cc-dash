@@ -91,7 +91,7 @@
         tag (small · muted · no chrome) so it never dwarfs the command.
         Picking a row stages it into the run bar (pickCmd); Run/Enter appends to the feed (runConsoleCmd,
         mock). This SUPERSEDES the v9p14 A9 proposal to run slash commands from Prompt → Compose (the
-        multi-select To target made the command target ambiguous; see TODO B6/B7).
+        multi-select To target made the command target ambiguous).
       • WIDTH via EXPAND → STEP-INTO: the Console carries an "Expand" control (openConsole) that pops it
         into a full-window view (#console-view) mirroring the Settings step-into pattern — covers the
         3-pane body, returns on Close / Esc. The pieces REFLOW: in-column the feed gets priority and the
@@ -250,7 +250,7 @@
         Demo-data aligned so the jump lands on the same item: the 01-sandy Approval card ("Merge
         remediation plan to main") targets plan-1, the "In review" Auth token-rotation remediation plan
         (its owner set to 01 sandy to match). Reply→Compose behavior is unchanged.
-    v9p7 — four backlog items (A1–A4); adds a Documentation panel + reflows the 3-pane frame:
+    v9p7 — four items (A1–A4); adds a Documentation panel + reflows the 3-pane frame:
       • CONTEXT CUTOFF SHADING (A1): every context usage bar now grays out the region above the
         cutoff so the real usable limit is visible. A hatched overlay (.bar-cut) covers cutoff→100%
         with a 2px muted marker line at the cutoff. Applied to the Team Graph card bars (.pbar), the
@@ -262,7 +262,7 @@
         context bar+% row (was sharing the row). The bar+% keep their own line below it.
       • DOCUMENTATION PANEL (A3): a new "Documentation" panel — the home for organizing all docs.
         Tabs: Plan · README.md · CLAUDE.md (plus a "+" add-doc affordance). Plan hosts the
-        native-plan interface (backlog C4): a list of plans, each an expandable card with a step
+        native-plan interface (C4): a list of plans, each an expandable card with a step
         checklist and Review/Edit/Approve · Reject actions. The three
         file tabs are a doc viewer — a path chip + Copy + an Edit toggle that swaps the rendered view
         for a mono textarea. Content is grounded to this workspace, kept representative like the rest
@@ -691,17 +691,24 @@
                 <div class="summary-row"><div data-comp="progress-bar" class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
               <div data-comp="accordion" class="acc" id="turns-bd-panel"></div>
-              <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above.
-                   Turns→Timeline gap: the accordion body is display:none when collapsed (so a margin on it is a no-op) — the 12px gap that matches the Context→Turns section gap lives on the always-rendered heading via mt-3 (collapses with the panel's own spacing when expanded). -->
+              <!-- TIMELINE — the standing per-turn log (§7.19): ONE row per DASHBOARD-INITIATED turn, rendered from the
+                   per-agent per-turn record (settings-at-turn + a one-line reply summary). The list is always visible as a
+                   read-only log; the Rewind/Handoff switcher ARMS row-clicks (a row click opens the inline confirm above the
+                   list). Row ordinals are RECORD ordinals — deliberately not the Turns readout's model-round count — and
+                   terminal-driven turns never land in the record (the standing .tl-foot footnote + the rewind confirm carry
+                   that honest limit). Edge states ride the .tl root as classes matching the declared variants: empty (no
+                   turns yet) · busy (mid-run → actions wait for idle) · gated (CLI below the rewind/fork version floor) ·
+                   no-anchor (post-rewind: records carry no rewind anchor, rows are marked rolled-back, never truncated). -->
               <div class="sec-h mt-3">Timeline</div>
-              <div data-comp="timeline-mode-switcher" class="tri-tabs" id="hist-tabs">
+              <div data-comp="timeline-mode-switcher" data-variants="gated" class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
               </div>
-              <div data-comp="accordion" id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:var(--space-6)">
-                <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
+              <div id="hist-acc" class="tl-wrap flex flex-col">
+                <div class="tl-phead" id="hist-phead" style="display:none"></div>
                 <div data-comp="inline-confirm" data-variants="danger" class="tl-confirm" id="hist-confirm"></div>
-                <div data-comp="timeline" data-variants="now" class="tl" id="hist-panel" style="min-height:120px"></div>
+                <!-- "now" is deliberately NOT declared: the standing log renders at boot with the now pill live in the DOM (shown states are never declared) -->
+                <div data-comp="timeline" data-variants="empty busy gated no-anchor" class="tl" id="hist-panel"></div>
               </div>
             </div>
 
@@ -1297,7 +1304,7 @@
                 <div class="imp-foot"><span class="imp-sel" id="imp-sel-note">Pick a session to import</span><button data-comp="button" data-status="planned" class="btn-main btn-sm" id="imp-go" disabled onclick="runImport()" title="Import the picked session to the chosen destination (the import engine is backend wiring; the doc destinations land a demo doc here)"><i data-lucide="download-cloud" class="w-3 h-3"></i>Import</button></div>
               </div>
 
-              <!-- PLAN — native plan review/edit/approve (backlog C4). L1 (ND 1+2): two-column — the shared entry-nav
+              <!-- PLAN — native plan review/edit/approve (C4). L1 (ND 1+2): two-column — the shared entry-nav
                    (#plan-nav, rendered from PLANS) beside the right card column; the subtitle count is live. -->
               <div id="doc-plan" data-group="doc" class="flex-1 min-h-0 flex p-2.5 gap-2.5">
                 <nav data-comp="entry-nav" class="docnav" id="plan-nav"></nav>

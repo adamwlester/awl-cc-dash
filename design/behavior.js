@@ -656,7 +656,8 @@
       const colNm=(a.color.match(/--ag-([a-z]+)/)||[])[1];const colVal=det.querySelector('[data-picker]:not([data-icopicker]) .picker-val');if(colVal&&colNm)colVal.textContent=colNm;
       const icoUse=det.querySelector('[data-icopicker] .picker-ico use');if(icoUse)icoUse.setAttribute('href','#'+a.icon);
       const icoNm=(AGENT_ICONS.find(p=>p[0]===a.icon)||[])[1];const icoVal=det.querySelector('[data-icopicker] .picker-val');if(icoVal&&icoNm)icoVal.textContent=icoNm;}
-    repaintConsoleIdentity(a);}
+    repaintConsoleIdentity(a);
+    if(typeof tlSetMode==='function')tlSetMode(null);}   /* the Timeline repaints per focused agent; an armed Rewind/Handoff resets on focus change */
   function selectNode(n){
     document.querySelectorAll('.node').forEach(x=>x.classList.remove('selected'));
     n.classList.add('selected');
@@ -821,8 +822,8 @@
      breaking the 34 turns out BY TOOL (Read/search · Edit · Bash · MCP · Subagent · Web) with a
      COORDINATING slice (the multi-agent angle), a "Remaining" segment closing the 50-turn budget
      (paralleling Context's "Free space"), and two drill-downs paralleling Context's sub-sections.
-     This is the categorical summary; the per-turn chronological log is the Rewind/Handoff timeline below.
-     NOTE: named TURNS_BD (not TURNS) so it does NOT clash with the timeline's `const TURNS` further down. */
+     This is the categorical summary; the per-turn chronological log is the Rewind/Handoff timeline below
+     (whose demo records live in TL_ROWS_DEFAULT / TL_ROWS). */
   const TURNS_BD={subject:'sandy',tot:'34 / 50 · 68%',pct:68,cutoff:null,cats:[
     {nm:'Read / search',v:'10',pc:'20%',c:'var(--ag-azure)'},{nm:'Edit / Write',v:'8',pc:'16%',c:'var(--ag-emerald)'},
     {nm:'Bash',v:'6',pc:'12%',c:'var(--ag-gold)'},{nm:'Coordinating',v:'4',pc:'8%',c:'var(--ag-violet)'},
@@ -841,38 +842,130 @@
   (function(){const panel=document.getElementById('turns-bd-panel');if(panel)panel.innerHTML=turnsBreakdownHTML(TURNS_BD);
     const btn=document.getElementById('turns-btn');if(btn)btn.addEventListener('click',()=>{const p=document.getElementById('turns-bd-panel');const open=p.classList.toggle('open');btn.classList.toggle('open',open);const ch=document.getElementById('turns-chev');if(ch)ch.classList.toggle('up',open);});})();
 
-  /* ===== HISTORY timeline ===== */
-  /* timeline of the focused agent's run — TOTAL = its Max-turns, current turn matches the Turns readout (34/50).
-     ND 15: each turn also carries its SETTINGS at that turn (model + mode/effort/thinking — the agent-card icon
-     pairs) and a one-line SUMMARY (desc, single-line clamp); the build-side capture of both is ARCHITECTURE
-     §11.3 #39. The summary vocabulary is shared with the (queued) Team Feed / History collapsed previews. */
-  const TOTAL=50;const TURNS=[
-    {n:27,time:'14:21',ctx:54,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Posted CRITICAL finding to scratchpad'},{n:28,time:'14:28',ctx:58,model:'opus 4.8',mode:'auto',effort:'high',think:'off',desc:'Cross-checked with auditor-01 to confirm'},
-    {n:29,time:'14:33',ctx:61,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Demoted rate-limit finding to medium'},{n:30,time:'14:39',ctx:62,model:'opus 4.8',mode:'auto',effort:'max',think:'on',desc:'Reviewed coder-01 patch diff'},
-    {n:31,time:'14:44',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Requested regression test for rotation'},{n:32,time:'14:48',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Re-checked expiry path under reuse'},
-    {n:33,time:'14:52',ctx:62,model:'opus 4.8',mode:'ask',effort:'high',think:'on',desc:'Approved remediation plan ordering'},{n:34,time:'14:56',ctx:62,model:'opus 4.8',mode:'auto',effort:'high',think:'on',desc:'Awaiting deploy gate decision',cur:true}];
-  function ctxColor(p){return p<50?'var(--success)':(p<=75?'var(--warning)':'var(--danger)');}
-  /* ND 15 (confirmed, both modes): each row is BUTTON-LIKE with the whole row as the click target — the row
-     click fires confirmPick (the trailing .tl-ic icon button is retired). Row 1 = count only ("34/50") · now ·
-     ctx % · the settings string · right-aligned timestamp; row 2 = the turn summary. */
-  function tlSetHTML(t){return '<span class="tl-set" title="model · mode · effort · thinking">'+t.model
-    +'<span class="node-chip" title="Permission mode"><i data-lucide="shield"></i>'+t.mode+'</span>'
-    +'<span class="node-chip" title="Reasoning effort"><i data-lucide="gauge"></i>'+t.effort+'</span>'
-    +'<span class="node-chip" title="Extended thinking"><i data-lucide="brain"></i>'+t.think+'</span></span>';}
-  function renderHist(mode){const panel=document.getElementById('hist-panel');if(!panel)return;const tip=mode==='handoff'?'Hand off from the end of this turn':'Rewind to the end of this turn';
-    panel.innerHTML=TURNS.map(t=>'<div class="tl-row'+(t.cur?' current':'')+'" role="button" tabindex="0" title="'+tip+'" onclick="confirmPick('+t.n+",'"+mode+"')\"><div class=\"tl-main\"><div class=\"tl-top\"><span class=\"tl-turn\">"+t.n+'/'+TOTAL+'</span>'+(t.cur?'<span class="tl-now">now</span>':'')+'<span class="tl-ctx" style="color:'+ctxColor(t.ctx)+'">'+t.ctx+'%</span>'+tlSetHTML(t)+'<span class="tl-time">'+t.time+'</span></div><div class="tl-desc">'+t.desc+'</div></div></div>').join('');
-    LU();const cur=panel.querySelector('.tl-row.current');if(cur)panel.scrollTop=Math.max(0,cur.offsetTop-8);}
-  function confirmPick(n,mode){const c=document.getElementById('hist-confirm');if(!c)return;c.style.display='flex';
-    c.innerHTML='<span>'+(mode==='handoff'?'Hand off a new agent seeded through Turn '+n+'?':'Rewind this agent to the end of Turn '+n+'?')+'</span>';
-    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.style.display='none';};c.appendChild(cancel);
-    const go=document.createElement('button');go.className='btn-main btn-sm';
-    go.innerHTML=mode==='handoff'?'<i data-lucide="git-branch" class="w-3.5 h-3.5"></i>Hand off':'<i data-lucide="undo-2" class="w-3.5 h-3.5"></i>Rewind';
-    go.onclick=()=>{c.style.display='none';const a=AG[FOCUS]||{name:'agent'};
-      if(mode==='handoff'){switchTab('mid','create');prefillFromFocus();toast('Handed off from Turn '+n+' → new agent (seeded from '+a.name+')');}
-      else{toast('Rewound '+a.name+' to the end of Turn '+n);trimTimeline(n);}};
-    c.appendChild(go);LU();}
-  function trimTimeline(n){const panel=document.getElementById('hist-panel');if(!panel)return;
-    [...panel.querySelectorAll('.tl-row')].forEach(r=>{const t=r.querySelector('.tl-turn');const m=t&&t.textContent.match(/^(\d+)\//);if(m&&parseInt(m[1],10)>n)r.style.display='none';});}   /* ND 15: the count reads "34/50" (no "Turn" word) */
+  /* ===== TIMELINE (the standing per-turn log — rewind / handoff) ===== */
+  /* One row per DASHBOARD-INITIATED turn of the focused agent, from the per-agent per-turn record: the
+     settings AT that turn (model + the agent-card mode/effort/thinking icon pairs — unknown fields honestly
+     omitted; the rendered settings string rides the tooltip) and a one-line summary of the reply (a missing
+     summary reads a muted "—", never a fabricated line). Row numbers are RECORD ordinals — deliberately not
+     the Turns readout's model-round count — and terminal-driven turns never land in the record (the standing
+     footnote + the rewind confirm carry that honest limit). Rewind addressing is k-FROM-LAST over these
+     records: picking row n of N rolls back N−n prompts; Handoff from row n forks a new agent seeded through
+     that turn (row N = fork at head). The summary vocabulary is shared with the Team Feed / History
+     collapsed previews. */
+  function ctxColor(p){return p<50?'var(--success)':(p<=75?'var(--warning)':'var(--danger)');}   /* the shared health scale — the card + Agent-panel context/turns bars key off it */
+  const TL_ROWS_DEFAULT=[
+    {n:1,time:'12:41',model:'sonnet 4.6',mode:'ask',effort:null,think:null,sum:'Scoped the audit — session handling first, then token rotation'},
+    {n:2,time:'12:58',model:'sonnet 4.6',mode:'ask',effort:'med',think:'off',sum:'Mapped the auth module and its three token entry points'},
+    {n:3,time:'13:22',model:'opus 4.8',mode:'ask',effort:'high',think:'on',sum:'Flagged JWT expiry unchecked on the refresh path'},
+    {n:4,time:'13:40',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:null},
+    {n:5,time:'14:05',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Posted CRITICAL token-rotation finding to the scratchpad'},
+    {n:6,time:'14:28',model:'opus 4.8',mode:'auto',effort:'max',think:'on',sum:'Cross-checked the finding with auditor-01 — confirmed'},
+    {n:7,time:'14:41',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Demoted the rate-limit finding to medium severity'},
+    {n:8,time:'14:56',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Drafted the remediation plan — awaiting the deploy-gate decision',cur:true}];
+  /* per-agent demo records + edge states (representative; the app repaints per focused agent): io = a young
+     agent with no dashboard turns yet (empty) · max = mid-run (busy — actions wait for idle) · quinn = an
+     older CLI below the ≥ 2.1.191 rewind/fork floor (gated) · lex = a non-repo cwd (exercises the handoff
+     confirm's shared-cwd file-state note). Agents without their own rows show the default set, like the
+     other repaint-per-focus readouts in this mockup. */
+  const TL_ROWS={
+    max:[
+      {n:1,time:'13:12',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Reproduced the rotation bug behind the ECONNREFUSED'},
+      {n:2,time:'13:48',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Patched refresh-token rotation + added a regression test'},
+      {n:3,time:'14:31',model:'opus 4.8',mode:'auto',effort:'high',think:'on',sum:'Applying review feedback on the expiry-check patch',cur:true}],
+    quinn:[
+      {n:1,time:'09:02',model:'sonnet 4.6',mode:'plan',effort:'med',think:'off',sum:'Drafted the milestone plan skeleton'},
+      {n:2,time:'09:36',model:'sonnet 4.6',mode:'plan',effort:'med',think:'off',sum:'Sequenced the phases against the dependency map'},
+      {n:3,time:'10:04',model:'sonnet 4.6',mode:'plan',effort:'med',think:'off',sum:'Filed open questions for the roadmap review',cur:true}],
+    io:[]};
+  const TL_STATE={io:{state:'empty'},max:{state:'busy'},quinn:{state:'gated',cli:'2.1.184'},lex:{repo:false,cwd:'~/design-scratch'}};
+  const TL_ANCHOR={};   /* per-agent post-rewind marker (agent → target turn n) — drives the no-anchor caveat state */
+  let TL_MODE=null;     /* 'rewind' | 'handoff' | null (nothing armed — the list is a read-only log) */
+  function tlRows(){return TL_ROWS[FOCUS]||TL_ROWS_DEFAULT;}
+  function tlHead(){const r=tlRows();return r.length?r[r.length-1].n:0;}
+  function tlChip(icon,title,val){return '<span class="node-chip" title="'+title+'"><i data-lucide="'+icon+'"></i>'+val+'</span>';}
+  function tlSetHTML(t){const str=[t.model,t.mode,t.effort?'effort '+t.effort:null,t.think!=null?'thinking '+t.think:null].filter(Boolean).join(' · ');
+    return '<span class="tl-set" title="'+str+'">'+t.model
+      +(t.mode?tlChip('shield','Permission mode',t.mode):'')
+      +(t.effort?tlChip('gauge','Reasoning effort',t.effort):'')
+      +(t.think!=null?tlChip('brain','Extended thinking',t.think):'')+'</span>';}
+  function tlNoteHTML(kind,icon,text){return '<div class="tl-note tl-note--'+kind+'"><i data-lucide="'+icon+'"></i><span>'+text+'</span></div>';}
+  function tlRowTitle(t,N){if(!TL_MODE)return 'Arm Rewind or Handoff above to act from this turn';
+    if(TL_MODE==='rewind')return t.n===N?'Already the head — rewinding here is a no-op':'Rewind to the end of this turn';
+    return t.n===N?'Hand off from here (fork at head)':'Hand off from the end of this turn';}
+  function tlRowHTML(t,N){const rolled=TL_ANCHOR[FOCUS]!=null&&t.n>TL_ANCHOR[FOCUS];
+    return '<div class="tl-row'+(t.cur?' current':'')+(rolled?' tl-row--rolled':'')+'" role="button" tabindex="0" title="'+tlRowTitle(t,N)+'" onclick="tlPick('+t.n+')">'
+      +'<div class="tl-main"><div class="tl-top"><span class="tl-turn">'+t.n+'</span>'
+      +(t.cur?'<span class="tl-now">now</span>':'')+(rolled?'<span class="tl-rolltag">rolled back</span>':'')
+      +tlSetHTML(t)+'<span class="tl-time">'+t.time+'</span></div>'
+      +(t.sum?'<div class="tl-desc">'+t.sum+'</div>':'<div class="tl-desc tl-desc--none">— no summary recorded</div>')+'</div></div>';}
+  function renderTimeline(){const panel=document.getElementById('hist-panel');if(!panel)return;
+    const a=AG[FOCUS]||{name:'agent'};const st=TL_STATE[FOCUS]||{};const anchor=TL_ANCHOR[FOCUS];
+    /* the four state notes are always emitted (hidden); the .tl root's state class shows the matching one.
+       Note kinds ≠ state names on purpose (fresh/running/version/anchor) — see the styles.css note. */
+    let html=tlNoteHTML('fresh','history','No turns yet — a row lands here as each dashboard-initiated turn completes.')
+      +tlNoteHTML('running','clock',esc(a.name)+' is mid-run — Rewind &amp; Handoff need an idle agent. The log stays readable; the actions return when the run completes.')
+      +tlNoteHTML('version','lock','Rewind &amp; Handoff need Claude Code ≥ 2.1.191 — this agent is running '+(st.cli||'an older CLI')+'. Relaunch it on a newer version to enable both.')
+      +tlNoteHTML('anchor','triangle-alert','Rewound to the end of Turn '+(anchor!=null?anchor:'n')+' — records carry no rewind anchor, so the rolled-back rows stay in the log (dimmed) and new turns will append after them.');
+    html+=tlRows().map(t=>tlRowHTML(t,tlHead())).join('');
+    html+='<div class="tl-foot">Dashboard-initiated turns only — turns driven from a raw terminal aren&#8217;t recorded and can&#8217;t be targeted.</div>';
+    panel.innerHTML=html;
+    panel.className='tl'+(st.state?' tl--'+st.state:'')+(anchor!=null?' tl--no-anchor':'')+(TL_MODE?' tl--armed tl--'+TL_MODE:'');
+    const tabs=document.getElementById('hist-tabs');
+    if(tabs){tabs.classList.toggle('tri-tabs--gated',st.state==='gated');
+      tabs.title=st.state==='gated'?'Needs Claude Code ≥ 2.1.191 — this agent runs '+(st.cli||'an older CLI'):'';}
+    LU();
+    /* a visible state note is a lead-in strip — keep it on screen (scroll top); otherwise follow the head row */
+    if(st.state||anchor!=null){panel.scrollTop=0;}
+    else{const cur=panel.querySelector('.tl-row.current');if(cur)panel.scrollTop=Math.max(0,cur.offsetTop-8);}}
+  function tlSetMode(m){TL_MODE=m;
+    document.querySelectorAll('#hist-tabs .tri-tab').forEach(x=>x.classList.toggle('active',x.dataset.tri===m));
+    const c=document.getElementById('hist-confirm');if(c)c.style.display='none';
+    const ph=document.getElementById('hist-phead');
+    if(ph){ph.style.display=m?'':'none';
+      if(m)ph.textContent=m==='handoff'?'Hand off from a point — branches a NEW agent seeded with context through that turn':"Rewind to a point — restores this agent's conversation to the end of that turn";}
+    renderTimeline();}
+  function tlPick(n){const st=TL_STATE[FOCUS]||{};if(!TL_MODE||st.state==='busy'||st.state==='gated'||st.state==='empty')return;
+    const N=tlHead();if(TL_MODE==='rewind'&&n===N)return;   /* the head row is not a rewind target (no-op) */
+    tlConfirm(n,N);}
+  /* the rewind / handoff confirms — the shared inline-confirm shell in its stacked form: message row ·
+     option/caveat rows · action row. Rewind is DANGER-toned (it discards the turns after the point —
+     irreversible) and carries the honest k-from-last addressing caveat; Handoff keeps the base confirm
+     tone (purely additive — the source is untouched) and carries the #switch-driven handoff-report
+     option + the fork's file-state note (own git worktree when the cwd is a repo, shared cwd otherwise). */
+  function tlConfirm(n,N){const c=document.getElementById('hist-confirm');if(!c)return;
+    const a=AG[FOCUS]||{name:'agent'};const st=TL_STATE[FOCUS]||{};const k=N-n;
+    if(TL_MODE==='rewind'){
+      c.className='tl-confirm tl-confirm--stack foot-confirm--danger';
+      c.innerHTML='<div class="tlc-row"><span>Rewind '+esc(a.name)+' to the end of Turn '+n+'? The '+(k===1?'turn':k+' turns')+' after it '+(k===1?'is':'are')+' discarded.</span></div>'
+        +'<div class="tlc-note">Addressed as '+k+' back from the latest recorded turn — dashboard-initiated turns only. Turns driven from a raw terminal are invisible to this record, so the real target can sit that many prompts off if this agent was driven outside the dashboard.</div>'
+        +'<div class="tlc-row"></div>';
+      const row=c.lastElementChild;
+      const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.style.display='none';};row.appendChild(cancel);
+      const go=document.createElement('button');go.className='btn-danger btn-sm';go.innerHTML='<i data-lucide="undo-2" class="w-3.5 h-3.5"></i>Rewind';
+      go.onclick=()=>{c.style.display='none';TL_ANCHOR[FOCUS]=n;tlSetMode(null);
+        toast('Rewound '+a.name+' to the end of Turn '+n+' — rolled back '+k+' prompt'+(k===1?'':'s'));};
+      row.appendChild(go);}
+    else{
+      c.className='tl-confirm tl-confirm--stack';
+      const repo=st.repo!==false;const cwd=st.cwd||'~/agent-dashboard';
+      c.innerHTML='<div class="tlc-row"><span>Hand off a new agent seeded through Turn '+n+(n===N?' (the head)':'')+'?</span></div>'
+        +'<div class="tlc-row tlc-opt"><span class="tlc-optlab">With handoff report</span><span class="tlc-optnote">files a short summary of the source&#8217;s recent work to the Library and hands it to the new agent</span></div>'
+        +'<div class="tlc-note">File state: '+(repo
+          ?'the fork gets its own git worktree — '+cwd+' is a git repo, so its file changes stay isolated from '+esc(a.name)+'&#8217;s.'
+          :cwd+' isn&#8217;t a git repo, so the fork shares the folder with '+esc(a.name)+' — concurrent edits can collide.')+'</div>'
+        +'<div class="tlc-row"></div>';
+      const opt=c.querySelector('.tlc-opt');
+      const sw=document.createElement('button');sw.setAttribute('data-comp','switch');sw.className='swh on';sw.title='On — a handoff report is generated and filed';
+      sw.onclick=()=>{const on=sw.classList.toggle('on');sw.title=on?'On — a handoff report is generated and filed':'Off — plain context carry-over only';};
+      opt.appendChild(sw);
+      const row=c.lastElementChild;
+      const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=()=>{c.style.display='none';};row.appendChild(cancel);
+      const go=document.createElement('button');go.className='btn-main btn-sm';go.innerHTML='<i data-lucide="git-branch" class="w-3.5 h-3.5"></i>Hand off';
+      go.onclick=()=>{const rep=sw.classList.contains('on');c.style.display='none';
+        switchTab('mid','create');prefillFromFocus();
+        toast('Handed off from Turn '+n+' → new agent (seeded from '+a.name+(rep?' + handoff report':'')+')');};
+      row.appendChild(go);}
+    c.style.display='flex';LU();}
   /* ===== Create-wizard + Retire handlers (scripted demos) ===== */
   const NAME_POOL=['kai','drew','rowan','vale','wren','sage','nova','ash','juno','remy','sol','bex','indi','koa'];
   function rosterNames(){return new Set([...document.querySelectorAll('#graph-grid .node .text-foreground.truncate')].map(e=>e.textContent.replace(/^\d+\s+/,'').trim()));}
@@ -930,16 +1023,12 @@
     footConfirm({danger:true,msg:'Permanently delete '+a.role+' · '+a.name+'? This wipes its configuration and transcripts and removes it from the roster, graph, and any links — this can\'t be undone.',
       goClass:'btn-danger-solid',goLabel:'<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete',
       onGo:()=>{toast('Deleted '+a.name+' — configuration + transcripts wiped');const node=document.querySelector('#graph-grid .node[data-agent$="-'+FOCUS+'"]');if(node)node.remove();}});}
-  (function(){const acc=document.getElementById('hist-acc');
-    function setMode(m){ // m = 'rewind' | 'handoff' | null (null = nothing selected → hide the panel)
-      document.querySelectorAll('#hist-tabs .tri-tab').forEach(x=>x.classList.toggle('active',x.dataset.tri===m));
-      const c=document.getElementById('hist-confirm');if(c)c.style.display='none';
-      if(!m){if(acc)acc.style.display='none';return;}
-      if(acc)acc.style.display='flex';
-      const ph=document.getElementById('hist-phead');if(ph)ph.textContent=m==='handoff'?'Hand off from a point — starts a new agent seeded with context up to that turn':"Rewind to a point — restores this agent's context to the end of that turn";
-      renderHist(m);}
-    document.querySelectorAll('#hist-tabs .tri-tab').forEach(t=>t.onclick=()=>setMode(t.classList.contains('active')?null:t.dataset.tri));
-    setMode(null);})();   /* v9p3: like Model — panel hidden until selected; both Rewind & Handoff can be toggled off */
+  /* v9p3 kept: both tabs toggle off — but the LIST is a standing log now, visible unarmed (arming only
+     makes rows click targets). The initial render rides boot() → selectNode → repaintAgentPanel →
+     tlSetMode(null) — deliberately NOT here at parse time (the AG roster const is later in the file). */
+  (function(){document.querySelectorAll('#hist-tabs .tri-tab').forEach(t=>t.onclick=()=>{
+      const st=TL_STATE[FOCUS]||{};if(st.state==='gated')return;   /* belt + braces — the gated switcher is already CSS-inert */
+      tlSetMode(t.classList.contains('active')?null:t.dataset.tri);});})();
 
   /* ===== RESPONSE / FORMAT grouped multi-select ===== */
   /* v10p10 (Next-up #2): Response popover reworked into graded axes (segmented = ordered single-select,
