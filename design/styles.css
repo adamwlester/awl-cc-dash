@@ -559,35 +559,81 @@
     .bd.is-loading .bd-tot{ opacity:.45; }
 
     /* ============================ timeline (rewind / handoff) ============================ */
-    .tl{ display:flex; flex-direction:column; gap:var(--space-6); max-height:230px; overflow-y:auto; padding:var(--space-8); }
-    /* ND 15: turn rows are BUTTON-LIKE — card shadow + press affordance, the WHOLE row is the click target
-       (the trailing .tl-ic Rewind/Handoff icon button is retired; a row click fires confirmPick). Row 1 =
-       count ("34/50") · now pill · ctx % · the settings string (model + the agent-card mode/effort/thinking
-       icon pairs) · right-aligned timestamp; row 2 = the turn's one-line summary. */
-    .tl-row{ display:flex; align-items:center; gap:var(--space-9); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-6) var(--space-7) var(--space-6) var(--space-9); background:var(--secondary-background);
-      box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s; }
-    .tl-row:hover{ transform:translate(2px,2px); box-shadow:none; }
+    /* The standing per-turn LOG: one row per dashboard-initiated turn, from the per-agent per-turn
+       record (settings-at-turn + one-line summary). Read-only by default; arming Rewind/Handoff
+       (.tl--armed, set by the mode switcher) makes rows button-like click targets. Edge states ride
+       the .tl root as classes matching the declared data-variants — .tl--empty (no turns yet) ·
+       .tl--busy (agent mid-run: actions wait for idle, the log stays readable) · .tl--gated (CLI
+       below the rewind/fork version floor: actions disabled with reason) · .tl--no-anchor
+       (post-rewind: records carry no rewind anchor — rolled-back rows are marked, never truncated).
+       Each state shows its matching .tl-note strip; the notes are emitted hidden by the renderer. */
+    .tl-wrap{ display:flex; flex-direction:column; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); margin-top:var(--space-6); background:var(--secondary-background); }
+    .tl{ display:flex; flex-direction:column; gap:var(--space-6); max-height:230px; min-height:120px; overflow-y:auto; padding:var(--space-8); }
+    /* ND 15 (amended to the record's real shape): row 1 = the record ORDINAL · now pill · the settings
+       string (model + the agent-card mode/effort/thinking icon pairs; unknown fields honestly omitted,
+       the full rendered settings string on the tooltip) · right-aligned timestamp; row 2 = the turn's
+       one-line summary (a record with no summary reads a muted "—", never a fabricated line). The old
+       per-row ctx % is gone — the per-turn record carries no context measure. Rows are flat log lines
+       until a mode is ARMED — then card shadow + press affordance, the WHOLE row the click target. */
+    .tl-row{ display:flex; align-items:center; gap:var(--space-9); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); padding:var(--space-6) var(--space-7) var(--space-6) var(--space-9); background:var(--secondary-background); }
+    .tl--armed .tl-row{ box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .07s, box-shadow .07s; }
+    .tl--armed .tl-row:hover{ transform:translate(2px,2px); box-shadow:none; }
+    /* the head ("now") row is NOT a rewind target (rewinding to the head is a no-op) — it stays flat
+       and dimmed while Rewind is armed; Handoff keeps it live (fork-at-head is valid) */
+    .tl--armed.tl--rewind .tl-row.current{ box-shadow:none; cursor:default; opacity:.55; }
+    .tl--armed.tl--rewind .tl-row.current:hover{ transform:none; }
     /* v8p9: current ("now") row no longer gets a pink fill — the "now" pill alone marks it */
     .tl-main{ flex:1; min-width:0; }
     .tl-top{ display:flex; align-items:center; flex-wrap:wrap; gap:0; margin-bottom:var(--space-2); }
     .tl-turn{ font-size:10px; font-weight:800; font-family:var(--font-mono); color:var(--foreground); }
     .tl-now{ font-size:7.5px; font-weight:900; text-transform:uppercase; color:var(--main-foreground); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); padding:0 var(--space-4); display:inline-flex; align-items:center; height:var(--badge-s-h); margin-left:var(--space-6); }
     .tl-time{ font-size:9.5px; color:var(--muted); font-family:var(--font-mono); margin-left:auto; }   /* timestamps right-align (DESIGN.md convention) — the '·' prefix went with the old inline placement */
-    .tl-ctx{ font-size:9.5px; font-weight:800; font-family:var(--font-mono); } .tl-ctx::before{ content:'·'; margin:0 var(--space-5); color:var(--muted-2); font-weight:400; }
     /* ND 15: the per-turn settings string — model name + the mode/effort/thinking icon pairs (the .node-chip
-       vocabulary from the agent card), captured per turn (the build-side capture is ARCHITECTURE §11.3 #39). */
+       vocabulary from the agent card); fields the record doesn't know are omitted, never fabricated. */
     .tl-set{ display:inline-flex; align-items:center; gap:var(--space-6); min-width:0; overflow:hidden; font-family:var(--font-mono); font-size:9px; font-weight:700; color:var(--foreground); white-space:nowrap; }
     .tl-set::before{ content:'·'; margin:0 var(--space-1) 0 var(--space-5); color:var(--muted-2); font-weight:400; }
     .tl-set .node-chip{ font-size:8.5px; }
     .tl-desc{ font-size:11px; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85; }   /* the turn summary — single-line clamp with ellipsis */
+    .tl-desc--none{ color:var(--muted-2); font-style:italic; }   /* record has no summary — an honest "—", never a fabricated line */
+    /* rolled-back rows (the post-rewind session view): the record keeps them — dimmed + tagged, never hidden */
+    .tl-row--rolled{ opacity:.5; }
+    .tl-rolltag{ display:inline-flex; align-items:center; height:var(--badge-s-h); padding:0 var(--space-4); margin-left:var(--space-6); border:var(--border-width-thin) solid var(--danger); border-radius:var(--radius-sm); color:var(--danger); font-size:7.5px; font-weight:900; text-transform:uppercase; }
+    /* state note strips — one per declared edge state, hidden until the .tl root carries the state class.
+       Note-class names deliberately do NOT echo the state names (fresh/running/version/anchor, not
+       empty/busy/gated): a child class ending in "--<state>" would trip the states page's live-twin
+       harvest and render the state's specimen as the default look — a dishonest render. */
+    .tl-note{ display:none; align-items:flex-start; gap:var(--space-6); padding:var(--space-6) var(--space-8); border-radius:var(--radius-base); font-size:9.5px; font-weight:700; line-height:1.45; }
+    .tl-note svg{ width:var(--size-12); height:var(--size-12); flex:0 0 auto; margin-top:var(--space-1); }
+    .tl-note--fresh{ border:var(--border-width) dashed var(--muted-2); color:var(--muted); font-weight:600; }   /* the quiet dashed empty placeholder (the proj-empty / imp-none precedent) */
+    .tl-note--running{ border:var(--border-width) solid var(--warning); background:var(--warning-soft); color:var(--warning-text); }
+    .tl-note--version{ border:var(--border-width) solid var(--muted-2); background:var(--surface-3); color:var(--muted); }   /* a capability absence, not an alarm — chrome-muted, with the reason + fix in words */
+    .tl-note--anchor{ border:var(--border-width) solid var(--warning); background:var(--warning-soft); color:var(--warning-text); }
+    .tl.tl--empty .tl-note--fresh{ display:flex; }
+    .tl.tl--empty .tl-row, .tl.tl--empty .tl-foot{ display:none; }
+    .tl.tl--busy .tl-note--running{ display:flex; }
+    .tl.tl--busy .tl-row{ opacity:.45; pointer-events:none; }   /* actions wait for idle; the log stays visible */
+    .tl.tl--gated .tl-note--version{ display:flex; }
+    .tl.tl--no-anchor .tl-note--anchor{ display:flex; }
+    /* the standing honest-limits footnote — the record covers dashboard-initiated turns only */
+    .tl-foot{ font-size:8.5px; font-style:italic; font-weight:600; color:var(--muted-2); padding:var(--space-2) var(--space-2) 0; }
     .tl-phead{ padding:var(--space-7) var(--space-10); border-bottom:var(--border-width) solid var(--border); background:var(--surface-3); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
     .tl-confirm{ display:none; align-items:center; gap:var(--space-7); margin:var(--space-8); padding:var(--space-7) var(--space-9); border-radius:var(--radius-base); background:var(--success-soft); border:var(--border-width) solid var(--success); color:var(--success-text); font-size:10px; font-weight:700; }
     .foot-confirm--danger{ background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }   /* R-batch item 11: the irreversible Delete confirm reads as severe (danger), vs Retire's success-soft confirm */
-    .tri-tabs{ display:flex; flex-shrink:0; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; timeline opens as a separate popout below */
+    /* stacked confirm form (the Timeline rewind/handoff confirms): message row · option/note rows · action row */
+    .tl-confirm--stack{ flex-direction:column; align-items:stretch; gap:var(--space-6); margin-bottom:0; }
+    .tlc-row{ display:flex; align-items:center; gap:var(--space-7); }
+    .tlc-note{ font-size:9px; font-weight:600; line-height:1.4; opacity:.85; }
+    .tlc-opt{ gap:var(--space-8); }
+    .tlc-optlab{ font-size:10px; font-weight:800; flex:0 0 auto; }
+    .tlc-optnote{ font-size:9px; font-weight:600; opacity:.85; flex:1; min-width:0; }
+    .tri-tabs{ display:flex; flex-shrink:0; border:var(--border-width) solid var(--border); border-radius:var(--radius-base); overflow:hidden; background:var(--surface-3); }   /* v9p3: standard (fully-rounded) button group; the armed action's confirm opens in the panel below */
     .tri-tab{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:var(--space-6); font-size:10px; font-weight:800; padding:var(--space-6) 0; color:var(--muted); background:transparent; border:none; border-right:var(--border-width) solid var(--border); cursor:pointer; }
     .tri-tab:last-child{ border-right:none; }
     .tri-tab svg{ width:var(--size-12); height:var(--size-12); }
     .tri-tab.active{ background:var(--secondary); color:var(--secondary-foreground); }
+    /* version-gated (CC below the rewind/fork floor): the switcher dims + goes inert — the visible reason
+       lives in the timeline's .tl-note--gated strip, the terse form on the switcher's tooltip */
+    .tri-tabs.tri-tabs--gated .tri-tab{ opacity:.45; pointer-events:none; }
 
     /* ============================ split button (Send+timing, Revise+strength) ============================ */
     .split{ position:relative; display:inline-flex; align-items:stretch; height:var(--size-30); }

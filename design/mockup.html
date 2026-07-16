@@ -691,17 +691,24 @@
                 <div class="summary-row"><div data-comp="progress-bar" class="ctxbar" id="det-turns-bar"><i style="width:68%;background:var(--warning)"></i></div><span class="text-[10px] font-bold text-muted font-mono" id="det-turns-pct">68%</span><i data-lucide="chevron-down" class="chev" id="turns-chev"></i></div>
               </button>
               <div data-comp="accordion" class="acc" id="turns-bd-panel"></div>
-              <!-- Next-up item 16: the Rewind/Handoff switcher gets its own section heading (standard .sec-h), matching the Context/Turns section labels above.
-                   Turns→Timeline gap: the accordion body is display:none when collapsed (so a margin on it is a no-op) — the 12px gap that matches the Context→Turns section gap lives on the always-rendered heading via mt-3 (collapses with the panel's own spacing when expanded). -->
+              <!-- TIMELINE — the standing per-turn log (§7.19): ONE row per DASHBOARD-INITIATED turn, rendered from the
+                   per-agent per-turn record (settings-at-turn + a one-line reply summary). The list is always visible as a
+                   read-only log; the Rewind/Handoff switcher ARMS row-clicks (a row click opens the inline confirm above the
+                   list). Row ordinals are RECORD ordinals — deliberately not the Turns readout's model-round count — and
+                   terminal-driven turns never land in the record (the standing .tl-foot footnote + the rewind confirm carry
+                   that honest limit). Edge states ride the .tl root as classes matching the declared variants: empty (no
+                   turns yet) · busy (mid-run → actions wait for idle) · gated (CLI below the rewind/fork version floor) ·
+                   no-anchor (post-rewind: records carry no rewind anchor, rows are marked rolled-back, never truncated). -->
               <div class="sec-h mt-3">Timeline</div>
-              <div data-comp="timeline-mode-switcher" class="tri-tabs" id="hist-tabs">
+              <div data-comp="timeline-mode-switcher" data-variants="gated" class="tri-tabs" id="hist-tabs">
                 <button class="tri-tab" data-tri="rewind"><i data-lucide="undo-2"></i>Rewind</button>
                 <button class="tri-tab" data-tri="handoff"><i data-lucide="git-branch"></i>Handoff</button>
               </div>
-              <div data-comp="accordion" id="hist-acc" class="acc flex flex-col" style="display:none;border-top:var(--border-width) solid var(--border);border-radius:var(--radius-base);margin-top:var(--space-6)">
-                <div class="tl-phead" id="hist-phead">Rewind to a point — restores this agent's context to the end of that turn</div>
+              <div id="hist-acc" class="tl-wrap flex flex-col">
+                <div class="tl-phead" id="hist-phead" style="display:none"></div>
                 <div data-comp="inline-confirm" data-variants="danger" class="tl-confirm" id="hist-confirm"></div>
-                <div data-comp="timeline" data-variants="now" class="tl" id="hist-panel" style="min-height:120px"></div>
+                <!-- "now" is deliberately NOT declared: the standing log renders at boot with the now pill live in the DOM (shown states are never declared) -->
+                <div data-comp="timeline" data-variants="empty busy gated no-anchor" class="tl" id="hist-panel"></div>
               </div>
             </div>
 
