@@ -1117,15 +1117,11 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 |--------|-------------------|------------|
 | §2, §4.1 | One-click launch: Electron main doesn't spawn/supervise the sidecar (`.bat` is the launcher) | #20 |
 | §3.1–§3.5, §9.1 | Projects UI (picker tab, chip, close dialog) + picker-first startup — the system side is built | #37 (UI), #20 |
-| §4.3 | No degraded-mode freeze/stale/backoff in the client | #38 |
-| §4.4, §7.5, §7.10 | Renderer trails the design system (16/25 colours, Console gaps, marquee omitted) — superseded by the fresh rebuild | #37 |
-| §7.5 | Randomize/auto-name not drawing from the shipped pool; 16/25 colours (renderer parity) | #40, #37 |
-| §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) | #13 UI (rides #37) |
-| §7.13 | Backend streaming attach built; the xterm.js renderer + React Console remain | #29 (rides #37) |
+| §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) — awaits a design-lane surface | #13 UI |
 | §7.15 | Cost endpoint built; on-card display is an OPEN design-lane conflict — DESIGN.md scopes per-agent cost OUT ("Usage only") vs §11 #32 wanting it on cards; needs operator reconciliation | §10 |
 | §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
-| §7.19 | Rewind/fork endpoints built; the Timeline renderer wiring remains | #37 |
+| §7.19 | Rewind/fork endpoints built; Timeline renderer wiring is gated on the #46 per-turn capture (no per-turn list to target rewind/fork yet) | #46, #37 |
 
 ### 11.2 Storage & persistence set (#1–11)
 
@@ -1179,8 +1175,8 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 
 ### 11.6 Frontend build (#37–41)
 
-37. **Renderer rebuild from the design system** *(→ §4.4 — the build-sprint item)* — rebuild the visible renderer **fresh** from `design/` (authority `mockup.html`, values `tokens.css`, behavior `behavior.js`, intent DESIGN.md), carrying [`api.ts`](../frontend/src/renderer/api.ts) as the preserved contract. Closes the §4.4/§7.5/§7.10 parity debt (25 colours, marquee, Console shell, identity editing UI) and hosts the UI halves of #13, #26, #29, #38–#41.
-38. **Degraded-mode + polling backoff** *(→ §4.3)* — on `/health` failure, freeze the poll-driven panels on last-known values **marked stale** and **back off** to a gentle retry until recovery. (The consolidated system-health *display* is a separate design-lane item.) Where: renderer transport.
+37. *(built 2026-07-15 — the visible renderer was rebuilt fresh from `design/` (recovered from the stranded lane, merged, verified headed) and WIRED to the backends: 25-colour tokens, marquee, the live xterm **Console** (#29, e2e-proven streaming a real tmux screen), context breakdown (#30), response presets (#39), randomize (#40), authors provenance (#41), degraded-mode + narrow-width (#38); `api.ts` carried as the preserved contract. Residual UI beyond the rebuild scope: the **Timeline** surface is #46-gated; per-agent **cost-on-cards** is a §10 design-lane conflict (#32); **resume/archive-roster** (#17/#18) + the **Bypass/Auto** gating UI (#13) await design-lane surfaces. See DEVLOG.)*
+38. *(built 2026-07-15 — `/health`-fail freeze-on-last-known + stale marking + backoff (store transport + connector-health badge) + a narrow-width guard (below ~1130px the body horizontal-scrolls with a 340px middle floor; Electron `minWidth` 1180); e2e-verified. See DEVLOG.)*
 39. *(backend built 2026-07-15 — 6-preset catalog incl. the operator's `tldr_table` (TL;DR + emoji) in `sidecar/response_presets.py`, per-agent set/get persisted to `state/agents.json`, injected at launch via `--append-system-prompt` (append, not replace — shapes format, keeps capabilities; applies at next launch/restart per §7.15); `GET /presets/response`, `GET|POST /sessions/{id}/response-preset`; api.ts wired. The preset-menu UI + per-message override ride #37. See DEVLOG)*
 40. *(backend built 2026-07-15 — `identity.draw_name()` draws an unused name from the shipped 179-name pool + `GET /identity/random-name?exclude=` (excludes live names); api.ts `randomName`. The Create-panel randomize/auto-name UI rides #37. See DEVLOG)*
 41. *(backend built 2026-07-15 — `library.doc_provenance()`; created-by/when/session provenance now rides `GET /library/documents` + `GET /library/document`; api.ts types. The Authors-lens consumption rides #37. See DEVLOG)*

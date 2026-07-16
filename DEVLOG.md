@@ -713,6 +713,14 @@ Files: sidecar/drivers/bridge.py, sidecar/main.py, tests/test_poll_bundle_unit.p
 
 ---
 
+### 2026-07-15 20:40:33 — build-sprint close-out: worktree cleanup + ARCHITECTURE §11 sweep
+
+**Run-end cleanup (git-license obligation):** removed the 6 leftover worktrees + deleted their branches — all were ancestors of `main` (the renderer lane `agent-a793…` @ 2c554ae merged at dce54bb, the stage-3 lane `agent-a862…` @ a819ed1, and the 4 abandoned `wf_8dfaa290-a45-*` @ f3b5839) — so nothing was lost. `git worktree list` is now `main` only; `git branch` is `main` only. No work stranded off-main, no branch litter. **ARCHITECTURE §11 sweep** to true the doc to the built reality: tombstoned #37 (renderer rebuilt fresh + recovered + verified headed + wired to the backends + e2e-proven — Console/context/presets/randomize/authors/degraded-mode; residual UI beyond rebuild scope noted: Timeline is #46-gated, cost-on-cards is the §10 design-lane conflict #32, resume/archive-roster + Bypass/Auto UI await design surfaces) and #38 (degraded-mode + narrow-width, e2e-verified); pruned the four §11.1 index rows now resolved (§4.3 #38, §4.4/§7.5/§7.10 renderer parity, §7.5 randomize, §7.13 Console xterm — all built/proven); reduced §7.11 (#13 UI awaits a design surface) and §7.19 (Timeline wiring #46-gated). Doc-only + git-state only; no product code.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
