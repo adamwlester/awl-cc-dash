@@ -56,6 +56,8 @@ import handoff
 import subagents_naming
 import prompt_library
 import import_context
+import changelog
+import system_check
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -422,12 +424,31 @@ def _render_piggyback(items: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+# §11 #47: operator commits in flight, counted per PROJECT key. `git add -A`
+# walks the whole shared repo, so while one runs no queued prompt may start a
+# turn anywhere in that project (the other half of the 409 busy gate — the gate
+# rejects a commit while a turn runs; this stops a turn starting mid-commit).
+# _flush_queue defers; session_git's finally re-schedules the deferred flushes.
+_git_commits_inflight: dict[str, int] = {}
+
+
+def _git_commit_inflight_for(session: "SessionState") -> bool:
+    """True when an operator commit is running in this session's project."""
+    if not _git_commits_inflight:
+        return False  # fast path — never resolve a project key per flush
+    key = storage.project_key(session.cwd)
+    return bool(key) and key in _git_commits_inflight
+
+
 async def _flush_queue(session: "SessionState") -> None:
     """Send the next queued prompt iff the agent is idle and one is queued.
 
     Re-entrancy is gated by flipping status to ``running`` *before* the only
     ``await`` (driver.send), so a concurrent flush sees ``running`` and returns —
-    strict one-in-flight, no double-send.
+    strict one-in-flight, no double-send. An in-flight operator commit in this
+    session's project (§11 #47) also defers the flush — the commit's `add -A`
+    must never capture a turn's half-written files; the commit path re-schedules
+    every deferred flush the moment it finishes.
 
     Piggyback (§7.6): any payloads parked for this agent ride THIS delivery —
     they never initiate a turn of their own. The parked block is prepended to
@@ -444,6 +465,8 @@ async def _flush_queue(session: "SessionState") -> None:
     """
     if session.status == "running" or not session.prompt_queue or not session.driver:
         return
+    if _git_commit_inflight_for(session):
+        return  # deferred — session_git re-schedules when the commit lands
     entry = session.prompt_queue.popleft()
     prompt = entry["prompt"]
     if entry.get("queue_awareness"):
@@ -672,16 +695,18 @@ SYSTEM_PROBE_INTERVAL = 10.0  # seconds
 
 async def _system_probe_loop():
     """Deterministic infrastructure probes (§7.2/§11 #27): every ~10 s, verify
-    the WSL2/tmux backbone answers (one `tmux ls` through the shared registry
-    bridge). A failure raises the coalesced System `infra` Error card; recovery
-    auto-resolves it. (Sidecar-down needs no probe — a dead sidecar can't raise
-    cards; the frontend's /health failure covers it, §4.3/#38.)"""
+    the WSL2/tmux backbone answers (the raising `TmuxBridge.ping` through the
+    shared registry bridge — `list` can't serve here: it folds every outage
+    into "zero sessions", so a dead WSL would read as healthy, the §11 #49
+    review finding). A failure raises the coalesced System `infra` Error card;
+    recovery auto-resolves it. (Sidecar-down needs no probe — a dead sidecar
+    can't raise cards; the frontend's /health failure covers it, §4.3/#38.)"""
     while True:
         try:
             await asyncio.sleep(SYSTEM_PROBE_INTERVAL)
             try:
                 bridge = _get_registry_bridge()
-                await asyncio.to_thread(bridge.list)
+                await asyncio.to_thread(bridge.ping)
                 _resolve_system_card("infra")
             except Exception as e:
                 _raise_system_card("infra", f"tmux/WSL2 unreachable: {e}")
@@ -4234,6 +4259,232 @@ async def import_external(req: ImportExternalRequest):
         # An idle target takes the import now; a busy one keeps it queued (§7.3).
         await _flush_queue(session)
     return result
+
+
+# ============================================================================
+# §11 #47 — Git automation (operator-triggered; rides #19's per-agent identity)
+# ============================================================================
+
+class GitActionRequest(BaseModel):
+    # Operator-triggered git in the agent's cwd. `message` is required for
+    # (and only used by) `commit`.
+    action: Literal["status", "diff", "commit"]
+    message: str | None = None
+
+
+def _git_http_error(e: RuntimeError) -> HTTPException:
+    """Map the driver's typed git degrades to honest HTTP errors (§11 #47).
+
+    The operator-actionable refusals — a cwd that isn't a git repo, a missing
+    commit message, an agent with no cwd, an unknown action — are 400s with a
+    plain-language detail; anything else (a WSL/bridge failure) is a 500.
+    """
+    reason = str(e) or "failed"
+    if reason == "not_a_repo":
+        return HTTPException(status_code=400,
+                             detail="agent cwd is not a git repository")
+    if reason == "message_required":
+        return HTTPException(status_code=400,
+                             detail="commit requires a non-empty message")
+    if reason == "no_cwd":
+        return HTTPException(status_code=400,
+                             detail="agent has no working directory to run git in")
+    if reason == "unknown_action":
+        return HTTPException(status_code=400,
+                             detail="action must be status|diff|commit")
+    return HTTPException(status_code=500, detail=f"git failed: {reason}")
+
+
+@app.post("/sessions/{session_id}/git")
+async def session_git(session_id: str, req: GitActionRequest):
+    """Run one OPERATOR-TRIGGERED git action in the agent's cwd (§11 #47).
+
+    Semi-automation means the operator pulls the trigger — there is NO
+    auto-commit cadence anywhere (the decided lean: operator-triggered first,
+    cadence deferred). The command runs non-interactively through the bridge's
+    WSL exec path (never keystrokes into the TUI pane), with the agent's #19
+    git identity (`identity.git_env`) explicitly injected — the launch-time
+    GIT_* env belongs to the claude process and does NOT reach this
+    subprocess, so without the injection an operator-triggered commit would
+    silently fall off the AI-touched author query.
+
+    `status`/`diff` are read-only and run anytime; `commit` (stage-all +
+    commit) stages the WHOLE shared repo, so it is 409-gated on ANY mid-turn
+    agent in the same project (one project, many agents — a sibling's
+    half-written files would land in the commit just as surely as the
+    addressed agent's), and while it runs the project's queued prompts are
+    deferred (`_flush_queue`) so no new turn starts under the in-flight
+    `add -A`. 404 unknown session; 400 when the driver lacks the `git`
+    capability, the cwd is not a git repo, or the commit message is missing.
+    A failed git command (e.g. "nothing to commit") is an honest `ok: false`
+    result, not an error.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    if not (session.driver and session.driver.supports("git")):
+        raise HTTPException(status_code=400,
+                            detail="Driver has no git surface (bridge agents only)")
+    if req.action != "commit":
+        try:
+            return await session.driver.git(req.action, req.message)
+        except RuntimeError as e:
+            raise _git_http_error(e)
+    # --- commit: the busy gate covers the whole project, not one agent ---
+    if session.status == "running":
+        raise HTTPException(
+            status_code=409,
+            detail="agent is mid-turn — a commit now would race its file "
+                   "writes; retry when idle")
+    pkey = storage.project_key(session.cwd)
+    if pkey:
+        busy = sorted(sid for sid, s in sessions.items()
+                      if s.status == "running"
+                      and storage.project_key(s.cwd) == pkey)
+        if busy:
+            raise HTTPException(
+                status_code=409,
+                detail=f"agent(s) mid-turn in this project ({', '.join(busy)}) "
+                       f"— `git add -A` spans the shared repo and would race "
+                       f"their file writes; retry when the project is idle")
+        _git_commits_inflight[pkey] = _git_commits_inflight.get(pkey, 0) + 1
+    try:
+        return await session.driver.git(req.action, req.message)
+    except RuntimeError as e:
+        raise _git_http_error(e)
+    finally:
+        if pkey:
+            left = _git_commits_inflight.get(pkey, 1) - 1
+            if left <= 0:
+                _git_commits_inflight.pop(pkey, None)
+            else:  # pragma: no cover - concurrent commits in one project
+                _git_commits_inflight[pkey] = left
+            # Wake every flush this commit deferred (queued prompts must not
+            # sit stranded once the tree is safe again).
+            for s in sessions.values():
+                if s.prompt_queue and storage.project_key(s.cwd) == pkey:
+                    _schedule_flush(s)
+
+
+# ============================================================================
+# §11 #48 — Change-log watcher (on-demand; engine: sidecar/changelog.py)
+# ============================================================================
+
+class ChangelogRefreshRequest(BaseModel):
+    # The project to refresh; omitted -> the open project.
+    cwd: str | None = None
+
+
+@app.post("/projects/changelog/refresh")
+async def refresh_changelog(req: ChangelogRefreshRequest | None = None):
+    """Refresh the project's AI-authored change-log doc (§11 #48 — on-demand v1).
+
+    Enumerates the fleet's commits via the #19 attribution query (`git log
+    --author='@agents.awl-cc-dash.invalid'`, run non-interactively in the
+    project cwd through the shared registry bridge's WSL exec path) and
+    re-renders `<project>/.awl-cc-dash/docs/change-log.md` via the Library
+    with provenance (`created_by="changelog-watcher"`). Triggered by the
+    operator or the product-shipped `changelog-watcher` agent — no live
+    file-watch (deferred by decision). 400 when no project is resolvable
+    (pass `cwd` or open a project) or the cwd is not a git repo; 502 when the
+    git enumeration itself fails.
+    """
+    cwd = (req.cwd if req else None) or _open_project
+    if not cwd:
+        raise HTTPException(
+            status_code=400,
+            detail="no project to refresh — pass cwd or open a project first")
+    root = storage.project_root(cwd)
+    if root is None or not root.is_dir():
+        raise HTTPException(status_code=400, detail=f"not a directory: {cwd}")
+    bridge = _get_registry_bridge()
+    # git runs INSIDE WSL, so hand it the in-WSL spelling of the canonical
+    # root. Critical for WSL-internal projects (§8.1): `_open_project` is the
+    # canonical \\wsl.localhost\<distro>\… UNC key, which win_to_wsl would
+    # pass through untranslated — the in-WSL `cd` would fail and every
+    # refresh would 502 (review finding). storage.doc_path_wsl owns the
+    # translation for all three spellings (UNC → /…, C:\… → /mnt/c/…, POSIX
+    # passes through).
+    git_cwd = storage.doc_path_wsl(root)
+
+    def _run_git(args: list[str]) -> dict[str, Any]:
+        return bridge.git_run(git_cwd, args)
+
+    try:
+        return await asyncio.to_thread(changelog.refresh, cwd, _run_git)
+    except changelog.NotAGitRepoError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502,
+                            detail=f"changelog refresh failed: {e}")
+
+
+# ============================================================================
+# §11 #49 — System check (one honest aggregation of the existing probes)
+# ============================================================================
+
+def _driver_capability_map() -> dict[str, Any]:
+    """Each driver's capability set, imported lazily (per the drivers-package
+    contract) so an unavailable engine reads as honest detail, never a crash."""
+    import importlib
+    out: dict[str, Any] = {}
+    for name, modpath, clsname in (("bridge", "drivers.bridge", "BridgeDriver"),
+                                   ("sdk", "drivers.sdk", "SDKDriver")):
+        try:
+            mod = importlib.import_module(modpath)
+            out[name] = sorted(getattr(mod, clsname).CAPABILITIES)
+        except Exception as e:
+            out[name] = {"unavailable": str(e)}
+    return out
+
+
+@app.get("/system-check")
+async def system_check_endpoint():
+    """One honest health JSON over the EXISTING probes (§11 #49).
+
+    Aggregates: sidecar basics (we're answering — version, live sessions,
+    open project), tmux/WSL2 liveness (the raising `TmuxBridge.ping` probe
+    the §7.2 System-probe loop also rides, then the session-count read —
+    `list` alone folds outages into "zero sessions" and cannot honestly
+    fail), ttyd presence (the §11 #29 console-attach
+    dependency), the account/auth read (§11 #33 split-source, read-only,
+    over the well-known creds locations), and driver availability +
+    capabilities. Each check is `{status: ok|fail|skipped, detail}`;
+    `ok` is true only when nothing FAILED (skipped = "couldn't probe",
+    stated, never a quiet pass). The easy-run half is the product-shipped
+    `assets/agents/system-check.md` agent, which drives this endpoint.
+    """
+    checks: dict[str, Any] = {}
+    checks["sidecar"] = system_check.ok_result(
+        f"answering — v{app.version}; {len(sessions)} live session(s); "
+        f"open project: {_open_project or 'none'}")
+    try:
+        bridge = _get_registry_bridge()
+    except Exception as e:
+        checks["tmux"] = system_check.fail_result(
+            f"bridge unavailable: {e}")
+        checks["ttyd"] = system_check.skipped_result(
+            "bridge unavailable — cannot probe ttyd")
+    else:
+        def _tmux_probe():
+            # ping() RAISES on a real outage — bridge.list alone can't serve
+            # as the probe: it folds every failure into "zero sessions", so a
+            # dead WSL would read as a healthy idle one (review finding).
+            bridge.ping()
+            return bridge.list()
+        checks["tmux"] = await asyncio.to_thread(
+            system_check.check_tmux, _tmux_probe)
+        if checks["tmux"]["status"] == "ok":
+            checks["ttyd"] = await asyncio.to_thread(
+                system_check.check_ttyd, bridge.resolve_ttyd)
+        else:
+            checks["ttyd"] = system_check.skipped_result(
+                "tmux/WSL unreachable — cannot probe ttyd")
+    checks["auth"] = await asyncio.to_thread(
+        system_check.check_auth, system_check.default_auth_candidates())
+    checks["drivers"] = system_check.check_drivers(
+        default_driver_name(), _driver_capability_map())
+    return system_check.aggregate(checks)
 
 
 # ============================================================================

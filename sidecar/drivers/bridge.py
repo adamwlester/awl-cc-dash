@@ -469,6 +469,10 @@ class BridgeDriver(AgentDriver):
         # Timeline per-turn capture (§11 #46): thin per-turn records persisted
         # to the launch-config dir and read back for GET /sessions/{id}/timeline.
         "timeline",
+        # Git automation (§11 #47): operator-triggered status/diff/commit run
+        # non-interactively in the agent's cwd via the bridge WSL exec path,
+        # with the #19 per-agent GIT_* identity explicitly injected.
+        "git",
     }
 
     def __init__(
@@ -1510,6 +1514,119 @@ class BridgeDriver(AgentDriver):
         if not name:
             return
         await asyncio.to_thread(self._bridge.send, self._name, f"/rename {name}")
+
+    # --- Git automation (§11 #47) ----------------------------------------------
+
+    GIT_ACTIONS = ("status", "diff", "commit")
+
+    async def git(self, action: str, message: str | None = None) -> dict:
+        """Run one OPERATOR-TRIGGERED git action in this agent's cwd (§11 #47).
+
+        Non-interactive by construction: rides ``TmuxBridge.git_run`` (the
+        bridge's ``_run`` WSL exec path), never keystrokes into the TUI pane —
+        so it works whatever the pane shows and never perturbs a live turn.
+
+        Attribution (§11 #19): the launch-time GIT_* env injection applies to
+        the *claude process*; a bridge-side git subprocess does NOT inherit
+        it. This method therefore explicitly injects ``identity.git_env(<this
+        agent's identity>)`` into its own subprocess env, so an operator-
+        triggered commit lands under the same per-agent author + synthetic
+        email as the agent's own commits (the AI-touched query stays whole).
+
+        Actions:
+          * ``status`` — ``git status`` (read-only).
+          * ``diff``   — the honest PRE-COMMIT view (read-only): ``git diff
+            HEAD`` (staged AND unstaged tracked changes — plain ``git diff``
+            would hide anything already staged), plus an appended listing of
+            untracked files (``git ls-files --others --exclude-standard``) —
+            ``commit`` runs ``git add -A``, so brand-new files are part of
+            what it will commit and the preview must say so. On an unborn
+            branch (no HEAD yet) the tracked diff falls back to ``git diff``.
+          * ``commit`` — ``git add -A`` then ``git commit -m <message>`` (the
+            "commit this work" flow stages everything, new files included).
+            ``message`` is required.
+
+        Returns ``{"action", "ok", "code", "output", "author", "email"}`` —
+        ``ok`` mirrors git's exit code (a failed commit is an honest not-ok
+        result, not an exception). Raises RuntimeError(<reason>) for the typed
+        degrades the endpoint maps to HTTP: ``"unknown_action"`` /
+        ``"message_required"`` / ``"no_cwd"`` / ``"not_a_repo"`` (all → 400),
+        anything else (a bridge/WSL failure) → 500.
+        """
+        if action not in self.GIT_ACTIONS:
+            raise RuntimeError("unknown_action")
+        cwd = self.config.cwd
+        if not cwd:
+            raise RuntimeError("no_cwd")
+        if action == "commit" and not (message or "").strip():
+            raise RuntimeError("message_required")
+        try:
+            import identity as _identity  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import identity as _identity  # type: ignore[no-redef]
+        env = _identity.git_env(self.config.identity)
+        from bridge.bridge import TmuxBridgeError  # type: ignore[import-not-found]
+
+        def _execute() -> dict:
+            if action == "status":
+                return self._bridge.git_run(cwd, ["status"], env=env)
+            if action == "diff":
+                return self._diff(cwd, env)
+            # commit: stage-all first; a failed stage is the honest result and
+            # the commit step never runs on top of it.
+            staged = self._bridge.git_run(cwd, ["add", "-A"], env=env)
+            if staged["code"] != 0:
+                return staged
+            return self._bridge.git_run(
+                cwd, ["commit", "-m", str(message)], env=env)
+
+        try:
+            res = await asyncio.to_thread(_execute)
+        except TmuxBridgeError as e:
+            raise RuntimeError(str(e) or "bridge failure")
+        if res["code"] == 128 and "not a git repository" in res["output"].lower():
+            raise RuntimeError("not_a_repo")
+        return {
+            "action": action,
+            "ok": res["code"] == 0,
+            "code": res["code"],
+            "output": res["output"],
+            "author": env["GIT_AUTHOR_NAME"],
+            "email": env["GIT_AUTHOR_EMAIL"],
+        }
+
+    def _diff(self, cwd: str, env: dict) -> dict:
+        """The honest pre-commit preview (§11 #47 review fix) — read-only.
+
+        ``commit`` is ``git add -A`` + commit, so the preview must cover
+        everything that commit would sweep up: ``git diff HEAD`` shows tracked
+        changes whether staged or not (plain ``git diff`` goes blind the moment
+        anything is staged), and the untracked files ``add -A`` would stage are
+        appended as a named listing (their contents aren't diffable pre-add,
+        but a preview that omits their existence reads as "nothing changed").
+        An unborn branch (fresh ``git init``, no HEAD yet) makes ``HEAD``
+        unresolvable — fall back to plain ``git diff`` and let the untracked
+        listing carry the (entirely new) tree.
+        """
+        res = self._bridge.git_run(cwd, ["diff", "HEAD"], env=env)
+        if res["code"] != 0:
+            low = res["output"].lower()
+            if "ambiguous argument" not in low:
+                return res  # honest failure (e.g. not a repo) — caller types it
+            res = self._bridge.git_run(cwd, ["diff"], env=env)
+            if res["code"] != 0:
+                return res
+        untracked = self._bridge.git_run(
+            cwd, ["ls-files", "--others", "--exclude-standard"], env=env)
+        names = (untracked["output"] or "").strip() \
+            if untracked["code"] == 0 else ""
+        if names:
+            listing = "\n".join(f"  {n}" for n in names.splitlines())
+            sep = "\n\n" if res["output"].strip() else ""
+            res = {**res, "output": res["output"] + sep +
+                   "Untracked files (a commit will stage these too):\n"
+                   + listing}
+        return res
 
     # --- Timeline: Rewind / Fork (§7.19, §11 #15) ------------------------------
     #

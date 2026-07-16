@@ -2276,6 +2276,88 @@ class TmuxBridge:
             return ""
         return out or ""
 
+    def ping(self, timeout=10):
+        """Prove the WSL2/tmux backbone actually ANSWERS, or raise (§7.2, §11 #49).
+
+        ``list()`` deliberately folds every probe failure into "zero sessions"
+        (``_list_raw`` catches the error so an empty fleet renders instead of
+        crashing) — which makes it useless as a liveness signal: WSL fully down
+        reads identical to WSL idle. This is the RAISING probe health surfaces
+        bind to (the §7.2 System-probe loop and ``GET /system-check``'s tmux
+        check): one WSL round-trip proving the exec path answers and the tmux
+        binary exists.
+
+        Returns:
+            The tmux version string (e.g. ``"tmux 3.4"``).
+
+        Raises:
+            TmuxBridgeError: WSL unreachable / exec failure / timeout, or the
+                tmux binary missing inside the distro.
+        """
+        out = self._run("tmux -V 2>/dev/null || echo __NO_TMUX__",
+                        timeout=timeout)
+        if not out or "__NO_TMUX__" in out:
+            raise TmuxBridgeError("tmux is not installed inside WSL")
+        return out
+
+    def git_run(self, cwd, args, env=None, timeout=60):
+        """Run one NON-INTERACTIVE git command in ``cwd`` inside WSL (§11 #47).
+
+        The bridge-internals exec path for the dashboard's git automation: the
+        command runs as a plain WSL subprocess via ``_run`` — NEVER keystrokes
+        into a TUI pane — so it cannot disturb a live agent's screen. Because
+        this is its own subprocess, it does NOT inherit the per-agent GIT_*
+        env injected onto the *claude* launch command (§11 #19); callers that
+        need attribution must pass it explicitly via ``env``
+        (``sidecar.identity.git_env`` — see ``BridgeDriver.git``).
+
+        Unlike ``_run`` (which raises on any nonzero exit), a nonzero **git**
+        exit is a RESULT here, not an infrastructure failure — "nothing to
+        commit" (1) and "not a git repository" (128) are honest outcomes the
+        caller inspects. The exit code rides back on a trailing
+        ``__GIT_RC__:<n>`` marker so one WSL round-trip yields both output and
+        code; stderr is folded into the output stream.
+
+        Args:
+            cwd: Working directory (Windows or WSL path — resolved like every
+                bridge cwd). Required — there is no meaningful "no-cwd git".
+            args: The git argv AFTER ``git``, as a list (each element is
+                shell-quoted individually — spaces in a commit message are safe).
+            env: Optional ``{VAR: value}`` mapping prefixed onto the command as
+                shell-quoted ``VAR=value`` assignments (per-process, like the
+                launch-time injection).
+            timeout: Seconds before the WSL subprocess is killed.
+
+        Returns:
+            ``{"code": int, "output": str}`` — git's exit code and its
+            combined stdout+stderr text.
+
+        Raises:
+            TmuxBridgeError: no resolvable cwd, WSL/exec failure, timeout, or
+                an unparseable exit marker (never a silent wrong answer).
+        """
+        resolved_cwd = self._resolve_cwd(cwd)
+        if not resolved_cwd:
+            raise TmuxBridgeError("git_run requires a working directory")
+        env_prefix = "".join(
+            f"{k}={shlex.quote(str(v))} " for k, v in (env or {}).items())
+        quoted_args = " ".join(shlex.quote(str(a)) for a in (args or []))
+        inner = f"cd {shlex.quote(resolved_cwd)} && {env_prefix}git {quoted_args}"
+        out = self._run(
+            f"{{ {inner}; }} 2>&1; printf '\\n__GIT_RC__:%s' \"$?\"",
+            timeout=timeout,
+        )
+        body, sep, rc_text = (out or "").rpartition("__GIT_RC__:")
+        if not sep:
+            raise TmuxBridgeError(
+                f"git_run: exit marker missing from output: {out[-120:]!r}")
+        try:
+            code = int(rc_text.strip())
+        except ValueError:
+            raise TmuxBridgeError(
+                f"git_run: unparseable exit marker: {rc_text[:40]!r}")
+        return {"code": code, "output": body.rstrip("\n")}
+
     # --- Configuration ---
 
     def set_cwd(self, cwd):
