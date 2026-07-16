@@ -1989,4 +1989,95 @@
     .proj-chip svg{ width:var(--size-11); height:var(--size-11); flex:0 0 auto; }
     .proj-chip .proj-chip-nm{ font-family:var(--font-mono); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .proj-chip:hover{ background:var(--select); }
+
+    /* ============================ Launch permissions (Create) — Bypass/Auto pre-arming ============================ */
+    /* An un-armed mode is SILENTLY ABSENT from the mode ring — display:none, never a greyed no-op. Applied to the
+       Details ring per the focused agent's armed[] flags and to the Create ring by the arm switches below. */
+    .seg-unarmed{ display:none; }
+    .arm-box{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow:hidden; }
+    .arm-row{ display:flex; align-items:center; gap:var(--space-8); padding:var(--space-6) var(--space-9); }
+    .arm-row + .arm-row{ border-top:var(--hairline-width) solid var(--border); }
+    .arm-lab{ flex:0 0 auto; font-size:10px; font-weight:800; color:var(--foreground); white-space:nowrap; }
+    .arm-row--danger .arm-lab{ color:var(--danger); }
+    .arm-note{ flex:1 1 auto; min-width:0; font-size:9px; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .swh--danger.on{ background:var(--danger); }   /* Bypass armed = the danger accent (Bypass is the danger option) */
+
+    /* ============================ subagent activity dot (roster tree parent rows) ============================ */
+    /* The roster's ACTIVE-vs-QUIET subagent signal at parent-row altitude: green = ≥1 subagent running,
+       muted = all quiet — readable without expanding the subtree (the leaf rows carry the full run-state badge). */
+    .sub-actdot{ flex:0 0 auto; width:var(--size-7); height:var(--size-7); border-radius:50%; border:var(--border-width-thin) solid var(--border); background:var(--success); }
+    .sub-actdot.quiet{ background:var(--muted-2); }
+
+    /* ============================ Agent → Past — resume picker + archive roster ============================ */
+    /* RESUMABLE list rows: identity + source tag (roster | archive) + stamp + a per-row Resume. Non-interactive
+       rows (no select-to-act here — Resume is the only action), so the base .agrow hover/cursor is neutralized. */
+    .past-list .agrow{ cursor:default; }
+    .past-list .agrow:hover{ background:transparent; }
+    .past-row{ gap:var(--space-6); }
+    .past-row--norez .agtile,.past-row--norez .ag-lab,.past-row--norez .past-stamp{ opacity:.55; }   /* not resumable — reads greyed, the Resume button is natively disabled */
+    .past-src{ flex:0 0 auto; display:inline-flex; align-items:center; height:var(--badge-m-h); padding:0 var(--badge-m-px); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); font-size:var(--badge-m-fs); font-weight:800; text-transform:uppercase; letter-spacing:.04em; background:var(--surface-3); color:var(--muted); }
+    .past-src--archive{ background:var(--muted); border-color:var(--muted); color:var(--icon-fg); }   /* deep-freeze = the solid muted treatment (the idle-badge family) */
+    .past-stamp{ flex:0 0 auto; margin-left:auto; font-size:8.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); text-align:right; line-height:1.2; white-space:nowrap; }
+    .past-resume{ flex:0 0 auto; }
+    /* ARCHIVE record cards: an expandable .fcard whose body is a key/value read of the light archive record. */
+    .arch-list{ display:flex; flex-direction:column; gap:var(--space-8); }
+    .arch-card .fcard-exp .agtile{ flex:0 0 auto; }
+    .arch-body{ padding-top:var(--space-8); }
+    .arch-kv{ display:flex; gap:var(--space-8); padding:var(--space-4) 0; align-items:baseline; }
+    .arch-kv + .arch-kv{ border-top:var(--hairline-width) solid var(--border); }
+    .arch-kv .k{ flex:0 0 86px; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }   /* 86px — a one-off layout width (a measurement, per styles.css practice) */
+    .arch-kv .v{ flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:9.5px; font-weight:600; color:var(--foreground); word-break:break-all; }
+    .arch-kv .v.plain{ font-family:var(--font-sans); word-break:normal; }
+    .arch-acts{ display:flex; align-items:center; gap:var(--space-8); margin-top:var(--space-9); }
+
+    /* ============================ Library Import — header button + in-flow drawer ============================ */
+    /* The Import control's host is the LIBRARY panel header (decision + rationale in DESIGN.md → Library). The
+       drawer is an IN-FLOW panel-level strip under the header — the tab panes push down; nothing floats. */
+    .lib-import-btn{ margin-left:var(--space-8); }
+    .imp-drawer{ flex:0 1 auto; min-height:0; overflow-y:auto; background:var(--surface-3); border-bottom:var(--border-width) solid var(--main-soft); padding:var(--space-9) var(--space-10) var(--space-10); }   /* shrinks + scrolls internally on a short pane, so the Import footer stays reachable at the pane's min height */
+    .imp-head{ display:flex; align-items:center; gap:var(--space-6); font-size:10.5px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:var(--foreground); margin-bottom:var(--space-8); }
+    .imp-head svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; }
+    .imp-head .ghost-ic{ margin-left:auto; }
+    .imp-grid{ display:flex; gap:var(--space-10); align-items:stretch; flex-wrap:wrap; }
+    .imp-col{ flex:1 1 240px; min-width:220px; display:flex; flex-direction:column; gap:var(--space-6); }   /* flex bases are layout measurements, not tokens */
+    .imp-col--sessions{ flex:1.4 1 300px; }
+    .imp-src-seg{ align-self:flex-start; }
+    .imp-src-seg button{ flex:0 0 auto; min-width:0; padding:var(--space-6) var(--space-14); }   /* a 2-option hug-content segment — the base .seg's flex:1 would shrink-truncate "Desktop" inside the flex-start hug */
+    .imp-srcnote{ font-size:9px; font-weight:600; color:var(--muted); }
+    .imp-lbl-gap{ margin-top:var(--space-6); }
+    .imp-dests{ display:flex; flex-direction:column; gap:var(--space-5); }
+    .imp-filter{ display:flex; align-items:center; gap:var(--space-6); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); padding:var(--space-4) var(--space-8); }
+    .imp-filter svg{ width:var(--size-12); height:var(--size-12); color:var(--muted); flex:0 0 auto; }
+    .imp-filter input{ border:none; outline:none; background:transparent; font:inherit; font-size:10.5px; font-weight:600; flex:1 1 auto; min-width:0; color:var(--foreground); }
+    .imp-list{ border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--secondary-background); overflow-y:auto; max-height:190px; flex:1 1 auto; min-height:0; }
+    .imp-row{ display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-1); width:100%; text-align:left; background:transparent; border:none; border-top:var(--hairline-width) solid var(--border); padding:var(--space-5) var(--space-8); cursor:pointer; }
+    .imp-row:first-child{ border-top:none; }
+    .imp-row:hover:not(.on){ background:var(--surface-3); }
+    .imp-row.on{ background:var(--select); }
+    .imp-t{ font-size:10.5px; font-weight:800; color:var(--foreground); }
+    .imp-meta{ font-size:8.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); }
+    .imp-none{ display:none; border:var(--border-width) dashed var(--muted-2); border-radius:var(--radius-base); padding:var(--space-9); font-size:10px; font-weight:600; color:var(--muted); }   /* the drawer's declared `empty` state — the quiet dashed placeholder (the project-empty precedent) */
+    .imp-drawer.empty .imp-list{ display:none; }
+    .imp-drawer.empty .imp-none{ display:block; }
+    .imp-aglist{ display:none; }
+    .imp-aglist.show{ display:block; }
+    .imp-agscroll{ max-height:150px; }
+    .imp-foot{ display:flex; align-items:center; gap:var(--space-8); margin-top:var(--space-9); }
+    .imp-sel{ flex:1 1 auto; min-width:0; font-size:9.5px; font-weight:700; font-family:var(--font-mono); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .imp-foot .btn-main{ flex:0 0 auto; margin-left:auto; }
+
+    /* ============================ Inbox workflow card — the Approve/Reject ROUND-TRIP states ============================ */
+    /* Approve = the hook allows the tool call (workflow launches) · Reject = deny (aborted before launch). The
+       resolved state shows IN PLACE for a beat before the card completes and leaves the Inbox: a success/danger
+       left edge + banner, the action strip gone, the script preview dimmed. Declared as the workflow-inbox-card's
+       approved/rejected data-variants. */
+    .wf-resolved{ display:none; align-items:center; gap:var(--space-6); margin-top:var(--space-9); padding:var(--space-6) var(--space-9); border:var(--border-width) solid var(--success); border-radius:var(--radius-base); background:var(--success-soft); color:var(--success-text); font-size:10.5px; font-weight:800; }
+    .wf-resolved svg{ width:var(--size-13); height:var(--size-13); flex:0 0 auto; }
+    .wf-resolved--no{ border-color:var(--danger); background:var(--danger-soft); color:var(--danger); }
+    .inbox-card.approved .wf-resolved--ok{ display:flex; }
+    .inbox-card.rejected .wf-resolved--no{ display:flex; }
+    .inbox-card.approved .inbox-acts,.inbox-card.rejected .inbox-acts{ display:none; }
+    .inbox-card.approved .wf-script,.inbox-card.rejected .wf-script{ max-height:56px; opacity:.55; }
+    .inbox-card.approved{ border-left:6px solid var(--success); }   /* collapsed-visible too — the round-trip reads on the card edge (the Error-edge convention, in the verdict's colour) */
+    .inbox-card.rejected{ border-left:6px solid var(--danger); }
   
