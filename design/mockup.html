@@ -5,6 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWL Multi-Agent Dashboard — v1.2 (neobrutalism)</title>
   <!--
+    DESIGN-LANE SURFACES (2026-07-15) — the missing surfaces the renderer consumes next (version badge unchanged at v1.2):
+      • AGENT → PAST (new 4th tab): the past-agents RESUME PICKER (the merged dead-roster + archive list, rows
+        source-tagged roster|archive with a resumable flag + per-row Resume) over the ARCHIVE roster (expandable
+        deep-freeze records: archive id · created/retired · model·mode · cwd · lineage · git author · transcript
+        pointer, with Resume + a confirmed true-delete). Rendered from PAST/ARCHIVE by renderPast().
+      • LAUNCH PERMISSIONS (Create): Arm Auto / Arm Bypass switches (Bypass fills danger when on) — an un-armed
+        mode is SILENTLY ABSENT from the mode ring (.seg-unarmed), in Create live via armToggle and in Details
+        per the focused agent's AG[k].armed flags (applyArmGate in repaintAgentPanel). Create ships un-armed.
+      • INBOX WORKFLOW CARD: the Review-section workflow card gains the Approve/Reject ROUND-TRIP (allow=launch ·
+        deny=abort): wfResolve shows the resolved state in place (approved/rejected variants — edge + banner,
+        actions gone, script dimmed) for a beat, then the card completes; Review (planned) + Reply stay.
+      • LIBRARY IMPORT: an Import button on the Library header opens an IN-FLOW drawer (source Web/Desktop ·
+        session list by title with filter + empty state · destination To agent / Read now / File as doc);
+        doc destinations land a real demo doc via createDoc, agent delivery is the backend engine's (planned).
+        Host decision + rationale recorded in DESIGN.md → Library.
+      • ROSTER SUBAGENT ACTIVITY DOT: feed-filter tree parent rows carry the active-vs-quiet glance dot
+        (green = ≥1 subagent running · muted = all quiet); max's lone sub flipped idle to show the quiet form.
     LINK-BEHAVIOR & DASHBOARD REFACTOR (P0–P4) — content-sharing collapsed into one Embed/Attach control routed
     through the Editor, plus an Inbox/Editor rebuild (version badge unchanged at v1.2; full per-phase log in DEVLOG.md).
     This block is the current-state summary; the version blocks below are kept as history (older = older, see line ~203).
@@ -503,6 +520,7 @@
           <div data-comp="tab-bar" class="tabset">
             <button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="tab-btn active">Details</button>
             <button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="tab-btn">Create</button>
+            <button data-tab-group="mid" data-tab="past" onclick="switchTab('mid','past')" class="tab-btn">Past</button>
             <button data-tab-group="mid" data-tab="console" onclick="switchTab('mid','console')" class="tab-btn">Console</button>
           </div>
         </div>
@@ -633,7 +651,8 @@
             <!-- MODE (permission modes + Fast / Think toggles) -->
             <div>
               <label class="ro-label block mb-1.5" data-hc-title="Mode" data-hc="Stays live while the agent runs. Permission mode: Plan · Ask · Edit · Auto · Bypass (Bypass skips approvals — dangerous). Opus Fast-Mode = /fast (gated to Opus) · Thinking Mode = extended thinking.">Mode</label>
-              <div data-comp="segmented-control" class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
+              <!-- Bypass/Auto are LAUNCH-GATED: an un-armed segment is silently ABSENT from the ring (display:none via .seg-unarmed — not a visible no-op). repaintAgentPanel applies the focused agent's armed[] flags; arming itself is a Create-tab (launch-time) choice. -->
+              <div data-comp="segmented-control" class="seg mode-seg" id="mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="active" data-mode="auto" onclick="segPick(this)">Auto</button><button class="seg-danger" data-mode="bypass" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div>
               <div class="grid grid-cols-2 gap-2 mt-2">
                 <button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button>
                 <button data-comp="toggle-button" class="think-tog tog-cell on" id="det-think" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode On</span></button>
@@ -810,7 +829,16 @@
               <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div data-comp="version-popout" class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button onclick="segPick(this)">Auto</button><button class="seg-danger" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg" id="create-mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="seg-unarmed" data-mode="auto" onclick="segPick(this)">Auto</button><button class="seg-danger seg-unarmed" data-mode="bypass" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
+            <!-- LAUNCH PERMISSIONS — Bypass/Auto pre-arming (a launch-time flag, not a live knob): an un-armed
+                 mode is silently ABSENT from the agent's mode ring after launch, so the Create ring above hides
+                 its Auto/Bypass segments until armed here. The ring never shows a segment that would no-op. -->
+            <div><label class="ro-label block mb-1.5" data-hc-title="Launch permissions" data-hc="Auto and Bypass must be pre-armed at launch. An un-armed mode is silently absent from the agent's mode ring — not a greyed no-op — and arming can't be granted mid-run: relaunch to change it. The ring above hides its Auto/Bypass segments until armed here.">Launch permissions</label>
+              <div data-comp="launch-arm" class="arm-box">
+                <div class="arm-row"><span class="arm-lab">Arm Auto</span><span class="arm-note">adds Auto to the mode ring at launch</span><button data-comp="switch" class="swh" onclick="armToggle(this,'auto')" title="Un-armed — Auto is absent from the mode ring"></button></div>
+                <div class="arm-row arm-row--danger"><span class="arm-lab">Arm Bypass</span><span class="arm-note">skips approvals — dangerous</span><button data-comp="switch" class="swh swh--danger" onclick="armToggle(this,'bypass')" title="Un-armed — Bypass is absent from the mode ring"></button></div>
+              </div>
+            </div>
             <div><label class="ro-label block mb-1.5">Effort</label><div data-comp="segmented-control" class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
             <div>
               <!-- ND 8c: the "Lifecycle — auto-stop conditions" label is gone; "Context %" reads "Max Context %" -->
@@ -818,6 +846,26 @@
                 <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max turns</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="40" min="0" step="5"><button onclick="step(this,5)">+</button></div></div>
                 <div><span class="block text-[8.5px] text-muted font-bold uppercase tracking-wide mb-1">Max Context %</span><div data-comp="stepper" class="stepper"><button onclick="step(this,-5)">−</button><input type="number" value="75" min="0" max="100" step="5"><button onclick="step(this,5)">+</button></div></div>
               </div>
+            </div>
+          </div>
+
+          <!-- ===== PAST — the past-agents resume picker + the per-agent archive (dead roster + deep-freeze).
+               The RESUMABLE list mirrors the merged past-agents feed (dead roster records + archived records,
+               each row source-tagged roster|archive with a resumable flag); the ARCHIVE section below it is the
+               full deep-freeze record — identity snapshot, timestamps, lineage, git author, the transcript
+               referenced in place — with Resume + true-delete. Rendered from PAST/ARCHIVE by renderPast(). -->
+          <div id="mid-past" data-group="mid" class="hidden p-3 space-y-3">
+            <div class="agent-head">
+              <span class="agtile agtile--user" style="width:var(--size-40);height:var(--size-40)"><i data-lucide="history" class="agtile-luc"></i></span>
+              <div class="min-w-0 flex-1"><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">Past agents</div><div class="text-[10px] text-muted font-semibold">resume a dead or archived agent — same conversation, same identity</div></div>
+            </div>
+            <div>
+              <div class="ro-head"><span class="ro-label" data-hc-title="Resumable" data-hc="Every persisted agent that isn't live right now — dead roster records plus the archive, merged and source-tagged. Resume relaunches the agent on its own conversation (never a fork); a row with no conversation id can't resume and reads greyed.">Resumable</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="past-count"></span></div>
+              <div data-comp="past-agent-picker" class="aglist past-list" id="past-list"></div>
+            </div>
+            <div>
+              <div class="ro-head"><span class="ro-label" data-hc-title="Archive" data-hc="Retire = deep-freeze: a light archive record — identity snapshot, created/retired stamps, lineage, per-agent git author — with the transcript referenced in place, never copied. Resume un-retires the agent; Delete forever true-deletes the record (the referenced transcript is untouched).">Archive</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="archive-count"></span></div>
+              <div data-comp="archive-roster" class="arch-list" id="archive-list"></div>
             </div>
           </div>
 
@@ -842,6 +890,7 @@
           <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button data-comp="button" class="btn flex-1" onclick="saveAgentMd(this)" title="Save this agent's current config as an agent.md — name it and pick Save to project / Save to system"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save</button><button data-comp="button" class="btn-danger flex-1" onclick="retireAgent(this)" title="Retire this agent — ends the session"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire</button><button data-comp="button" class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button></div>   <!-- ND 13: Save leads (writes the config out as an agent.md — filename + Save to project / Save to system); R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm), labels shortened (no "agent") -->
 
           <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button data-comp="button" class="btn-main" onclick="createAgent()">Create agent</button><button data-comp="button" class="btn px-3" onclick="resetCreate()">Reset</button><button data-comp="button" class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
+          <div data-group="mid-foot" id="mid-foot-past" class="hidden flex items-center"><span class="text-[9.5px] text-muted font-mono font-semibold" id="past-foot-note"></span></div>
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
             <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface (feed · catalog · run bar) is design-final/built; the live raw-terminal feed + slash-route are BACKEND wiring (separate stream), so runConsoleCmd stays a static-mockup demo -->
@@ -968,7 +1017,7 @@
                         <span class="trk b">editing renderer/App.tsx&nbsp;&nbsp;·&nbsp;&nbsp;wrote 3 hunks&nbsp;&nbsp;·&nbsp;&nbsp;running typecheck&nbsp;&nbsp;·&nbsp;&nbsp;</span>
                       </div>
                     </div>
-                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-active" title="subagent A1 — active · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
+                    <div data-comp="node-subagents" class="node-subs"><div class="subs-acc" onclick="subsTrig(event,this)"><div class="subs-badges"><span data-comp="subagent-badge" class="sbadge sb-idle" title="subagent A1 — done · click → focus parent + open Subagents + scope feed" onclick="subBadgeClick(event,this)">A1</span></div><button class="subs-chev" title="Show all subagents" type="button"><i data-lucide="chevron-right"></i></button></div></div>
                   </div>
 
                   <div data-comp="agent-node-card" id="node-5" data-agent="researcher-02-rowan" class="node" onclick="selectNode(this)" style="--nc:var(--ag-crimson)">
@@ -1214,9 +1263,39 @@
                 <button data-tab-group="doc" data-tab="plan" onclick="switchTab('doc','plan')" class="tab-btn active">Plans<span data-comp="count-square" class="req-badge ml-1" id="plans-badge">2</span></button>
                 <button data-tab-group="doc" data-tab="documents" onclick="switchTab('doc','documents')" class="tab-btn">Documents<span data-comp="count-square" class="req-badge ml-1" id="docs-badge">3</span></button>
                 <button data-tab-group="doc" data-tab="assets" onclick="switchTab('doc','assets')" class="tab-btn">Assets</button>
+                <!-- IMPORT lives on the Library header (host decision — see DESIGN.md → Library): reachable from all three tabs, and every import lands as document-shaped content the Library already routes onward. -->
+                <button data-comp="import-button" class="btn btn-sm lib-import-btn" onclick="toggleImport()" title="Import an external Claude session (claude.ai web / the desktop app) — deliver to an agent, read it here, or file it as a reference doc"><i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>Import</button>
               </div>
             </div>
             <div class="pcard-body flex flex-col overflow-hidden" style="background:var(--background)">
+
+              <!-- IMPORT DRAWER — an IN-FLOW drawer under the panel header (the tab panes below push down; nothing
+                   floats). Source picker (web / desktop) → session list by title → one selectable destination:
+                   agent (prompt queue) · read now (opens a read-only Library doc) · file as doc. Esc / ghost-x closes. -->
+              <div data-comp="import-drawer" data-variants="empty" class="imp-drawer hidden" id="import-drawer">
+                <div class="imp-head"><i data-lucide="download-cloud"></i><span>Import a Claude session</span><button data-comp="ghost-icon-button" class="ghost-ic" title="Close (Esc)" onclick="toggleImport(false)"><i data-lucide="x"></i></button></div>
+                <div class="imp-grid">
+                  <div class="imp-col">
+                    <span class="lbl">Source</span>
+                    <div data-comp="segmented-control" class="seg imp-src-seg"><button class="active" onclick="impPickSrc(this,'web')">Web</button><button onclick="impPickSrc(this,'desktop')">Desktop</button></div>
+                    <div class="imp-srcnote" id="imp-srcnote">claude.ai chats, listed by title</div>
+                    <span class="lbl imp-lbl-gap">Destination</span>
+                    <div class="imp-dests">
+                      <button data-comp="option-card" class="opt on" onclick="impPickDest(this,'agent')"><span class="opt-nm">To agent</span><span class="opt-desc">deliver to an agent — lands on its prompt queue as context</span></button>
+                      <button data-comp="option-card" class="opt" onclick="impPickDest(this,'read')"><span class="opt-nm">Read now</span><span class="opt-desc">open here in the Library as a read-only doc</span></button>
+                      <button data-comp="option-card" class="opt" onclick="impPickDest(this,'doc')"><span class="opt-nm">File as doc</span><span class="opt-desc">file into Documents as a reference doc</span></button>
+                    </div>
+                    <div class="imp-aglist show" id="imp-aglist"><div class="aglist aglist-scroll imp-agscroll" id="imp-agrows"></div></div>
+                  </div>
+                  <div class="imp-col imp-col--sessions">
+                    <span class="lbl">Session</span>
+                    <div data-comp="search-input" class="imp-filter"><i data-lucide="search"></i><input placeholder="Filter by title…" oninput="impFilter(this)"></div>
+                    <div class="imp-list" id="imp-list"></div>
+                    <div class="imp-none">No sessions match.</div>
+                  </div>
+                </div>
+                <div class="imp-foot"><span class="imp-sel" id="imp-sel-note">Pick a session to import</span><button data-comp="button" data-status="planned" class="btn-main btn-sm" id="imp-go" disabled onclick="runImport()" title="Import the picked session to the chosen destination (the import engine is backend wiring; the doc destinations land a demo doc here)"><i data-lucide="download-cloud" class="w-3 h-3"></i>Import</button></div>
+              </div>
 
               <!-- PLAN — native plan review/edit/approve (backlog C4). L1 (ND 1+2): two-column — the shared entry-nav
                    (#plan-nav, rendered from PLANS) beside the right card column; the subtitle count is live. -->

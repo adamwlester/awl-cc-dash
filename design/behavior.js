@@ -617,6 +617,11 @@
   function agKeyFromNode(n){const d=(n&&n.dataset&&n.dataset.agent)||'';return d.split('-').pop();}
   function setSegActive(id,label){if(!label)return;const seg=document.getElementById(id);if(!seg)return;
     seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.textContent.trim().toLowerCase()===label.toLowerCase()));}
+  /* Launch-gated Bypass/Auto (§ Launch permissions): hide the mode-ring segments the agent didn't pre-arm at
+     launch — SILENTLY absent (.seg-unarmed → display:none), never a greyed no-op. Applied to the Details ring
+     on every repaint from the focused agent's armed[] flags. */
+  function applyArmGate(seg,armed){if(!seg)return;armed=armed||[];
+    seg.querySelectorAll('button[data-mode]').forEach(b=>b.classList.toggle('seg-unarmed',armed.indexOf(b.dataset.mode)<0));}
   function nodeBarRaw(n,label){const rows=[...n.querySelectorAll('.nbar-row')];const r=rows.find(x=>{const l=x.querySelector('.nbl');return l&&l.textContent.trim()===label;});
     if(!r)return null;const i=r.querySelector('.pbar i');const pct=i?parseFloat(i.style.width):null;const val=(r.querySelector('.nbv')||{}).textContent||'';return{pct:pct,val:val};}
   function repaintConsoleIdentity(a){document.querySelectorAll('.con-agentbar').forEach(bar=>{const t=bar.querySelector('.agtile');if(t){t.style.color=a.color;const u=t.querySelector('use');if(u)u.setAttribute('href','#'+a.icon);}
@@ -633,6 +638,7 @@
     const meta=((n.querySelector('.node-meta')||{}).textContent||'').replace(/\s+/g,' ').trim();const parts=meta.split('·').map(s=>s.trim());
     const mc=document.getElementById('model-current');if(mc&&parts[0])mc.textContent=parts[0];
     setSegActive('mode-seg',parts[1]);setSegActive('effort-seg',parts[2]);
+    applyArmGate(document.getElementById('mode-seg'),a.armed);   /* un-armed Bypass/Auto vanish from the focused agent's ring */
     const tt=document.getElementById('det-think');if(tt)tt.classList.toggle('on',/think on/i.test(meta));
     const ctx=nodeBarRaw(n,'Ctx');if(ctx&&ctx.pct!=null){const cb=document.getElementById('ctx-bar');if(cb)cb.innerHTML='<i style="width:'+ctx.pct+'%;background:'+ctxColor(ctx.pct)+'"></i>'+cutHTML();
       const cp=document.getElementById('det-ctx-pct');if(cp)cp.textContent=Math.round(ctx.pct)+'%';}
@@ -1025,6 +1031,16 @@
   /* ===== v8p6: per-agent thinking toggle (inline with Mode) ===== */
   function toggleThink(b){b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Thinking Mode '+(on?'On':'Off');}
   function toggleFast(b){if(b.classList.contains('gated'))return;b.classList.toggle('on');const on=b.classList.contains('on');const l=b.querySelector('.tt-lbl');if(l)l.textContent='Opus Fast-Mode '+(on?'On':'Off');}   /* labeled toggle-button: the label reads its own Off/On state; Fast is gated to Opus (see gateFast) */
+
+  /* ===== Launch permissions (Create) — pre-arm Bypass/Auto at create ===== */
+  /* Arming reveals the segment in the CREATE mode ring; disarming hides it again (silently absent — the ring
+     never shows a segment that would no-op) and falls back to Edit if the hidden segment was the active pick. */
+  function armToggle(sw,which){const on=sw.classList.toggle('on');
+    sw.title=(on?'Armed — ':'Un-armed — ')+(which==='bypass'?'Bypass':'Auto')+(on?' joins the mode ring at launch':' is absent from the mode ring');
+    const seg=document.getElementById('create-mode-seg');if(!seg)return;
+    const btn=seg.querySelector('button[data-mode="'+which+'"]');if(!btn)return;
+    btn.classList.toggle('seg-unarmed',!on);
+    if(!on&&btn.classList.contains('active')){const fb=[...seg.querySelectorAll('button')].find(b=>b.textContent.trim()==='Edit');if(fb)segPick(fb);}}
 
   /* ===== v8p6: graph status badge → jump to the relevant surface, scoped to the focused agent ===== */
   function statusJump(status,el){
@@ -1432,6 +1448,131 @@
   }
   function projInit(){ if(document.getElementById('proj-list'))projRender(); }
 
+  /* ===== Past agents (Agent → Past) — the resume picker + the per-agent archive =====
+     PAST mirrors the merged past-agents feed: every persisted agent that isn't live — dead roster records
+     (src:'roster') plus archived records (src:'archive') — each with a resumable flag (has a conversation id
+     to resume AND isn't live). ARCHIVE holds the full deep-freeze records behind the archive rows: a distinct
+     archive id, the identity snapshot (colour/icon ride it), created/retired stamps, reserved lineage
+     (parent · fork · handoff), the per-agent git author email, and the transcript REFERENCED in place. */
+  const PAST=[
+    {key:'pax', role:'tester',    name:'02 pax',  color:'var(--ag-turquoise)',icon:'ag-spider',model:'sonnet 4.6',src:'roster', resumable:true, stamp:'died 07-14 22:10', why:'tmux gone after reboot — cold-resumable on its conversation id'},
+    {key:'juno',role:'coder',     name:'02 juno', color:'var(--ag-sapphire)', icon:'ag-golem', model:'opus 4.8',  src:'roster', resumable:false,stamp:'died 07-09 18:33', why:'no conversation id persisted — launched before id persistence; can\'t resume'},
+    {key:'vera',role:'researcher',name:'03 vera', color:'var(--ag-orchid)',   icon:'ag-fox',   model:'opus 4.8',  src:'archive',resumable:true, stamp:'retired 07-12 17:40', arc:'arc-7f21c9'},
+    {key:'otto',role:'reviewer',  name:'02 otto', color:'var(--ag-azure)',    icon:'ag-eagle', model:'sonnet 4.6',src:'archive',resumable:true, stamp:'retired 07-10 09:05', arc:'arc-b04e11'},
+    {key:'mira',role:'planner',   name:'02 mira', color:'var(--ag-rose)',     icon:'ag-centurion',model:'haiku 4.5',src:'archive',resumable:true, stamp:'retired 07-06 15:22', arc:'arc-3d98a2'}
+  ];
+  const ARCHIVE=[
+    {arc:'arc-7f21c9',role:'researcher',name:'03 vera',color:'var(--ag-orchid)',icon:'ag-fox',model:'opus 4.8',mode:'Ask',
+     created:'07-08 10:12',retired:'07-12 17:40',cwd:'~/MeDocuments/…/awl-cc-dash',
+     lineage:{parent:'researcher-01-sandy',fork:'turn 21',handoff:null},
+     git:'researcher-03@agents.awl-cc-dash.invalid',transcript:'~/.claude/projects/…/9c2e41d7.jsonl'},
+    {arc:'arc-b04e11',role:'reviewer',name:'02 otto',color:'var(--ag-azure)',icon:'ag-eagle',model:'sonnet 4.6',mode:'Edit',
+     created:'07-04 08:50',retired:'07-10 09:05',cwd:'~/MeDocuments/…/awl-cc-dash',
+     lineage:{parent:null,fork:null,handoff:'handoff-report-0704.md'},
+     git:'reviewer-02@agents.awl-cc-dash.invalid',transcript:'~/.claude/projects/…/5aa10f38.jsonl'},
+    {arc:'arc-3d98a2',role:'planner',name:'02 mira',color:'var(--ag-rose)',icon:'ag-centurion',model:'haiku 4.5',mode:'Plan',
+     created:'06-30 13:15',retired:'07-06 15:22',cwd:'~/MeDocuments/…/awl-cc-dash',
+     lineage:{parent:null,fork:null,handoff:null},
+     git:'planner-02@agents.awl-cc-dash.invalid',transcript:'~/.claude/projects/…/e77c02b4.jsonl'}
+  ];
+  function pastRowHTML(p,i){const tile='<span class="agtile" style="width:var(--size-28);height:var(--size-28);color:'+p.color+'"><svg class="ag-svg"><use href="#'+p.icon+'"/></svg></span>';
+    return '<div data-comp="past-agent-row" class="agrow past-row'+(p.resumable?'':' past-row--norez')+'" title="'+esc(p.why||p.model+' · '+p.stamp)+'">'
+      +tile+'<span class="ag-lab"><span class="ag-role">'+p.role+' · '+p.model+'</span><span class="ag-name">'+p.name+'</span></span>'
+      +'<span data-comp="past-source-badge" class="past-src'+(p.src==='archive'?' past-src--archive':'')+'" title="'+(p.src==='archive'?'From the archive — Resume un-retires it':'A dead roster record — the agent process is gone, the record persists')+'">'+p.src+'</span>'
+      +'<span class="past-stamp">'+esc(p.stamp)+'</span>'
+      +'<button data-comp="button" data-status="planned" class="btn btn-sm past-resume" '+(p.resumable?'':'disabled ')+'onclick="pastResume('+i+')" title="'+(p.resumable?'Resume — relaunch on the same conversation, same identity':'Can\'t resume — no conversation id to resume onto')+'"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Resume</button></div>';}
+  function archLineage(l){if(!l||(!l.parent&&!l.fork&&!l.handoff))return '—';const bits=[];
+    if(l.parent)bits.push('parent '+l.parent);if(l.fork)bits.push('fork @ '+l.fork);if(l.handoff)bits.push('handoff '+l.handoff);return bits.join(' · ');}
+  function archRowHTML(a,i){const tile='<span class="agtile" style="width:var(--size-28);height:var(--size-28);color:'+a.color+'"><svg class="ag-svg"><use href="#'+a.icon+'"/></svg></span>';
+    const kv=(k,v,plain)=>'<div class="arch-kv"><span class="k">'+k+'</span><span class="v'+(plain?' plain':'')+'">'+esc(v)+'</span></div>';
+    return '<div data-comp="archive-row" class="fcard arch-card" data-arci="'+i+'">'
+      +'<div class="fcard-head"><button class="fcard-exp" onclick="toggleFcard(this)" title="Expand the archive record">'+tile
+      +'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span>'
+      +'<span class="fcard-time">retired '+a.retired+'</span></button>'
+      +'<button class="fcard-chevbtn" onclick="toggleFcard(this)" title="Expand / collapse"><i data-lucide="chevron-right" class="fcard-chev"></i></button></div>'
+      +'<div class="fcard-body arch-body">'
+      +kv('Archive id',a.arc)+kv('Created',a.created)+kv('Retired',a.retired)
+      +kv('Model · mode',a.model+' · '+a.mode,true)+kv('CWD',a.cwd)
+      +kv('Lineage',archLineage(a.lineage),!a.lineage||(!a.lineage.parent&&!a.lineage.fork&&!a.lineage.handoff))
+      +kv('Git author',a.git)+kv('Transcript',a.transcript)
+      +'<div class="arch-acts"><button data-comp="button" data-status="planned" class="btn btn-sm" onclick="archResume('+i+')" title="Resume — un-retires the agent back onto the roster, same conversation"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Resume</button>'
+      +'<span class="flex-1"></span>'
+      +'<button data-comp="button" class="btn-danger btn-sm" onclick="archDelete(this)" title="Delete forever — true-deletes this archive record (the referenced transcript is untouched)"><i data-lucide="trash-2" class="w-3 h-3"></i>Delete forever</button></div>'
+      +'</div></div>';}
+  function renderPast(){const pl=document.getElementById('past-list');if(pl)pl.innerHTML=PAST.map(pastRowHTML).join('');
+    const al=document.getElementById('archive-list');if(al)al.innerHTML=ARCHIVE.map(archRowHTML).join('');
+    const rez=PAST.filter(p=>p.resumable).length;
+    const pc=document.getElementById('past-count');if(pc)pc.textContent=PAST.length+' past · '+rez+' resumable';
+    const ac=document.getElementById('archive-count');if(ac)ac.textContent=ARCHIVE.length+' archived';
+    const fn=document.getElementById('past-foot-note');if(fn)fn.textContent=PAST.length+' past agents · '+ARCHIVE.length+' archived — Resume relaunches on the same conversation, never a fork';
+    LU();}
+  function pastResume(i){const p=PAST[i];if(!p||!p.resumable)return;
+    toast('Resuming '+p.role+' '+p.name+' — relaunching on its own conversation'+(p.src==='archive'?' (un-retired from the archive)':''));}
+  function archResume(i){const a=ARCHIVE[i];if(!a)return;toast('Resuming '+a.role+' '+a.name+' — un-retired from the archive, same conversation');}
+  function archDelete(btn){const card=btn.closest('.fcard');if(!card||card.querySelector('.arch-del-confirm'))return;
+    const i=parseInt(card.dataset.arci,10);const a=ARCHIVE[i];if(!a)return;
+    const c=document.createElement('div');c.setAttribute('data-comp','inline-confirm');c.className='tl-confirm foot-confirm--danger arch-del-confirm';c.style.display='flex';
+    c.innerHTML='<span>Delete '+esc(a.name)+'’s archive record forever? This can’t be undone (the transcript it references is untouched).</span>';
+    const cancel=document.createElement('button');cancel.className='btn btn-sm ml-auto';cancel.textContent='Cancel';cancel.onclick=e=>{e.stopPropagation();c.remove();};
+    const go=document.createElement('button');go.className='btn-danger-solid btn-sm';go.innerHTML='<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete forever';
+    go.onclick=e=>{e.stopPropagation();ARCHIVE.splice(i,1);const pi=PAST.findIndex(p=>p.arc===a.arc);if(pi>=0)PAST.splice(pi,1);
+      renderPast();toast('Archive record '+a.arc+' deleted forever');};
+    c.appendChild(cancel);c.appendChild(go);
+    const head=card.querySelector('.fcard-head');if(head)head.insertAdjacentElement('afterend',c);else card.appendChild(c);LU();}
+
+  /* ===== Import (Library header) — pull an external Claude session into the workspace =====
+     Host decision (recorded in DESIGN.md → Library): the control lives on the LIBRARY panel header — every
+     import lands as document-shaped content, and the Library already owns both the read surface (the
+     line-numbered doc editor) and the onward routing to agents (the merged Export control). The drawer is an
+     IN-FLOW surface under the header (tab panes push down; Esc / ghost-x closes). One engine, one selectable
+     destination: agent (prompt queue) · read now (opens a read-only doc card) · file as doc. */
+  const IMPORT_SESSIONS={
+    web:[
+      {t:'Dashboard design direction — quiet brutalism',d:'07-12',n:48},
+      {t:'JWT rotation strategy — one-time vs sliding',d:'07-11',n:31},
+      {t:'Electron sidecar lifecycle notes',d:'07-08',n:22},
+      {t:'Agent naming brainstorm — human names',d:'07-05',n:17},
+      {t:'OKLCH jewel palette derivation',d:'06-29',n:40}],
+    desktop:[
+      {t:'Local agent run — bridge poller profiling',d:'07-13',n:26},
+      {t:'Sidecar storage model walkthrough',d:'07-10',n:35},
+      {t:'tmux capture-pane quirks under WSL2',d:'07-07',n:19},
+      {t:'Archive record shape review',d:'07-03',n:12}]};
+  const IMPORT_SRC_NOTE={web:'claude.ai chats, listed by title',desktop:'the desktop app’s local sessions, read off disk'};
+  let impSrc='web',impSel=null,impDest='agent',impAgent='max';
+  function toggleImport(show){const d=document.getElementById('import-drawer');if(!d)return;
+    const to=(show===undefined)?d.classList.contains('hidden'):!!show;d.classList.toggle('hidden',!to);
+    if(to){renderImportList();renderImportAgents();LU();}}
+  function impPickSrc(btn,src){segPick(btn);impSrc=src;impSel=null;
+    const note=document.getElementById('imp-srcnote');if(note)note.textContent=IMPORT_SRC_NOTE[src]||'';
+    const f=document.querySelector('#import-drawer .imp-filter input');if(f)f.value='';
+    renderImportList();impSyncGo();}
+  function impRowHTML(s,i,on){return '<button data-comp="import-session-row" class="imp-row'+(on?' on':'')+'" onclick="impPickSession(this,'+i+')"><span class="imp-t">'+esc(s.t)+'</span><span class="imp-meta">'+s.d+' · '+s.n+' messages</span></button>';}
+  function renderImportList(){const el=document.getElementById('imp-list');if(!el)return;
+    el.innerHTML=(IMPORT_SESSIONS[impSrc]||[]).map((s,i)=>impRowHTML(s,i,impSel===i)).join('');
+    document.getElementById('import-drawer').classList.remove('empty');}
+  function impPickSession(row,i){impSel=i;row.parentElement.querySelectorAll('.imp-row').forEach(r=>r.classList.toggle('on',r===row));impSyncGo();}
+  function impFilter(inp){const q=inp.value.toLowerCase();const el=document.getElementById('imp-list');if(!el)return;let vis=0;
+    [...el.querySelectorAll('.imp-row')].forEach(r=>{const hit=r.textContent.toLowerCase().includes(q);r.style.display=hit?'':'none';if(hit)vis++;});
+    document.getElementById('import-drawer').classList.toggle('empty',vis===0);}
+  function impPickDest(el,d){pickOpt(el);impDest=d;
+    const ag=document.getElementById('imp-aglist');if(ag)ag.classList.toggle('show',d==='agent');impSyncGo();}
+  function impAgentRowHTML(k,on){const a=AG[k];return '<button class="agrow'+(on?' on':'')+'" onclick="impPickAgent(this,\''+k+'\')" data-ag="'+k+'">'+agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span><i data-lucide="check" class="ag-ck"></i></button>';}
+  function renderImportAgents(){const el=document.getElementById('imp-agrows');if(!el)return;
+    el.innerHTML=AG_ORDER.map(k=>impAgentRowHTML(k,k===impAgent)).join('');}   /* the one shared roster, agents only — subagents/System are never addressable */
+  function impPickAgent(row,k){impAgent=k;row.parentElement.querySelectorAll('.agrow').forEach(r=>r.classList.toggle('on',r===row));impSyncGo();}
+  function impSyncGo(){const go=document.getElementById('imp-go');if(go)go.disabled=impSel==null;
+    const note=document.getElementById('imp-sel-note');if(!note)return;
+    const s=impSel!=null?(IMPORT_SESSIONS[impSrc]||[])[impSel]:null;
+    note.textContent=s?('“'+s.t+'” → '+(impDest==='agent'?(AG[impAgent]?AG[impAgent].role+' '+AG[impAgent].name:'agent'):(impDest==='read'?'read now':'Documents'))):'Pick a session to import';}
+  function runImport(){const s=impSel!=null?(IMPORT_SESSIONS[impSrc]||[])[impSel]:null;if(!s)return;
+    const stub='# '+s.t+'\n\n> Imported from Claude ('+impSrc+') · '+s.n+' messages · exported '+s.d+'\n\nThe full conversation renders here — user/assistant turns, tool calls, and thinking, as clean markdown.';
+    const slug=s.t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,42)+'.md';
+    if(impDest==='agent'){toast('Queued import → '+(AG[impAgent]?AG[impAgent].role+' '+AG[impAgent].name:'agent')+' — “'+s.t+'” lands on its prompt queue');toggleImport(false);return;}
+    const d=createDoc(stub,slug);
+    if(impDest==='read'){toggleImport(false);openEntry(d.key);toast('Imported for reading — opened in Documents (read-only)');}
+    else{toggleImport(false);switchTab('doc','documents');const row=document.querySelector('.docnav-row[data-navid="'+d.key+'"]');if(row)row.scrollIntoView({block:'nearest'});toast('Imported → Documents · '+d.name);}}
+
   /* ============================ v9p10 ============================ */
   /* shared agent model + identity badges (one source of truth for badges everywhere).
      Next-up item 6: each agent's `subs` array is the ONE shared SUBAGENT roster — it mirrors that agent's
@@ -1449,22 +1590,25 @@
        subagent precedent) — it renders ONLY in the feed From/To filter tree (second, after User), never in
        Compose To, Compose From, or the History From filter (those iterate AG_ORDER, which excludes it). */
     system:{role:'app',name:'System',system:true,addressable:false},
-    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard',created:'06-26 14:30 · 2h12m',
+    /* armed[] = the LAUNCH-GATED permission modes (§ Launch permissions): Bypass/Auto must be pre-armed at
+       launch, and an un-armed mode is silently ABSENT from that agent's mode ring (repaintAgentPanel applies
+       these flags to #mode-seg). Every agent whose current mode is Auto necessarily has 'auto' armed. */
+    sandy:{role:'researcher',name:'01 sandy',color:'var(--ag-emerald)',icon:'ag-wizard',created:'06-26 14:30 · 2h12m',armed:['auto','bypass'],
       subs:[{id:'A1',st:'sb-active',type:'Explore'},{id:'A2',st:'sb-active',type:'Explore'},{id:'A3',st:'sb-active',type:'Explore'},{id:'A4',st:'sb-idle',type:'general-purpose'},{id:'A5',st:'sb-active',type:'code-reviewer'},{id:'A6',st:'sb-error',type:'general-purpose'}]},
-    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem',created:'06-25 09:12 · 1d'},
-    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask',created:'06-26 15:48 · 54m'},
-    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot',created:'06-26 13:05 · 3h37m',
-      subs:[{id:'A1',st:'sb-active',type:'Explore'}]},
-    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox',created:'06-26 11:20 · 5h22m'},
-    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider',created:'06-24 16:40 · 2d'},
-    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle',created:'06-26 16:02 · 40m'},
-    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion',created:'06-23 08:15 · 3d'},
-    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot',created:'06-26 10:05 · 6h37m'},
-    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal',created:'06-26 15:10 · 1h32m',
+    kai:{role:'synthesizer',name:'01 kai',color:'var(--ag-cobalt)',icon:'ag-golem',created:'06-25 09:12 · 1d',armed:['auto']},
+    drew:{role:'auditor',name:'01 drew',color:'var(--ag-fern)',icon:'ag-gasmask',created:'06-26 15:48 · 54m',armed:[]},
+    max:{role:'coder',name:'01 max',color:'var(--ag-amber)',icon:'ag-robot',created:'06-26 13:05 · 3h37m',armed:['auto'],
+      subs:[{id:'A1',st:'sb-idle',type:'Explore'}]},
+    rowan:{role:'researcher',name:'02 rowan',color:'var(--ag-crimson)',icon:'ag-fox',created:'06-26 11:20 · 5h22m',armed:['auto']},
+    nova:{role:'tester',name:'01 nova',color:'var(--ag-violet)',icon:'ag-spider',created:'06-24 16:40 · 2d',armed:[]},
+    vega:{role:'reviewer',name:'01 vega',color:'var(--ag-cyan)',icon:'ag-eagle',created:'06-26 16:02 · 40m',armed:['auto','bypass']},
+    quinn:{role:'planner',name:'01 quinn',color:'var(--ag-vermilion)',icon:'ag-centurion',created:'06-23 08:15 · 3d',armed:[]},
+    wren:{role:'docs',name:'01 wren',color:'var(--ag-citron)',icon:'ag-parrot',created:'06-26 10:05 · 6h37m',armed:['auto']},
+    lex:{role:'designer',name:'01 lex',color:'var(--ag-magenta)',icon:'ag-tribal',created:'06-26 15:10 · 1h32m',armed:['auto'],
       subs:[{id:'A1',st:'sb-active',type:'Explore'},{id:'A2',st:'sb-active',type:'general-purpose'}]},
-    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut',created:'06-22 14:00 · 4d'},
-    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye',created:'06-26 16:25 · 17m'},
-    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled',created:'06-26 12:48 · 3h54m',
+    sage:{role:'ops',name:'01 sage',color:'var(--ag-teal)',icon:'ag-astronaut',created:'06-22 14:00 · 4d',armed:['auto']},
+    io:{role:'analyst',name:'01 io',color:'var(--ag-indigo)',icon:'ag-thirdeye',created:'06-26 16:25 · 17m',armed:[]},
+    fen:{role:'scribe',name:'01 fen',color:'var(--ag-gold)',icon:'ag-cowled',created:'06-26 12:48 · 3h54m',armed:['auto'],
       subs:[{id:'A1',st:'sb-active',type:'Explore'},{id:'A2',st:'sb-active',type:'Explore'},{id:'A3',st:'sb-pending',type:'general-purpose'},{id:'B1',st:'sb-idle',type:'code-reviewer'},{id:'B2',st:'sb-active',type:'Explore'},{id:'B3',st:'sb-error',type:'general-purpose'},{id:'C1',st:'sb-pending',type:'Plan'},{id:'C2',st:'sb-active',type:'Explore'}]}
   };
   const AG_ORDER=['sandy','kai','drew','max','rowan','nova','vega','quinn','wren','lex','sage','io','fen'];
@@ -1500,8 +1644,10 @@
   function agrowTreeHTML(k,on,expand){const a=AG[k];const subs=agSubs(k);
     if(!subs.length)return agrowHTML(k,on);
     const n=subs.length,selN=on?n:0;   /* initial state: parent on = whole subtree on */
+    const actN=subs.filter(s=>s.st==='sb-active').length;   /* the roster's subagent ACTIVE-vs-QUIET signal: a glance dot on the collapsed parent row (green = ≥1 running · muted = all quiet), so activity reads without expanding the subtree */
     return '<button class="agrow agrow--parent'+(on?' on':'')+(expand?' subs-open':'')+'" onclick="toggleAgRow(this)" data-ag="'+k+'">'
       +agtileHTML(a)+'<span class="ag-lab"><span class="ag-role">'+a.role+'</span><span class="ag-name">'+a.name+'</span></span>'
+      +'<span data-comp="subagent-activity-dot" class="sub-actdot'+(actN?'':' quiet')+'" title="'+(actN?actN+' of '+n+' subagent'+(n===1?'':'s')+' running':'all '+n+' subagent'+(n===1?'':'s')+' quiet')+'"></span>'
       +'<span class="ag-subcount" title="'+selN+' of '+n+' subagent'+(n===1?'':'s')+' selected">'+selN+'/'+n+'</span>'
       +'<span class="ag-exp" onclick="toggleAgSubs(event,this)" title="Show subagents"><i data-lucide="chevron-right"></i></span><i data-lucide="check" class="ag-ck"></i></button>'
       +'<div class="agrow-subs'+(expand?' open':'')+'">'+subs.map(s=>subRowHTML(k,s,on)).join('')+'</div>';}
@@ -2397,7 +2543,7 @@ Short-lived notes for the current run — kept brief on purpose.
     {ag:'sage',type:'permission',time:'14:43',title:'Run bash command',cmd:'kubectl apply -f deploy/prod.yaml'},
     {ag:'sandy',type:'plan',time:'14:41',title:'Merge remediation plan to main',body:'Plan: Auth token-rotation remediation · 3 files · +84 −19 · rotation path covered by new test',plan:'plan-1'},
     {ag:'wren',type:'plan',time:'14:45',title:'Review README.md edits before commit',body:'Docs edit: README.md · +37 −12 · refreshed the Quick-start and the driver-seam overview to match the sidecar rename — ready for a look before it lands.',plan:'doc-readme'},   /* doc-review flow (Lane I): SAME unified plan card, plan id is doc-* so Review routes to Library → Documents (the doc card lands after the Lane-L Plans+Documents merge; graceful no-op until then) */
-    {ag:'lex',type:'plan',time:'14:53',title:'Run workflow: design-verify-sweep',wf:{name:'design-verify-sweep',desc:'Drive every touched design component headed — one verifier per panel, findings adversarially checked before they report.',phases:['Scan','Verify','Report'],script:"export const meta = {\n  name: 'design-verify-sweep',\n  description: 'Verify the touched design components headed',\n  phases: [\n    { title: 'Scan',   detail: 'list the touched components' },\n    { title: 'Verify', detail: 'one headed verifier per panel' },\n    { title: 'Report', detail: 'adversarial check, then summarize' },\n  ],\n}\nphase('Scan')\nconst targets = await agent('List the design components this diff touches.', {schema: LIST})\nphase('Verify')\nconst runs = await parallel(targets.map(t => () =>\n  agent('Drive ' + t + ' headed at both width extremes; screenshot each state.', {schema: RUN})))\nphase('Report')\nreturn await agent('Adversarially verify the findings, then summarize.', {schema: REPORT})"}},   /* ND 16: a /workflows approval routed through the Inbox — the PreToolUse interception is spike-proven (ARCHITECTURE §11.3 #40); same action strip as the plan/doc cards, the preview in the card content */
+    {ag:'lex',type:'plan',time:'14:53',title:'Run workflow: design-verify-sweep',wf:{name:'design-verify-sweep',desc:'Drive every touched design component headed — one verifier per panel, findings adversarially checked before they report.',phases:['Scan','Verify','Report'],script:"export const meta = {\n  name: 'design-verify-sweep',\n  description: 'Verify the touched design components headed',\n  phases: [\n    { title: 'Scan',   detail: 'list the touched components' },\n    { title: 'Verify', detail: 'one headed verifier per panel' },\n    { title: 'Report', detail: 'adversarial check, then summarize' },\n  ],\n}\nphase('Scan')\nconst targets = await agent('List the design components this diff touches.', {schema: LIST})\nphase('Verify')\nconst runs = await parallel(targets.map(t => () =>\n  agent('Drive ' + t + ' headed at both width extremes; screenshot each state.', {schema: RUN})))\nphase('Report')\nreturn await agent('Adversarially verify the findings, then summarize.', {schema: REPORT})"}},   /* ND 16: a /workflows approval routed through the Inbox — the PreToolUse interception is spike-proven; the preview renders in the card content, and the card carries its OWN Approve/Reject round-trip (a workflow has no Library home, so its approval lives on the card — see DESIGN.md → The Inbox tab) */
     {ag:'sandy',type:'permission',time:'14:42',title:'Edit settings.json',cmd:'apply patch → .claude/settings.json (add rotation-hook allow rule)'},
     {ag:'vega',type:'decision',time:'14:44',title:'Choose token rotation strategy',options:[
       {nm:'A · Sliding window',desc:'Refresh extends expiry; simplest, slightly weaker on replay.'},
@@ -2414,12 +2560,22 @@ Short-lived notes for the current run — kept brief on purpose.
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxResolve(this,\'Approved\')">Approve</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Denied\')">Deny</button>'+inboxReplyHTML();}   /* binary Approve/Deny (+Reply) — "Always allow" fully removed (no always-allow rule-persistence, now or later) */
     else if(o.type==='plan'){
       /* ND 16: the Review section covers plans, doc hand-offs, AND workflow approvals — a wf entry renders the
-         workflow preview (name / description / phase chips / full script) in the card content and keeps the SAME
-         action strip (Review + Reply); a workflow's Review will reuse the Library editor infrastructure (planned). */
+         workflow preview (name / description / phase chips / full script) in the card content. Unlike plan/doc
+         cards it carries the Approve/Reject ROUND-TRIP on the card (allow = launch · deny = abort — a workflow
+         has no Library home, so its approval lives here) plus Review (planned — reuses the Library editor) + Reply. */
       if(o.wf){detail='<div class="wf-prev"><div class="rc-body"><b>'+esc(o.wf.name)+'</b></div><div class="wf-desc">'+esc(o.wf.desc)+'</div>'
           +'<div class="wf-phases">'+(o.wf.phases||[]).map(p=>'<span data-comp="workflow-phase-chip" class="wf-phase">'+esc(p)+'</span>').join('')+'</div>'
-          +'<pre class="wf-script">'+esc(o.wf.script||'')+'</pre></div>';
-        acts='<button data-comp="button" data-status="planned" class="btn btn-sm" onclick="toast(\'Open the workflow in the Library editor — planned\')" title="Review the workflow in the Library editor (planned — reuses the shared editor)"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
+          +'<pre class="wf-script">'+esc(o.wf.script||'')+'</pre>'
+          /* the round-trip's resolved states (shown via the card's approved/rejected classes — wfResolve): the
+             hook verdict either LAUNCHES the workflow (allow) or ABORTS the tool call before launch (deny) */
+          +'<div class="wf-resolved wf-resolved--ok"><i data-lucide="circle-check"></i>Approved — workflow launched</div>'
+          +'<div class="wf-resolved wf-resolved--no"><i data-lucide="circle-x"></i>Rejected — workflow aborted before launch</div></div>';
+        /* Approve/Reject ROUND-TRIP: unlike plan/doc cards (whose approval lives in the Library), a workflow has
+           no Library home — its approval lives ON the card. Approve = the hook allows the tool call (launch);
+           Reject = the hook denies it (abort). Review (planned) will reuse the shared Library editor. */
+        acts='<button data-comp="button" class="btn-main btn-sm" onclick="wfResolve(this,true)" title="Approve — allow the Workflow tool call; the workflow launches">Approve</button>'
+          +'<button data-comp="button" class="btn-danger btn-sm" onclick="wfResolve(this,false)" title="Reject — deny the tool call; the workflow never launches">Reject</button>'
+          +'<button data-comp="button" data-status="planned" class="btn btn-sm" onclick="toast(\'Open the workflow in the Library editor — planned\')" title="Review the workflow in the Library editor (planned — reuses the shared editor)"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}
       else{detail='<div class="rc-body">'+esc(o.body)+'</div>';   /* plans + docs: Review (→ the matching Library tab) + Reply only — no Approve/Reject */
         const isDoc=o.plan&&o.plan.indexOf('doc-')===0;
         acts='<button data-comp="button" class="btn btn-sm" onclick="reviewPlan(\''+o.plan+'\')" title="'+(isDoc?'Review the full doc in Library → Documents':'Review the full plan in Library → Plans')+'"><i data-lucide="file-text" class="w-3 h-3"></i>Review</button>'+inboxReplyHTML();}}
@@ -2445,8 +2601,10 @@ Short-lived notes for the current run — kept brief on purpose.
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxRetry(this)" title="Retry — load the last command into the Editor"><i data-lucide="rotate-ccw" class="w-3 h-3"></i>Retry</button><button data-comp="button" class="btn-danger btn-sm" onclick="inboxResolve(this,\'Dismissed\')">Dismiss</button>'+inboxReplyHTML(!!a.system);}
     const sub=o.subtype?'<span data-comp="inbox-subtype-badge" class="inbox-subtype'+(o.type==='warning'?' inbox-subtype--warning':'')+'">'+esc(o.subtype)+'</span>':'';   /* R11 item 1: emit the header subtype badge for any card carrying o.subtype (Error → red base, Warning → --warning variant); cards without a subtype render none */
     const runs=(o.type==='response'&&o.runs>1)?'<span data-comp="inbox-runs-chip" class="inbox-runs" title="'+o.runs+' unseen runs coalesced — a new unseen run updates this card, never stacks">×'+o.runs+' runs</span>':'';   /* item 14: the coalesce marker */
-    const _inboxComp=o.wf?'workflow-inbox-card':({error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card');   /* ND 16: the workflow card is its own component */
-    return '<div data-comp="'+_inboxComp+'" data-variants="reply-flash" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
+    const _inboxComp={error:'error-inbox-card',warning:'warning-inbox-card',permission:'permission-inbox-card',plan:'plan-inbox-card',decision:'decision-inbox-card',response:'response-inbox-card'}[o.type]||'error-inbox-card';   /* ND 16: the workflow card is its own component — emitted LITERALLY below so its approved/rejected round-trip states declare on its own slug */
+    return (o.wf
+      ?'<div data-comp="workflow-inbox-card" data-variants="reply-flash approved rejected" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">'
+      :'<div data-comp="'+_inboxComp+'" data-variants="reply-flash" class="fcard inbox-card inbox-card--'+o.type+'" data-agent="'+o.ag+'" data-reqi="'+i+'">')
       +'<div class="fcard-head">'
       +'<button class="fcard-exp msel-head" onclick="fcardSel(event,this)" title="Select this request (Attach)">'+badgeHTML(a)+sub+runs
       +'<span class="inbox-title">'+esc(o.title)+'</span>'
@@ -2472,6 +2630,15 @@ Short-lived notes for the current run — kept brief on purpose.
   function inboxResolve(btn,verb){const card=btn.closest('.fcard');if(!card)return;const sec=card.closest('.inbox-sec');const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();
     toast(verb+' — '+nm+' unblocked');card.style.transition='opacity .2s,transform .2s';card.style.opacity='0';card.style.transform='translateX(8px)';
     setTimeout(()=>{card.remove();inboxAfterRemove(sec);refreshInbox();},200);}
+  /* Workflow Approve/Reject ROUND-TRIP: the card first shows its resolved state IN PLACE (the approved/rejected
+     class — success/danger left edge + banner, actions gone, script dimmed) for a beat, then completes and
+     leaves the Inbox like every resolved card. Approve = allow (launch) · Reject = deny (abort before launch). */
+  function wfResolve(btn,ok){const card=btn.closest('.fcard');if(!card)return;const sec=card.closest('.inbox-sec');
+    card.classList.add(ok?'approved':'rejected');
+    const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();
+    toast(ok?('Approved — '+nm+'’s workflow launches'):('Rejected — '+nm+'’s workflow aborted before launch'));
+    setTimeout(()=>{card.style.transition='opacity .2s,transform .2s';card.style.opacity='0';card.style.transform='translateX(8px)';
+      setTimeout(()=>{card.remove();inboxAfterRemove(sec);refreshInbox();if(typeof renderNodeInboxes==='function')renderNodeInboxes();},200);},1600);}
   function inboxDecision(btn){const card=btn.closest('.fcard');const opt=card&&card.querySelector('.opt.on');if(!opt){toast('Select an option first');return;}
     const sec=card.closest('.inbox-sec');const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
     toast('Approved '+lab+' — '+nm+' unblocked');card.style.transition='opacity .2s';card.style.opacity='0';
@@ -2676,6 +2843,8 @@ Short-lived notes for the current run — kept brief on purpose.
     document.querySelectorAll('[data-expmount]').forEach(m=>{m.outerHTML=expMenuHTML(m.dataset.expmount);});   /* R-batch items 6/9: mount the merged Export control into the Feed + History footers (static markup carries a placeholder span) */
     fillRosterLists();   /* Next-up item 6: mount every agent-selector list from the shared roster (before renderFeed, whose applyHistFilters reads the History-From selection) */
     renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();renderLinkList();eaUpdateAll();
+    renderPast();   /* Agent → Past: the resume picker + the archive roster */
+    renderImportList();renderImportAgents();   /* Library Import drawer — pre-rendered so it opens instantly (and the states page clones a faithful specimen) */
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
     const s=JSON.parse(localStorage.getItem('awl-v8')||'{}');Object.entries(s).forEach(([g,t])=>{if(g==='settings')return;switchTab(g,t);});   /* settings tab is not restored — it always opens on its default lead tab (Projects), even if a prior session saved another */
@@ -2695,7 +2864,7 @@ Short-lived notes for the current run — kept brief on purpose.
   window.addEventListener('load',()=>{autosizeAll();drawEdgesSoon();LU();});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{autosizeAll();drawEdgesSoon();});
   document.addEventListener('click',e=>{if(!e.target.closest('.split')&&!e.target.closest('.fmt')&&!e.target.closest('.picker')&&!e.target.closest('.combo')&&!e.target.closest('.msel')&&!e.target.closest('.src-dd')&&!e.target.closest('.rev-chip')&&!e.target.closest('.vtally')&&!e.target.closest('.exp'))closeAllPopups();});   /* R-batch item 5: exempt .rev-chip — its menu carries the .src-pop class, so without this the chip's own opening click bubbled here and closeAllPopups() instantly re-closed the just-opened reviewer menu */
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');if(sv&&sv.classList.contains('open')){const pc=document.getElementById('proj-close-confirm');if(pc&&pc.classList.contains('show')){projCancelClose();}else{closeSettings();}}else if(cv&&cv.classList.contains('open')){closeConsole();}else{closeAllPopups();if(typeof closeSrcAccordions==='function')closeSrcAccordions();}}});   /* Next-up item 8: Esc also closes the sticky accordion-selector drawers (outside clicks don't) */
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){const sv=document.getElementById('settings-view');const cv=document.getElementById('console-view');const imp=document.getElementById('import-drawer');if(sv&&sv.classList.contains('open')){const pc=document.getElementById('proj-close-confirm');if(pc&&pc.classList.contains('show')){projCancelClose();}else{closeSettings();}}else if(cv&&cv.classList.contains('open')){closeConsole();}else if(imp&&!imp.classList.contains('hidden')){toggleImport(false);}else{closeAllPopups();if(typeof closeSrcAccordions==='function')closeSrcAccordions();}}});   /* Next-up item 8: Esc also closes the sticky accordion-selector drawers (outside clicks don't); the Library Import drawer closes on Esc too (before the generic popup sweep) */
   setInterval(()=>{const e=document.getElementById('clock');if(e)e.textContent=new Date().toLocaleTimeString();},1000);
   /* live-reload on save (design iteration) */
   (function(){let l=null;setInterval(async()=>{try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const m=r.headers.get('Last-Modified');if(l&&m&&m!==l)location.reload();l=m;}catch(e){}},500);})();
