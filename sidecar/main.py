@@ -32,7 +32,8 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
-from identity import assign_identity, git_author
+from identity import assign_identity, git_author, draw_name
+import response_presets
 import eventbus
 import hookbus
 import links
@@ -115,7 +116,8 @@ class SessionState:
                  permission_rules: dict[str, list[str]] | None = None,
                  enabled_plugins: dict[str, bool] | None = None,
                  mcp_servers: list[str] | None = None,
-                 identity: dict[str, Any] | None = None):
+                 identity: dict[str, Any] | None = None,
+                 response_preset: str | None = None):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
@@ -129,6 +131,10 @@ class SessionState:
         self.permission_rules = permission_rules
         self.enabled_plugins = enabled_plugins
         self.mcp_servers = mcp_servers
+        # Per-agent reply-format preset (§7.14, §11 #39). Applied at launch via
+        # `--append-system-prompt` (the bridge driver resolves the instruction);
+        # persisted in the roster record so it survives a restart.
+        self.response_preset = response_preset
         # Dashboard-owned identity (role/number/name/color/icon), assigned at
         # create and surfaced on to_dict so the UI reads it everywhere.
         self.identity = identity
@@ -207,6 +213,8 @@ class SessionState:
                 "permission_rules": self.permission_rules,
                 "enabled_plugins": self.enabled_plugins,
                 "mcp_servers": self.mcp_servers,
+                # Per-agent reply-format preset id (§11 #39); None = default style.
+                "response_preset": self.response_preset,
             },
         }
 
@@ -779,6 +787,7 @@ async def start_session(session: SessionState):
         enabled_plugins=session.enabled_plugins,
         mcp_servers=session.mcp_servers,
         identity=session.identity,
+        response_preset=session.response_preset,
     )
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
@@ -895,6 +904,7 @@ async def reconnect_sessions(project_key: str | None = None):
             enabled_plugins=rec.get("enabled_plugins"),
             mcp_servers=rec.get("mcp_servers"),
             identity=identity,
+            response_preset=rec.get("response_preset"),
         )
         sessions[sid] = session
         config = DriverConfig(
@@ -909,6 +919,7 @@ async def reconnect_sessions(project_key: str | None = None):
             enabled_plugins=rec.get("enabled_plugins"),
             mcp_servers=rec.get("mcp_servers"),
             identity=identity,
+            response_preset=rec.get("response_preset"),
         )
         try:
             driver = BridgeDriver(
@@ -1034,6 +1045,7 @@ class CreateSessionRequest(BaseModel):
     enabled_plugins: dict[str, bool] | None = None         # {"id@mkt": bool}
     mcp_servers: list[str] | None = None                   # subset; None = global
     identity: IdentityInput | None = None                  # dashboard-owned id fields
+    response_preset: str | None = None                     # reply-format preset id (§11 #39)
     max_turns: int | None = None                           # lifecycle cap (notify-only)
     max_context_pct: float | None = None                   # lifecycle cap (notify-only)
 
@@ -1053,6 +1065,10 @@ class SendPromptRequest(BaseModel):
     # (spike-proven on the installed build — lands at the next tool boundary
     # without stopping the turn; if the agent is idle it lands on its next run).
     disposition: Literal["now", "next", "queue", "hold", "inject"] = "queue"
+
+class SetResponsePresetRequest(BaseModel):
+    # A known preset id from GET /presets/response (§11 #39). Unknown -> 400.
+    preset: str
 
 class SetModelRequest(BaseModel):
     model: str
@@ -1240,6 +1256,7 @@ async def create_session(req: CreateSessionRequest):
         enabled_plugins=req.enabled_plugins,
         mcp_servers=req.mcp_servers,
         identity=identity,
+        response_preset=req.response_preset,
     )
     session.max_turns = req.max_turns                  # notify-only caps
     session.max_context_pct = req.max_context_pct
@@ -2300,7 +2317,11 @@ async def library_documents(cwd: str, subdir: str | None = None):
     (``<project>/.awl-cc-dash/<subdir>``), falling back to the legacy
     ``<root>/<subdir>`` when the store dir doesn't exist yet. No ``subdir``
     keeps listing the project root itself — the browse-read-only surface
-    (other ``subdir`` values likewise browse ``<root>/<subdir>`` read-only)."""
+    (other ``subdir`` values likewise browse ``<root>/<subdir>`` read-only).
+
+    Each entry carries a ``provenance`` block (created-by / when / session) from
+    the doc's ``.meta.json`` sidecar (§8.5, §11 #41), so the renderer's Authors
+    lens groups by author off the listing; ``{}`` for un-stamped/browse docs."""
     root = storage.project_root(cwd)
     if not root:
         raise HTTPException(status_code=400, detail="cwd required")
@@ -2889,6 +2910,87 @@ async def update_identity(session_id: str, req: IdentityUpdateRequest):
             logger.warning("display-name rename failed for %s: %s", session_id, e)
 
     return {"status": "ok", "session_id": session_id, "identity": identity}
+
+
+@app.get("/identity/random-name")
+async def identity_random_name(exclude: str | None = None):
+    """Draw a random unused name from the shipped 179-name pool (§7.5, §11 #40).
+
+    The Create panel's randomize / auto-name affordance calls this; a user-typed
+    name is always allowed instead (the pool is a convenience, not a constraint).
+    The draw avoids collisions with names already taken: every LIVE agent's
+    identity name, plus any extra names the caller passes as a comma-separated
+    ``exclude`` query param (e.g. a name staged in an unsubmitted Create form).
+    Returns ``{"name": <str|null>}`` — ``null`` only if the pool is empty.
+    """
+    taken: set[str] = set()
+    if exclude:
+        taken |= {n.strip() for n in exclude.split(",") if n.strip()}
+    for s in sessions.values():
+        nm = (s.identity or {}).get("name") if s.identity else None
+        if nm:
+            taken.add(nm)
+    return {"name": draw_name(exclude=taken)}
+
+
+# ---- Response-format presets (§7.14, §11 #39) ------------------------------
+
+@app.get("/presets/response")
+async def response_preset_catalog():
+    """The per-agent reply-format preset menu (§7.14, §11 #39).
+
+    A small catalog of canned response formats (id · label · description),
+    including the operator's TL;DR-table + emoji-status house style. The operator
+    picks one per agent (Create / Agent panel); the chosen preset's instruction is
+    appended to that agent's system prompt at launch so every reply follows the
+    format. ``default`` is the no-op (the agent's own natural style)."""
+    return {"default": response_presets.DEFAULT_PRESET,
+            "presets": response_presets.catalog()}
+
+
+@app.get("/sessions/{session_id}/response-preset")
+async def get_response_preset(session_id: str):
+    """The agent's chosen reply-format preset id (§11 #39), or ``None``."""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id,
+            "response_preset": sessions[session_id].response_preset}
+
+
+@app.post("/sessions/{session_id}/response-preset")
+async def set_response_preset(session_id: str, req: SetResponsePresetRequest):
+    """Choose an agent's reply-format preset (§7.14, §11 #39), persisted to
+    ``state/agents.json``.
+
+    The choice reaches and persists to the agent: it lands on ``session`` +
+    the driver config + the roster record (the same persist path as
+    ``update_identity``), so it survives a sidecar restart. Because the preset is
+    injected via ``--append-system-prompt`` (a launch flag a running TUI can't be
+    re-scoped with), a change here **takes effect at the next launch/restart** —
+    exactly like per-agent MCP/model/plugins (§7.15). The create-time choice IS
+    applied immediately (the agent launches with it). 400 on an unknown preset id.
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not response_presets.is_valid(req.preset):
+        raise HTTPException(status_code=400,
+                            detail=f"unknown response preset {req.preset!r}")
+    session = sessions[session_id]
+    session.response_preset = req.preset
+    drv = session.driver
+    # Keep the driver's config copy in sync (what the bridge driver persists).
+    if drv is not None and getattr(drv, "config", None) is not None:
+        drv.config.response_preset = req.preset
+    # Persist through the roster record (§8.2) so a restart keeps the choice.
+    rec = getattr(drv, "_record", None)
+    if isinstance(rec, dict):
+        rec["response_preset"] = req.preset
+        try:
+            import runtime_store
+            runtime_store.save_record(rec)
+        except Exception as e:  # pragma: no cover - persistence is best-effort
+            logger.warning("response-preset persist failed for %s: %s", session_id, e)
+    return {"status": "ok", "session_id": session_id, "response_preset": req.preset}
 
 
 @app.post("/sessions/{session_id}/permission")

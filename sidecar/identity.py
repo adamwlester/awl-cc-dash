@@ -30,7 +30,10 @@ the human-name pools, and in-panel identity editing (v1 is read-only).
 
 from __future__ import annotations
 
+import json
+import random
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 # The agent colors as (name, hex), in the mockup's interleaved round-robin order
@@ -92,6 +95,74 @@ def _discover_icons() -> list[str]:
 
 # Full discovered set (167) — the manual picker / recolor endpoint use this.
 AG_ICONS: list[str] = _discover_icons()
+
+
+# --- Name pool (§7.5, §11 #40) — the Create-panel randomize / auto-name draw ---
+#
+# The curated 179-name pool ships at assets/names/agent-names.json — one-word,
+# 3-5-letter, lowercase names, each validated to double safely as a git
+# commit-author name (§11 #19). The Create panel's randomize affordance draws an
+# UNUSED name from it; a user-typed name is ALWAYS allowed (the pool is a
+# convenience, never a constraint). Loaded once and cached, exactly like the icon
+# set above — a stripped/unreadable asset tree degrades to a single default so a
+# name draw never crashes.
+
+_DEFAULT_NAME = "agent"
+
+
+def _load_name_pool() -> list[str]:
+    """The shipped curated name pool from ``assets/names/agent-names.json``.
+
+    Returns the JSON's ``names`` list (179 lowercase names), each stripped and
+    non-empty. Falls back to ``[_DEFAULT_NAME]`` when the file is
+    missing/unreadable/mis-shaped, so drawing a name never fails on a stripped
+    asset tree (mirrors :func:`_discover_icons`).
+    """
+    try:
+        repo_root = Path(__file__).resolve().parents[1]
+        pool_path = repo_root / "assets" / "names" / "agent-names.json"
+        data = json.loads(pool_path.read_text(encoding="utf-8"))
+        raw = data.get("names") if isinstance(data, dict) else None
+        cleaned = [str(n).strip() for n in raw if str(n).strip()] \
+            if isinstance(raw, list) else []
+        return cleaned or [_DEFAULT_NAME]
+    except Exception:
+        return [_DEFAULT_NAME]
+
+
+# The cached pool — the randomize/auto-name draw reads this.
+NAME_POOL: list[str] = _load_name_pool()
+
+
+def draw_name(
+    exclude: Iterable[str] | None = None,
+    *,
+    pool: list[str] | None = None,
+    rng: random.Random | None = None,
+) -> str | None:
+    """Draw a random UNUSED name from the pool (§7.5, §11 #40).
+
+    ``exclude`` is the set of names already taken (live / known agents) — matched
+    **case-insensitively**, so a user-typed ``"Ivy"`` still blocks the pool's
+    ``"ivy"``. The draw is over the names NOT excluded; when every pool name is
+    excluded it falls back to the FULL pool (a best-effort duplicate beats
+    returning nothing — the 179-name pool makes true exhaustion unlikely, and a
+    user-typed name is always allowed regardless). Returns ``None`` only when the
+    pool itself is empty.
+
+    Hermetic by construction: inject ``pool`` and/or ``rng`` (a
+    :class:`random.Random`) so a unit test pins a deterministic draw with no real
+    randomness in the assertion.
+    """
+    names = pool if pool is not None else NAME_POOL
+    if not names:
+        return None
+    taken = {str(e).strip().lower() for e in (exclude or []) if str(e).strip()}
+    available = [n for n in names if n.lower() not in taken]
+    if not available:
+        available = list(names)  # exhausted — best-effort, allow a repeat
+    chooser = rng or random
+    return chooser.choice(available)
 
 
 def assign_identity(requested: dict | None, ordinal: int) -> dict:

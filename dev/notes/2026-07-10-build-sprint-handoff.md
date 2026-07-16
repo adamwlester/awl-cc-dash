@@ -2,6 +2,26 @@
 
 > **What this is:** the running state file for THE build sprint (prompt: `dev/prompts/2026-07-09-build-sprint-run.md`). If the driving session dies or hands off, a fresh session continues FROM HERE: read the prompt, read this file, check `git log` + DEVLOG since `9c58ded`, then pick up at "NEXT ACTIONS". Update this file at every stage boundary.
 
+## ⚠⚠ HANDOFF @ 2026-07-15 (build-sprint SESSION 2 — mid-Stage-5; AUTHORITATIVE, supersedes the post-restart section below for STATE)
+
+Session 2 resumed from the post-restart handoff and drove the sprint forward. **Reconcile from `git log` + DEVLOG (both current), not from background agents.** Everything below is committed + pushed to `origin/main`.
+
+**DONE this session (each with a DEVLOG entry + ARCHITECTURE §11 tombstone):**
+- **Stage 3** — §11 #29–#34 marker sweep (`8f3aaf5`). **Stage 4** — renderer #37 recovered (clean merge `dce54bb`), verified headed (all surfaces PASS, Console xterm streams live), 2 bug fixes (`3344dfa`). **`.npmrc`** pins `legacy-peer-deps` (the vite8/electron-vite5 set).
+- **Stage 5 backend:** #19 git identity (`a547bc6`), #18 archive (`0611bd9`), #15 rewind/fork (`96568d6`), #17 resume + #16 handoff artifacts (`93d8077`). Hermetic tier **890 passed** (was 777).
+- #40/#41/#39 renderer-feature backends **in flight** (a batch subagent) as of this note.
+
+**REMAINING (priority order):**
+1. Finish the #40/#41/#39 backend batch (name-pool draw, authors provenance, response presets) → commit + tombstone.
+2. **#23 workflow approval** (spike-proven, `tests/workflow_approval_probe/`), then **#46** per-turn capture, **#44** docs-in-context, **#28** import extractors, **#45** prompt/UI-text library, **#24** queue awareness.
+3. **Comprehensive renderer-wiring pass** (`frontend/src/renderer`, api.ts): stage-3 display (#30 context breakdown, #32 cost-on-cards — endpoints exist), #38 degraded-mode/backoff + narrow-width clamp (<~1130px middle column collapses), and the UI halves of #39/#40/#41 + the #15 Timeline + #18 archive + #17 resume surfaces. Re-verify headed via `dev/tools/ui-verify` (resize extremes, click every control).
+4. **Isolated lanes** (main.py-free, low priority): #20 Electron one-click, #47 git-automation, #48 change-log watcher, #49 system-check agent.
+5. **Stage 6** — §10 #1 attachment ladder (sidecar-served asset endpoint default).
+6. **Final** — `start-dashboard.bat` e2e proof (real agent via the hydrated sidecar, events/inbox/links/scratchpad/console/fork flow, screenshots to `.scratch/`), commit the dogfood `.awl-cc-dash/` (#10), then the final §11 per-item report.
+7. **Run-end cleanup** — remove the 5 leftover worktrees (renderer `agent-a793…` now merged; `agent-a862…` merged; `wf_8dfaa290-a45-1..4` abandoned) + delete their branches.
+
+**Method in force:** backend spine built SERIALLY in the main tree (one subagent per item/batch — the shared `sidecar/main.py` makes parallel worktrees conflict-heavy), reviewed + tested (hermetic green) + committed + pushed by the orchestrator; small clean items batched 2–3 per subagent. **Environment ready:** launch in bypass; hydrate `CLAUDE_CODE_OAUTH_TOKEN` from the User env var in any shell that starts the sidecar/live tests (this VS Code session doesn't natively carry it — see the 2026-07-15 auth note). ttyd is installed (Console streams). Backend halves of renderer features exist; the renderer UI wiring is the remaining big frontend chunk.
+
 ## Ground rules in force (from the prompt — read it in full)
 - Full autonomy, never pause for the operator. Git license granted for this run (branches/worktrees OK; merge back + delete before run end; commit/push main continuously).
 - Hermetic tier green after every backend stage: `.venv\Scripts\python.exe -m pytest tests\ -m "not integration and not slow" -q`.

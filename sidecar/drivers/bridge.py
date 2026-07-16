@@ -705,6 +705,15 @@ class BridgeDriver(AgentDriver):
         except ImportError:  # pragma: no cover - package import (tests)
             from .. import identity as _identity  # type: ignore[no-redef]
         git_author_name, git_author_email = _identity.git_author(self.config.identity)
+        # Response-format preset (§7.14, §11 #39): resolve the operator's chosen
+        # reply-format instruction and append it to the agent's system prompt at
+        # launch, so every reply the agent writes follows the format. Empty for
+        # the default / none / unknown preset -> nothing appended (natural style).
+        try:
+            import response_presets as _presets  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import response_presets as _presets  # type: ignore[no-redef]
+        append_system_prompt = _presets.instruction_for(self.config.response_preset) or None
         info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
@@ -717,6 +726,7 @@ class BridgeDriver(AgentDriver):
             display_name=display_name,
             git_author_name=git_author_name,
             git_author_email=git_author_email,
+            append_system_prompt=append_system_prompt,
             **kwargs,
         )
         # Remember the launched claude session id so it can be persisted for
@@ -784,6 +794,9 @@ class BridgeDriver(AgentDriver):
                 "mcp_servers": self.config.mcp_servers,
                 # Dashboard-owned identity, persisted so it survives restart.
                 "identity": self.config.identity,
+                # Per-agent reply-format preset id (§11 #39), persisted so the
+                # choice survives a restart (reconnect reads it back).
+                "response_preset": self.config.response_preset,
             })
             self._record = record
             try:

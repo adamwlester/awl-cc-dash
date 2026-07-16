@@ -592,7 +592,7 @@ class TmuxBridge:
                settings=None, mcp_config=None, session_id=None,
                resume_session_id=None, display_name=None,
                git_author_name=None, git_author_email=None,
-               fork_session=False):
+               fork_session=False, append_system_prompt=None):
         """Spawn a named tmux session running the Claude Code TUI.
 
         Per-agent permissions, plugins, and MCP scoping are applied AT LAUNCH
@@ -689,6 +689,12 @@ class TmuxBridge:
                 discovers + registers it post-launch. ``resumed_conversation``
                 and ``forked`` are both True. Higher-level branch-from-N (rewind
                 the fork to an earlier prompt) is ``fork()``'s job, not this flag.
+            append_system_prompt: Optional text APPENDED to the default system
+                prompt via ``--append-system-prompt`` (§7.14, §11 #39 — the
+                per-agent reply-format preset instruction). Appends, never
+                replaces, so the agent keeps all built-in capabilities and only
+                its reply FORMAT is shaped. ``None``/empty adds nothing. Rides the
+                argv directly (short, shell-quoted), no per-agent file.
 
         Returns:
             dict with session info: name, cwd, pid, session_id (None for a
@@ -775,6 +781,14 @@ class TmuxBridge:
         if mcp_config is not None:
             mcp_path = self._write_agent_config(name, "mcp.json", mcp_config)
             argv += ["--mcp-config", mcp_path, "--strict-mcp-config"]
+        if append_system_prompt:
+            # Per-agent reply-format preset (§7.14, §11 #39): APPEND the chosen
+            # format instruction to the default system prompt (not replace it),
+            # so the agent keeps its normal capabilities and only its reply
+            # FORMAT is constrained. Short (a few hundred chars) — well under the
+            # command-line limit, so it rides the argv directly (shell-quoted by
+            # the join below), no per-agent file needed.
+            argv += ["--append-system-prompt", append_system_prompt]
 
         claude_cmd = " ".join(shlex.quote(a) for a in argv)
         # Per-agent git attribution (ARCHITECTURE §7.5, §11 #19): prepend the four

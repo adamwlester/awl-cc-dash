@@ -83,9 +83,15 @@ def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
 
     Each entry::
 
-        {"filename": str, "path": str, "size": int, "modified": str(iso)}
+        {"filename": str, "path": str, "size": int, "modified": str(iso),
+         "provenance": {created_by?, created_at?, session?}}
 
-    Results are sorted by ``filename`` for a stable rendering order.
+    The ``provenance`` block (§8.5, §11 #41) is lifted from the doc's paired
+    ``.meta.json`` sidecar (created-by / when / session) so the renderer's Authors
+    lens can group by author straight off the listing; it is ``{}`` for any doc
+    with no sidecar or no recorded provenance (a browse-read-only ``.md`` outside
+    the store, or a doc the dashboard never stamped). Results are sorted by
+    ``filename`` for a stable rendering order.
     """
     base = Path(root_dir)
     if subdir:
@@ -106,6 +112,7 @@ def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
                 "path": str(child),
                 "size": st.st_size,
                 "modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                "provenance": doc_provenance(child),
             }
         )
     entries.sort(key=lambda e: e["filename"])
@@ -115,8 +122,13 @@ def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
 def read_document(path: str) -> dict:
     """Read a single document's raw text.
 
-    Returns ``{"filename": str, "path": str, "content": str}``. Raises
-    :class:`FileNotFoundError` if the file does not exist (or isn't a file).
+    Returns
+    ``{"filename": str, "path": str, "content": str, "provenance": {...}}``.
+    ``provenance`` (§8.5, §11 #41) is the created-by / when / session block from
+    the doc's paired ``.meta.json`` sidecar, or ``{}`` when there is none — so the
+    Authors lens can read a single doc's author on open, not only from the
+    listing. Raises :class:`FileNotFoundError` if the file does not exist (or
+    isn't a file).
     """
     p = Path(path)
     if not p.is_file():
@@ -125,6 +137,7 @@ def read_document(path: str) -> dict:
         "filename": p.name,
         "path": str(p),
         "content": p.read_text(encoding="utf-8"),
+        "provenance": doc_provenance(p),
     }
 
 
@@ -326,6 +339,18 @@ def set_provenance(
     if "created_at" not in prov:
         prov["created_at"] = _utc_now()
     return save_meta(md_path, meta)
+
+
+def doc_provenance(md_path: str | Path) -> dict:
+    """The document's provenance block (``{created_by?, created_at?, session?}``).
+
+    Read straight off the paired ``.meta.json`` sidecar via :func:`load_meta`, so
+    a missing/corrupt sidecar or an un-stamped doc degrades to ``{}`` rather than
+    raising — the Library read path (§11 #41: the Authors lens) never fails on a
+    doc that carries no provenance. Read-only; never writes a sidecar.
+    """
+    prov = load_meta(md_path).get("provenance")
+    return prov if isinstance(prov, dict) else {}
 
 
 def rename_document_pair(md_path: str | Path, new_filename: str) -> dict:

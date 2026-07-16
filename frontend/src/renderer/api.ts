@@ -32,6 +32,20 @@ export interface LaunchConfig {
   permission_rules: Record<string, string[]> | null
   enabled_plugins: Record<string, boolean> | null
   mcp_servers: string[] | null
+  // Per-agent reply-format preset id (§11 #39); null = the agent's default style.
+  response_preset?: string | null
+}
+
+// Response-format preset menu (§7.14/§11 #39). The instruction text is a launch
+// detail the sidecar owns; the menu carries only id/label/description.
+export interface ResponsePreset {
+  id: string
+  label: string
+  description: string
+}
+export interface ResponsePresetCatalog {
+  default: string
+  presets: ResponsePreset[]
 }
 
 // The arbitrated run-state (§7.4): hook-pushed fields when fresh (source="push"),
@@ -198,8 +212,13 @@ export interface LinksResponse {
 
 export interface ScratchPost { seq: number; author: string; text: string; ts: string }
 
-export interface LibraryDoc { filename: string; path: string; size: number; modified: string }
-export interface LibraryDocument { filename: string; path: string; content: string }
+// Provenance (created-by / when / session) lifted from a doc's .meta.json
+// sidecar (§8.5) onto the Library read path so the Authors lens (§11 #41) can
+// group by author. `{}` for un-stamped / browse-read-only docs.
+export interface DocProvenance { created_by?: string; created_at?: string; session?: string }
+
+export interface LibraryDoc { filename: string; path: string; size: number; modified: string; provenance?: DocProvenance }
+export interface LibraryDocument { filename: string; path: string; content: string; provenance?: DocProvenance }
 export interface Review { owner?: string; state?: string; verdict?: string; comments?: any; updated_at?: string }
 
 // Per-doc .meta.json sidecar shape (§8.5): review + comments + provenance.
@@ -220,7 +239,7 @@ export interface DocMeta {
   verdict_by?: string
   verdict_at?: string
   comments?: DocComment[]
-  provenance?: { created_by?: string; created_at?: string; session?: string }
+  provenance?: DocProvenance
   updated_at?: string
 }
 
@@ -278,6 +297,9 @@ export interface CreatePayload {
   // values; older sidecars ignore unknown fields.
   mcp_servers?: string[] | null
   enabled_plugins?: Record<string, boolean> | null
+  // Chosen reply-format preset id (§11 #39) — injected at launch. Omit for the
+  // agent's default style.
+  response_preset?: string | null
 }
 
 export type Disposition = 'now' | 'next' | 'queue' | 'hold' | 'inject'
@@ -392,6 +414,21 @@ export const api = {
   // 400 on a retired number; a name change also /rename's the live session.
   updateIdentity: (id: string, patch: Partial<Identity>) =>
     postJSON<{ status: string; session_id: string; identity: Identity }>(`/sessions/${id}/identity`, patch),
+  // Draw a random unused agent name from the shipped 179-name pool (§7.5/#40).
+  // The draw excludes every live agent's name; pass `exclude` for extra names
+  // (e.g. one staged in the Create form). A user-typed name is always allowed.
+  randomName: (exclude?: string[]) =>
+    getJSON<{ name: string | null }>(`/identity/random-name${qs({ exclude: exclude?.length ? exclude.join(',') : undefined })}`),
+
+  // ---- response-format presets (§7.14/§11 #39) ----------------------------
+  // The menu, plus per-agent get/set. A set persists to state/agents.json and
+  // takes effect at the agent's next launch/restart (append-system-prompt is a
+  // launch flag); the create-time choice applies immediately. 400 on unknown id.
+  responsePresets: () => getJSON<ResponsePresetCatalog>('/presets/response'),
+  responsePreset: (id: string) =>
+    getJSON<{ session_id: string; response_preset: string | null }>(`/sessions/${id}/response-preset`),
+  setResponsePreset: (id: string, preset: string) =>
+    postJSON<{ status: string; session_id: string; response_preset: string }>(`/sessions/${id}/response-preset`, { preset }),
 
   // ---- per-agent readouts --------------------------------------------------
   context: (id: string) => getJSON<ContextUsage>(`/sessions/${id}/context`),

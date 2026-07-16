@@ -60,6 +60,10 @@ class DriverConfig:
     # create time. Not a launch flag — it rides along so the bridge driver can
     # persist it in the runtime record for restart-survival. Drivers ignore it.
     identity: Optional[dict[str, Any]] = None
+    # Per-agent reply-format preset id (§7.14, §11 #39). The bridge driver
+    # resolves it to a format instruction and appends it to the agent's system
+    # prompt at launch (`--append-system-prompt`); other drivers ignore it.
+    response_preset: Optional[str] = None
 
 
 EventCallback = Callable[[dict[str, Any]], None]
