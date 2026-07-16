@@ -797,6 +797,14 @@ Files: bridge/bridge.py, sidecar/drivers/bridge.py, sidecar/main.py, sidecar/cha
 
 ---
 
+### 2026-07-16 04:09:04 — build-run Phase 1 merged: §11 #20 one-click launch + the #50 design half (lanes → main)
+
+Merged the two Phase-1 worktree lanes to main (merges `fc5f590`, `0913e46`) after the serial backend spine landed #46/#23/#44/#45/#28/#24/#47–#49 (commits `cd3217a`…`3c95b7d`, each adversarially reviewed + doc-swept + pushed individually — see their entries via git log; hermetic tier 943 → **1226**). **#20 one-click launch:** new [frontend/src/main/sidecar.ts](frontend/src/main/sidecar.ts) — adopt-or-spawn on `/health` (supervised child using the start-dashboard.bat invocation, `.venv` python preferred, logs to `.scratch/`), §3.4 close semantics via a native v1 dialog (Close = terminate owned child, detached agents survive; Close & stop = best-effort graceful stop; adopted sidecar never killed), crash-restart deferred; verified in-lane (build, strict typecheck, spawn/Close smokes — the interactive dialog drive rides the phase-3 e2e). **#50 design half:** [design/](design/) gains the launch-arm gating (#13), the Past tab (resume picker #17 + archive roster #18), the workflow Approve/Reject Review card (#23), the Library-header Import control (#28 — host-panel decision + rationale recorded in DESIGN.md), and the subagent activity dot (§7.17); the Projects surfaces already existed and were verified; headed-verified via ui-verify (37 screenshots), variant-lint clean. Post-merge verification on main: hermetic **1226 passed**, `npm run build` green, variant-lint violations none. ARCHITECTURE swept: §2/§3.2/§4.1 #20 markers cleared + #20 tombstoned; #50 row updated to design-half-built (Timeline design + renderer wiring remain); §11.1 re-trued. Known type-hygiene debt flagged (not defects): Pyright None-narrowing in `prompt_library.parse_markdown`/`library.migrate_legacy_reviews`, and the pre-existing driver setter return-type looseness vs `AgentDriver`.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md (merge commits: frontend/src/main/index.ts, frontend/src/main/sidecar.ts, design/mockup.html, design/styles.css, design/behavior.js, design/DESIGN.md)
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

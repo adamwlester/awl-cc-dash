@@ -110,7 +110,7 @@ Two boundaries matter most:
 - **Frontend ↔ sidecar** is a plain **localhost HTTP + SSE** boundary. The Electron app is a thin client
   — thin enough that a browser tab could replace the shell (the renderer falls back to
   `http://127.0.0.1:7690` when `window.awl` is absent). `start-dashboard.bat` launches the sidecar and the
-  Electron app together, but they are **independent processes**. The decided end-state is **one-click launch**: Electron main owns sidecar spawn / supervise / shutdown with detach-on-close — the lifecycle is proven, modeled in Python (`test_oneclick_launch_live`, live, 2026-07-02); porting it into Electron main is queued (§11 #20). ⚠ **Today:** the `.bat` two-process launch is the shipped model until that lands.
+  Electron app together, but they are **independent processes**. The decided end-state is **one-click launch**: Electron main owns sidecar spawn / supervise / shutdown with detach-on-close — the lifecycle is proven, modeled in Python (`test_oneclick_launch_live`, live, 2026-07-02); **ported into Electron main** (§11 #20, built 2026-07-16): on start the app adopts a running sidecar on `:7690` or spawns it as a supervised child ([`frontend/src/main/sidecar.ts`](../frontend/src/main/sidecar.ts)), and window close runs the §3.4 semantics (Close = quit + terminate the owned child, detached agents survive; Close & stop = best-effort graceful agent stop first; an adopted sidecar is never killed) via a native v1 dialog — the styled in-app dialog rides #50. `start-dashboard.bat` stays the documented fallback; crash-restart supervision stays deferred per the manual-relaunch posture.
 - **Sidecar ↔ agents** crosses the **Windows→WSL2** boundary. Outbound (drive the agent) goes
   `sidecar → bridge → wsl -d Ubuntu -- bash -c '…' → tmux`. Inbound-by-poll (read the agent) is
   `capture-pane` + the transcript JSONL. Inbound-by-push (hooks) is the agent **POSTing back** to the
@@ -216,8 +216,7 @@ An **electron-vite** project with the three standard process layers.
 ### 4.1 Process layers
 - **Main** — [`frontend/src/main/index.ts`](../frontend/src/main/index.ts): creates one `BrowserWindow`
   (1440×900, dark chrome), wires the preload bridge (`contextIsolation: true`, `nodeIntegration: false`),
-  and loads the renderer. It is deliberately **frontend-only** *today* — it does not yet launch the Python
-  sidecar (one-click launch is decided and queued, §2 / §11 #20).
+  and loads the renderer, and owns the sidecar lifecycle (adopt-or-spawn + close semantics — §2, §11 #20, built 2026-07-16).
 - **Preload** — [`frontend/src/preload/index.ts`](../frontend/src/preload/index.ts): a minimal context
   bridge exposing only `window.awl.sidecarUrl = 'http://127.0.0.1:7690'`. No RPC to main; all data flow is
   HTTP/SSE to the sidecar.
@@ -273,7 +272,7 @@ drive the live loop" against that contract, independent of the parked renderer.
 **Scope of the freeze — renderer only, not the Electron shell.** What is frozen is the **visible UI**:
 layout, styling, components, and their interaction behaviour — the surface the design system owns. The
 Electron **main-process shell** is *not* frozen and is *not* design-owned: sidecar spawn/supervise/shutdown
-(proven in the Python model, §2; the Electron-main port is the unproven half — §11 #20), window + app
+(proven in the Python model, §2, and ported into Electron main — §11 #20, built 2026-07-16), window + app
 lifecycle, detach-on-close, and packaging still carry feasibility unknowns to prove. "Don't build the frontend yet" means the renderer UI — never the shell
 plumbing.
 
@@ -1111,8 +1110,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 
 | Body § | What's owed today | Queue item |
 |--------|-------------------|------------|
-| §2, §4.1 | One-click launch: Electron main doesn't spawn/supervise the sidecar (`.bat` is the launcher) | #20 |
-| §3.1–§3.5, §9.1 | Projects UI (picker tab, chip, close dialog) + picker-first startup — the system side is built | #50, #20 |
+| §3.1–§3.5, §9.1 | Projects UI in the renderer (chip, close dialog, picker-first startup) — the mockup surfaces + the system side are built | #50 |
 | §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) | #13 UI, #50 |
 | §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not surfaced in the UI roster | #50 |
@@ -1144,7 +1142,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 17. *(built 2026-07-15 — on-demand per-agent resume: `GET /sessions/past` (dead roster records + archived records, tagged `source`/`resumable`) + `POST /sessions/resume {session_id|name|archive_id}` riding the #8 cold path (`claude --resume`, same id); resume-from-archive un-retires the record (reversible Retire per §7.12). The file-explorer pick rides #37. See DEVLOG)*
 18. *(built 2026-07-15 — per-project `state/archive.json`, a distinct-ID (`arc…`) table of LIGHT records written through the atomic state-store; Retire = deep-freeze archived by default, Delete = true wipe (never archived), transcripts referenced in place (§8.6, never copied), reserved lineage fields (parent/fork/handoff), per-agent git author from #19; `GET /archive`, `GET /archive/{id}`, `DELETE /archive/{id}` (true-delete of a row). Archiving is additive — dropping the live-roster row on retire ties to #17/picker-first startup, deferred. See DEVLOG)*
 19. *(built 2026-07-15 — per-launch `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env injection at bridge launch (not repo-local `git config`, which would collide across a shared `.git/config`), synthetic `<slug>-<number>@agents.awl-cc-dash.invalid` emails, so "what did AI touch" = `git log --author='@agents.awl-cc-dash.invalid'`; helpers `git_author`/`git_env` in `sidecar/identity.py`. Feeds the lineage / archive substrate (#18). Per-folder `index.md` deferred (drift-accepted). See DEVLOG)*
-20. **One-click launch — Electron-main sidecar lifecycle** *(→ §2, §4.1)* — port the Python-modeled spawn/supervise/shutdown lifecycle (`test_oneclick_launch_live`) into Electron main: own the venv path and shutdown ordering, preserving **detach-on-close** of running tmux agents through the §3.4 close dialog (crash/restart supervision stays deferred per §2's manual-relaunch posture — include only if unattended operation matters). Fallback if the port hits a wall: the `.bat` two-process launch stays the shipped model. Where: [`frontend/`](../frontend/).
+20. *(built 2026-07-16 — Electron main owns the sidecar lifecycle: adopt-or-spawn on `/health` ([`frontend/src/main/sidecar.ts`](../frontend/src/main/sidecar.ts) — supervised child using the start-dashboard.bat invocation, `.venv` python preferred, logs to `.scratch/`), §3.4 close semantics via a native v1 dialog (Close = terminate the owned child, detached tmux agents survive; Close & stop = best-effort graceful stop first; an adopted sidecar is never killed), crash-restart deferred per §2. Verified in-lane: build + strict typecheck + spawn/Close smokes; the interactive dialog drive + tmux Read-backs ride the phase-3 e2e; the styled in-app close dialog rides #50. `start-dashboard.bat` stays the documented fallback. See DEVLOG.)*
 
 ### 11.4 Coordination spine, hooks & inbox (#21–28)
 
@@ -1175,7 +1173,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 39. *(backend built 2026-07-15 — 6-preset catalog incl. the operator's `tldr_table` (TL;DR + emoji) in `sidecar/response_presets.py`, per-agent set/get persisted to `state/agents.json`, injected at launch via `--append-system-prompt` (append, not replace — shapes format, keeps capabilities; applies at next launch/restart per §7.15); `GET /presets/response`, `GET|POST /sessions/{id}/response-preset`; api.ts wired. The preset-menu UI + per-message override ride #37. See DEVLOG)*
 40. *(backend built 2026-07-15 — `identity.draw_name()` draws an unused name from the shipped 179-name pool + `GET /identity/random-name?exclude=` (excludes live names); api.ts `randomName`. The Create-panel randomize/auto-name UI rides #37. See DEVLOG)*
 41. *(backend built 2026-07-15 — `library.doc_provenance()`; created-by/when/session provenance now rides `GET /library/documents` + `GET /library/document`; api.ts types. The Authors-lens consumption rides #37. See DEVLOG)*
-50. **Design surfaces + renderer wiring for the built backends** *(→ §3.1–§3.5, §7.11, §7.12, §7.16, §7.19, §9.1, §9.9; entered 2026-07-15 under the operator's design license — the design lane designs the surfaces into `design/` with full five-file propagation, then the renderer consumes them)* — design the missing mockup surfaces and wire the rebuilt renderer to the already-built backends: the **Projects** picker tab / active-project chip / §3.4 close dialog; the **Bypass/Auto launch-gating** Create-panel UI (#13); the **past-agents resume picker** (#17 — `GET /sessions/past` + `POST /sessions/resume`); the **archive roster** (#18 — `GET /archive`); the Inbox **Review card** with Approve/Reject for workflow approval (#23); the **Import control** (#28 — the host panel is the design lane's call); the **subagent active-vs-quiet roster signal** (§7.17); and the **Timeline** (§7.19 — rides the #46 capture). Where: `design/`, then [`frontend/src/renderer/`](../frontend/src/renderer/).
+50. **Design surfaces + renderer wiring for the built backends** *(→ §3.1–§3.5, §7.11, §7.12, §7.16, §7.19, §9.1, §9.9; entered 2026-07-15 under the operator's design license)* — **design half BUILT 2026-07-16** (headed-verified, 37 screenshots): the **Bypass/Auto launch-arm gating** (#13 — `launch-arm` block, un-armed segments absent from the mode ring), the **Past tab** with resume picker + archive roster (#17/#18), the Inbox **Review card** with Approve/Reject (#23), the **Import control** in the Library header (#28 — host-panel decision + rationale recorded in DESIGN.md), and the **subagent activity dot** (§7.17); the **Projects** picker/chip/close-dialog surfaces already existed in the mockup and were verified. **Remaining:** the **Timeline surface design** (§7.19 — the #46 capture + `GET /sessions/{id}/timeline` now exist to design against) and the **renderer wiring half** for all of the above. Where: `design/` (Timeline), then [`frontend/src/renderer/`](../frontend/src/renderer/).
 
 ### 11.7 Platform, hygiene & support (#42–49)
 
