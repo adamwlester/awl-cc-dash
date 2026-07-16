@@ -55,6 +55,7 @@ import utility_llm
 import handoff
 import subagents_naming
 import prompt_library
+import import_context
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("awl-sidecar")
@@ -1347,6 +1348,25 @@ class HandoffReportRequest(BaseModel):
     records which agent the handoff is FOR (provenance only)."""
     target_session_id: str | None = None
     model: str | None = None
+    cwd: str | None = None
+
+
+class ImportExternalRequest(BaseModel):
+    """Import an OUTSIDE Claude session by title (§11 #28; engine:
+    ``sidecar/import_context.py``).
+
+    ``source`` = ``web`` (claude.ai — needs the tool's gitignored
+    ``session_key.txt``) | ``desktop`` (the desktop app's local store).
+    ``destination`` picks where the captured markdown lands — one engine, one
+    selectable destination: ``agent`` (deliver onto ``target_agent``'s §7.3
+    prompt queue), ``panel`` (return the markdown for the operator read
+    panel), ``library`` (a §7.16 reference doc under ``cwd``'s project store,
+    provenance stamped). ``cwd`` is only meaningful for ``library``;
+    ``target_agent`` only for ``agent``."""
+    source: str
+    title: str
+    destination: str
+    target_agent: str | None = None
     cwd: str | None = None
 
 
@@ -4066,6 +4086,127 @@ async def get_usage():
         # The status-footer token pill jumps to Usage; this is its value.
         "token_pill": fleet_tokens,
     }
+
+
+# ============================================================================
+# §11 #28 — Import external Claude context (engine: sidecar/import_context.py)
+# ============================================================================
+
+def _import_http_error(e: Exception) -> HTTPException:
+    """Map the import engine's typed degrades to honest, plain-language HTTP
+    errors (§11 #28's honest-degrade instruction): a missing prerequisite
+    (session key / desktop store / extractor tool) or any other extractor
+    failure is a 400 the operator can act on, no-title-match is 404, and the
+    bounded subprocess timeout is 504 — never a crash, never a hang."""
+    if isinstance(e, HTTPException):
+        return e  # already-typed (e.g. the deliver-time 409) — pass through
+    if isinstance(e, import_context.SessionNotFoundError):
+        return HTTPException(status_code=404, detail=str(e))
+    if isinstance(e, import_context.ExtractorTimeoutError):
+        return HTTPException(status_code=504, detail=str(e))
+    if isinstance(e, (import_context.ImportContextError, ValueError)):
+        return HTTPException(status_code=400, detail=str(e))
+    return HTTPException(status_code=500, detail=f"import failed: {e}")
+
+
+@app.get("/import/external")
+async def list_import_external(source: str):
+    """List importable outside Claude sessions by title (§11 #28).
+
+    ``source=web|desktop`` runs the matching extractor's ``--list`` (in a
+    worker thread — the web one does network I/O) and returns
+    ``{source, sessions: [{source, id, title, updated_at, model}]}``. Honest
+    degrades per ``_import_http_error`` (400 missing key/store/tool with a
+    plain-language message, 504 on the bounded timeout)."""
+    try:
+        items = await asyncio.to_thread(import_context.list_external, source)
+    except Exception as e:
+        raise _import_http_error(e)
+    return {"source": source, "sessions": items}
+
+
+@app.post("/import/external")
+async def import_external(req: ImportExternalRequest):
+    """Import one outside Claude session by title to ONE destination (§11 #28).
+
+    Destination prerequisites are validated BEFORE the (network-bound) fetch:
+    400 on an unknown source/destination, a missing ``target_agent``, or a
+    ``library`` request whose ``cwd`` doesn't resolve to an existing project;
+    404 when the target agent doesn't exist. The engine call runs in a worker
+    thread. For ``destination=agent`` the markdown is enqueued on the target's
+    §7.3 prompt queue (``queue`` disposition — an idle agent flushes
+    immediately below, a busy one keeps it queued; never dropped) — and
+    because the fetch can span up to the extractor timeout, the target's
+    liveness is RE-CHECKED at delivery time: a target retired/deleted
+    mid-fetch is an honest 409, never an enqueue onto an orphaned session
+    reported as queued. ``panel`` returns the markdown; ``library`` writes the
+    provenance-stamped doc. Extractor degrades map per ``_import_http_error``."""
+    if req.destination not in import_context.DESTINATIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"destination must be one of "
+                   f"{'|'.join(import_context.DESTINATIONS)}, not {req.destination!r}")
+    if req.source not in import_context.SOURCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"source must be one of {'|'.join(import_context.SOURCES)}, "
+                   f"not {req.source!r}")
+    session: SessionState | None = None
+    if req.destination == "agent":
+        if not req.target_agent:
+            raise HTTPException(status_code=400,
+                                detail="destination 'agent' requires target_agent")
+        if req.target_agent not in sessions:
+            raise HTTPException(status_code=404, detail="Target agent not found")
+        session = sessions[req.target_agent]
+    if req.destination == "library":
+        # The library prerequisite — a cwd under an existing project — is as
+        # pre-checkable as the agent ones: fail the request BEFORE spending an
+        # up-to-timeout extractor run on an import that can never land.
+        root = storage.project_root(req.cwd)
+        if root is None or not root.is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail="destination 'library' requires cwd — an existing "
+                       "project folder for the imported doc to land under "
+                       "(<project>/.awl-cc-dash/docs/)")
+
+    def _deliver(agent_id: str, text: str) -> dict[str, Any]:
+        # The §7.3 conventional entry shape (mirrors /sessions/{id}/send),
+        # operator-attributed: the import is the operator handing context over.
+        # Liveness re-check first: this runs AFTER the network-length fetch,
+        # and the target can be retired/deleted meanwhile (close_session drops
+        # it from the roster) — enqueueing onto the orphaned SessionState
+        # would report "queued" while silently dropping the import.
+        if sessions.get(agent_id) is not session:
+            raise HTTPException(
+                status_code=409,
+                detail="the target agent was closed while the import was "
+                       "fetching — nothing was delivered; pick a live agent "
+                       "and retry")
+        entry = {
+            "id": str(uuid.uuid4())[:8],
+            "prompt": text,
+            "source": "user",
+            "recipients": [agent_id],
+            "disposition": "queue",
+            "enqueued_at": datetime.now().isoformat(),
+        }
+        return session.enqueue(entry, "queue")  # type: ignore[union-attr]
+
+    try:
+        result = await asyncio.to_thread(
+            import_context.import_by_title, req.source, req.title,
+            req.destination, req.target_agent, req.cwd, deliver=_deliver)
+    except Exception as e:
+        raise _import_http_error(e)
+    if session is not None and sessions.get(req.target_agent) is session:
+        # §11 #34: the delivered import is inbound activity — snap the poll
+        # cadence even while it sits queued (same rule as /sessions/{id}/send).
+        _nudge_driver(req.target_agent)
+        # An idle target takes the import now; a busy one keeps it queued (§7.3).
+        await _flush_queue(session)
+    return result
 
 
 # ============================================================================
