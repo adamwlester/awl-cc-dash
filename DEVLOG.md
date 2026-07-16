@@ -721,6 +721,14 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-15 23:11:30 — build-run doc-truing: operator decisions recorded + stale-marker sweep (#10/#29 tombstoned, #45 rescoped, cost decided out, #50 queued)
+
+Recorded the operator's go-decisions for the build-completion run in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and trued every stale marker found on the pass. **Decisions:** per-agent **cost-on-cards is decided OUT** (§7.15 rewritten — DESIGN.md's "Usage only" scope holds, the subscription context makes the dollar figure informational; `GET /sessions/{id}/cost` stays for an optional low-priority Details-level readout; the §11.1 conflict row removed); the **#45 prompt-library System scope is rescoped** to shipped in-repo defaults at `assets/prompts/` + the project copy at `.awl-cc-dash/docs/prompts/` (project-overrides-defaults; the `~/.claude` lean dropped — operator: nothing of the dashboard's lives in `~/.claude`); new **§11 #50** queues the design-surface + renderer-wiring set (Projects UI, #13 gating, #17 resume picker, #18 archive roster, #23 Review card, #28 Import control, §7.17 roster signal, #46-gated Timeline) under the operator's design license, with the §11.1 rows re-pointed to it. **Stale markers cleared** (all work already built + e2e-proven 2026-07-14/15): the §4 parked-renderer paragraph, §5.2 Library + Console endpoint rows, §7.5 16-colours/randomize, §7.10 marquee, §7.13 Console xterm, §7.19 "nothing is wired", and §11 rows **#10** (dogfood store committed at the e2e) + **#29** (xterm Console built with #37) tombstoned. Doc-only; hermetic tier re-verified **943 green** beforehand; environment probes green (token/WSLENV, tmux, ttyd 1.7.7).
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
