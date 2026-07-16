@@ -466,6 +466,9 @@ class BridgeDriver(AgentDriver):
         "subagents", "set_display_name", "context_breakdown", "cost",
         # Timeline (§7.19, §11 #15): in-place conversation rewind + fork-from-N.
         "rewind", "fork",
+        # Timeline per-turn capture (§11 #46): thin per-turn records persisted
+        # to the launch-config dir and read back for GET /sessions/{id}/timeline.
+        "timeline",
     }
 
     def __init__(
@@ -1163,6 +1166,48 @@ class BridgeDriver(AgentDriver):
         except (json.JSONDecodeError, ValueError):
             return None
         return payload if isinstance(payload, dict) else None
+
+    # --- Timeline per-turn capture (§7.19/§7.14, §11 #46) ----------------------
+
+    async def append_turn_record(self, record: dict) -> None:
+        """Persist one per-turn Timeline record (§11 #46) — thin, append-only.
+
+        One compact JSON line appended to this agent's launch-config dir
+        (``~/.awl-cc-dash-agents/<name>/turns.jsonl``, beside the §11 #31
+        ``statusline.jsonl``). The sidecar calls this at the exactly-once
+        turn-completion it derives from this driver's completion branch (see
+        ``events()`` step 3 — ``_pending_turn``/``_saw_reply_since_send``); the
+        settings-at-turn snapshot is NOT in the transcript, so per §8.3 it
+        persists thin here. Failures raise; the caller treats them as
+        best-effort (the in-memory mirror keeps the record).
+        """
+        line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+        await asyncio.to_thread(self._bridge.turns_append, self._name, line)
+
+    async def get_timeline(self) -> list[dict]:
+        """The ordered per-turn Timeline records (§11 #46), oldest first.
+
+        Reads the whole per-agent ``turns.jsonl`` back and parses each line;
+        blank and torn/corrupt lines are skipped (best-effort, like the
+        statusline tail). Missing file / failed read → an empty list, never an
+        error.
+        """
+        try:
+            text = await asyncio.to_thread(self._bridge.turns_read, self._name)
+        except Exception:
+            return []
+        records: list[dict] = []
+        for ln in (text or "").splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                obj = json.loads(ln)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if isinstance(obj, dict):
+                records.append(obj)
+        return records
 
     # --- /context deep readout (§7.18 source 1, §11 #30) -----------------------
 

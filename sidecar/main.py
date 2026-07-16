@@ -47,6 +47,7 @@ import state_store
 import scratchpad
 import watermark
 import runstate
+import timeline
 import marquee
 import console_catalog
 import settings_io
@@ -175,6 +176,24 @@ class SessionState:
         self._was_running: bool = False
         self.total_cost_usd: float = 0.0
         self.total_turns: int = 0
+        # §11 #46 — per-turn Timeline capture. The last-known effort/thinking
+        # levers, tracked when set through the dashboard endpoints (None until
+        # then — neither the run-state arbiter nor the statusline payload
+        # reports them, so the endpoints are the join's only source), plus the
+        # in-memory per-turn record mirror. The bridge driver ALSO persists
+        # each record thin to its launch-config turns.jsonl (§8.3); the mirror
+        # is the serve fallback for drivers with no persist surface.
+        self.last_effort: str | None = None
+        self.last_thinking: bool | None = None
+        self.turns: list[dict[str, Any]] = []
+        # Capture serialization: the tail of the per-session capture chain
+        # (each capture awaits its predecessor, so a stalled statusline
+        # snapshot can never let a later turn's record land first) and the
+        # records whose driver persist failed transiently — retried IN ORDER
+        # ahead of the next record, so `turns.jsonl` self-heals instead of
+        # holing permanently.
+        self._capture_tail: asyncio.Task | None = None
+        self._turns_pending: list[dict[str, Any]] = []
         self.driver: AgentDriver | None = None
         self.listen_task: asyncio.Task | None = None
 
@@ -305,6 +324,11 @@ class SessionState:
                     self.total_turns = self.turn_count
                     self._was_running = False
                     _raise_response_card(self)
+                    # §11 #46: capture this turn's settings + one-line summary.
+                    # Rides the SAME exactly-once completion gate as the turn
+                    # count (the driver's reply-gated completion → _was_running
+                    # consumed once) — never a parallel turn detector.
+                    _capture_turn(self)
                 # Reply-to: relay this finished turn back to a linked peer FIRST (uses
                 # this turn's output before a queued prompt starts a new turn), then
                 # the shared-context fire (§7.6), then flush the next queued prompt.
@@ -366,6 +390,9 @@ class SessionState:
             if self._was_running:
                 self.turn_count += 1
                 self._was_running = False
+                # §11 #46: per-turn capture on the SDK completion point too —
+                # same exactly-once gate as the turn count.
+                _capture_turn(self)
             _raise_response_card(self)
             # Reply-to relay, then the shared-context fire, then flush of the
             # next queued prompt.
@@ -746,6 +773,100 @@ def _raise_response_card(session: "SessionState") -> None:
             dedup_key=f"response:{session.session_id}")
     except Exception:  # pragma: no cover - a card must never break the turn loop
         pass
+
+
+def _capture_turn(session: "SessionState") -> None:
+    """Per-turn settings + summary capture (§7.19/§7.14, §11 #46) — scheduler.
+
+    Called ONLY at the exactly-once turn-completion points in ``handle_event``
+    (the bridge driver's reply-gated run→idle and the SDK driver's ``result``
+    — both consume ``_was_running`` once), never from a bare idle, so one
+    dashboard-initiated turn yields exactly one Timeline record.
+    ``handle_event`` is sync, so the join + persist run as a loop task; the
+    turn number, turn-start index, AND the timestamp are snapshotted HERE (a
+    queued follow-up prompt may move the indices before the task runs, and the
+    timestamp must mark the completion point, not append time). Captures are
+    SERIALIZED per session — each task awaits its predecessor before building
+    or appending — because stored order IS the read surface's re-minted
+    ordinal order: a capture whose statusline snapshot stalls on a slow WSL
+    round trip must never let a faster later turn's record land first. With no
+    running loop (hermetic sync callers) the capture is skipped silently — it
+    is a side-effect of the live loop, never load-bearing for the turn.
+    """
+    turn_no = session.turn_count
+    start_idx = session._turn_start_idx
+    ts = datetime.now().isoformat()
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    prev = session._capture_tail
+
+    async def _chained() -> None:
+        if prev is not None:
+            try:
+                await prev
+            except Exception:  # pragma: no cover - predecessor already logged
+                pass
+        await _capture_turn_record(session, turn_no, start_idx, ts)
+
+    session._capture_tail = loop.create_task(_chained())
+
+
+async def _capture_turn_record(session: "SessionState", turn_no: int,
+                               start_idx: int, ts: str | None = None) -> None:
+    """Build + store one per-turn Timeline record (§11 #46).
+
+    Settings-at-turn is a JOIN of what's already known at the turn boundary —
+    the statusline capture's model (§11 #31, the freshest boundary payload;
+    ``session.model`` is the fallback), the run-state arbiter's
+    ``permission_mode`` (§7.4 hook-pushed; ``session.permission_mode`` is the
+    fallback), and the session-tracked effort/thinking levers. The one-line
+    summary is the leading line of the turn's assistant reply (the §11 #39
+    preamble lean; first-sentence fallback, sanely truncated —
+    ``timeline.turn_summary``). The record lands in the in-memory mirror and —
+    for drivers with a persist surface (bridge) — appends thin to the
+    per-agent ``turns.jsonl`` (§8.3: the settings snapshot is NOT in the
+    transcript, so it must persist). Best-effort throughout: a failed join
+    source degrades to its fallback; a failed persist logs, keeps the
+    in-memory record, AND queues it for an in-order re-append ahead of the
+    next turn's record (``_turns_pending``), so a transient WSL hiccup never
+    permanently holes ``turns.jsonl``.
+    """
+    text = _last_turn_assistant_text(session, start_idx)
+    summary = timeline.turn_summary(text)
+    drv = session.driver
+    snap = None
+    if drv is not None and hasattr(drv, "get_statusline_snapshot"):
+        try:
+            snap = await drv.get_statusline_snapshot()
+        except Exception:  # pragma: no cover - best-effort by contract
+            snap = None
+    model = timeline.model_from_snapshot(snap) or session.model
+    rstate = runstate.get(session.session_id) or {}
+    mode = rstate.get("permission_mode") or session.permission_mode
+    record = timeline.build_record(
+        turn=turn_no, timestamp=ts or datetime.now().isoformat(), model=model,
+        mode=mode, effort=session.last_effort, thinking=session.last_thinking,
+        summary=summary)
+    session.turns.append(record)
+    if drv is not None and hasattr(drv, "append_turn_record"):
+        # Drain in order: any earlier record whose persist failed goes FIRST,
+        # so the file keeps completion order. Captures are serialized per
+        # session (the `_capture_tail` chain), so this drain never races
+        # another capture's.
+        session._turns_pending.append(record)
+        while session._turns_pending:
+            head = session._turns_pending[0]
+            try:
+                await drv.append_turn_record(head)
+            except Exception as e:
+                logger.warning(
+                    "turn-record persist failed for %s (%d queued for the "
+                    "next capture): %s",
+                    session.session_id, len(session._turns_pending), e)
+                break
+            session._turns_pending.pop(0)
 
 
 def _scratch_key(session: "SessionState") -> str:
@@ -3023,14 +3144,44 @@ async def answer_permission(session_id: str, req: AnswerPermissionRequest):
     return {"status": "ok", "approve": req.approve}
 
 
+# The effort levels Claude Code accepts (the documented EffortValue set — see
+# dev/notes/research/research-subagent-architecture.md). The bridge lever is a
+# fire-and-forget typed `/effort <level>` with NO read-back surface, so the
+# endpoint must supply the honesty the driver can't: validate the value here
+# rather than recording an arbitrary string as settings-at-turn truth.
+_EFFORT_LEVELS = {"low", "medium", "high", "max"}
+
+
 @app.post("/sessions/{session_id}/effort")
 async def set_effort(session_id: str, req: SetEffortRequest):
+    """Set reasoning effort on a live session — validated + idle-gated.
+
+    Unlike the mode/fast/thinking siblings there is no read-back for effort
+    (the bridge lever just types `/effort <level>`), so the gates live here:
+    an unknown level is a 400 (never sent, never recorded), and a mid-run send
+    is a 409 ``busy`` — typed into a generating TUI the command would land as
+    queued composer input, not an applied setting, and the §11 #46 per-turn
+    settings join would then report a lever the turn never ran with.
+    """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
     if not (session.driver and session.driver.supports("set_effort")):
         raise HTTPException(status_code=400, detail="Driver has no effort control")
+    if req.effort not in _EFFORT_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown effort level {req.effort!r} — expected one of "
+                   f"{sorted(_EFFORT_LEVELS)}")
+    if session.status == "running":
+        raise HTTPException(status_code=409,
+                            detail="set_effort failed: busy — agent is not idle")
     await session.driver.set_effort(req.effort)
+    # §11 #46: remember the lever for the per-turn settings join — validated
+    # and sent at an idle boundary (best-effort apply; /effort has no
+    # read-back surface, so this is the requested-at-idle value, not an echo
+    # of the TUI's state).
+    session.last_effort = req.effort
     return {"status": "ok", "effort": req.effort}
 
 
@@ -3070,8 +3221,10 @@ async def set_thinking(session_id: str, req: SetThinkingRequest):
         result = await session.driver.set_thinking(req.on)
     except RuntimeError as e:
         raise _lever_http_error(e, "set_thinking")
-    return {"status": "ok",
-            "thinking": result if isinstance(result, bool) else req.on}
+    applied = result if isinstance(result, bool) else req.on
+    # §11 #46: remember the READ-BACK lever state for the per-turn settings join.
+    session.last_thinking = applied
+    return {"status": "ok", "thinking": applied}
 
 
 # --- Timeline: Rewind / Fork (§7.19, §11 #15) ------------------------------
@@ -3359,6 +3512,43 @@ async def get_context_usage(session_id: str):
         except Exception:  # pragma: no cover - best-effort by contract
             result["per_turn"] = None
     return result
+
+
+@app.get("/sessions/{session_id}/timeline")
+async def get_timeline_endpoint(session_id: str):
+    """The ordered per-turn Timeline list (§7.19, §11 #46).
+
+    One row per completed dashboard-initiated turn: the settings the agent ran
+    that turn with (model + mode/effort/thinking — joined at the turn boundary
+    from the statusline capture, the run-state arbiter, and the session
+    levers — rendered as a ``settings`` string) plus a concise one-line
+    ``summary`` (the reply's leading line per the §11 #39 preamble lean;
+    first-sentence fallback). Rows come from the per-agent ``turns.jsonl`` for
+    drivers that persist it (bridge — survives a sidecar restart), else the
+    session's in-memory mirror; ``turn`` is re-minted 1..N in stored order so
+    the index stays monotonic across restarts (the session-local count resets,
+    the file does not). An empty list before the first completed turn — never
+    an error. Manual-terminal turns are absent by design: the dashboard tracks
+    turns IT initiated (the driver's completion gate).
+    """
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[session_id]
+    records: list[dict[str, Any]] | None = None
+    drv = session.driver
+    if drv is not None and drv.supports("timeline"):
+        try:
+            records = await drv.get_timeline()
+        except Exception:  # pragma: no cover - fall back to the mirror
+            records = None
+    if not records:
+        records = list(session.turns)
+    turns: list[dict[str, Any]] = []
+    for i, rec in enumerate(records, start=1):
+        row = dict(rec) if isinstance(rec, dict) else {"summary": None}
+        row["turn"] = i
+        turns.append(row)
+    return {"session_id": session_id, "count": len(turns), "turns": turns}
 
 
 @app.get("/sessions/{session_id}/context/breakdown")

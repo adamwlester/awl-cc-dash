@@ -729,6 +729,16 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-16 00:00:53 — §11 #46 built: per-turn settings + summary capture → GET /sessions/{id}/timeline
+
+Built the #46 per-turn Timeline capture end-to-end: one thin record per dashboard-initiated turn at the exactly-once completion gate in [main.py](sidecar/main.py) `handle_event` (the bridge driver's reply-gated run→idle and the SDK `result` branch, both inside the `_was_running` consume — never a parallel turn detector). Each record joins settings-at-turn from the #31 statusline model + the §7.4 arbiter `permission_mode` + the session-tracked effort/thinking levers, and derives a one-line summary from the reply's leading line (#39 preamble lean; first-sentence fallback, 140-char cut — new pure module [timeline.py](sidecar/timeline.py)). Persistence is thin per §8.3: the bridge driver appends compact JSON lines to `~/.awl-cc-dash-agents/<name>/turns.jsonl` beside `statusline.jsonl` (new `TmuxBridge.turns_append/turns_read`, stdin-piped; driver capability `timeline`), with the in-memory `session.turns` mirror as the serve fallback; `GET /sessions/{id}/timeline` re-mints ordinals 1..N in stored order (monotonic across restarts).
+Integration hardening from adversarial review: captures are now **serialized per session** (`_capture_tail` chain, timestamp stamped at the completion point) so a stalled WSL statusline snapshot can't land a later turn's record first; a **failed persist re-appends in order on the next capture** (`_turns_pending`) instead of permanently holing the file; **set-effort is now validated ({low,medium,high,max}) + idle-gated (409 busy)** since `/effort` is a fire-and-forget slash command with no read-back — mid-run it would record a lever the turn never ran with; and the SDK `result` completion point got its own pinning test. Known inherited hazard (shared with the reply-relay, not #46's): a late driver `running` can rebase `_turn_start_idx` past the turn's first assistant entry when a poll stalls — left as-is (the fix trades against straggler pollution and needs live proof). Records carry no prompt-checkpoint anchor and rewind doesn't truncate them; the row→rewind/fork mapping is #50's design call (recorded in ARCHITECTURE §7.19/§11).
+Hermetic tier: **979 passed** (943 pre-existing + 36 new in [test_readouts_unit.py](tests/test_readouts_unit.py)); live persist deliberately not driven (mechanism mirrors the live-proven statusline.jsonl capture). ARCHITECTURE: #46 tombstoned, §11.1 §7.19 row and the §4/§7.19 Today markers trued.
+
+Files: sidecar/timeline.py (new), sidecar/main.py, sidecar/drivers/bridge.py, bridge/bridge.py, tests/test_readouts_unit.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

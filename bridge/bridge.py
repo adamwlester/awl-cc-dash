@@ -2239,6 +2239,43 @@ class TmuxBridge:
         out = (out or "").strip()
         return out or None
 
+    def turns_append(self, name, line):
+        """Append one per-turn Timeline record line for a session (§11 #46).
+
+        The bridge driver captures a thin per-turn record (settings-at-turn +
+        one-line summary) at each dashboard-turn completion; this appends it as
+        ONE line to ``~/.awl-cc-dash-agents/<name>/turns.jsonl`` — beside the
+        §11 #31 ``statusline.jsonl`` in the launch-config dir. The payload
+        rides stdin (``cat >>``) so a long record can never blow past
+        Windows' ~32 KB command-line cap.
+
+        Args:
+            name: Session name.
+            line: The record as one JSON line (trailing newline normalized).
+        """
+        agent_dir = f"{WSL_AWL_DIR}/{name}"
+        path = f"{agent_dir}/turns.jsonl"
+        self._run(
+            f"mkdir -p {shlex.quote(agent_dir)} && cat >> {shlex.quote(path)}",
+            stdin_data=line.rstrip("\n") + "\n",
+            timeout=10,
+        )
+
+    def turns_read(self, name):
+        """Read a session's per-turn Timeline records back (§11 #46).
+
+        Returns the raw ``turns.jsonl`` text (one JSON record per line, oldest
+        first), or ``""`` when the file doesn't exist yet — best-effort by
+        design, mirroring ``statusline_tail``.
+        """
+        path = f"{WSL_AWL_DIR}/{name}/turns.jsonl"
+        try:
+            out = self._run(f"cat {shlex.quote(path)} 2>/dev/null || true",
+                            timeout=10)
+        except TmuxBridgeError:
+            return ""
+        return out or ""
+
     # --- Configuration ---
 
     def set_cwd(self, cwd):
