@@ -46,6 +46,9 @@ __pycache__/
 *.jpeg
 *.gif
 *.webp
+
+# Dogfood store: runtime media assets stay out of git (state/ + docs/ are committed deliberately; asset bytes + their .meta.json sidecars are runtime data)
+.awl-cc-dash/assets/
 *.svg
 *.bmp
 *.ico

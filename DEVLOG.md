@@ -859,6 +859,14 @@ Files: bridge/bridge.py, tests/test_rewind_fork_unit.py, tests/test_rewind_hando
 
 ---
 
+### 2026-07-16 10:49:11 — build-run close-out: completeness-critic fixes (CLAUDE.md renderer row, index/table truing, README map, handoff-note retirement)
+
+Applied the completeness critic's findings (read-only audit; verdict: "mission substantively complete and genuinely e2e-proven — every gap found is doc-truth cleanup"). **HIGH:** the [CLAUDE.md](CLAUDE.md) `frontend/` FOLDER MAP row still declared the renderer a frozen parked prototype and the Electron shell unproven — rewritten to the built reality (renderer rebuilt from `design/` + fully wired + e2e-proven; the freeze is over; shell owns the sidecar lifecycle). **MED:** ARCHITECTURE §11.1 re-trued post-e2e (the §3.4/§7.16 rows removed — their markers cleared — leaving the two honest #46-rewind-anchor rows); the two stale §8.4 master-table cells fixed (Plans listing recursive since 2026-07-16; asset delete ships with Remove enabled); the #22 revise-leg wording re-anchored ("still live-unverified — the 2026-07-16 e2e did not drive a plan-mode flow" replaces the stale "pending the e2e drive"); [tests/README.md](tests/README.md) coverage map gained the 10 unit files this run added (exact collected counts) and the `test_oneclick_launch_live` verdict now records the shipped Electron port; [dev/notes/2026-07-10-build-sprint-handoff.md](dev/notes/2026-07-10-build-sprint-handoff.md) got a RUN COMPLETE banner (historical, reconcile from DEVLOG/git/ARCHITECTURE). **LOW:** `.gitignore` now excludes `.awl-cc-dash/assets/` (runtime media + `.meta.json` sidecars stay out of git; state/docs stay committed); the orphaned WSL `ttyd` (pid 9374, a never-detached console attach) killed and verified gone. The critic's remaining watch item — the rewind race hardening — landed separately at `cee79bd` (hermetic 1384).
+
+Files: CLAUDE.md, docs/ARCHITECTURE.md, tests/README.md, dev/notes/2026-07-10-build-sprint-handoff.md, .gitignore, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

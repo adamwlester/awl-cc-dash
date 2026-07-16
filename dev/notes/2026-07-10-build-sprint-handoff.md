@@ -2,6 +2,10 @@
 
 > **What this is:** the running state file for THE build sprint (prompt: `dev/prompts/2026-07-09-build-sprint-run.md`). If the driving session dies or hands off, a fresh session continues FROM HERE: read the prompt, read this file, check `git log` + DEVLOG since `9c58ded`, then pick up at "NEXT ACTIONS". Update this file at every stage boundary.
 
+## ✅ RUN COMPLETE @ 2026-07-16 — this note is HISTORICAL, not authoritative
+
+The build run finished on 2026-07-16 (session 3, the build-completion run): the complete ARCHITECTURE §11 queue #1–#50 is built and tombstoned, §10 #1 is resolved into the body, the renderer is rebuilt + fully wired, the gap batch landed, and the system was e2e-proven end to end in the real Electron window (evidence: DEVLOG entries dated 2026-07-15/16; `.scratch/e2e-final/`). Everything below this banner describes a MID-RUN state that no longer exists — a fresh session must reconcile from `DEVLOG.md` + `git log` + `docs/ARCHITECTURE.md`, never from this note.
+
 ## ⚠⚠ HANDOFF @ 2026-07-15 (build-sprint SESSION 2 — mid-Stage-5; AUTHORITATIVE, supersedes the post-restart section below for STATE)
 
 Session 2 resumed from the post-restart handoff and drove the sprint forward. **Reconcile from `git log` + DEVLOG (both current), not from background agents.** Everything below is committed + pushed to `origin/main`.
