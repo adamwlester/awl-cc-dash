@@ -144,19 +144,28 @@ function ProjectsTab() {
       )}
 
       <Sec icon="folder-git-2" title="Known projects" kind={`${proj?.projects.length ?? 0} · open / register`} kindCls="edit">
-        {(proj?.projects || []).map(p => (
-          <div key={p.path} data-comp="registry-row" className={`reg-row${p.open ? ' proj-open' : ''}${flashPath === p.path ? ' proj-flash' : ''}`}>
-            <div className="reg-main">
-              <div className="reg-name">{p.name}</div>
-              <div className="reg-meta">{p.path} · {p.agent_count} agent{p.agent_count === 1 ? '' : 's'}{p.last_used ? ` · ${timeAgo(p.last_used, d.nowMs)} ago` : ''}</div>
+        {(() => {
+          // Last-used leads (§3.1/§9.1 picker-first startup): with no project
+          // open, the most-recent row is the preselected pick — it sorts first
+          // and its Open takes the primary treatment.
+          const rows = [...(proj?.projects || [])].sort((a2, b2) => (b2.last_used || '').localeCompare(a2.last_used || ''))
+          const preselect = !open && rows.length ? rows[0].path : null
+          return rows.map(p => (
+            <div key={p.path} data-comp="registry-row" className={`reg-row${p.open ? ' proj-open' : ''}${flashPath === p.path ? ' proj-flash' : ''}`}>
+              <div className="reg-main">
+                <div className="reg-name">{p.name}</div>
+                <div className="reg-meta">{p.path} · {p.agent_count} agent{p.agent_count === 1 ? '' : 's'}{p.last_used ? ` · ${timeAgo(p.last_used, d.nowMs)} ago` : ''}</div>
+              </div>
+              <div className="reg-rt">
+                {p.open
+                  ? <span data-comp="connector-health-badge" className="hbadge hb-conn"><span className="hd" style={{ background: 'var(--success)' }} />Open</span>
+                  : <button data-comp="button" className={`${preselect === p.path ? 'btn-main' : 'btn'} btn-sm`} disabled={!!open}
+                    title={open ? 'Close the current project first (one at a time)' : preselect === p.path ? 'Last used — the preselected pick' : 'Open this project'}
+                    onClick={() => doOpen(p.path)}><Ic name="folder-open" className="w-3 h-3" />Open</button>}
+              </div>
             </div>
-            <div className="reg-rt">
-              {p.open
-                ? <span data-comp="connector-health-badge" className="hbadge hb-conn"><span className="hd" style={{ background: 'var(--success)' }} />Open</span>
-                : <button data-comp="button" className="btn btn-sm" disabled={!!open} title={open ? 'Close the current project first (one at a time)' : 'Open this project'} onClick={() => doOpen(p.path)}><Ic name="folder-open" className="w-3 h-3" />Open</button>}
-            </div>
-          </div>
-        ))}
+          ))
+        })()}
         {!proj?.projects.length && <Row k="Registry" v="No projects registered yet — add one below." />}
       </Sec>
 

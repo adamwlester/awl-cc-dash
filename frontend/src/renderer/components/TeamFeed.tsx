@@ -25,9 +25,16 @@ const KIND_FILTER: Record<string, string> = {
   bash: 'shell', shell: 'shell', search: 'search', workflow: 'workflow',
 }
 
-const SECTIONS: { type: string; lab: string }[] = [
-  { type: 'error', lab: 'Error' }, { type: 'warning', lab: 'Warning' }, { type: 'permission', lab: 'Permission' },
-  { type: 'plan', lab: 'Review' }, { type: 'decision', lab: 'Decision' }, { type: 'response', lab: 'Response' },
+// Typed sections (§7.8; ND 16): ONE Review section covers plan/doc hand-offs
+// (type "plan") AND the §11 #23 workflow approvals (type "review" — the
+// PreToolUse(Workflow) HELD gate's card).
+const SECTIONS: { key: string; types: string[]; lab: string }[] = [
+  { key: 'error', types: ['error'], lab: 'Error' },
+  { key: 'warning', types: ['warning'], lab: 'Warning' },
+  { key: 'permission', types: ['permission'], lab: 'Permission' },
+  { key: 'plan', types: ['plan', 'review'], lab: 'Review' },
+  { key: 'decision', types: ['decision'], lab: 'Decision' },
+  { key: 'response', types: ['response'], lab: 'Response' },
 ]
 
 function identForKey(key: string, d: ReturnType<typeof useDash>): Ident {
@@ -83,10 +90,16 @@ export function TeamFeed() {
     return agentOn(c.agent) || c.recipients.some(r => agentOn(r))
   })
   const log = logAll.filter(r => r.agent === 'system' ? agentOn('system') : agentOn(r.agent))
+  // §11 #23 — resolved review cards are HELD in place for the read beat: the
+  // store's own 2s inbox poll drops a resolved item from /inbox almost
+  // immediately (GET /inbox excludes resolved), so without this hold the
+  // approved/rejected banner's visibility would depend on poll phase.
+  const [heldReviews, setHeldReviews] = useState<(InboxItem & { _agent: string })[]>([])
   const inboxByAgent = d.inbox.inbox
   const inboxItems: (InboxItem & { _agent: string })[] = Object.entries(inboxByAgent)
     .flatMap(([agent, items]) => items.filter(i => !i.resolved).map(i => ({ ...i, _agent: agent })))
     .filter(i => i._agent === 'system' ? agentOn('system') : agentOn(i._agent))
+  for (const h of heldReviews) if (!inboxItems.some(i => i.id === h.id)) inboxItems.push(h)
   const openCount = inboxItems.length
 
   // ---- cross-panel jumps ---------------------------------------------------------
@@ -180,16 +193,26 @@ export function TeamFeed() {
   }
 
   // ---- inbox actions ----------------------------------------------------------------
+  // A review (workflow) verdict keeps its resolved state IN PLACE for a beat:
+  // the item is HELD in the local list for 1.2s (see heldReviews above) so the
+  // success/danger banner reads before the card completes and leaves (the ND 16
+  // round-trip) — a delayed refresh alone can't guarantee it, because the
+  // store's independent 2s inbox poll drops the resolved item on its own phase.
   const resolve = async (it: InboxItem & { _agent: string }, answer?: any) => {
+    if (it.type === 'review') {
+      setHeldReviews(prev => prev.some(h => h.id === it.id) ? prev : [...prev, it])
+      setTimeout(() => setHeldReviews(prev => prev.filter(h => h.id !== it.id)), 1200)
+    }
     if (it.id.startsWith('perm:')) {
       await api.answerPermission(it._agent, answer === 'approved')
     } else {
       await api.resolveInbox(it._agent, it.id, answer)
     }
-    d.refreshInbox()
+    if (it.type === 'review') setTimeout(() => d.refreshInbox(), 1200)
+    else d.refreshInbox()
   }
   const replyToItem = (it: InboxItem & { _agent: string }) => {
-    d.replyTo(it._agent, { source: `Inbox · ${SECTIONS.find(s => s.type === it.type)?.lab || it.type}`, text: `${inboxTitle(it)}\n${inboxBody(it)}` })
+    d.replyTo(it._agent, { source: `Inbox · ${SECTIONS.find(s => s.types.includes(it.type))?.lab || it.type}`, text: `${inboxTitle(it)}\n${inboxBody(it)}` })
   }
 
   return (
@@ -311,10 +334,10 @@ export function TeamFeed() {
               </div>
               <div className="flex flex-col gap-2.5">
                 {SECTIONS.map(sec => {
-                  const items = inboxItems.filter(i => i.type === sec.type)
+                  const items = inboxItems.filter(i => sec.types.includes(i.type))
                   if (!items.length) return null
                   return (
-                    <InboxSection key={sec.type} sec={sec} items={items} d={d}
+                    <InboxSection key={sec.key} sec={sec} items={items} d={d}
                       selCards={selCards} openCards={openCards} flashKey={flashKey}
                       onSel={toggleCard} onOpen={toggleOpen}
                       resolve={resolve} replyToItem={replyToItem} />
@@ -348,7 +371,15 @@ export function TeamFeed() {
             onCopy: expCopy,
             onFile: expFile,
             onEmbed: expEmbed,
-            onAttach: async () => { await expFile(); expEmbed() },
+            // Materialized content (§7.14): the selection lands in the project
+            // store as a real asset and is chipped on Compose by id.
+            onAttach: async () => {
+              if (!selInfo || !d.projectCwd) { toast(d.projectCwd ? 'Nothing selected' : 'No project open'); return }
+              const b64 = btoa(unescape(encodeURIComponent(selInfo.text)))
+              const r = await api.ingestAsset({ cwd: d.projectCwd, filename: `feed-${Date.now() % 100000}.md`, content_base64: b64, created_by: 'user' })
+              if (r.ok && r.data?.asset?.id) { d.attachToCompose([{ id: r.data.asset.id, filename: r.data.asset.filename, kind: 'doc' }]); toast(`Attached ${r.data.asset.filename}`) }
+              else toast(`Attach failed: ${r.detail || 'sidecar error'}`)
+            },
           }} />
           {d.feedTab !== 'inbox' && (
             <button data-comp="button" className="btn" title="Summarize the conversation" onClick={doSummarize}><Ic name="sparkles" className="w-3.5 h-3.5" />Summarize</button>
@@ -417,6 +448,7 @@ function TxCardView({ c, d, sel, open, flash, flt, blockSel, onSel, onOpen, onBl
 // ---- inbox section + cards ---------------------------------------------------------
 export function inboxTitle(it: InboxItem): string {
   const dt = it.data || {}
+  if (it.type === 'review') return `Run workflow: ${dt.preview?.name || dt.tool_input?.name || dt.tool || 'Workflow'}`
   if (dt.title) return dt.title
   if (dt.question) return dt.question
   if (it.type === 'response') return 'Run ended — final reply not yet reviewed'
@@ -436,7 +468,7 @@ export function inboxBody(it: InboxItem): string {
 }
 
 function InboxSection({ sec, items, d, selCards, openCards, flashKey, onSel, onOpen, resolve, replyToItem }: {
-  sec: { type: string; lab: string }
+  sec: { key: string; types: string[]; lab: string }
   items: (InboxItem & { _agent: string })[]
   d: ReturnType<typeof useDash>
   selCards: Set<string>; openCards: Set<string>; flashKey: string | null
@@ -446,7 +478,7 @@ function InboxSection({ sec, items, d, selCards, openCards, flashKey, onSel, onO
 }) {
   const [open, setOpen] = useState(true)
   return (
-    <div data-comp="inbox-section" className={`inbox-sec inbox-sec--${sec.type}${open ? ' open' : ''}`}>
+    <div data-comp="inbox-section" className={`inbox-sec inbox-sec--${sec.key}${open ? ' open' : ''}`}>
       <button className="inbox-sec-head" onClick={() => setOpen(o => !o)} title="Collapse / expand this section">
         <Ic name="chevron-down" className="inbox-sec-chev" /><span className="inbox-sec-lab">{sec.lab}</span>
         <span data-comp="count-square" className="inbox-sec-n">{items.length}</span>
@@ -471,6 +503,10 @@ function InboxCard({ it, d, sel, isOpen, flash, onSel, onOpen, resolve, replyToI
   const a = identForKey(it._agent, d)
   const dt = it.data || {}
   const [decision, setDecision] = useState<string | null>(null)
+  // §11 #23 — the workflow round-trip's resolved-in-place beat: the verdict
+  // class shows the success/danger edge + banner (styles.css) until the next
+  // inbox poll drops the completed card.
+  const [wfState, setWfState] = useState<null | 'approved' | 'rejected'>(null)
   const isSystem = it._agent === 'system'
   const subtype = dt.subtype ? String(dt.subtype) : null
   const reply = (
@@ -492,6 +528,47 @@ function InboxCard({ it, d, sel, isOpen, flash, onSel, onOpen, resolve, replyToI
     acts = (<>
       <button data-comp="button" className="btn btn-sm" title={isDoc ? 'Review the full doc in Library → Documents' : 'Review the full plan in Library → Plans'}
         onClick={() => { d.setLibTab(isDoc ? 'documents' : 'plan'); }}><Ic name="file-text" className="w-3 h-3" />Review</button>
+      {reply}
+    </>)
+  } else if (it.type === 'review') {
+    // §11 #23 — a /workflows approval held at the PreToolUse gate: the parsed
+    // script preview (name / description / phase chips / the full scrolling
+    // script) renders in the card; Approve = the hook ALLOWS the call (the
+    // workflow launches) · Reject = DENIES it (aborts before launch). A lapsed
+    // hold (data.timed_out) reads honestly: the gate already fell back to the
+    // agent's on-pane dialog, so resolving now only clears the card.
+    const pv = dt.preview || {}
+    const scriptText: string = dt.tool_input?.script || ''
+    const timedOut = !!dt.timed_out
+    const wfVerdict = async (ok: boolean) => {
+      setWfState(ok ? 'approved' : 'rejected')
+      await resolve(it, { verdict: ok ? 'approve' : 'reject' })
+    }
+    detail = (
+      <div className="wf-prev">
+        <div className="rc-body"><b>{pv.name || dt.tool || 'Workflow'}</b></div>
+        {pv.description && <div className="wf-desc">{pv.description}</div>}
+        {(pv.phase_titles || []).length > 0 && (
+          <div className="wf-phases">{(pv.phase_titles as string[]).map((p, i) => <span data-comp="workflow-phase-chip" className="wf-phase" key={i}>{p}</span>)}</div>
+        )}
+        {pv.script_path && <div className="wf-desc" title={pv.script_path}>script: <span style={{ fontFamily: 'var(--font-mono)' }}>{pv.script_path}</span></div>}
+        {scriptText
+          ? <pre className="wf-script">{scriptText}</pre>
+          : <div className="wf-desc">{pv.script_path ? 'script preview read from the file (best-effort) — see the path above' : 'no inline script carried on the tool call'}</div>}
+        {timedOut && (
+          <div className="wf-desc" style={{ color: 'var(--warning-text)' }}>
+            Hold lapsed — the approval fell back to the agent&#8217;s on-pane dialog; answering here only clears this card.
+          </div>
+        )}
+        <div className="wf-resolved wf-resolved--ok"><Ic name="circle-check" />Approved — workflow launched</div>
+        <div className="wf-resolved wf-resolved--no"><Ic name="circle-x" />Rejected — workflow aborted before launch</div>
+      </div>
+    )
+    acts = (<>
+      <button data-comp="button" className="btn-main btn-sm" onClick={() => wfVerdict(true)}
+        title={timedOut ? 'The hold already lapsed — this only clears the card' : 'Approve — allow the Workflow tool call; the workflow launches'}>Approve</button>
+      <button data-comp="button" className="btn-danger btn-sm" onClick={() => wfVerdict(false)}
+        title={timedOut ? 'The hold already lapsed — this only clears the card' : 'Reject — deny the tool call; the workflow never launches'}>Reject</button>
       {reply}
     </>)
   } else if (it.type === 'decision') {
@@ -534,8 +611,8 @@ function InboxCard({ it, d, sel, isOpen, flash, onSel, onOpen, resolve, replyToI
     </>)
   }
   return (
-    <div data-comp={`${it.type}-inbox-card`} data-inbox-id={it.id}
-      className={`fcard inbox-card inbox-card--${it.type}${sel ? ' sel' : ''}${isOpen ? ' open' : ''}${flash ? ' reply-flash' : ''}`} data-agent={it._agent}>
+    <div data-comp={it.type === 'review' ? 'workflow-inbox-card' : `${it.type}-inbox-card`} data-inbox-id={it.id}
+      className={`fcard inbox-card inbox-card--${it.type === 'review' ? 'plan' : it.type}${sel ? ' sel' : ''}${isOpen ? ' open' : ''}${flash ? ' reply-flash' : ''}${wfState ? ` ${wfState}` : ''}`} data-agent={it._agent}>
       <div className="fcard-head">
         <button className="fcard-exp msel-head" onClick={onSel} title="Select this request (Attach)">
           <IdentBadge a={a} />

@@ -8,18 +8,53 @@
 // ============================================================================
 
 import React, { useEffect, useRef, useState } from 'react'
-import { api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset } from '../api'
+import {
+  api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset,
+  type PastAgent, type ArchiveRecord, type TimelineTurn, type Identity,
+} from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph, SPRITE_BY_FILE } from '../lib/icons'
 import {
   identOf, runStateOf, ctxColor, createdStamp, modelLabel, jewelName, JEWELS,
-  NB_CLASS, NB_LABEL, fmtTokens, MODE_VALUE,
+  NB_CLASS, NB_LABEL, fmtTokens, MODE_VALUE, clockTime, timeAgo,
 } from '../lib/identity'
 import { toast } from '../lib/toast'
 import { useConsole, ConsoleFeed, CommandList } from './Console'
 
 const DEFAULT_MAX_TURNS = 50
 const CTX_CUTOFF = 80
+
+// ---- §7.11/#13 — launch-gated permission modes -------------------------------
+// The CLI pre-arm IS the launch mode (`--permission-mode`, main.py's honest
+// 400 "unreachable" for anything absent from the live Shift+Tab ring). The
+// sidecar exposes no armed-set read, so the renderer keeps the honest client
+// view: modes PROVEN or KNOWN un-armed per session — seeded at create (a
+// session not launched in Bypass has no Bypass segment) and extended whenever
+// the mode endpoint answers 400 "unreachable". A segment in this set is
+// silently absent from the Details ring (§7.11 — never a control that no-ops).
+const UNARMED_LIVE: Record<string, Set<string>> = {}
+function markUnarmed(sid: string, label: string) {
+  ;(UNARMED_LIVE[sid] = UNARMED_LIVE[sid] || new Set()).add(label)
+}
+// Launch spelling for `--permission-mode` (differs from the live set-mode
+// SetModeRequest Literal: launch accepts `auto`, the live endpoint doesn't).
+const LAUNCH_MODE_VALUE: Record<string, string> = {
+  Plan: 'plan', Ask: 'default', Edit: 'acceptEdits', Auto: 'auto', Bypass: 'bypassPermissions',
+}
+
+// ---- §7.19 Timeline — per-session client-side state that must survive a
+// focus switch: the post-rewind rolled-back ranges and the proven version gate.
+// The record is APPEND-ONLY (a rewind never trims turns.jsonl), so after a
+// rewind the record ordinals over-count the live conversation's prompt stack.
+// Each successful rewind therefore logs the rolled ordinal range (from = the
+// rewind target, still live; to = the newest ordinal at rewind time): rows
+// inside a range are dimmed AND excluded from the k-from-last arithmetic, so a
+// second rewind / a handoff after a rewind targets the real prompt stack, and
+// turns appended AFTER a rewind (ordinals past every range) stay live and
+// undimmed. Client-memory only — a reload forgets it (the records carry no
+// anchor; the documented §7.19 gap stands).
+const TL_ROLLED: Record<string, { ranges: { from: number; to: number }[]; lastTarget: number }> = {}
+const TL_GATED: Record<string, string> = {}
 
 // Nice labels for the /context per-category keys (§11 #30). Falls back to a
 // humanized key for any category the backend adds later.
@@ -212,16 +247,42 @@ function ModeBlock({ s, isOpus, live }: { s?: Session | null; isOpus: boolean; l
   const [rejected, setRejected] = useState<string | null>(null)
   const [fast, setFast] = useState<boolean>(!!(s as any)?.fast_mode)
   const [think, setThink] = useState<boolean>(!!(s as any)?.thinking)
+  const [, setUnarmedTick] = useState(0)   // re-render after an unreachable verdict drops a segment
+  // §7.11/#13 — un-armed segments are ABSENT from the ring: the client-known
+  // un-armed set (seeded at create, extended by honest 400 "unreachable"
+  // read-backs). An `armed_modes` field from the sidecar would supersede this
+  // when it exists; none does today.
   const armed: string[] | null = ((s as any)?.armed_modes || (s?.launch_config as any)?.armed_modes) ?? null
-  const shown = armed ? MODES.filter(m => armed.some(a => modeLabelOf(a) === m || a.toLowerCase() === m.toLowerCase())) : MODES
+  const unarmed = (s && UNARMED_LIVE[s.session_id]) || new Set<string>()
+  const shown = (armed
+    ? MODES.filter(m => armed.some(a => modeLabelOf(a) === m || a.toLowerCase() === m.toLowerCase()))
+    : MODES).filter(m => !unarmed.has(m))
   const active = pick ?? current
   useEffect(() => { setPick(null) }, [s?.session_id])
 
   const pickMode = async (m: string) => {
     if (!live || !s) return
     setPick(m)
-    const r = await api.setMode(s.session_id, MODE_VALUE[m] || m.toLowerCase())
-    if (!r) { setPick(null); setRejected(m); setTimeout(() => setRejected(null), 1500); toast(`Mode ${m} rejected by the sidecar`) }
+    // Honest states off the mode endpoint (§11 #12/#13): 409 busy (screen not
+    // idle — retryable), 400 "unreachable" (the segment is launch-gated and
+    // absent from the real ring — remove it here too), other 400s verbatim.
+    const r = await api.setModeStatus(s.session_id, MODE_VALUE[m] || m.toLowerCase())
+    if (r.ok) {
+      const back = r.data?.mode
+      if (back) setPick(modeLabelOf(back))   // render the READ-BACK mode, never the echo
+      return
+    }
+    setPick(null)
+    if (r.status === 409) {
+      setRejected(m); setTimeout(() => setRejected(null), 1500)
+      toast(`${m}: agent is busy — mode changes need an idle screen (retry at idle)`)
+    } else if (r.status === 400 && /unreachable/i.test(r.detail || '')) {
+      markUnarmed(s.session_id, m); setUnarmedTick(t => t + 1)
+      toast(`${m} isn't armed on this agent — launch-gated (arm it at create); segment removed from the ring`)
+    } else {
+      setRejected(m); setTimeout(() => setRejected(null), 1500)
+      toast(`Mode ${m} failed: ${r.detail || 'rejected by the sidecar'}`)
+    }
   }
   const toggleFast = async () => {
     if (!isOpus) return
@@ -305,7 +366,6 @@ function DetailsTab({ s }: { s: Session }) {
   const [bdLoading, setBdLoading] = useState(false)
   const [bdMsg, setBdMsg] = useState<string | null>(null)
   const [turnsOpen, setTurnsOpen] = useState(false)
-  const [triMode, setTriMode] = useState<null | 'rewind' | 'handoff'>(null)
   const [subsOpen, setSubsOpen] = useState(false)
   const subsRef = useRef<HTMLDivElement>(null)
   const ctx = d.ctx
@@ -495,19 +555,7 @@ function DetailsTab({ s }: { s: Session }) {
           </div>
         </div>
 
-        <div className="sec-h mt-3">Timeline</div>
-        <div data-comp="timeline-mode-switcher" className="tri-tabs">
-          <button className={`tri-tab${triMode === 'rewind' ? ' active' : ''}`} onClick={() => setTriMode(m => m === 'rewind' ? null : 'rewind')}><Ic name="undo-2" />Rewind</button>
-          <button className={`tri-tab${triMode === 'handoff' ? ' active' : ''}`} onClick={() => setTriMode(m => m === 'handoff' ? null : 'handoff')}><Ic name="git-branch" />Handoff</button>
-        </div>
-        {triMode && (
-          <div data-comp="accordion" className="acc flex flex-col" style={{ display: 'flex', borderTop: 'var(--border-width) solid var(--border)', marginTop: 'var(--space-6)' }}>
-            <div className="tl-phead">{triMode === 'handoff' ? 'Hand off from a point — starts a new agent seeded with context up to that turn' : "Rewind to a point — restores this agent's context to the end of that turn"}</div>
-            <div data-comp="timeline" className="tl" style={{ minHeight: 120 }}>
-              <div className="awl-empty">per-turn timeline pending the turn-capture backend (§11 #46){triMode === 'handoff' && <> — <button className="link-act" onClick={() => d.setAgentTab('create')}>open Create prefilled</button></>}</div>
-            </div>
-          </div>
-        )}
+        <TimelineSection s={s} />
       </div>
 
       {/* SUBAGENTS AUDIT */}
@@ -558,6 +606,243 @@ function usageBits(u: any): string[] {
   return bits.length ? bits : []
 }
 
+// ---- Timeline — the standing per-turn log + Rewind/Handoff (§7.19, #50) ----------
+// One row per DASHBOARD-INITIATED turn from GET /sessions/{id}/timeline (§11 #46):
+// record ordinal · "now" pill on the head row · the settings chips (unknown
+// fields honestly omitted; the rendered settings string rides the tooltip) ·
+// right-aligned time · the one-line summary (a missing one reads a muted "—").
+// The Rewind|Handoff switcher ARMS row clicks; Rewind addresses k-FROM-LAST
+// over the records (no prompt-checkpoint anchor exists — the confirm says so),
+// Handoff forks via POST /sessions/{id}/fork (+ the #16 handoff-report switch,
+// the file-state note read honestly off the response's `filestate`). Edge
+// states render off the REAL responses: 409 → busy · 400 version → gated ·
+// no rows → empty · post-rewind → the no-anchor caveat (rows marked, never
+// truncated).
+function tlChip({ icon, title, val }: { icon: string; title: string; val: string }) {
+  return <span className="node-chip" title={title}><Ic name={icon} />{val}</span>
+}
+
+function TimelineSection({ s }: { s: Session }) {
+  const d = useDash()
+  const a = identOf(s)
+  const sid = s.session_id
+  const [rows, setRows] = useState<TimelineTurn[] | null>(null)
+  const [triMode, setTriMode] = useState<null | 'rewind' | 'handoff'>(null)
+  const [confirm, setConfirm] = useState<{ mode: 'rewind' | 'handoff'; n: number } | null>(null)
+  const [handoffReport, setHandoffReport] = useState(true)
+  const [acting, setActing] = useState(false)
+  const [busy409, setBusy409] = useState(false)
+  const [, setTick] = useState(0)   // re-render after TL_ROLLED / TL_GATED updates
+  const running = runStateOf(s) === 'active'
+  const gated = TL_GATED[sid] || null
+  const roll = TL_ROLLED[sid] || null
+  const ranges = roll?.ranges || []
+  const anchor = roll ? roll.lastTarget : null
+  // Rolled-row + live-position arithmetic over the append-only record: a row
+  // inside a rolled range no longer exists in the live conversation; livePos
+  // maps a LIVE ordinal to its position in the real prompt stack.
+  const rolledOf = (t: number) => ranges.some(r => t > r.from && t <= r.to)
+  const livePos = (t: number) => t - ranges.reduce((acc, r) => acc + (r.to <= t ? r.to - r.from : 0), 0)
+
+  // Own light poll (5s, in-flight-guarded) — never bundled into the roster poll.
+  useEffect(() => {
+    let cancelled = false
+    let inflight = false
+    const pull = async () => {
+      if (inflight) return
+      inflight = true
+      try {
+        const r = await api.timeline(sid)
+        if (!cancelled && r) setRows(r.turns)
+      } finally { inflight = false }
+    }
+    pull()
+    const i = setInterval(pull, 5000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [sid])
+
+  const turns = rows || []
+  const head = turns.length ? turns[turns.length - 1].turn : 0          // newest RECORD ordinal
+  const liveTurns = turns.filter(t => !rolledOf(t.turn))
+  const liveHead = liveTurns.length ? liveTurns[liveTurns.length - 1].turn : 0   // newest LIVE ordinal
+  // k-from-last over the LIVE prompt stack (rolled rows excluded) — the record
+  // is append-only, so raw ordinal subtraction overshoots after any rewind.
+  const kFor = (n: number) => livePos(liveHead) - livePos(n)
+  const state = !turns.length ? 'empty' : (running || busy409) ? 'busy' : gated ? 'gated' : null
+  const clsState = [
+    !turns.length ? 'tl--empty' : '',
+    (running || busy409) ? 'tl--busy' : '',
+    gated ? 'tl--gated' : '',
+    anchor != null ? 'tl--no-anchor' : '',
+    triMode ? `tl--armed tl--${triMode}` : '',
+  ].filter(Boolean).join(' ')
+
+  const arm = (m: 'rewind' | 'handoff') => {
+    if (gated) return   // the gated switcher is inert — the note carries the reason
+    setConfirm(null)
+    setTriMode(prev => (prev === m ? null : m))
+  }
+  const rowTitle = (t: TimelineTurn): string => {
+    if (rolledOf(t.turn)) return 'Rolled back — this turn is no longer part of the live conversation and can’t be targeted'
+    if (!triMode) return 'Arm Rewind or Handoff above to act from this turn'
+    if (triMode === 'rewind') return t.turn === liveHead ? 'Already the head — rewinding here is a no-op' : 'Rewind to the end of this turn'
+    return t.turn === liveHead ? 'Hand off from here (fork at head)' : 'Hand off from the end of this turn'
+  }
+  const pickRow = (n: number) => {
+    if (!triMode || state === 'busy' || state === 'gated' || state === 'empty') return
+    if (rolledOf(n)) return                              // rolled rows are not valid targets
+    if (triMode === 'rewind' && n === liveHead) return   // the live head is not a rewind target
+    setHandoffReport(true)
+    setConfirm({ mode: triMode, n })
+  }
+
+  const failHonestly = (rr: { status: number; detail: string | null }, op: string) => {
+    if (rr.status === 409) {
+      setBusy409(true)
+      setTimeout(() => setBusy409(false), 4000)
+      toast(`${op} refused — ${rr.detail || 'busy: agent is not idle'}`)
+    } else if (rr.status === 400) {
+      // The version gate (< 2.1.191) and capability absences render as the
+      // standing gated note, carrying the endpoint's own words.
+      TL_GATED[sid] = rr.detail || `${op} unavailable on this agent`
+      setTick(t => t + 1)
+      setTriMode(null)
+      toast(rr.detail || `${op} unavailable`)
+    } else {
+      toast(`${op} failed: ${rr.detail || 'sidecar error'}`)
+    }
+  }
+
+  const doRewind = async (n: number) => {
+    const k = kFor(n)
+    setActing(true)
+    const rr = await api.rewind(sid, k)
+    setActing(false)
+    setConfirm(null)
+    if (rr.ok) {
+      // Log the rolled range: everything live above n (which spans any prior
+      // rolled ranges up to the newest record ordinal) is now rolled back.
+      const prior = TL_ROLLED[sid]?.ranges || []
+      const kept = prior.filter(r => r.from < n)
+      const to = Math.max(head, ...prior.filter(r => r.from >= n).map(r => r.to))
+      TL_ROLLED[sid] = { ranges: [...kept, { from: n, to }], lastTarget: n }
+      setTick(t => t + 1)
+      setTriMode(null)
+      toast(`Rewound ${a.short} to the end of Turn ${n} — rolled back ${k} prompt${k === 1 ? '' : 's'}`)
+      const r = await api.timeline(sid)
+      if (r) setRows(r.turns)
+    } else failHonestly(rr, 'rewind')
+  }
+
+  const doHandoff = async (n: number) => {
+    const k = kFor(n)
+    setActing(true)
+    const rr = await api.fork(sid, { to_prompt_index: k > 0 ? k : null, handoff: handoffReport })
+    setActing(false)
+    setConfirm(null)
+    if (rr.ok && rr.data) {
+      setTriMode(null)
+      const fs = rr.data.filestate
+      const fsNote = fs?.note || (fs?.isolated ? 'fork isolated in its own git worktree' : 'file-state shared with the source')
+      const ho = rr.data.handoff
+      const hoNote = handoffReport ? (ho?.error ? ` · handoff report failed: ${ho.error}` : ho?.filename ? ` · handoff report filed: ${ho.filename}` : '') : ''
+      // A fork's backend-assigned identity can carry an empty name today —
+      // never print a dangling "role · " separator; fall back to the id.
+      const newIdent = rr.data.identity
+      const identLabel = newIdent && (newIdent.name || newIdent.role)
+        ? [newIdent.role, newIdent.name].filter(Boolean).join(' · ')
+        : rr.data.session_id
+      toast(`Handed off from Turn ${n} → ${identLabel} — ${fsNote}${hoNote}`)
+      d.select(rr.data.session_id)
+      d.setAgentTab('details')
+    } else failHonestly(rr, 'fork')
+  }
+
+  return (
+    <>
+      <div className="sec-h mt-3">Timeline</div>
+      <div data-comp="timeline-mode-switcher" className={`tri-tabs${gated ? ' tri-tabs--gated' : ''}`}
+        title={gated ? gated : ''}>
+        <button className={`tri-tab${triMode === 'rewind' ? ' active' : ''}`} onClick={() => arm('rewind')}><Ic name="undo-2" />Rewind</button>
+        <button className={`tri-tab${triMode === 'handoff' ? ' active' : ''}`} onClick={() => arm('handoff')}><Ic name="git-branch" />Handoff</button>
+      </div>
+      <div className="tl-wrap flex flex-col">
+        {triMode && (
+          <div className="tl-phead">
+            {triMode === 'handoff'
+              ? 'Hand off from a point — branches a NEW agent seeded with context through that turn'
+              : 'Rewind to a point — restores this agent’s conversation to the end of that turn'}
+          </div>
+        )}
+        {confirm && confirm.mode === 'rewind' && (
+          <div data-comp="inline-confirm" className="tl-confirm tl-confirm--stack foot-confirm--danger" style={{ display: 'flex' }}>
+            <div className="tlc-row"><span>Rewind {a.short} to the end of Turn {confirm.n}? The {kFor(confirm.n) === 1 ? 'turn' : `${kFor(confirm.n)} turns`} after it {kFor(confirm.n) === 1 ? 'is' : 'are'} discarded.</span></div>
+            <div className="tlc-note">Addressed as {kFor(confirm.n)} back from the latest live turn — dashboard-initiated turns only. Turns driven from a raw terminal are invisible to this record, so the real target can sit that many prompts off if this agent was also driven outside the dashboard.</div>
+            <div className="tlc-row">
+              <button className="btn btn-sm ml-auto" onClick={() => setConfirm(null)}>Cancel</button>
+              <button className="btn-danger btn-sm" disabled={acting} onClick={() => doRewind(confirm.n)}><Ic name="undo-2" className="w-3.5 h-3.5" />{acting ? 'Rewinding…' : 'Rewind'}</button>
+            </div>
+          </div>
+        )}
+        {confirm && confirm.mode === 'handoff' && (
+          <div data-comp="inline-confirm" className="tl-confirm tl-confirm--stack" style={{ display: 'flex' }}>
+            <div className="tlc-row"><span>Hand off a new agent seeded through Turn {confirm.n}{confirm.n === liveHead ? ' (the head)' : ''}?</span></div>
+            <div className="tlc-row tlc-opt">
+              <span className="tlc-optlab">With handoff report</span>
+              <span className="tlc-optnote">files a short summary of the source&#8217;s recent work to the Library and hands it to the new agent</span>
+              <button data-comp="switch" className={`swh${handoffReport ? ' on' : ''}`}
+                title={handoffReport ? 'On — a handoff report is generated and filed' : 'Off — plain context carry-over only'}
+                onClick={() => setHandoffReport(o => !o)} />
+            </div>
+            <div className="tlc-note">File state: when {s.cwd || 'the working folder'} is a git repo the fork gets its own git worktree (its file changes stay isolated from {a.short}&#8217;s); otherwise it shares the folder — concurrent edits can collide. The confirm toast reports which case actually applied.</div>
+            <div className="tlc-row">
+              <button className="btn btn-sm ml-auto" onClick={() => setConfirm(null)}>Cancel</button>
+              <button className="btn-main btn-sm" disabled={acting} onClick={() => doHandoff(confirm.n)}><Ic name="git-branch" className="w-3.5 h-3.5" />{acting ? 'Forking…' : 'Hand off'}</button>
+            </div>
+          </div>
+        )}
+        <div data-comp="timeline" className={`tl ${clsState}`}>
+          {/* the four state notes are emitted hidden; the .tl root's state class shows the matching one (styles.css) */}
+          <div className="tl-note tl-note--fresh"><Ic name="clock" /><span>No turns yet — a row lands here as each dashboard-initiated turn completes.</span></div>
+          <div className="tl-note tl-note--running"><Ic name="clock" /><span>{a.short} is mid-run — Rewind &amp; Handoff need an idle agent. The log stays readable; the actions return when the run completes.</span></div>
+          <div className="tl-note tl-note--version"><Ic name="shield" /><span>{gated || 'Rewind & Handoff need Claude Code ≥ 2.1.191 — relaunch this agent on a newer CLI to enable both.'}</span></div>
+          <div className="tl-note tl-note--anchor"><Ic name="triangle-alert" /><span>Rewound to the end of Turn {anchor ?? 'n'} — records carry no rewind anchor, so the rolled-back rows stay in the log (dimmed) and new turns will append after them.</span></div>
+          {turns.map(t => {
+            const rolled = rolledOf(t.turn)
+            const cur = t.turn === liveHead
+            return (
+              <div key={t.turn} data-comp="timeline-row"
+                className={`tl-row${cur ? ' current' : ''}${rolled ? ' tl-row--rolled' : ''}`}
+                role="button" tabIndex={0} title={t.settings ? `${rowTitle(t)} — ${t.settings}` : rowTitle(t)}
+                onClick={() => pickRow(t.turn)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickRow(t.turn) } }}>
+                <div className="tl-main">
+                  <div className="tl-top">
+                    <span className="tl-turn">{t.turn}</span>
+                    {cur && <span className="tl-now">now</span>}
+                    {rolled && <span className="tl-rolltag">rolled back</span>}
+                    <span className="tl-set" title={t.settings || ''}>
+                      {modelLabel(t.model)}
+                      {t.mode ? tlChip({ icon: 'shield', title: 'Permission mode', val: t.mode }) : null}
+                      {t.effort ? tlChip({ icon: 'gauge', title: 'Reasoning effort', val: t.effort }) : null}
+                      {t.thinking != null ? tlChip({ icon: 'brain', title: 'Extended thinking', val: t.thinking ? 'on' : 'off' }) : null}
+                    </span>
+                    <span className="tl-time">{clockTime(t.timestamp)}</span>
+                  </div>
+                  {t.summary
+                    ? <div className="tl-desc">{t.summary}</div>
+                    : <div className="tl-desc tl-desc--none">— no summary recorded</div>}
+                </div>
+              </div>
+            )
+          })}
+          <div className="tl-foot">Dashboard-initiated turns only — turns driven from a raw terminal aren&#8217;t recorded and can&#8217;t be targeted.</div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ---- Create tab -------------------------------------------------------------------
 function CreateTab() {
   const d = useDash()
@@ -573,8 +858,10 @@ function CreateTab() {
   const [icon, setIcon] = useState('wizard-face')
   const [model, setModel] = useState<string>('inherit')
   const [mode, setMode] = useState('Ask')
-  const [armBypass, setArmBypass] = useState(false)    // #13 UI half — launch flags
-  const [armAuto, setArmAuto] = useState(true)
+  // #13 — Launch permissions: Create ALWAYS starts un-armed (both off); arming
+  // is an explicit per-create act (DESIGN.md → Create), never prepopulated.
+  const [armBypass, setArmBypass] = useState(false)
+  const [armAuto, setArmAuto] = useState(false)
   const [effort, setEffort] = useState('Med')
   const [maxTurns, setMaxTurns] = useState(40)
   const [maxCtx, setMaxCtx] = useState(75)
@@ -596,13 +883,23 @@ function CreateTab() {
     else setName(FALLBACK_NAMES[Math.floor(Math.random() * FALLBACK_NAMES.length)])
   }
 
-  const shownModes = armBypass ? MODES : MODES.filter(m => m !== 'Bypass')
+  // The Create ring never shows a segment that would silently no-op: Auto and
+  // Bypass render only once ARMED (mirrors armToggle in design/behavior.js).
+  const shownModes = MODES.filter(m => (m !== 'Bypass' || armBypass) && (m !== 'Auto' || armAuto))
+  // Disarming a mode that was the active pick falls the selection back to Edit.
+  const toggleArm = (which: 'auto' | 'bypass') => {
+    if (which === 'auto') setArmAuto(v => { if (v && mode === 'Auto') setMode('Edit'); return !v })
+    else setArmBypass(v => { if (v && mode === 'Bypass') setMode('Edit'); return !v })
+  }
 
   const create = async () => {
     setBusy(true)
     const payload: CreatePayload = {
       model: model === 'inherit' ? null : model,
-      permission_mode: MODE_VALUE[mode] || 'default',
+      // The arm flags express through the launch mode itself — the CLI pre-arm
+      // IS `--permission-mode` (§7.11; the live launch-matrix finding). `auto`
+      // is the live-proven launch spelling for the Auto segment.
+      permission_mode: LAUNCH_MODE_VALUE[mode] || 'default',
       cwd: d.projectCwd,
       identity: { role: role.trim() || 'agent', number: parseInt(num, 10) || undefined, name: name.trim() || undefined, color, icon },
       allowed_tools: tools.length ? tools : null,
@@ -614,8 +911,17 @@ function CreateTab() {
     if (respPreset && respPreset !== 'default') payload.response_preset = respPreset
     const s = await api.create(payload)
     setBusy(false)
-    if (s) { toast(`Created ${role} · ${s.identity?.name || name || s.session_id}`); d.select(s.session_id); d.setAgentTab('details') }
-    else toast('Create failed — see the sidecar log')
+    if (s) {
+      // Seed the honest un-armed set (§7.11): Bypass exists on the live ring
+      // only when the agent LAUNCHED in it — no separate arm flag reaches the
+      // backend, so any other launch mode leaves Bypass unreachable. Auto sits
+      // in the default ring on this account (account-dependent; a live 400
+      // "unreachable" would drop it honestly).
+      if (mode !== 'Bypass') markUnarmed(s.session_id, 'Bypass')
+      toast(`Created ${role} · ${s.identity?.name || name || s.session_id}`)
+      d.select(s.session_id)
+      d.setAgentTab('details')
+    } else toast('Create failed — see the sidecar log')
   }
 
   return (
@@ -668,15 +974,35 @@ function CreateTab() {
               <button key={m} className={`${mode === m ? 'active ' : ''}${m === 'Bypass' ? 'seg-danger' : ''}`} onClick={() => setMode(m)}>{m}</button>
             ))}
           </div>
-          {/* #13 UI half — the launch flags that ARM modes on the real CLI session */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <button data-comp="toggle-button" className={`think-tog tog-cell${armAuto ? ' on' : ''}`} onClick={() => setArmAuto(v => !v)} title="Arm Auto (accept-all) at launch so the mode can be switched live">
-              <Ic name="shield" /><span className="tt-lbl">Arm Auto {armAuto ? 'On' : 'Off'}</span>
-            </button>
-            <button data-comp="toggle-button" className={`think-tog tog-cell${armBypass ? ' on' : ''}`} onClick={() => { setArmBypass(v => { if (v && mode === 'Bypass') setMode('Ask'); return !v }) }} title="Arm Bypass (--dangerously-skip-permissions) at launch — dangerous; un-armed, the Bypass segment stays hidden">
-              <Ic name="zap" /><span className="tt-lbl">Arm Bypass {armBypass ? 'On' : 'Off'}</span>
-            </button>
+        </div>
+
+        {/* LAUNCH PERMISSIONS — Bypass/Auto pre-arming (#13, §7.11): an un-armed
+            mode is silently ABSENT from the ring above (never a greyed no-op);
+            arming can't be granted mid-run — relaunch to change it. */}
+        <div>
+          <label className="ro-label block mb-1.5" title="Auto and Bypass must be pre-armed at launch. An un-armed mode is silently absent from the agent's mode ring — not a greyed no-op — and arming can't be granted mid-run: relaunch to change it. The ring above hides its Auto/Bypass segments until armed here.">Launch permissions</label>
+          <div data-comp="launch-arm" className="arm-box">
+            <div className="arm-row">
+              <span className="arm-lab">Arm Auto</span>
+              <span className="arm-note">adds Auto to the mode ring at launch</span>
+              <button data-comp="switch" className={`swh${armAuto ? ' on' : ''}`} onClick={() => toggleArm('auto')}
+                title={armAuto ? 'Armed — Auto joins the mode ring at launch' : 'Un-armed — Auto is absent from the mode ring'} />
+            </div>
+            <div className="arm-row arm-row--danger">
+              <span className="arm-lab">Arm Bypass</span>
+              <span className="arm-note">skips approvals — dangerous</span>
+              <button data-comp="switch" className={`swh swh--danger${armBypass ? ' on' : ''}`} onClick={() => toggleArm('bypass')}
+                title={armBypass ? 'Armed — Bypass joins the mode ring at launch' : 'Un-armed — Bypass is absent from the mode ring'} />
+            </div>
           </div>
+          {/* The honest-limit note covers BOTH arm switches (§7.11 — never a
+              control that silently no-ops): an armed mode that isn't also the
+              launch Mode transmits nothing today. */}
+          {((armBypass && mode !== 'Bypass') || (armAuto && mode !== 'Auto')) && (
+            <div className="text-[10px] text-muted-2 mt-1 normal-case font-semibold">
+              Honest limit: the CLI pre-arm rides the launch mode itself (<span className="font-mono">--permission-mode</span>) — pick <b>{[armAuto && mode !== 'Auto' ? 'Auto' : null, armBypass && mode !== 'Bypass' ? 'Bypass' : null].filter(Boolean).join(' / ')}</b> as the launch Mode to actually arm it. Arm-without-activate (<span className="font-mono">--allow-dangerously-skip-permissions</span>) isn&#8217;t carried by the backend yet.{armAuto && mode !== 'Auto' ? <> Auto may already sit in this account&#8217;s default ring regardless (account-dependent) — a live 400 &#8220;unreachable&#8221; drops it honestly.</> : null}
+            </div>
+          )}
         </div>
 
         <div>
@@ -715,6 +1041,203 @@ function CreateFooter({ busy, onCreate, onReset }: { busy: boolean; onCreate: ()
         <button data-comp="button" className="btn-main" disabled={busy} onClick={onCreate}>{busy ? 'Creating…' : 'Create agent'}</button>
         <button data-comp="button" className="btn px-3" onClick={onReset}>Reset</button>
         <button data-comp="button" className="btn px-3" onClick={() => d.setAgentTab('details')}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// ---- Past tab — the resume picker + the per-agent archive (#17/#18, §7.12) ------
+// RESUMABLE: GET /sessions/past — every persisted agent that isn't live (dead
+// roster records + archived/retired ones), source-tagged, each with an honest
+// `resumable` flag (a row with no conversation id reads greyed, Resume
+// disabled). Resume → POST /sessions/resume: relaunch on the SAME conversation
+// (never a fork); resuming an archived row also un-retires it. ARCHIVE: the
+// deep-freeze records behind the rows (GET /archive) — expandable key/value
+// cards over Resume + the true-delete (DELETE /archive/{id}, behind the
+// designed inline danger confirm; the referenced transcript is untouched).
+function pastStampFmt(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d2 = new Date(iso)
+  if (isNaN(d2.getTime())) return String(iso).slice(0, 16)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d2.getMonth() + 1)}-${p(d2.getDate())} ${p(d2.getHours())}:${p(d2.getMinutes())}`
+}
+function pastIdentBits(identity: Identity | null, fallbackName?: string | null, sessionId?: string | null) {
+  const num = identity?.number != null ? String(identity.number).padStart(2, '0') : ''
+  // A fork's backend-assigned identity can carry an empty name (backend gap):
+  // fall back to the session id it always has rather than a blank / bare "—".
+  const idShort = sessionId ? sessionId.replace(/^awl-/, '').slice(0, 8) : ''
+  return {
+    role: identity?.role || 'agent',
+    display: `${num ? num + ' ' : ''}${identity?.name || fallbackName || idShort || '—'}`,
+    color: identity?.color || 'var(--muted)',
+    icon: identity?.icon || '',
+  }
+}
+
+function PastTab() {
+  const d = useDash()
+  const [past, setPast] = useState<PastAgent[] | null>(null)
+  const [arch, setArch] = useState<ArchiveRecord[] | null>(null)
+  const [openArc, setOpenArc] = useState<Set<string>>(new Set())
+  const [confirmArc, setConfirmArc] = useState<string | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+
+  // Own 5s cadence while the tab is open (in-flight guarded) — never bundled
+  // into the roster poll (#33's lesson).
+  useEffect(() => {
+    let cancelled = false
+    let inflight = false
+    const pull = async () => {
+      if (inflight) return
+      inflight = true
+      try {
+        const [p, ar] = await Promise.all([api.sessionsPast(), api.archive()])
+        if (cancelled) return
+        if (p) setPast(p.past)
+        if (ar) setArch(ar.archived)
+      } finally { inflight = false }
+    }
+    pull()
+    const i = setInterval(pull, 5000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [])
+
+  const refresh = async () => {
+    const [p, ar] = await Promise.all([api.sessionsPast(), api.archive()])
+    if (p) setPast(p.past)
+    if (ar) setArch(ar.archived)
+  }
+
+  const doResume = async (sel: { session_id?: string; archive_id?: string }, label: string) => {
+    const key = sel.archive_id || sel.session_id || ''
+    setBusyKey(key)
+    const r = await api.resumeSession(sel.archive_id ? { archive_id: sel.archive_id } : { session_id: sel.session_id })
+    setBusyKey(null)
+    if (r.ok && r.data) {
+      toast(`Resumed ${label} — same conversation, same identity${r.data.resumed_from === 'archive' ? ' (un-retired from the archive)' : ''}`)
+      d.select(r.data.session_id)
+      d.setAgentTab('details')
+      refresh()
+    } else {
+      toast(`Resume failed: ${r.detail || 'sidecar error'}`)   // honest 400/404/409 verbatim
+    }
+  }
+
+  const doArcDelete = async (arcId: string, label: string) => {
+    setConfirmArc(null)
+    const r = await api.deleteArchive(arcId)
+    toast(r.ok ? `Archive record ${arcId} deleted forever (${label}'s transcript is untouched)` : `Delete failed: ${r.detail || 'sidecar error'}`)
+    refresh()
+  }
+
+  const rows = past || []
+  const arcs = arch || []
+  const rez = rows.filter(p => p.resumable).length
+  const kv = (k: string, v: React.ReactNode, plain?: boolean) => (
+    <div className="arch-kv"><span className="k">{k}</span><span className={`v${plain ? ' plain' : ''}`}>{v}</span></div>
+  )
+
+  return (
+    <div data-group="mid" className="p-3 space-y-3">
+      <div className="agent-head">
+        <span className="agtile agtile--user" style={{ width: 'var(--size-40)', height: 'var(--size-40)' }}><Ic name="history" className="agtile-luc" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-heading text-foreground leading-tight" style={{ fontWeight: 900 }}>Past agents</div>
+          <div className="text-[10px] text-muted font-semibold">resume a dead or archived agent — same conversation, same identity</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="ro-head">
+          <span className="ro-label" title="Every persisted agent that isn't live right now — dead roster records plus the archive, merged and source-tagged. Resume relaunches the agent on its own conversation (never a fork); a row with no conversation id can't resume and reads greyed.">Resumable</span>
+          <span className="ml-auto text-[9.5px] text-muted font-mono font-semibold">{past == null ? '…' : `${rows.length} past · ${rez} resumable`}</span>
+        </div>
+        <div data-comp="past-agent-picker" className="aglist past-list">
+          {rows.map(p => {
+            const b = pastIdentBits(p.identity, p.name, p.session_id)
+            const stamp = p.source === 'archive' ? `retired ${pastStampFmt(p.retired_at)}` : `created ${pastStampFmt(p.created_at)}`
+            const key = p.archive_id || p.session_id || b.display
+            return (
+              <div key={key} data-comp="past-agent-row" className={`agrow past-row${p.resumable ? '' : ' past-row--norez'}`}
+                title={p.resumable ? `${p.model || 'model inherit'} · ${stamp}` : 'No conversation id persisted — can’t resume onto its conversation'}>
+                <span className="agtile" style={{ width: 'var(--size-28)', height: 'var(--size-28)', color: b.color }}><AgGlyph icon={b.icon} /></span>
+                <span className="ag-lab">
+                  <span className="ag-role">{b.role}{p.model ? ` · ${modelLabel(p.model)}` : ''}</span>
+                  <span className="ag-name">{b.display}</span>
+                </span>
+                <span data-comp="past-source-badge" className={`past-src${p.source === 'archive' ? ' past-src--archive' : ''}`}
+                  title={p.source === 'archive' ? 'From the archive — Resume un-retires it' : 'A dead roster record — the agent process is gone, the record persists'}>{p.source}</span>
+                <span className="past-stamp">{stamp}</span>
+                <button data-comp="button" className="btn btn-sm past-resume" disabled={!p.resumable || busyKey === key}
+                  title={p.resumable ? 'Resume — relaunch on the same conversation, same identity' : 'Can’t resume — no conversation id to resume onto'}
+                  onClick={() => doResume(p.source === 'archive' && p.archive_id ? { archive_id: p.archive_id } : { session_id: p.session_id || undefined }, b.display)}>
+                  <Ic name="rotate-ccw" className="w-3 h-3" />{busyKey === key ? 'Resuming…' : 'Resume'}
+                </button>
+              </div>
+            )
+          })}
+          {past != null && !rows.length && <div className="awl-empty">No past agents — everything persisted is live.</div>}
+          {past == null && <div className="awl-empty">reading the past-agents feed…</div>}
+        </div>
+      </div>
+
+      <div>
+        <div className="ro-head">
+          <span className="ro-label" title="Retire = deep-freeze: a light archive record — identity snapshot, created/retired stamps, lineage, per-agent git author — with the transcript referenced in place, never copied. Resume un-retires the agent; Delete forever true-deletes the record (the referenced transcript is untouched).">Archive</span>
+          <span className="ml-auto text-[9.5px] text-muted font-mono font-semibold">{arch == null ? '…' : `${arcs.length} archived`}</span>
+        </div>
+        <div data-comp="archive-roster" className="arch-list">
+          {arcs.map(rec => {
+            const b = pastIdentBits((rec.identity as Identity) || null, rec.name, rec.session_id)
+            const lin = rec.lineage || {}
+            const linBits = [
+              lin.parent ? `parent ${lin.parent}` : null,
+              lin.fork ? `fork${typeof lin.fork === 'object' && lin.fork?.rewound_to != null ? ` @ turn ${lin.fork.rewound_to}` : ''}` : null,
+              lin.handoff ? `handoff ${typeof lin.handoff === 'string' ? lin.handoff : ''}`.trim() : null,
+            ].filter(Boolean).join(' · ')
+            const isOpen = openArc.has(rec.archive_id)
+            return (
+              <div key={rec.archive_id} data-comp="archive-row" className={`fcard arch-card${isOpen ? ' open' : ''}`}>
+                <div className="fcard-head">
+                  <button className="fcard-exp" onClick={() => setOpenArc(prev => { const n = new Set(prev); n.has(rec.archive_id) ? n.delete(rec.archive_id) : n.add(rec.archive_id); return n })} title="Expand the archive record">
+                    <span className="agtile" style={{ width: 'var(--size-28)', height: 'var(--size-28)', color: b.color }}><AgGlyph icon={b.icon} /></span>
+                    <span className="ag-lab"><span className="ag-role">{b.role}</span><span className="ag-name">{b.display}</span></span>
+                    <span className="fcard-time">retired {pastStampFmt(rec.retired_at)}</span>
+                  </button>
+                  <button className="fcard-chevbtn" onClick={() => setOpenArc(prev => { const n = new Set(prev); n.has(rec.archive_id) ? n.delete(rec.archive_id) : n.add(rec.archive_id); return n })} title="Expand / collapse"><Ic name="chevron-right" className="fcard-chev" /></button>
+                </div>
+                {confirmArc === rec.archive_id && (
+                  <div data-comp="inline-confirm" className="tl-confirm foot-confirm--danger arch-del-confirm" style={{ display: 'flex' }}>
+                    <span>Delete {b.display}&#8217;s archive record forever? This can&#8217;t be undone (the transcript it references is untouched).</span>
+                    <button className="btn btn-sm ml-auto" onClick={() => setConfirmArc(null)}>Cancel</button>
+                    <button className="btn-danger-solid btn-sm" onClick={() => doArcDelete(rec.archive_id, b.display)}><Ic name="trash-2" className="w-3.5 h-3.5" />Delete forever</button>
+                  </div>
+                )}
+                <div className="fcard-body arch-body">
+                  {kv('Archive id', rec.archive_id)}
+                  {kv('Created', pastStampFmt(rec.created_at))}
+                  {kv('Retired', pastStampFmt(rec.retired_at))}
+                  {kv('Model · mode', `${modelLabel(rec.model)} · ${rec.permission_mode || '—'}`, true)}
+                  {kv('CWD', rec.cwd || '—')}
+                  {kv('Lineage', linBits || '—', !linBits)}
+                  {kv('Git author', (rec as any).git_author_email || '—')}
+                  {kv('Transcript', rec.transcript?.transcript_path || '—')}
+                  <div className="arch-acts">
+                    <button data-comp="button" className="btn btn-sm" disabled={!rec.transcript?.claude_session_id}
+                      title={rec.transcript?.claude_session_id ? 'Resume — un-retires the agent back onto the roster, same conversation' : 'Can’t resume — no conversation id referenced'}
+                      onClick={() => doResume({ archive_id: rec.archive_id }, b.display)}><Ic name="rotate-ccw" className="w-3 h-3" />Resume</button>
+                    <span className="flex-1" />
+                    <button data-comp="button" className="btn-danger btn-sm" title="Delete forever — true-deletes this archive record (the referenced transcript is untouched)"
+                      onClick={() => setConfirmArc(rec.archive_id)}><Ic name="trash-2" className="w-3 h-3" />Delete forever</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {arch != null && !arcs.length && <div className="awl-empty">No archived agents — Retire deep-freezes an agent here.</div>}
+          {arch == null && <div className="awl-empty">reading the archive…</div>}
+        </div>
       </div>
     </div>
   )
@@ -821,6 +1344,7 @@ export function AgentPanel() {
         <div data-comp="tab-bar" className="tabset">
           <button className={`tab-btn${d.agentTab === 'details' ? ' active' : ''}`} onClick={() => d.setAgentTab('details')}>Details</button>
           <button className={`tab-btn${d.agentTab === 'create' ? ' active' : ''}`} onClick={() => d.setAgentTab('create')}>Create</button>
+          <button className={`tab-btn${d.agentTab === 'past' ? ' active' : ''}`} onClick={() => d.setAgentTab('past')}>Past</button>
           <button className={`tab-btn${d.agentTab === 'console' ? ' active' : ''}`} onClick={() => d.setAgentTab('console')}>Console</button>
         </div>
       </div>
@@ -833,6 +1357,18 @@ export function AgentPanel() {
         </>
       )}
       {d.agentTab === 'create' && <CreateTab />}
+      {d.agentTab === 'past' && (
+        <>
+          <div className="pcard-body flex flex-col overflow-y-auto" style={{ background: 'var(--background)' }}>
+            <PastTab />
+          </div>
+          <div className="pcard-foot px-2 py-2.5">
+            <div className="flex items-center">
+              <span className="text-[9.5px] text-muted font-mono font-semibold">Resume relaunches on the same conversation, never a fork — actions are per-row.</span>
+            </div>
+          </div>
+        </>
+      )}
       {d.agentTab === 'console' && <ConsoleTab s={s} />}
     </section>
   )

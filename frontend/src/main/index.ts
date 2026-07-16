@@ -1,23 +1,69 @@
 // Use require() directly for Electron CJS compatibility
-const { app, BrowserWindow, dialog } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron')
 const { join } = require('path')
 import type { BrowserWindow as BrowserWindowType, Event as ElectronEvent } from 'electron'
 import { ensureSidecar, requestGracefulStop, sidecarSummary, stopOwnedSidecar } from './sidecar'
 
 // One-click launch (§11 #20): Electron main owns the sidecar lifecycle — see
-// ./sidecar.ts. Close semantics per ARCHITECTURE §3.4, served here as a native
-// dialog (the accepted v1 surface; the styled in-app dialog rides the #50
-// design work):
-//   Close              → quit; terminate the OWNED sidecar child only. Detached
-//                        WSL tmux agents keep running — that is the point
-//                        (Read-back A of tests/test_oneclick_launch_live.py).
-//                        An ADOPTED (pre-existing) sidecar is never killed.
-//   Close & stop agents→ first invoke the sidecar's graceful-stop path
-//                        (POST /projects/close {stop_agents:true}; a 409 "no
-//                        project open" is tolerated), then quit as above.
-//   Cancel             → abort the close.
+// ./sidecar.ts. Close semantics per ARCHITECTURE §3.4. The close dialog is the
+// STYLED in-app one first (§50): main asks the renderer over IPC and acts on
+// its answer; the native dialog stays the fallback when the renderer is
+// unresponsive (no ack) or the send fails. Choices (both surfaces):
+//   0 Close              → quit; terminate the OWNED sidecar child only. Detached
+//                          WSL tmux agents keep running — that is the point
+//                          (Read-back A of tests/test_oneclick_launch_live.py).
+//                          An ADOPTED (pre-existing) sidecar is never killed.
+//   1 Close & stop agents→ first invoke the sidecar's graceful-stop path
+//                          (POST /projects/close {stop_agents:true}; a 409 "no
+//                          project open" is tolerated), then quit as above.
+//   2 Cancel             → abort the close.
 let quitConfirmed = false
 let closeDialogOpen = false
+
+/** Ask the renderer to run the styled §3.4 close dialog. Resolves the choice,
+ *  or null when the renderer is unresponsive (no ack within the grace window)
+ *  — the caller then falls back to the native dialog. Once acked, the answer
+ *  is waited on without a timeout (the user is deliberating in the styled UI)
+ *  — BUT a renderer that acked and then reloaded or crashed can never answer,
+ *  so those events rescue to null too; without that, closeDialogOpen would
+ *  stay latched and every later close would be swallowed forever. */
+function askRendererClose(win: BrowserWindowType): Promise<number | null> {
+  return new Promise((resolve) => {
+    let acked = false
+    let settled = false
+    const wc = win.webContents
+    const settle = (v: number | null) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(v)
+    }
+    const onAck = () => { acked = true }
+    const onAnswer = (_e: unknown, choice: unknown) =>
+      settle(typeof choice === 'number' && choice >= 0 && choice <= 2 ? choice : 2)
+    const onGone = () => settle(null)   // reload / crash — the dialog's state is gone
+    const cleanup = () => {
+      ipcMain.removeListener('awl:close-ack', onAck)
+      ipcMain.removeListener('awl:close-answer', onAnswer)
+      try {
+        wc.removeListener('render-process-gone', onGone)
+        wc.removeListener('did-navigate', onGone)
+        wc.removeListener('destroyed', onGone)
+      } catch { /* webContents may already be destroyed */ }
+    }
+    ipcMain.on('awl:close-ack', onAck)
+    ipcMain.on('awl:close-answer', onAnswer)
+    wc.on('render-process-gone', onGone)
+    wc.on('did-navigate', onGone)
+    wc.on('destroyed', onGone)
+    try {
+      wc.send('awl:close-request')
+    } catch {
+      settle(null); return
+    }
+    setTimeout(() => { if (!acked) settle(null) }, 450)
+  })
+}
 
 async function resolveCloseChoice(win: BrowserWindowType): Promise<number> {
   // Smoke seam: AWL_SMOKE_CLOSE='0'|'1'|'2' resolves the dialog choice without
@@ -25,6 +71,13 @@ async function resolveCloseChoice(win: BrowserWindowType): Promise<number> {
   // smoke; the full interactive dialog drive rides the phase-3 e2e).
   const smoke = process.env.AWL_SMOKE_CLOSE
   if (smoke === '0' || smoke === '1' || smoke === '2') return Number(smoke)
+  // Styled in-app dialog first; null = renderer unresponsive → native fallback.
+  const styled = await askRendererClose(win)
+  if (styled !== null) return styled
+  // A late ack (renderer main thread was blocked past the grace window) could
+  // otherwise leave a zombie styled dialog whose answers nobody listens to —
+  // tell the renderer to dismiss before the native dialog takes over.
+  try { win.webContents.send('awl:close-cancel') } catch { /* window going away */ }
   const { response } = await dialog.showMessageBox(win, {
     type: 'question',
     title: 'Close AWL Dashboard',
@@ -86,6 +139,23 @@ function createWindow() {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// §7.16 Assets thumbnails — the decided mechanism (docs/ARCHITECTURE.md §7.16):
+// Electron's nativeImage.createThumbnailFromPath (the Windows Shell thumbnail
+// provider) with app.getFileIcon() as the file-type-icon fallback. Returns a
+// data: URL string, or null when neither source can render the path.
+ipcMain.handle('awl:thumb', async (_e: unknown, absPath: unknown): Promise<string | null> => {
+  if (typeof absPath !== 'string' || !absPath.trim()) return null
+  try {
+    const img = await nativeImage.createThumbnailFromPath(absPath, { width: 96, height: 96 })
+    if (img && !img.isEmpty()) return img.toDataURL()
+  } catch { /* not thumbnailable (non-image, missing codec, …) — fall through */ }
+  try {
+    const icon = await app.getFileIcon(absPath, { size: 'normal' })
+    if (icon && !icon.isEmpty()) return icon.toDataURL()
+  } catch { /* no icon either */ }
+  return null
+})
 
 app.whenReady().then(() => {
   createWindow()

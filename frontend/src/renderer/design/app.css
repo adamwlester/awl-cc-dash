@@ -50,3 +50,18 @@ html, body, #root { height: 100%; margin: 0; }
 #pMid { min-width: 340px; }
 
 /* Focused-agent context pull shimmer reuses the loading strip from styles.css. */
+
+/* --- §3.4 app-quit dialog (#50) ---------------------------------------------
+   The styled close confirm reuses the design system's .proj-close-confirm
+   component; this shim only centers it as the app-quit variant (an overlay is
+   the one honest shape for a window-close intercept). */
+.awl-quit-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--overlay);
+  display: flex; align-items: center; justify-content: center;
+}
+.awl-quit-box { margin-top: 0; max-width: 460px; width: min(460px, calc(100vw - 48px)); box-shadow: var(--shadow-md); }
+
+/* --- Compose attachment thumbnails / Assets rail (renderer-only sizing) ----- */
+.awl-asset-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+

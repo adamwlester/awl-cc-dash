@@ -35,7 +35,10 @@ export function identOf(s: Session): Ident {
     return { key: s.session_id, role: s.agent_type || 'agent', name: short, short, color: 'var(--ag-cobalt)', icon: '' }
   }
   const num = String(id.number ?? 1).padStart(2, '0')
-  return { key: s.session_id, role: id.role || 'agent', name: `${num} ${id.name}`, short: id.name, color: id.color || 'var(--ag-cobalt)', icon: id.icon || '' }
+  // A backend-assigned identity can carry an empty name (today: a handoff
+  // fork's — backend gap): fall back to the session id rather than a blank.
+  const nm = id.name || s.session_id.replace(/^awl-/, '').slice(0, 8)
+  return { key: s.session_id, role: id.role || 'agent', name: `${num} ${nm}`, short: nm, color: id.color || 'var(--ag-cobalt)', icon: id.icon || '' }
 }
 
 // ---- run-state (the 4-state badge model: active / idle / pending / error) --

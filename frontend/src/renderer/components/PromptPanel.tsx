@@ -42,6 +42,7 @@ export function PromptPanel() {
   const d = useDash()
   const roster = useRoster()
   const fieldRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   // ---- From / To ------------------------------------------------------------
   const [source, setSource] = useState('user')
@@ -50,16 +51,90 @@ export function PromptPanel() {
   const agentKeys = d.sessions.map(s => s.session_id)
   const histSel = useMemo(() => new Set(agentKeys.filter(k => !histOff.has(k))), [agentKeys, histOff])
 
+  // ---- attachments (§7.14) — materialized asset chips above the Editor -------
+  const [attachments, setAttachments] = useState<{ id: string; filename: string; kind?: 'asset' | 'doc' }[]>([])
+  const [flashAtt, setFlashAtt] = useState<string | null>(null)
+  const addAttachments = (atts: { id: string; filename: string; kind?: 'asset' | 'doc' }[]) => {
+    setAttachments(prev => {
+      const have = new Set(prev.map(a => a.id))
+      return [...prev, ...atts.filter(a => !have.has(a.id))]
+    })
+    if (atts.length) { setFlashAtt(atts[atts.length - 1].id); setTimeout(() => setFlashAtt(null), 1100) }
+  }
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id))
+    // Deleting an attachment CASCADES to its citation pills (the §7.14 rule);
+    // deleting a pill never deletes the attachment.
+    fieldRef.current?.querySelectorAll(`.ed-cite[data-att="${CSS.escape(id)}"]`).forEach(c => c.remove())
+  }
+  const citeAttachment = (att: { id: string; filename: string }) => {
+    const f = fieldRef.current
+    if (!f) return
+    const pill = `<span data-comp="citation-pill" class="ed-cite" contenteditable="false" data-att="${esc(att.id)}" title="Citation → ${esc(att.filename)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="width:9px;height:9px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${esc(att.filename)}</span>&nbsp;`
+    f.focus()
+    const selDoc = window.getSelection()
+    if (selDoc && selDoc.rangeCount && f.contains(selDoc.anchorNode)) {
+      const range = selDoc.getRangeAt(0)
+      const span = document.createElement('span')
+      span.innerHTML = pill
+      range.insertNode(span)
+      range.collapse(false)
+    } else {
+      f.insertAdjacentHTML('beforeend', pill)
+    }
+  }
+  // The Compose Attach: pick a file → read it IN THE RENDERER → base64 →
+  // POST /library/assets → chip the returned id. The 400s (over-size, bad
+  // name, no project) surface verbatim. The size pre-check mirrors the
+  // sidecar's ingest cap (AWL_ASSET_MAX_MB, default 256 MB) so an over-size
+  // pick fails honestly BEFORE a multi-hundred-MB base64 encode freezes the
+  // renderer for a guaranteed 400 (or overflows V8's string limit).
+  const ASSET_MAX_MB = 256
+  const fileToBase64 = (file: File): Promise<string> => new Promise((res, rej) => {
+    const rd = new FileReader()
+    rd.onerror = () => rej(rd.error || new Error('file read failed'))
+    rd.onload = () => {
+      const s = String(rd.result || '')
+      const i = s.indexOf(',')
+      i >= 0 ? res(s.slice(i + 1)) : rej(new Error('unexpected data-URL shape'))
+    }
+    rd.readAsDataURL(file)
+  })
+  const pickFile = () => {
+    if (!d.projectCwd) { toast('No project open — Attach materializes into the project store'); return }
+    fileRef.current?.click()
+  }
+  const onFilePicked = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const file = ev.target.files?.[0]
+    ev.target.value = ''
+    if (!file || !d.projectCwd) return
+    if (file.size > ASSET_MAX_MB * 1024 * 1024) {
+      toast(`Attach failed: ${file.name} is ${Math.round(file.size / (1024 * 1024))} MB — over the ${ASSET_MAX_MB} MB ingest limit`)
+      return
+    }
+    try {
+      const b64 = await fileToBase64(file)
+      const r = await api.ingestAsset({ cwd: d.projectCwd, filename: file.name, content_base64: b64, created_by: 'user' })
+      if (r.ok && r.data?.asset?.id) {
+        addAttachments([{ id: r.data.asset.id, filename: r.data.asset.filename, kind: 'asset' }])
+        toast(`Attached ${r.data.asset.filename} — copied into the project store`)
+      } else toast(`Attach failed: ${r.detail || 'sidecar error'}`)
+    } catch (e) {
+      toast(`Attach failed: ${e instanceof Error ? e.message : 'could not read the file'}`)
+    }
+  }
+
   // default target: the focused agent
   useEffect(() => {
     if (!targets.size && d.selectedId) setTargets(new Set([d.selectedId]))
   }, [d.selectedId])
 
-  // ---- pending compose (Reply / Retry / Embed hand-offs) ----------------------
+  // ---- pending compose (Reply / Retry / Embed / Attach hand-offs) --------------
   useEffect(() => {
     if (!d.pendingCompose.seq) return
     const p = d.pendingCompose
     if (p.targets?.length) setTargets(new Set(p.targets.filter(Boolean)))
+    if (p.attachments?.length) addAttachments(p.attachments)
     const f = fieldRef.current
     if (f) {
       if (p.text != null) f.innerText = p.text
@@ -124,14 +199,20 @@ export function PromptPanel() {
   const composeText = (): string => fieldRef.current?.innerText.trim() || ''
   const send = async () => {
     const text = composeText()
-    if (!text) { toast('Nothing to send'); return }
+    if (!text && !attachments.length) { toast('Nothing to send'); return }
     const tg = [...targets]
     if (!tg.length) { toast('Pick a target first'); return }
     setBusy(true)
-    const r = await d.sendPrompt(text, { source, targets: tg, timing })
+    const r = await d.sendPrompt(text || '(attachments)', {
+      source, targets: tg, timing,
+      attachments: attachments.map(a => a.id),
+    })
     setBusy(false)
     toast(`Send → ${r}`)
-    if (fieldRef.current && /queued|sent|delivered|posted|injected/.test(r)) fieldRef.current.innerHTML = ''
+    if (fieldRef.current && /queued|sent|delivered|posted|injected/.test(r)) {
+      fieldRef.current.innerHTML = ''
+      setAttachments([])   // delivered — the assets stay materialized in the store
+    }
   }
   const revise = async () => {
     const text = composeText()
@@ -197,6 +278,24 @@ export function PromptPanel() {
         <div className="flex-1 min-w-0 flex flex-col p-2.5 overflow-hidden">
           {d.promptTab === 'compose' && (
             <div className="flex-1 flex flex-col min-h-0">
+              {/* Attachment-chip strip (§7.14) — hidden when empty; chips are
+                  removable, citable (link icon → inline citation pill), and
+                  click-to-open in the Library → Assets tab. */}
+              {attachments.length > 0 && (
+                <div className="shrink-0">
+                  <div className="sec-h">Attachments</div>
+                  <div id="attach-strip" className="attach-strip">
+                    {attachments.map(at => (
+                      <span key={at.id} data-comp="attachment-chip" className={`att-card${flashAtt === at.id ? ' att-flash' : ''}`} data-att={at.id} title={at.id}>
+                        <Ic name={at.kind === 'doc' ? 'file-text' : 'image'} className="att-card-ic" />
+                        <span className="att-card-nm" onClick={() => { d.setLibTab('assets'); toast(`Opening ${at.filename} in Library → Assets`) }}>{at.filename}</span>
+                        <button className="att-card-cite" type="button" title="Cite this attachment in the prose" onClick={() => citeAttachment(at)}><Ic name="link" /></button>
+                        <button className="att-card-x" type="button" title="Remove attachment (its citation pills go with it)" onClick={() => removeAttachment(at.id)}><Ic name="x" /></button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="text-[9px] font-heading uppercase tracking-wide text-muted">Editor</span>
                 <button data-comp="ghost-icon-button" className="ghost-ic editor-mic" title="Dictate (voice → text) — pending the dictation backend" disabled><Ic name="mic" /></button>
@@ -260,8 +359,10 @@ export function PromptPanel() {
       {d.promptTab === 'compose' && (
         <div className="pcard-foot px-2 py-2.5">
           <div className="flex items-center gap-2">
-            <button data-comp="attach-button" className="mic-btn attach-btn" title="Attach an asset (from the Library → Assets)"
-              onClick={() => { d.setLibTab('assets'); toast('Pick an asset in Library → Assets') }}><Ic name="paperclip" /></button>
+            <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={onFilePicked} />
+            <button data-comp="attach-button" className="mic-btn attach-btn"
+              title={d.projectCwd ? 'Attach a file — copied into the project store (POST /library/assets), chipped above the Editor' : 'No project open — Attach needs a project store'}
+              onClick={pickFile}><Ic name="paperclip" /></button>
             <SplitButton kind="outline" label={scope[0].toUpperCase() + scope.slice(1)} actIcon="wand-sparkles" actTitle="Revise the draft"
               onAct={revise} busy={busy}
               menuHeader="Revise scope"
@@ -301,7 +402,16 @@ export function PromptPanel() {
                 toast(r ? 'Exported → Library → Documents' : 'Export failed')
               },
               onEmbed: () => d.replyTo(d.selectedId || '', { source: 'History', text: histSelection.map(p => p.text).join('\n\n') }),
-              onAttach: () => toast('Attach lands with the attachment strip backend'),
+              // Materialized content (§7.14): the selection is written into the
+              // project store as a real asset, then chipped on Compose.
+              onAttach: async () => {
+                if (!d.projectCwd) { toast('No project open'); return }
+                const text = histSelection.map(p => p.text).join('\n\n')
+                const b64 = btoa(unescape(encodeURIComponent(text)))
+                const r = await api.ingestAsset({ cwd: d.projectCwd, filename: `history-${Date.now() % 100000}.md`, content_base64: b64, created_by: 'user' })
+                if (r.ok && r.data?.asset?.id) { addAttachments([{ id: r.data.asset.id, filename: r.data.asset.filename, kind: 'doc' }]); d.setPromptTab('compose'); toast(`Attached ${r.data.asset.filename}`) }
+                else toast(`Attach failed: ${r.detail || 'sidecar error'}`)
+              },
             }} />
             <div className="flex-1" />
             <button data-comp="icon-button" className="icon-btn" title="Retry prompt"

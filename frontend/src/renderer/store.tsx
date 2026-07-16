@@ -19,11 +19,74 @@ import {
 
 const EVENT_CAP = 4000
 
+// ---- §7.17 — client-side repair of the subagents blend ----------------------
+// GET /sessions/{id}/subagents appends hook-registry records the sidecar could
+// not match to a transcript row as {id: null, agent_id, …} "extras". The blend
+// matches only on the transcript result's agentId, which lands when the
+// subagent FINISHES — so every RUNNING subagent arrives twice: its transcript
+// spawn row (id "s1", agent_id null) plus its own hook record (id null,
+// agent_id set). Verified live 2026-07-16 (agent cb106b61: s1 running +
+// {id:null, agent_id:"a09f42…", live_status:"running"} side by side; the
+// finished s2 was correctly merged). Raw nulls rendered blank badges, colliding
+// `${sid}:null` selection keys (React duplicate-key errors), and an inflated
+// count/activity split. Merge what can be proven or safely paired, and mint an
+// honest display id from the engine agent_id for anything left. A sidecar-side
+// blend fix would supersede this (backend gap, reported).
+type WireSubagent = Omit<Subagent, 'id'> & { id: string | null }
+export function normalizeSubs(raw: WireSubagent[]): Subagent[] {
+  const named = raw.filter(s => s.id != null) as Subagent[]
+  const hook = raw.filter(s => s.id == null)
+  if (!hook.length) return named
+  const out = named.map(s => ({ ...s }))
+  const claimed = new Set<number>()
+  const sameAgent = (x?: string | null, y?: string | null) =>
+    !!x && !!y && (x === y || (x.length >= 8 && y.startsWith(x)) || (y.length >= 8 && x.startsWith(y)))
+  const claim = (idx: number, h: WireSubagent) => {
+    claimed.add(idx)
+    const t = out[idx]
+    out[idx] = {
+      ...t,
+      agent_id: t.agent_id || h.agent_id,
+      type: t.type || h.type,
+      live_status: h.live_status ?? t.live_status,
+      transcript_path: h.transcript_path ?? t.transcript_path,
+    }
+  }
+  const leftovers: WireSubagent[] = []
+  for (const h of hook) {
+    // 1) exact/prefix engine-id match (the merge the sidecar itself intends)
+    let idx = out.findIndex((s, i) => !claimed.has(i) && sameAgent(s.agent_id, h.agent_id))
+    // 2) a RUNNING hook record belongs to a transcript spawn whose result (and
+    //    agentId) hasn't landed yet — pair in order with an unclaimed running
+    //    spawn that has no engine id
+    if (idx < 0 && h.live_status === 'running') idx = out.findIndex((s, i) => !claimed.has(i) && !s.agent_id && s.status === 'running')
+    // 3) a STOPPED hook record whose result never carried an agentId — pair
+    //    with an unclaimed finished spawn missing its engine id
+    if (idx < 0 && h.live_status !== 'running') idx = out.findIndex((s, i) => !claimed.has(i) && !s.agent_id && s.status !== 'running')
+    if (idx >= 0) claim(idx, h)
+    else leftovers.push(h)
+  }
+  // Leftover hook records that are STILL RUNNING are real live activity the
+  // transcript hasn't caught up with (the blend's stated reason to append) —
+  // keep them, with an honest display id derived from the real engine id (the
+  // s1/A1 ids are themselves dashboard-minted). A STOPPED leftover never gained
+  // a transcript spawn — the engine's internal helper agents fire the same
+  // hooks (verified live 2026-07-16: 4 such records beside 2 real spawns) —
+  // and keeping those inflates the roster forever, so they are dropped.
+  let n = 0
+  for (const h of leftovers) {
+    if (h.live_status !== 'running') continue
+    n += 1
+    out.push({ ...h, id: h.agent_id ? String(h.agent_id).slice(0, 5) : `h${n}` })
+  }
+  return out
+}
+
 export type LinkState = 'connecting' | 'connected' | 'reconnecting' | 'offline'
 
 export type FeedTab = 'transcript' | 'scratch' | 'log' | 'inbox'
 export type PromptTab = 'compose' | 'history'
-export type AgentTab = 'details' | 'create' | 'console'
+export type AgentTab = 'details' | 'create' | 'past' | 'console'
 export type LibTab = 'plan' | 'documents' | 'assets'
 
 export interface Jump {
@@ -38,6 +101,9 @@ export interface PendingCompose {
   targets?: string[]        // pre-target these agents
   embeds?: { source: string; text: string }[]  // frozen reference blocks to insert
   text?: string             // raw text to load (Retry)
+  // Attachment chips to add to the Compose strip (§7.14): materialized asset
+  // ids from POST /library/assets, handed over from the Library/Assets Attach.
+  attachments?: { id: string; filename: string; kind?: 'asset' | 'doc' }[]
 }
 
 interface Dash {
@@ -86,11 +152,12 @@ interface Dash {
   gotoInbox: (agent: string, type?: string) => void
   gotoSubagent: (agent: string, subId: string) => void
   replyTo: (agent: string, embed?: { source: string; text: string }, text?: string) => void
+  attachToCompose: (atts: { id: string; filename: string; kind?: 'asset' | 'doc' }[]) => void
   refreshInbox: () => Promise<void>
   refreshLinks: () => Promise<void>
   refreshProjects: () => Promise<void>
   refreshCtx: () => Promise<void>
-  sendPrompt: (text: string, opts: { source: string; targets: string[]; timing: Disposition }) => Promise<string>
+  sendPrompt: (text: string, opts: { source: string; targets: string[]; timing: Disposition; attachments?: string[] }) => Promise<string>
   projectCwd: string | null
 }
 
@@ -277,7 +344,7 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
       const ss = sessionsRef.current
       if (!ss.length) { setSubagentsBy({}); return }
       const entries = await Promise.all(
-        ss.map(async s => [s.session_id, (await api.subagents(s.session_id))?.subagents || []] as const)
+        ss.map(async s => [s.session_id, normalizeSubs(((await api.subagents(s.session_id))?.subagents || []) as WireSubagent[])] as const)
       )
       if (!cancelled) setSubagentsBy(Object.fromEntries(entries))
     }
@@ -301,6 +368,17 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
     const i = setInterval(poll, 30000)
     return () => { cancelled = true; clearInterval(i) }
   }, [])
+
+  // ---- picker-first startup (§3.1/§9.1) --------------------------------------
+  // Startup never silently auto-loads a project: when the first successful
+  // /projects read shows NO open project, step into Settings → Projects (the
+  // picker, last-used preselected by the tab's ordering). Runs exactly once.
+  const pickerShownRef = useRef(false)
+  useEffect(() => {
+    if (pickerShownRef.current || projects == null) return
+    pickerShownRef.current = true
+    if (!projects.open) { setSettingsTab('projects'); setSettingsOpen(true) }
+  }, [projects])
 
   const projectCwd = projects?.open || sessions.find(s => s.cwd)?.cwd || null
 
@@ -379,10 +457,18 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
     bumpJump({ target: 'compose', agent })
   }, [bumpJump])
 
+  // Attach hand-off (§7.14): drop materialized asset chips onto the Compose
+  // attachment strip and reveal Compose (the design's "switch + flash" path).
+  const attachToCompose = useCallback((atts: { id: string; filename: string; kind?: 'asset' | 'doc' }[]) => {
+    setPromptTab('compose')
+    setPendingCompose(p => ({ seq: p.seq + 1, attachments: atts }))
+    bumpJump({ target: 'compose' })
+  }, [bumpJump])
+
   const refreshInbox = useCallback(async () => { const ib = await api.inbox(); if (ib) setInbox(ib) }, [])
   const refreshLinks = useCallback(async () => { const lk = await api.links(); if (lk) setLinks(lk) }, [])
 
-  const sendPrompt = useCallback(async (text: string, opts: { source: string; targets: string[]; timing: Disposition }): Promise<string> => {
+  const sendPrompt = useCallback(async (text: string, opts: { source: string; targets: string[]; timing: Disposition; attachments?: string[] }): Promise<string> => {
     const agents = opts.targets.filter(t => t !== 'scratch')
     const toScratch = opts.targets.includes('scratch')
     let out = ''
@@ -391,8 +477,14 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
       out += r ? 'posted to Scratch' : 'Scratch post failed'
     }
     for (const id of agents) {
-      const r = await api.send(id, text, { source: opts.source, recipients: [...agents, ...(toScratch ? ['scratch'] : [])], disposition: opts.timing })
-      out += `${out ? ' · ' : ''}${r ? `${r.status}` : 'send failed'}`
+      const r = await api.send(id, text, {
+        source: opts.source, recipients: [...agents, ...(toScratch ? ['scratch'] : [])],
+        disposition: opts.timing, attachments: opts.attachments?.length ? opts.attachments : null,
+      })
+      // Honest failure: carry the endpoint's own detail (unknown attachment id,
+      // "agent has no cwd; attachments need a project store", …) — never a bare
+      // "send failed" that hides why nothing was delivered.
+      out += `${out ? ' · ' : ''}${r.ok && r.data ? `${r.data.status}` : `send failed${r.detail ? ` — ${r.detail}` : ''}`}`
     }
     return out || 'no target'
   }, [projectCwd])
@@ -406,8 +498,8 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
     selectedId, agentTab, feedTab, promptTab, libTab, settingsOpen, settingsTab, consoleExpanded, drawerOpen,
     jump, pendingCompose,
     select, setAgentTab, setFeedTab, setPromptTab, setLibTab, openSettings, closeSettings,
-    setConsoleExpanded, setDrawerOpen, statusJump, gotoInbox, gotoSubagent, replyTo, refreshInbox, refreshLinks,
-    refreshProjects, refreshCtx, sendPrompt, projectCwd,
+    setConsoleExpanded, setDrawerOpen, statusJump, gotoInbox, gotoSubagent, replyTo, attachToCompose,
+    refreshInbox, refreshLinks, refreshProjects, refreshCtx, sendPrompt, projectCwd,
   }
   return <DashCtx.Provider value={value}>{children}</DashCtx.Provider>
 }

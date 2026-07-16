@@ -3,12 +3,15 @@
 // Plans + Documents render as the shared reviewable-document card: entry-nav
 // beside single-open cards, the line-numbered editor with the select-to-act
 // rail, comments via the sidecar .meta.json sidecars, raw-markdown edit → PUT,
-// and the decision footer. Assets is the honest tab shell (no backend asset
-// surface yet).
+// and the decision footer. Assets lists the project's materialized attachments
+// (GET /library/assets) as the rail + preview, thumbnails via the decided
+// Electron nativeImage/getFileIcon IPC (§7.16). The header Import control
+// (§11 #28) pulls an external Claude session in through GET/POST
+// /import/external — to an agent's queue, read here, or filed as a doc.
 // ============================================================================
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { api, type LibraryDoc, type DocMeta } from '../api'
+import { api, API, type LibraryDoc, type DocMeta, type AssetRecord, type ImportSessionRow } from '../api'
 import { useDash } from '../store'
 import { Ic } from '../lib/icons'
 import { identOf, IdentBadge, AgTile, USER_IDENT, type Ident } from '../lib/identity'
@@ -47,6 +50,10 @@ export function Library() {
   const [openId, setOpenId] = useState<string | null>(null)
   const bump = useRef(0)
   const [refresh, setRefresh] = useState(0)
+  const [impOpen, setImpOpen] = useState(false)
+  // Import destination "Read now" (panel): the returned markdown renders here
+  // as a read-only doc surface (nothing is filed).
+  const [readDoc, setReadDoc] = useState<{ title: string; markdown: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -89,10 +96,22 @@ export function Library() {
           <button className={`tab-btn${d.libTab === 'plan' ? ' active' : ''}`} onClick={() => d.setLibTab('plan')}>Plans{plansBadge > 0 && <span data-comp="count-square" className="req-badge ml-1">{plansBadge}</span>}</button>
           <button className={`tab-btn${d.libTab === 'documents' ? ' active' : ''}`} onClick={() => d.setLibTab('documents')}>Documents{docsBadge > 0 && <span data-comp="count-square" className="req-badge ml-1">{docsBadge}</span>}</button>
           <button className={`tab-btn${d.libTab === 'assets' ? ' active' : ''}`} onClick={() => d.setLibTab('assets')}>Assets</button>
+          {/* IMPORT lives on the Library header (host decision — DESIGN.md → Library): reachable from all three tabs. */}
+          <button data-comp="import-button" className="btn btn-sm lib-import-btn" onClick={() => setImpOpen(o => !o)}
+            title="Import an external Claude session (claude.ai web / the desktop app) — deliver to an agent, read it here, or file it as a reference doc">
+            <Ic name="download-cloud" className="w-3.5 h-3.5" />Import
+          </button>
         </div>
       </div>
       <div className="pcard-body flex flex-col overflow-hidden" style={{ background: 'var(--background)' }}>
-        {(d.libTab === 'plan' || d.libTab === 'documents') && (
+        {impOpen && (
+          <ImportDrawer
+            onClose={() => setImpOpen(false)}
+            onRead={(title, markdown) => { setReadDoc({ title, markdown }); setImpOpen(false) }}
+            onFiled={() => { setImpOpen(false); d.setLibTab('documents'); setRefresh(x => x + 1) }} />
+        )}
+        {readDoc && <ImportReadCard doc={readDoc} onClose={() => setReadDoc(null)} />}
+        {!readDoc && (d.libTab === 'plan' || d.libTab === 'documents') && (
           <div className="flex-1 min-h-0 flex p-2.5 gap-2.5">
             <nav data-comp="entry-nav" className="docnav">
               {entries.map(e => {
@@ -101,7 +120,8 @@ export function Library() {
                 const dir = e.doc.path.slice(0, e.doc.path.length - fn.length)
                 return (
                   <div key={e.id} className={`docnav-row navcard${openId === e.id ? ' on' : ''}`} role="button" tabIndex={0}
-                    onClick={() => setOpenId(openId === e.id ? null : e.id)}>
+                    onClick={() => setOpenId(openId === e.id ? null : e.id)}
+                    onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOpenId(openId === e.id ? null : e.id) } }}>
                     <div className="docnav-top">
                       <span className="docnav-lab">
                         <span className="docnav-name">{e.kind === 'plan' ? fn.replace(/\.md$/, '') : fn}</span>
@@ -153,19 +173,304 @@ export function Library() {
           </div>
         )}
 
-        {d.libTab === 'assets' && (
-          <div className="flex-1 min-h-0 flex p-2.5 gap-2.5">
-            <nav data-comp="entry-nav" className="docnav assetnav">
-              <div className="awl-empty">no assets listed</div>
-            </nav>
-            <div className="docmain assetmain flex-1 min-h-0 flex flex-col">
-              <div className="awl-empty">Assets needs a backend listing surface (assets/ dir) — the tab ships as a shell until it lands.</div>
-            </div>
-          </div>
-        )}
+        {!readDoc && d.libTab === 'assets' && <AssetsTab />}
       </div>
     </section>
   )
+}
+
+// ---- Import drawer (§11 #28) — in-flow under the panel header ---------------------
+// Source segment (Web = claude.ai · Desktop = the desktop app's local store) →
+// the session list by title (filterable; the honest 4xx message renders
+// verbatim where the list would be) → ONE destination (agent queue · read now ·
+// file as doc). Esc / the ghost-x close.
+function ImportDrawer({ onClose, onRead, onFiled }: {
+  onClose: () => void
+  onRead: (title: string, markdown: string) => void
+  onFiled: () => void
+}) {
+  const d = useDash()
+  const [src, setSrc] = useState<'web' | 'desktop'>('web')
+  const [rows, setRows] = useState<ImportSessionRow[] | null>(null)
+  const [listErr, setListErr] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
+  const [selIdx, setSelIdx] = useState<number | null>(null)
+  const [dest, setDest] = useState<'agent' | 'read' | 'doc'>('agent')
+  const [agent, setAgent] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [runErr, setRunErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [onClose])
+
+  // List on open + on source switch — the 4xx (missing session key, no desktop
+  // store, tool missing) renders exactly as returned.
+  useEffect(() => {
+    let cancelled = false
+    setRows(null); setListErr(null); setSelIdx(null)
+    api.importList(src).then(r => {
+      if (cancelled) return
+      if (r.ok && r.data) setRows(r.data.sessions)
+      else setListErr(r.detail || 'listing failed')
+    })
+    return () => { cancelled = true }
+  }, [src])
+
+  useEffect(() => { if (!agent && d.sessions.length) setAgent(d.sessions[0].session_id) }, [d.sessions, agent])
+
+  const q = filter.trim().toLowerCase()
+  const visible = (rows || []).map((r, i) => ({ r, i })).filter(x => !q || x.r.title.toLowerCase().includes(q))
+  const picked = selIdx != null ? (rows || [])[selIdx] : null
+  const destLabel = dest === 'agent'
+    ? (agent ? (() => { const s = d.sessions.find(x => x.session_id === agent); return s ? `${identOf(s).role} ${identOf(s).name}` : 'agent' })() : 'agent')
+    : dest === 'read' ? 'read now' : 'Documents'
+
+  const run = async () => {
+    if (!picked) return
+    if (dest === 'agent' && !agent) { toast('Pick a target agent'); return }
+    if (dest === 'doc' && !d.projectCwd) { toast('No project open — File as doc needs a project store'); return }
+    setBusy(true); setRunErr(null)
+    const r = await api.importRun({
+      source: src, title: picked.title,
+      destination: dest === 'agent' ? 'agent' : dest === 'read' ? 'panel' : 'library',
+      target_agent: dest === 'agent' ? agent : undefined,
+      cwd: dest === 'doc' ? d.projectCwd : undefined,
+    })
+    setBusy(false)
+    if (!r.ok || !r.data) { setRunErr(r.detail || 'import failed'); return }
+    if (dest === 'agent') {
+      const s = d.sessions.find(x => x.session_id === agent)
+      toast(`Queued import → ${s ? identOf(s).name : agent} — “${r.data.title}” lands on its prompt queue`)
+      onClose()
+    } else if (dest === 'read') {
+      onRead(r.data.title, r.data.markdown || '(the import returned no markdown)')
+      toast('Imported for reading — opened here (read-only, nothing filed)')
+    } else {
+      toast(`Imported → Documents · ${r.data.filename}`)
+      onFiled()
+    }
+  }
+
+  return (
+    <div data-comp="import-drawer" className={`imp-drawer${rows != null && !listErr && visible.length === 0 ? ' empty' : ''}`}>
+      <div className="imp-head"><Ic name="download-cloud" /><span>Import a Claude session</span>
+        <button data-comp="ghost-icon-button" className="ghost-ic" title="Close (Esc)" onClick={onClose}><Ic name="x" /></button></div>
+      <div className="imp-grid">
+        <div className="imp-col">
+          <span className="lbl">Source</span>
+          <div data-comp="segmented-control" className="seg imp-src-seg">
+            <button className={src === 'web' ? 'active' : ''} onClick={() => setSrc('web')}>Web</button>
+            <button className={src === 'desktop' ? 'active' : ''} onClick={() => setSrc('desktop')}>Desktop</button>
+          </div>
+          <div className="imp-srcnote">{src === 'web' ? 'claude.ai chats, listed by title' : 'the desktop app’s local sessions, read off disk'}</div>
+          <span className="lbl imp-lbl-gap">Destination</span>
+          <div className="imp-dests">
+            <button data-comp="option-card" className={`opt${dest === 'agent' ? ' on' : ''}`} onClick={() => setDest('agent')}><span className="opt-nm">To agent</span><span className="opt-desc">deliver to an agent — lands on its prompt queue as context</span></button>
+            <button data-comp="option-card" className={`opt${dest === 'read' ? ' on' : ''}`} onClick={() => setDest('read')}><span className="opt-nm">Read now</span><span className="opt-desc">open here in the Library as a read-only doc</span></button>
+            <button data-comp="option-card" className={`opt${dest === 'doc' ? ' on' : ''}`} onClick={() => setDest('doc')}><span className="opt-nm">File as doc</span><span className="opt-desc">file into Documents as a reference doc</span></button>
+          </div>
+          <div className={`imp-aglist${dest === 'agent' ? ' show' : ''}`}>
+            <div className="aglist aglist-scroll imp-agscroll">
+              {d.sessions.map(s => {
+                const a = identOf(s)
+                return (
+                  <button key={s.session_id} className={`agrow${agent === s.session_id ? ' on' : ''}`} onClick={() => setAgent(s.session_id)}>
+                    <AgTile a={a} /><span className="ag-lab"><span className="ag-role">{a.role}</span><span className="ag-name">{a.name}</span></span><Ic name="check" className="ag-ck" />
+                  </button>
+                )
+              })}
+              {!d.sessions.length && <div className="awl-empty">no live agents to deliver to</div>}
+            </div>
+          </div>
+        </div>
+        <div className="imp-col imp-col--sessions">
+          <span className="lbl">Session</span>
+          <div data-comp="search-input" className="imp-filter"><Ic name="search" /><input placeholder="Filter by title…" value={filter} onChange={e => setFilter(e.target.value)} /></div>
+          {listErr
+            ? <div className="imp-none" style={{ display: 'block' }}>{listErr}</div>
+            : rows == null
+              ? <div className="awl-empty">listing {src === 'web' ? 'claude.ai chats' : 'desktop sessions'}…</div>
+              : (
+                <div className="imp-list">
+                  {visible.map(({ r, i }) => (
+                    <button key={`${r.title}-${i}`} data-comp="import-session-row" className={`imp-row${selIdx === i ? ' on' : ''}`} onClick={() => setSelIdx(i)}>
+                      <span className="imp-t">{r.title}</span>
+                      <span className="imp-meta">{[r.updated_at, r.model].filter(Boolean).join(' · ') || r.source}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+          <div className="imp-none">No sessions match.</div>
+        </div>
+      </div>
+      {runErr && <div className="imp-srcnote" style={{ color: 'var(--danger)', marginTop: 'var(--space-6)' }}>{runErr}</div>}
+      <div className="imp-foot">
+        <span className="imp-sel">{picked ? `“${picked.title}” → ${destLabel}` : 'Pick a session to import'}</span>
+        <button data-comp="button" className="btn-main btn-sm" disabled={!picked || busy} onClick={run}
+          title="Import the picked session to the chosen destination">
+          <Ic name="download-cloud" className="w-3 h-3" />{busy ? 'Importing…' : 'Import'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---- Import "Read now" surface — the returned markdown, read-only ------------------
+function ImportReadCard({ doc, onClose }: { doc: { title: string; markdown: string }; onClose: () => void }) {
+  const lines = doc.markdown.split('\n')
+  return (
+    <div className="flex-1 min-h-0 flex flex-col p-2.5" data-comp="import-read-card">
+      <div data-comp="editor-header" className="lib-edit-head" style={{ flex: '0 0 auto' }}>
+        <span className="lib-edit-lab">Read-only</span>
+        <span className="lib-edit-fname" title={doc.title}>{doc.title}</span>
+        <span className="flex-1" />
+        <button data-comp="ghost-icon-button" className="ghost-ic" title="Close the imported read" onClick={onClose}><Ic name="x" /></button>
+      </div>
+      <div data-comp="doc-editor" className="doc-ed" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+        <div className="md">
+          {lines.map((ln, i) => (
+            <div className="md-row" key={i} data-line={i + 1}>
+              <span className="md-rail"><span className="rn">{i + 1}</span></span>
+              {/^#\s+/.test(ln)
+                ? <span className="md-line md-h1">{inlineMd(ln.replace(/^#\s+/, ''))}</span>
+                : /^#{2,4}\s+/.test(ln)
+                  ? <span className={`md-line md-h${(ln.match(/^(#+)/) as any)[1].length}`}>{inlineMd(ln.replace(/^#{2,4}\s+/, ''))}</span>
+                  : ln.trim() === ''
+                    ? <span className="md-line md-blank"> </span>
+                    : <span className="md-line">{inlineMd(ln)}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---- Assets tab (§7.16) — rail + preview over GET /library/assets ------------------
+const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'tiff'])
+const isImageFile = (name: string) => IMG_EXT.has((name.split('.').pop() || '').toLowerCase())
+const fileTypeIcon = (name: string) => (isImageFile(name) ? 'file-image' : 'file-text')
+
+// Thumbnail via the decided mechanism (§7.16): main-process IPC →
+// nativeImage.createThumbnailFromPath (Shell provider) → app.getFileIcon
+// fallback; when the IPC is absent (browser verification) or both fail, an
+// image asset falls back to its byte-endpoint URL, others to the type icon.
+function useThumb(rec: AssetRecord, cwd: string | null): string | null {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setUrl(null)
+    const thumb = (window as any).awl?.thumb as ((p: string) => Promise<string | null>) | undefined
+    // The Shell provider needs a WINDOWS path: derive it from the store cwd +
+    // the record's rel_path (both are store-truths from the listing).
+    const winPath = cwd && rec.rel_path ? `${cwd.replace(/[\\/]+$/, '')}\\.awl-cc-dash\\${String(rec.rel_path).replace(/\//g, '\\')}` : null
+    const fallback = () => { if (!cancelled) setUrl(rec.http_url && isImageFile(rec.filename) ? `${API}${rec.http_url}` : null) }
+    if (thumb && winPath) thumb(winPath).then(u => { if (!cancelled) { u ? setUrl(u) : fallback() } }).catch(fallback)
+    else fallback()
+    return () => { cancelled = true }
+  }, [rec.id, rec.rel_path, cwd])
+  return url
+}
+
+function AssetThumb({ rec, cwd }: { rec: AssetRecord; cwd: string | null }) {
+  const url = useThumb(rec, cwd)
+  if (url) return <span data-comp="asset-thumb" className="asset-thumb" title={rec.filename}><img className="awl-asset-thumb" src={url} alt="" /></span>
+  return <span data-comp="asset-thumb" className="asset-thumb asset-thumb--icon" title={rec.filename}><Ic name={fileTypeIcon(rec.filename)} /></span>
+}
+
+function AssetsTab() {
+  const d = useDash()
+  const [assets, setAssets] = useState<AssetRecord[] | null>(null)
+  const [selId, setSelId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let inflight = false
+    const pull = async () => {
+      if (!d.projectCwd) { setAssets([]); return }
+      if (inflight) return
+      inflight = true
+      try {
+        const r = await api.libraryAssets(d.projectCwd)
+        if (!cancelled && r != null) setAssets(r)
+      } finally { inflight = false }
+    }
+    pull()
+    const i = setInterval(pull, 8000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [d.projectCwd])
+
+  const list = assets || []
+  const sel = list.find(a => (a.id || a.filename) === selId) || list[0] || null
+
+  const attach = async (rec: AssetRecord) => {
+    if (!rec.id) { toast('Loose file — not byte-addressable; re-add it via Attach to materialize it'); return }
+    d.attachToCompose([{ id: rec.id, filename: rec.filename, kind: 'asset' }])
+    toast(`Attached ${rec.filename} — chip added to Compose`)
+  }
+
+  return (
+    <div className="flex-1 min-h-0 flex p-2.5 gap-2.5">
+      <nav data-comp="entry-nav" className="docnav assetnav">
+        {list.map(a => {
+          const key = a.id || a.filename
+          return (
+            <div key={key} className={`docnav-row assetnav-row${sel && (sel.id || sel.filename) === key ? ' on' : ''}`} role="button" tabIndex={0}
+              onClick={() => setSelId(key)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(key) } }}
+              title={a.id ? a.filename : `${a.filename} — loose file (no asset id; visible media, not byte-endpoint-addressable)`}>
+              <AssetThumb rec={a} cwd={d.projectCwd} />
+              <span className="docnav-lab">
+                <span className="docnav-name">{a.filename}</span>
+                <span className="docnav-path">{[a.mime, a.size != null ? fmtSize(a.size) : null, a.id ? null : 'loose'].filter(Boolean).join(' · ')}</span>
+              </span>
+            </div>
+          )
+        })}
+        {assets != null && !list.length && <div className="awl-empty">{d.projectCwd ? 'no assets yet — Attach in Compose materializes files here' : 'no project open'}</div>}
+        {assets == null && <div className="awl-empty">reading assets…</div>}
+      </nav>
+      <div className="docmain assetmain flex-1 min-h-0 flex flex-col">
+        {sel ? (
+          <div data-comp="asset-card" className="assetdoc on" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
+            <div className="doc-header">
+              <span className="dh-path">{sel.rel_path || sel.filename}</span>
+              <span className="dh-dates"><b>Created</b> {(sel.created || sel.provenance?.created_at || '—').slice(0, 16).replace('T', ' ')}{sel.provenance?.created_by ? <>&nbsp;&nbsp;<b>By</b> {sel.provenance.created_by}</> : null}</span>
+            </div>
+            <div className="asset-preview">
+              {sel.http_url && isImageFile(sel.filename)
+                ? <span className="ap-img" style={{ background: 'var(--surface-3)' }}><img className="awl-asset-thumb" style={{ objectFit: 'contain' }} src={`${API}${sel.http_url}`} alt={sel.filename} /></span>
+                : <span className="ap-img" style={{ background: 'var(--surface-3)' }}><Ic name={isImageFile(sel.filename) ? 'image' : fileTypeIcon(sel.filename)} style={{ color: 'var(--muted)' }} /></span>}
+            </div>
+            <div className="doc-foot">
+              <ExportControl a={{
+                enabled: !!sel.id,          // Assets are Attach-only (whole-file)
+                wholeOnly: true,
+                onCopy: () => toast('Assets are Attach-only — an image isn’t copyable as text'),
+                onFile: () => toast('Assets are Attach-only'),
+                onEmbed: () => toast('Assets are Attach-only — Embed needs quotable text'),
+                onAttach: () => attach(sel),
+              }} />
+              <span className="flex-1" />
+              <button data-comp="button" className="btn-danger btn-sm" disabled
+                title="Remove isn't wired yet — the sidecar exposes no asset-delete endpoint (backend gap, reported)">
+                <Ic name="trash-2" className="w-3 h-3" />Remove
+              </button>
+            </div>
+          </div>
+        ) : <div className="awl-empty">{d.projectCwd ? 'No asset selected.' : 'Open a project to see its assets.'}</div>}
+      </div>
+    </div>
+  )
+}
+
+function fmtSize(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`
+  return `${n} B`
 }
 
 // ---- the reviewable-document card ------------------------------------------------
@@ -242,7 +547,7 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
   const sendReview = async () => {
     if (!reviewer) { toast('Pick a reviewer first'); return }
     const r = await api.send(reviewer, `Review the ${e.kind} at ${e.doc.path} and post verdicts as comments.`, { source: 'user', disposition: 'queue' })
-    toast(r ? `Sent for review` : 'Review send failed')
+    toast(r.ok ? `Sent for review` : `Review send failed${r.detail ? ` — ${r.detail}` : ''}`)
   }
 
   const railKind = (i: number): 'title' | 'sec' | 'line' => {
@@ -316,16 +621,20 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
               {lens === 'feedback' && (
                 <div className="ol-scroll">
                   <div className="ol-cap">Feedback</div>
-                  {comments.map(c => (
-                    <div key={c.id} className="fb-card" role="button" onClick={() => {
+                  {comments.map(c => {
+                    const jump = () => {
                       const h = headings.find(h2 => h2.text === c.anchor_heading)
                       if (h) setSel({ kind: 'section', line: h.line })
-                    }}>
+                    }
+                    return (
+                    <div key={c.id} className="fb-card" role="button" tabIndex={0} onClick={jump}
+                      onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); jump() } }}>
                       <div className="flex items-center gap-1 w-full"><span className="docnav-name">{c.author}</span><span className="fcard-time" style={{ marginLeft: 'auto' }}>{(c.ts || '').slice(5, 16).replace('T', ' ')}</span></div>
                       <div className="text-[10px] text-muted" style={{ width: '100%' }}>{c.text.slice(0, 90)}</div>
                       {d.projectCwd && <button className="mini-link" onClick={async ev => { ev.stopPropagation(); await api.resolveComment({ cwd: d.projectCwd!, path: e.doc.path, comment_id: c.id }); toast('Comment resolved'); onChanged() }}>resolve</button>}
                     </div>
-                  ))}
+                    )
+                  })}
                   {!comments.length && <div className="fb-empty">No feedback yet.</div>}
                 </div>
               )}
@@ -439,7 +748,22 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
                 const text = sel ? lines.filter((_, i) => selected(i)).join('\n') : (content || '')
                 d.replyTo(d.selectedId || '', { source: e.doc.filename, text })
               },
-              onAttach: () => d.replyTo(d.selectedId || '', { source: e.doc.path, text: `Read this file: ${e.doc.path}` }),
+              // Real Attach (§7.14): the doc is COPIED into the project store
+              // via POST /library/assets (source_path ingest) and chipped by
+              // asset id; a selected section/line rides as the citation anchor.
+              onAttach: async () => {
+                if (!d.projectCwd) { toast('No project open'); return }
+                const citation = sel?.kind === 'section'
+                  ? { doc: e.doc.filename, location: lines[sel.line - 1]?.replace(/^#{2,4}\s+/, '') || `line ${sel.line}` }
+                  : sel?.kind === 'line'
+                    ? { doc: e.doc.filename, location: `line ${sel.line}` }
+                    : undefined
+                const r = await api.ingestAsset({ cwd: d.projectCwd, source_path: e.doc.path, created_by: 'user', citation })
+                if (r.ok && r.data?.asset?.id) {
+                  d.attachToCompose([{ id: r.data.asset.id, filename: r.data.asset.filename, kind: 'doc' }])
+                  toast(`Attached ${r.data.asset.filename} — chip added to Compose${citation ? ` (cites ${citation.location})` : ''}`)
+                } else toast(`Attach failed: ${r.detail || 'sidecar error'}`)
+              },
             }} />
             <div data-comp="review-chip" className="rev-chip" data-revchip>
               <button className="rev-trig" type="button" onClick={() => setRevOpen(o => !o)} title="Choose the reviewer">

@@ -157,12 +157,20 @@ export interface Usage {
 }
 
 export interface Subagent {
+  // NOTE: the wire can carry `id: null` on the §7.17 blend's hook-registry
+  // "extra" records (a SubagentStart the transcript hasn't matched) — the
+  // store normalizes those away (merge or mint) so every consumer sees a
+  // non-null display id. See normalizeSubs in store.tsx.
   id: string
   tool_use_id: string | null
   agent_id: string | null
   type: string | null
   description: string | null
   status: 'running' | 'done' | 'error'
+  // Hook-fed live fields (§7.17 blend): live_status is the authoritative
+  // active-vs-quiet signal when present; transcript status is the fallback.
+  live_status?: string | null
+  transcript_path?: string | null
   usage: any
 }
 
@@ -282,6 +290,95 @@ export interface ProjectEntry {
 }
 export interface ProjectsResponse { open: string | null; projects: ProjectEntry[] }
 
+// ---- Past agents + archive (§11 #17/#18 — the Agent → Past tab) ------------
+
+// One GET /sessions/past row: a persisted agent that isn't live — a dead
+// roster record (source "roster") or a deep-frozen retired one ("archive").
+export interface PastAgent {
+  session_id: string | null
+  name: string | null
+  identity: Identity | null
+  cwd: string | null
+  model: string | null
+  claude_session_id: string | null
+  created_at: string | null
+  retired_at: string | null
+  source: 'roster' | 'archive'
+  archive_id: string | null
+  live: boolean
+  resumable: boolean
+}
+export interface PastResponse { past: PastAgent[]; count: number }
+
+// The §11 #18 LIGHT archive record (transcript referenced in place, never copied).
+export interface ArchiveRecord {
+  archive_id: string
+  session_id?: string | null
+  name?: string | null
+  identity?: Identity | null
+  role?: string | null
+  model?: string | null
+  permission_mode?: string | null
+  cwd?: string | null
+  created_at?: string | null
+  retired_at?: string | null
+  lineage?: { parent?: string | null; fork?: any; handoff?: any } | null
+  git_author?: { name?: string; email?: string } | string | null
+  transcript?: { claude_session_id?: string | null; transcript_path?: string | null } | null
+  [key: string]: any
+}
+export interface ArchiveResponse { archived: ArchiveRecord[]; count: number }
+
+// ---- Timeline (§7.19/§11 #46) — one thin record per dashboard-initiated turn.
+export interface TimelineTurn {
+  turn: number                 // ordinal re-minted 1..N in stored order
+  timestamp: string | null
+  model: string | null
+  mode: string | null
+  effort: string | null
+  thinking: boolean | null
+  settings: string | null     // the rendered settings string (row tooltip)
+  summary: string | null      // one-line reply summary; null = honest "—"
+}
+export interface TimelineResponse { session_id: string; count: number; turns: TimelineTurn[] }
+
+// ---- Import (§11 #28) — pull an external Claude session into the workspace.
+export interface ImportSessionRow {
+  source: 'web' | 'desktop'
+  id: string | null            // claude.ai conversation uuid; null for desktop
+  title: string
+  updated_at: string | null
+  model: string | null         // desktop-only
+}
+export interface ImportResult {
+  source: string
+  destination: string
+  title: string
+  filename: string
+  external_id: string | null
+  markdown?: string            // destination "panel"
+  path?: string                // destination "library"
+  target_agent?: string        // destination "agent"
+  delivery?: any
+  [key: string]: any
+}
+
+// ---- Assets (§7.14/§7.16) — the materialized attachment store. -------------
+export interface AssetRecord {
+  id: string | null            // null = loose hand-dropped file (not byte-addressable)
+  filename: string
+  rel_path?: string
+  mime?: string | null
+  size?: number | null
+  sha256?: string | null
+  created?: string | null
+  provenance?: { created_by?: string; created_at?: string; source?: string; session?: string } | null
+  citation?: { doc?: string; location?: string } | null
+  agent_path?: string | null   // the receiving agent's WSL-absolute rendering
+  http_url?: string | null     // sidecar-relative byte URL (client prefixes API)
+  [key: string]: any
+}
+
 export interface ConsoleCommand {
   command: string
   description: string
@@ -337,6 +434,9 @@ export interface SendOpts {
   source?: string
   recipients?: string[] | null
   disposition?: Disposition
+  // Asset ids from POST /library/assets (§7.14): the sidecar appends ONE
+  // attributed path block to the delivered text; an unknown id is an honest 400.
+  attachments?: string[] | null
 }
 export interface SendResult { status: string; position?: number; session_id?: string; inject_id?: string }
 
@@ -373,6 +473,32 @@ async function delJSON<T>(path: string): Promise<T | null> {
     return (await r.json()) as T
   } catch {
     return null
+  }
+}
+
+// Status-aware request — for surfaces that must render the HONEST failure
+// (409 busy / 400 unreachable / 404 / the import 4xx messages) rather than
+// collapsing every non-ok into null. `detail` carries the sidecar's
+// plain-language `{detail: …}` body when present; status 0 = network-level
+// failure (sidecar unreachable).
+export interface ApiResult<T> { ok: boolean; status: number; data: T | null; detail: string | null }
+
+async function reqJSON<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: any): Promise<ApiResult<T>> {
+  try {
+    const r = await fetch(`${API}${path}`, {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    let payload: any = null
+    try { payload = await r.json() } catch { /* non-JSON body */ }
+    if (!r.ok) {
+      const detail = payload && (typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail ?? payload))
+      return { ok: false, status: r.status, data: null, detail: detail || `HTTP ${r.status}` }
+    }
+    return { ok: true, status: r.status, data: payload as T, detail: null }
+  } catch {
+    return { ok: false, status: 0, data: null, detail: 'sidecar unreachable' }
   }
 }
 
@@ -423,16 +549,26 @@ export const api = {
     getJSON<SDKEvent[]>(`/events/history${qs({ since: opts?.since, source: opts?.source, recipient: opts?.recipient })}`),
 
   // ---- send (queue/timing dispositions) + run control ----------------------
+  // Status-aware: the endpoint's honest 4xx details — unknown attachment asset
+  // id, "agent has no cwd; attachments need a project store", busy — must reach
+  // the user verbatim, never collapse into a bare "send failed".
   send: (id: string, prompt: string, opts?: SendOpts) =>
-    postJSON<SendResult>(`/sessions/${id}/send`, {
+    reqJSON<SendResult>('POST', `/sessions/${id}/send`, {
       prompt,
       source: opts?.source ?? 'user',
       recipients: opts?.recipients ?? null,
       disposition: opts?.disposition ?? 'queue',
+      ...(opts?.attachments?.length ? { attachments: opts.attachments } : {}),
     }),
   interrupt: (id: string) => postJSON(`/sessions/${id}/interrupt`),
   setModel: (id: string, model: string) => postJSON(`/sessions/${id}/model`, { model }),
   setMode: (id: string, mode: string) => postJSON(`/sessions/${id}/mode`, { mode }),
+  // Status-aware mode set (§7.11/#13): the bridge answers an honest 409 "busy"
+  // (screen not idle — retryable) or 400 "unreachable" (an un-armed Bypass/Auto
+  // segment silently absent from the Shift+Tab ring) — the UI renders those
+  // states instead of a silent revert.
+  setModeStatus: (id: string, mode: string) =>
+    reqJSON<{ status: string; mode: string }>('POST', `/sessions/${id}/mode`, { mode }),
   setEffort: (id: string, effort: string) => postJSON(`/sessions/${id}/effort`, { effort }),
   // Live toggles the backend lane is adding — callers treat a null return as
   // "endpoint absent / rejected" and revert their optimistic UI (renderer #37).
@@ -554,6 +690,51 @@ export const api = {
     getJSON<{ user: any[]; project: any[] }>(`/settings/mcp${qs({ project })}`),
   settingsPlugins: () => getJSON<{ installed: any[]; marketplaces: any[] }>('/settings/plugins'),
   settingsConfig: (project?: string) => getJSON<any>(`/settings/config${qs({ project })}`),
+
+  // ---- past agents + archive (§11 #17/#18 — Agent → Past) ------------------
+  sessionsPast: () => getJSON<PastResponse>('/sessions/past'),
+  // Status-aware resume: 404 no match · 409 already live · 400 no conversation
+  // id — each rendered honestly on the Past tab.
+  resumeSession: (sel: { session_id?: string; name?: string; archive_id?: string }) =>
+    reqJSON<Session & { resumed_from?: string; archive_id?: string | null }>('POST', '/sessions/resume', sel),
+  archive: () => getJSON<ArchiveResponse>('/archive'),
+  archiveRecord: (id: string) => getJSON<ArchiveRecord>(`/archive/${encodeURIComponent(id)}`),
+  deleteArchive: (id: string) =>
+    reqJSON<{ status: string; archive_id: string }>('DELETE', `/archive/${encodeURIComponent(id)}`),
+
+  // ---- Timeline + Rewind/Handoff (§7.19, §11 #15/#46) -----------------------
+  timeline: (id: string) => getJSON<TimelineResponse>(`/sessions/${id}/timeline`),
+  // k-from-last addressing: to_prompt_index = how many prompt checkpoints to
+  // roll back from the end (the record carries no anchor — §7.19's caveat).
+  // Honest failures: 409 busy · 400 version-gated (< 2.1.191) / no capability.
+  rewind: (id: string, k: number) =>
+    reqJSON<{ status: string; [key: string]: any }>('POST', `/sessions/${id}/rewind`, { to_prompt_index: k }),
+  fork: (id: string, body: { to_prompt_index?: number | null; handoff?: boolean; model?: string | null }) =>
+    reqJSON<Session & {
+      forked_from?: string; rewound_to?: number | null
+      filestate?: { mode?: string; isolated?: boolean; cwd?: string; note?: string; [key: string]: any } | null
+      handoff?: { filename?: string; path?: string; error?: string; [key: string]: any } | null
+    }>('POST', `/sessions/${id}/fork`, body),
+
+  // ---- Import an external Claude session (§11 #28) ---------------------------
+  // Both are status-aware: the 4xx messages (missing session key, no desktop
+  // store, no title match, extractor timeout) surface verbatim in the drawer.
+  importList: (source: 'web' | 'desktop') =>
+    reqJSON<{ source: string; sessions: ImportSessionRow[] }>('GET', `/import/external${qs({ source })}`),
+  importRun: (body: { source: string; title: string; destination: 'agent' | 'panel' | 'library'; target_agent?: string | null; cwd?: string | null }) =>
+    reqJSON<ImportResult>('POST', '/import/external', body),
+
+  // ---- Library assets (§7.14/§7.16) — materialized attachments ---------------
+  libraryAssets: (cwd: string) => getJSON<AssetRecord[]>(`/library/assets${qs({ cwd })}`),
+  // Ingest — exactly one of content_base64 / source_path; status-aware so the
+  // 400s (over-size, bad name, no cwd) render honestly on the Attach flow.
+  ingestAsset: (body: {
+    cwd: string; filename?: string; content_base64?: string; source_path?: string
+    created_by?: string; session?: string; citation?: { doc?: string; location?: string } | null
+  }) => reqJSON<{ asset: AssetRecord; agent_path: string | null; http_url: string | null }>('POST', '/library/assets', body),
+  // The renderer's byte URL for an asset (localhost HTTP — the recommended
+  // render path; http_url from the records is the same, sidecar-relative).
+  assetUrl: (rec: AssetRecord): string | null => (rec.http_url ? `${API}${rec.http_url}` : null),
 
   // ---- assets --------------------------------------------------------------
   iconUrl: (icon: string, color: string) =>

@@ -91,12 +91,19 @@ export function MultiAgAccordion({ id, header, rows, lead, sel, onSel, cap = 3, 
             const subKeys = subs.map(su => `${k}:${su.id}`)
             const selN = subKeys.filter(sk => sel.has(sk)).length + (sel.has(k) ? 0 : 0)
             const isExp = expanded.has(k)
+            // §7.17 — the collapsed-parent activity dot: the roster's
+            // active-vs-quiet glance signal, fed from the GET /sessions/{id}/
+            // subagents blend (the hook-fed `live_status` is authoritative;
+            // the transcript-derived `status` is the proven fallback).
+            const actN = subs.filter(su => (su.live_status ? su.live_status === 'running' : su.status === 'running')).length
             return (
               <React.Fragment key={k}>
                 <button className={`agrow agrow--parent${sel.has(k) ? ' on' : ''}${isExp ? ' subs-open' : ''}`} type="button"
                   onClick={() => toggle(k, subKeys)}>
                   <AgTile a={r.ident} />
                   <span className="ag-lab"><span className="ag-role">{r.ident.role}</span><span className="ag-name">{r.ident.name}</span></span>
+                  <span data-comp="subagent-activity-dot" className={`sub-actdot${actN ? '' : ' quiet'}`}
+                    title={actN ? `${actN} of ${subs.length} subagent${subs.length === 1 ? '' : 's'} running` : `all ${subs.length} subagent${subs.length === 1 ? '' : 's'} quiet`} />
                   <span className="ag-subcount" title={`${subKeys.filter(sk => sel.has(sk)).length} of ${subs.length} subagents selected`}>{subKeys.filter(sk => sel.has(sk)).length}/{subs.length}</span>
                   <span className="ag-exp" title="Show subagents" onClick={e => {
                     e.stopPropagation()
