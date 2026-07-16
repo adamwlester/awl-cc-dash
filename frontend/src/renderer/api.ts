@@ -110,6 +110,35 @@ export interface ContextUsage {
   tool_total: number
 }
 
+// The §7.18 deep context readout (§11 #30) — ON-DEMAND ONLY (GET
+// /sessions/{id}/context/breakdown). `rows` are the per-category `/context`
+// slices in canonical order; `compact_history` is the compaction ledger. null
+// from the helper means the endpoint is absent (400), the agent is busy (409),
+// or unreachable — the accordion falls back to the JSONL floor honestly.
+export interface ContextBreakdownRow {
+  key: string
+  tokens: number
+  percent: number
+  raw?: string
+}
+export interface ContextBreakdown {
+  rows: ContextBreakdownRow[]
+  compact_history?: { count: number; boundaries?: any[] }
+  fetched_at?: string
+}
+
+// Per-agent cost (§7.15, §11 #32) — ON-DEMAND ONLY (GET /sessions/{id}/cost),
+// Claude Code's own `/cost` estimate scraped idle-gated. `usd: null` is the
+// honest miss (no panel rendered); null from the helper is absent/busy/offline.
+// ⚠ No card surface yet: DESIGN.md + mockup both scope per-agent dollar spend
+// out, so this contract method is unused pending a design-lane placement.
+export interface CostBreakdown {
+  usd: number | null
+  per_model: number[]
+  raw?: string
+  fetched_at?: string
+}
+
 export interface UsageAgent {
   session_id: string
   model: string | null
@@ -432,6 +461,10 @@ export const api = {
 
   // ---- per-agent readouts --------------------------------------------------
   context: (id: string) => getJSON<ContextUsage>(`/sessions/${id}/context`),
+  // On-demand deep readouts (§7.15/§7.18, §11 #30/#32) — never on a poll loop;
+  // each costs a live TUI round-trip, so the frontend pulls them lazily.
+  contextBreakdown: (id: string) => getJSON<ContextBreakdown>(`/sessions/${id}/context/breakdown`),
+  cost: (id: string) => getJSON<CostBreakdown>(`/sessions/${id}/cost`),
   subagents: (id: string) => getJSON<Subagents>(`/sessions/${id}/subagents`),
   checklist: (id: string) => getJSON<Checklist>(`/sessions/${id}/checklist`),
   marquee: (id: string) => getJSON<Marquee>(`/sessions/${id}/marquee`),

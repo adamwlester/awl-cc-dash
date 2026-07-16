@@ -8,7 +8,7 @@
 // ============================================================================
 
 import React, { useEffect, useRef, useState } from 'react'
-import { api, type CreatePayload, type Session } from '../api'
+import { api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset } from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph, SPRITE_BY_FILE } from '../lib/icons'
 import {
@@ -20,6 +20,16 @@ import { useConsole, ConsoleFeed, CommandList } from './Console'
 
 const DEFAULT_MAX_TURNS = 50
 const CTX_CUTOFF = 80
+
+// Nice labels for the /context per-category keys (§11 #30). Falls back to a
+// humanized key for any category the backend adds later.
+const CTX_CAT_LABEL: Record<string, string> = {
+  system_prompt: 'System prompt', system_tools: 'System tools', mcp_tools: 'MCP tools',
+  custom_agents: 'Custom agents', memory: 'Memory files', skills: 'Skills',
+  messages: 'Messages', free_space: 'Free space', autocompact_buffer: 'Autocompact buffer',
+}
+const ctxCatLabel = (key: string): string =>
+  CTX_CAT_LABEL[key] || key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
 
 // ---- small shared atoms -----------------------------------------------------
 
@@ -291,6 +301,9 @@ function DetailsTab({ s }: { s: Session }) {
   const a = identOf(s)
   const state = runStateOf(s)
   const [ctxOpen, setCtxOpen] = useState(false)
+  const [bd, setBd] = useState<ContextBreakdown | null>(null)
+  const [bdLoading, setBdLoading] = useState(false)
+  const [bdMsg, setBdMsg] = useState<string | null>(null)
   const [turnsOpen, setTurnsOpen] = useState(false)
   const [triMode, setTriMode] = useState<null | 'rewind' | 'handoff'>(null)
   const [subsOpen, setSubsOpen] = useState(false)
@@ -317,7 +330,18 @@ function DetailsTab({ s }: { s: Session }) {
     }
   }, [d.jump.seq])
 
-  const onCtxToggle = () => { const next = !ctxOpen; setCtxOpen(next); if (next) d.refreshCtx() }
+  // Opening the accordion triggers BOTH the cheap JSONL floor (d.refreshCtx) and
+  // the on-demand deep `/context` breakdown pull (§11 #30). The deep pull is
+  // idle-gated + slow (a live TUI round-trip), so the floor rows show at once
+  // while the breakdown shimmers in; a busy/absent agent keeps the floor honestly.
+  const pullBreakdown = async () => {
+    setBdLoading(true); setBdMsg(null)
+    const r = await api.contextBreakdown(s.session_id)
+    setBdLoading(false)
+    if (r && r.rows?.length) { setBd(r) }
+    else { setBd(null); setBdMsg(r ? 'no category rows parsed — showing the JSONL floor' : 'deep readout unavailable (agent busy, or the driver has none) — showing the JSONL floor') }
+  }
+  const onCtxToggle = () => { const next = !ctxOpen; setCtxOpen(next); if (next) { d.refreshCtx(); pullBreakdown() } }
   const groups = groupSubs(subs)
 
   return (
@@ -417,16 +441,35 @@ function DetailsTab({ s }: { s: Session }) {
           </div>
         </button>
         <div data-comp="accordion" className="acc" style={{ display: ctxOpen ? 'block' : 'none' }}>
-          <div data-comp="context-breakdown" className={`bd${d.ctxLoading ? ' is-loading' : ''}`}>
-            <div className="bd-head"><h4 className="text-[10px] font-heading uppercase tracking-wide">Context</h4><span className="bd-tot">{hasTok ? `${fmtTokens(ctx!.tokens)} · ${ctxPct}%` : '—'}</span></div>
-            {ctx && hasTok ? (
-              <>
+          <div data-comp="context-breakdown" className={`bd${bdLoading ? ' is-loading' : ''}`}>
+            <div className="bd-head">
+              <h4 className="text-[10px] font-heading uppercase tracking-wide">Context</h4>
+              <button data-comp="text-button" className="link-act" style={{ marginLeft: 'auto', marginRight: 'var(--space-6)' }} onClick={pullBreakdown} title="Re-pull the deep /context breakdown (idle-gated)">{bdLoading ? 'Reading…' : 'Refresh'}</button>
+              <span className="bd-tot">{hasTok ? `${fmtTokens(ctx!.tokens)} · ${ctxPct}%` : '—'}</span>
+            </div>
+            {bd && bd.rows.length ? (
+              <div className="bd-rows">
+                {bd.rows.map(r => (
+                  <div className="cat" key={r.key}>
+                    <span className="sw2" style={{ background: r.key === 'free_space' ? 'var(--surface-3)' : 'var(--secondary)' }} />
+                    <span className="nm">{ctxCatLabel(r.key)}</span>
+                    <span className="tk" style={{ marginLeft: 'auto' }}>{fmtTokens(r.tokens)}</span>
+                    <span className="pc">{Math.round(r.percent)}%</span>
+                  </div>
+                ))}
+                <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx?.model || s.model || 'inherit'}</span><span className="t">{hasTok ? `${fmtTokens(ctx!.window)} window` : ''}</span></div></div>
+                {bd.compact_history && bd.compact_history.count > 0 && (
+                  <div className="bd-sub"><h5>Compactions</h5><div className="ml"><span className="p">{bd.compact_history.count} compaction{bd.compact_history.count === 1 ? '' : 's'}</span></div></div>
+                )}
+              </div>
+            ) : ctx && hasTok ? (
+              <div className="bd-rows">
                 <div className="cat"><span className="sw2" style={{ background: ctxColor(ctxPct || 0) }} /><span className="nm">Used context</span><span className="tk" style={{ marginLeft: 'auto' }}>{fmtTokens(ctx.tokens)}</span><span className="pc">{ctxPct}%</span></div>
                 <div className="cat"><span className="sw2" style={{ background: 'var(--surface-3)' }} /><span className="nm">Free space</span><span className="tk" style={{ marginLeft: 'auto' }}>{fmtTokens(Math.max(0, ctx.window - ctx.tokens))}</span><span className="pc">{100 - (ctxPct || 0)}%</span></div>
                 <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx.model || s.model || 'inherit'}</span><span className="t">{fmtTokens(ctx.window)} window</span></div></div>
-                <div className="text-[9px] text-muted-2 mt-2 font-semibold">per-category breakdown lands with the context-pull endpoint (§ backlog)</div>
-              </>
-            ) : <div className="awl-empty">no context reading yet</div>}
+                <div className="text-[9px] text-muted-2 mt-2 font-semibold">{bdLoading ? 'reading the deep /context breakdown…' : (bdMsg || 'the per-category breakdown pulls on open')}</div>
+              </div>
+            ) : <div className="awl-empty">{bdLoading ? 'reading context…' : 'no context reading yet'}</div>}
           </div>
         </div>
       </div>
@@ -535,10 +578,23 @@ function CreateTab() {
   const [effort, setEffort] = useState('Med')
   const [maxTurns, setMaxTurns] = useState(40)
   const [maxCtx, setMaxCtx] = useState(75)
+  const [respPreset, setRespPreset] = useState('default')
+  const [presets, setPresets] = useState<ResponsePreset[]>([])
   const [busy, setBusy] = useState(false)
 
-  const NAMES = ['kai', 'drew', 'rowan', 'vale', 'wren', 'sage', 'nova', 'ash', 'juno', 'remy', 'sol', 'bex', 'indi', 'koa']
-  const randomize = () => setName(NAMES[Math.floor(Math.random() * NAMES.length)])
+  // Response-format preset catalog (§11 #39) — the create-time choice is applied
+  // immediately at launch (append-system-prompt), unlike a live edit.
+  useEffect(() => { api.responsePresets().then(c => { if (c) setPresets(c.presets) }) }, [])
+
+  // #40 — draw an unused name from the shipped pool; the sidecar already excludes
+  // every live agent's name, so we only pass the staged name (so a re-roll differs).
+  // Falls back to a tiny local pool when the sidecar is unreachable.
+  const FALLBACK_NAMES = ['kai', 'drew', 'rowan', 'vale', 'wren', 'sage', 'nova', 'ash', 'juno', 'remy', 'sol', 'bex', 'indi', 'koa']
+  const randomize = async () => {
+    const r = await api.randomName(name.trim() ? [name.trim()] : [])
+    if (r && r.name) setName(r.name)
+    else setName(FALLBACK_NAMES[Math.floor(Math.random() * FALLBACK_NAMES.length)])
+  }
 
   const shownModes = armBypass ? MODES : MODES.filter(m => m !== 'Bypass')
 
@@ -555,6 +611,7 @@ function CreateTab() {
     }
     if (mcp.length) payload.mcp_servers = mcp
     if (plugins.length) payload.enabled_plugins = Object.fromEntries(plugins.map(p => [p, true]))
+    if (respPreset && respPreset !== 'default') payload.response_preset = respPreset
     const s = await api.create(payload)
     setBusy(false)
     if (s) { toast(`Created ${role} · ${s.identity?.name || name || s.session_id}`); d.select(s.session_id); d.setAgentTab('details') }
@@ -627,6 +684,14 @@ function CreateTab() {
           <div data-comp="segmented-control" className="seg">
             {EFFORTS.map(m => <button key={m} className={effort === m ? 'active' : ''} onClick={() => setEffort(m)}>{m}</button>)}
           </div>
+        </div>
+
+        <div className="field editing">
+          <label className="lbl block mb-1">Response format</label>
+          <select className="in" value={respPreset} onChange={e => setRespPreset(e.target.value)} title="Reply-format preset injected into the agent's system prompt at launch (§11 #39)">
+            {presets.length ? presets.map(p => <option key={p.id} value={p.id}>{p.label}</option>) : <option value="default">Default</option>}
+          </select>
+          {(() => { const p = presets.find(x => x.id === respPreset); return p && p.id !== 'default' ? <div className="text-[10px] text-muted-2 mt-1 normal-case font-semibold">{p.description}</div> : null })()}
         </div>
 
         <div>

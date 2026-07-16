@@ -6,7 +6,9 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1024,
+    // #38: the pinned side columns (400 + 700) plus the middle floor need ~1180px;
+    // below that the layout horizontal-scrolls (app.css guard) rather than breaking.
+    minWidth: 1180,
     minHeight: 600,
     title: 'AWL Multi-Agent Dashboard',
     webPreferences: {

@@ -38,4 +38,15 @@ html, body, #root { height: 100%; margin: 0; }
 .con-feed.awl-xterm { position: relative; overflow: hidden; padding: 0; }
 .xterm .xterm-viewport { background-color: transparent !important; }
 
+/* --- Narrow-width guard (§11 #38) ------------------------------------------
+   The left (--col-left) and right (--col-right) columns are pinned wide and the
+   middle needs a usable floor; below their sum the middle column collapsed and
+   the right column clipped (Stage-4 headed pass, ~1000px). Give the 3-column
+   row a min-width and let the body scroll HORIZONTALLY instead of breaking, so
+   the layout stays intact at any window width (Electron minWidth also lifted to
+   match in src/main/index.ts). --pane-mid-min is the middle column's floor. */
+.three { overflow-x: auto; overflow-y: hidden; }
+#rzMain { min-width: calc(var(--col-left-min) + var(--col-right-min) + 340px); }
+#pMid { min-width: 340px; }
+
 /* Focused-agent context pull shimmer reuses the loading strip from styles.css. */

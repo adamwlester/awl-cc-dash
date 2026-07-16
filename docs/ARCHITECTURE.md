@@ -1122,7 +1122,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 | §7.5 | Randomize/auto-name not drawing from the shipped pool; 16/25 colours (renderer parity) | #40, #37 |
 | §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) | #13 UI (rides #37) |
 | §7.13 | Backend streaming attach built; the xterm.js renderer + React Console remain | #29 (rides #37) |
-| §7.15 | Per-agent cost endpoint built but not yet shown on cards (renderer) | #37 |
+| §7.15 | Cost endpoint built; on-card display is an OPEN design-lane conflict — DESIGN.md scopes per-agent cost OUT ("Usage only") vs §11 #32 wanting it on cards; needs operator reconciliation | §10 |
 | §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
 | §7.17 | Subagent active-vs-quiet signal not wired into the roster | #21 |
 | §7.19 | Rewind/fork endpoints built; the Timeline renderer wiring remains | #37 |

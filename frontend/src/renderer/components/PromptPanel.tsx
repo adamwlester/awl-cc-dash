@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { api, type Disposition } from '../api'
+import { api, type Disposition, type ResponsePreset } from '../api'
 import { useDash } from '../store'
 import { Ic } from '../lib/icons'
 import { identOf, IdentBadge, BadgeXs, USER_IDENT, SCRATCH_IDENT, clockTime, type Ident } from '../lib/identity'
@@ -320,23 +320,61 @@ export function PromptPanel() {
   )
 }
 
-// ---- Response-format control (visual parity; grouped presets are queued work) -----
+// ---- Response-format control (§11 #39) — the focused agent's reply-format preset ----
+// The backend shipped a FLAT preset catalog (id / label / description), not the
+// mockup's older Style·Behavior axes, so the popover renders the presets as a
+// single-choice list. A set persists to state/agents.json and takes effect at the
+// agent's NEXT launch/restart (append-system-prompt is a launch flag); the fmt
+// badge reads "1" when a non-default preset is active. Binds to the focused agent.
 function ResponseFormat() {
+  const d = useDash()
   const [open, setOpen] = useState(false)
+  const [presets, setPresets] = useState<ResponsePreset[]>([])
+  const [dflt, setDflt] = useState('default')
+  const [sel, setSel] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const id = d.selectedId
+
   useEffect(() => {
     const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
+  useEffect(() => { api.responsePresets().then(c => { if (c) { setPresets(c.presets); setDflt(c.default) } }) }, [])
+  // Pull the focused agent's current preset whenever the focus changes.
+  useEffect(() => {
+    if (!id) { setSel(null); return }
+    let cancelled = false
+    api.responsePreset(id).then(r => { if (!cancelled) setSel(r?.response_preset ?? null) })
+    return () => { cancelled = true }
+  }, [id])
+
+  const current = sel ?? dflt
+  const overridden = !!sel && sel !== dflt
+  const pick = async (pid: string) => {
+    if (!id) { toast('Focus an agent first'); return }
+    const prev = sel
+    setSel(pid); setBusy(true)
+    const r = await api.setResponsePreset(id, pid)
+    setBusy(false)
+    if (r) toast(`Response format → ${presets.find(p => p.id === pid)?.label || pid} (applies at next launch)`)
+    else { setSel(prev); toast('Response-format set rejected') }
+  }
   return (
     <div data-comp="response-format-control" className="fmt" ref={ref}>
-      <button className={`fmt-btn`} title="Response format" onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
+      <button className={`fmt-btn${overridden ? ' active' : ''}`} title="Response format — the focused agent's reply-format preset" onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
         <Ic name="sliders-horizontal" className="ic" /><span className="fmt-lbl">Response</span>
-        <span data-comp="count-square" className="fmt-badge">0</span><Ic name="chevron-down" className="cv" />
+        <span data-comp="count-square" className="fmt-badge">{overridden ? 1 : 0}</span><Ic name="chevron-down" className="cv" />
       </button>
       <div data-comp="format-popover" className={`fmt-menu up left${open ? ' open' : ''}`}>
-        <div className="awl-empty" style={{ padding: 'var(--space-10)' }}>Response-format axes (style · behavior · pace) land with the format-preset pass — nothing overrides yet.</div>
+        <div className="split-menu-h">{id ? 'Reply-format preset · applies at next launch' : 'Focus an agent to set its reply format'}</div>
+        {presets.map(p => (
+          <button key={p.id} className={`split-mi${current === p.id ? ' sel' : ''}`} disabled={busy || !id} onClick={() => pick(p.id)}>
+            <span className="lead"><b>{p.label}</b><span className="sub">{p.description}</span></span><span className="ck">✓</span>
+          </button>
+        ))}
+        {!presets.length && <div className="awl-empty" style={{ padding: 'var(--space-10)' }}>No presets — the sidecar's /presets/response is unavailable.</div>}
       </div>
     </div>
   )

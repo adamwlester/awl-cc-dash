@@ -187,8 +187,15 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
   }, [open])
 
   const meta = e.meta
+  // Provenance (§8.5, §11 #41) rides on BOTH the reviews .meta.json (e.meta) and
+  // the Library listing (e.doc) — prefer the sidecar meta, fall back to the doc.
+  const prov = meta?.provenance || e.doc.provenance || null
+  const hasProv = !!(prov && (prov.created_by || prov.created_at || prov.session))
+  const authorSession = prov?.created_by
+    ? d.sessions.find(x => x.session_id === prov.created_by || identOf(x).short === prov.created_by)
+    : null
   const owner: Ident = (() => {
-    const key = meta?.owner || meta?.provenance?.created_by
+    const key = meta?.owner || prov?.created_by
     const s = key ? d.sessions.find(x => x.session_id === key || identOf(x).short === key) : null
     return s ? identOf(s) : USER_IDENT
   })()
@@ -288,7 +295,7 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
               <div className="nav-tabs">
                 <button data-comp="nav-tab" className={`nav-tab nav-tab--ol${lens === 'toc' ? ' on' : ''}`} onClick={() => setLens('toc')} title="TOC — table of contents"><span className="nt-ic"><Ic name="list" /></span><span className="nt-lab">TOC</span></button>
                 <button data-comp="nav-tab" className={`nav-tab nav-tab--fb${lens === 'feedback' ? ' on' : ''}`} onClick={() => setLens('feedback')} title="Feedback"><span className="nt-ic"><Ic name="message-square" /></span><span className="nt-lab">Feedback</span>{comments.length > 0 && <span className="nav-cnt">{comments.length}</span>}</button>
-                <button data-comp="nav-tab" className={`nav-tab nav-tab--au${lens === 'authors' ? ' on' : ''}`} onClick={() => setLens('authors')} title="Authors"><span className="nt-ic"><Ic name="users" /></span><span className="nt-lab">Authors</span>{meta?.provenance && <span className="nav-cnt">1</span>}</button>
+                <button data-comp="nav-tab" className={`nav-tab nav-tab--au${lens === 'authors' ? ' on' : ''}`} onClick={() => setLens('authors')} title="Authors"><span className="nt-ic"><Ic name="users" /></span><span className="nt-lab">Authors</span>{hasProv && <span className="nav-cnt">1</span>}</button>
               </div>
               {lens === 'toc' && (
                 <div className="ol-scroll">
@@ -325,9 +332,16 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
               {lens === 'authors' && (
                 <div className="ol-scroll">
                   <div className="ol-cap">Authors</div>
-                  {meta?.provenance
-                    ? <div className="fb-card"><span className="docnav-name">{meta.provenance.created_by || 'unknown'}</span><span data-comp="contribution-badge" className="dbadge au-act">Drafted</span></div>
-                    : <div className="fb-empty">No authorship recorded yet.</div>}
+                  {hasProv ? (
+                    <div className="fb-card">
+                      <div className="flex items-center gap-2 w-full">
+                        {authorSession ? <IdentBadge a={identOf(authorSession)} /> : <span className="docnav-name">{prov!.created_by || 'unknown'}</span>}
+                        <span data-comp="contribution-badge" className="dbadge au-act" style={{ marginLeft: 'auto' }}>Drafted</span>
+                      </div>
+                      {prov!.created_at && <div className="text-[10px] text-muted" style={{ width: '100%' }}>{prov!.created_at.slice(0, 16).replace('T', ' ')}</div>}
+                      {prov!.session && <div className="text-[9px] text-muted-2 font-mono" style={{ width: '100%' }} title={prov!.session}>session {prov!.session.length > 24 ? prov!.session.slice(0, 24) + '…' : prov!.session}</div>}
+                    </div>
+                  ) : <div className="fb-empty">No authorship recorded yet.</div>}
                 </div>
               )}
             </div>
