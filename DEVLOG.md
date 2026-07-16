@@ -815,6 +815,14 @@ Files: sidecar/attachments.py (new), sidecar/main.py, sidecar/library.py, sideca
 
 ---
 
+### 2026-07-16 05:17:03 — build-run Phase 2a merged: Timeline surface design (the #50 design remainder) + design/ backlog-ref cleanup
+
+Merged the Timeline design lane to main (merge of `258f96b` + `88bd93d`; attachments §10 #1 landed separately at `7f857ee` with its own entry). The Agent→Details **Timeline** is now a standing per-turn log matching the real `GET /sessions/{id}/timeline` record — row = ordinal + "now" pill + settings string (model/mode/effort/thinking chips, unknowns honestly omitted) + time over the one-line summary — with **Rewind** and **Handoff** confirm flows (handoff-report toggle per #16, worktree/shared-cwd file-state note per #15) and the edge states declared as `data-variants`: version-gated (names the 2.1.191 floor), busy (rows inert, reading stays live), empty, and the records-carry-no-anchor caveat. Verified headed via ui-verify in the lane: **41/41 scripted checks**, zero page errors; variant-lint clean post-merge (violations: none). The lane also removed the two pre-existing backlog references from design/ surfaces (design-purity rule). ARCHITECTURE: #50 row updated (design work now fully built — only the renderer wiring half remains, incl. Attach/Assets), §11.1 §7.19 row re-trued. Lane worktree + branch removed; main-only again.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md (merge: design/mockup.html, design/styles.css, design/behavior.js, design/DESIGN.md)
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
