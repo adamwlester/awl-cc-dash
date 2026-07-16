@@ -373,6 +373,7 @@ class TestEventsBundledLoop:
     def test_generating_screen_emits_status_and_nudges(self, monkeypatch):
         br = _BundleBridge([_bundle(screen=GENERATING_SCREEN)])
         d = _mk_driver(br)
+        d._pending_turn = True     # a dashboard turn is outstanding (a send fired)
         # Pre-idle the cadence so the nudge is observable.
         d._cadence._last_activity -= 1000
         assert d._cadence.interval() == 5.0
@@ -380,6 +381,21 @@ class TestEventsBundledLoop:
         assert events[-1]["type"] == "status_change"
         assert events[-1]["status"] == "running"
         assert d._cadence.interval() == 1.0, "activity must snap the cadence"
+
+    def test_generating_screen_without_pending_turn_suppresses_running(
+            self, monkeypatch):
+        # Post-turn background work (Claude Code auto-generating the conversation
+        # title, etc.) spins the screen with NO dashboard turn outstanding. It
+        # must NOT emit a running status_change — otherwise its trailing idle
+        # would fire a phantom completion. The cadence still nudges on activity.
+        br = _BundleBridge([_bundle(screen=GENERATING_SCREEN)])
+        d = _mk_driver(br)          # _pending_turn defaults False
+        d._cadence._last_activity -= 1000
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        statuses = [e for e in events if e["type"] == "status_change"]
+        assert statuses == [], "generating with no turn pending emits no running"
+        assert d._cadence.interval() == 1.0, "activity still snaps the cadence"
+        assert d._last_state == "generating"   # the read is still recorded
 
     def test_legacy_path_still_used_before_resolution(self, monkeypatch):
         br = _BundleBridge([])
@@ -454,3 +470,247 @@ class TestNudgePlumbing:
             main._nudge_driver("s1")        # driver is None — no-op
         finally:
             main.sessions.pop("s1", None)
+
+
+# -----------------------------------------------------------------------------
+# Turn-completion backstop — the run->idle signal must fire even when the poll
+# never samples the `generating` phase (the fast-turn / coasted-poll bug), yet
+# must NOT false-fire in the brief idle gap between send and the TUI actually
+# entering `generating` (proven live: firing there raised an empty completion).
+#
+# _flush_queue sets session.status="running" synthetically on send; the ONLY
+# thing that resets it to idle AND fires the turn-completion side-effects (turn
+# count, §7.8 response card, reply-relay, shared-context, queue flush) is the
+# driver emitting a status_change="idle". The driver emits idle on its internal
+# generating->idle transition; when the poll misses `generating` entirely the
+# transition never fires (idle==idle), so send() flags `_pending_turn` and the
+# poll backstops it — but ONLY once the turn's reply is in the transcript
+# (`_saw_reply_since_send`), never on the empty pre-`generating` gap.
+# -----------------------------------------------------------------------------
+
+USER_ENTRY = {"type": "user", "uuid": "u1", "timestamp": "T",
+              "message": {"content": "hi"}}
+ASSISTANT_ENTRY = {"type": "assistant", "uuid": "a1", "timestamp": "T",
+                   "message": {"content": [{"type": "text", "text": "PONG"}]}}
+
+
+class _SendBridge:
+    """Fake with a no-op send() so BridgeDriver.send() can set its flags."""
+
+    def send(self, name, text):
+        pass
+
+
+class TestTurnCompletionBackstop:
+    def test_send_arms_backstop_and_resets_reply_watermark(self):
+        d = _mk_driver(_SendBridge())
+        d._saw_reply_since_send = True     # a stale prior-turn reply
+        assert d._pending_turn is False
+        asyncio.run(d.send("do a thing"))
+        assert d._pending_turn is True, \
+            "a successful send must flag an outstanding turn"
+        assert d._saw_reply_since_send is False, \
+            "send must reset the reply watermark — a new turn owes a fresh reply"
+
+    def test_failed_send_leaves_no_pending_turn(self):
+        class _BoomBridge:
+            def send(self, name, text):
+                raise RuntimeError("tmux gone")
+
+        d = _mk_driver(_BoomBridge())
+        with pytest.raises(RuntimeError):
+            asyncio.run(d.send("x"))
+        assert d._pending_turn is False, \
+            "a throwing send starts no turn — must not flag one"
+
+    def test_missed_generating_with_reply_emits_one_completion(self, monkeypatch):
+        # The bug: the whole turn (generating + the reply) landed inside one
+        # coasted poll interval. The poll wakes to an idle screen with the reply
+        # already in the transcript delta; `_last_state` is still "idle" so the
+        # transition path stays silent — the backstop must emit exactly one idle.
+        br = _BundleBridge([_bundle(entries=[USER_ENTRY, ASSISTANT_ENTRY],
+                                    screen=IDLE_SCREEN)])
+        d = _mk_driver(br)                 # _last_state="idle"
+        d._pending_turn = True             # a send happened; generating missed
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert len(idles) == 1, "must emit the run->idle completion signal once"
+        assert d._saw_reply_since_send is True
+        assert d._pending_turn is False, "the outstanding turn is now resolved"
+
+    def test_no_false_completion_in_pre_generating_gap(self, monkeypatch):
+        # The false-early bug (proven live): after send the screen is briefly
+        # still idle BEFORE the TUI enters `generating`, and NO reply exists yet.
+        # The completion must NOT fire here, and must LEAVE `_pending_turn` armed
+        # so the real completion still fires later.
+        br = _BundleBridge([_bundle(entries=(), screen=IDLE_SCREEN)])
+        d = _mk_driver(br)                 # _last_state="idle"
+        d._pending_turn = True             # send outstanding, reply not in yet
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert idles == [], "no reply yet => the gap idle must NOT complete a turn"
+        assert d._pending_turn is True, "the turn stays outstanding — armed"
+
+    def test_no_false_completion_on_first_poll_after_immediate_send(
+            self, monkeypatch):
+        # The live `None -> idle` race (proven on a create-then-send agent whose
+        # first poll ran only AFTER the send): `_last_state` is still None, so the
+        # first idle read is a `None -> idle` transition. With a turn outstanding
+        # that transition must be SUPPRESSED (not fire an empty completion); only
+        # the reply-backed completion may close the turn.
+        br = _BundleBridge([_bundle(entries=(), screen=IDLE_SCREEN)])
+        d = _mk_driver(br)
+        d._last_state = None               # first poll ever, but send already fired
+        d._pending_turn = True
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert idles == [], "None->idle with a turn outstanding must not complete it"
+        assert d._pending_turn is True
+        assert d._last_state == "idle"     # the read is still recorded
+
+    def test_connect_idle_emits_when_no_turn_outstanding(self, monkeypatch):
+        # A freshly-connected agent (no send) must still emit its connect idle so
+        # its status settles to idle — the suppression is gated on `_pending_turn`.
+        br = _BundleBridge([_bundle(entries=(), screen=IDLE_SCREEN)])
+        d = _mk_driver(br)
+        d._last_state = None               # fresh driver, nothing emitted yet
+        # _pending_turn defaults False (no send)
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert len(idles) == 1, "the connect idle must fire when no turn is pending"
+
+    def test_gap_then_real_completion_fires_exactly_once(self, monkeypatch):
+        # The full live sequence: an empty pre-generating gap idle (no fire), then
+        # the reply lands with the screen idle (missed generating) => fire ONCE.
+        br = _BundleBridge([
+            _bundle(entries=(), screen=IDLE_SCREEN),                 # gap
+            _bundle(entries=[USER_ENTRY, ASSISTANT_ENTRY], screen=IDLE_SCREEN),
+        ])
+        d = _mk_driver(br)
+        d._pending_turn = True
+        events = asyncio.run(_cycles(monkeypatch, d, n=2))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert len(idles) == 1, "exactly one completion across the gap + real idle"
+        assert d._pending_turn is False
+
+    def test_no_completion_without_a_pending_turn(self, monkeypatch):
+        # A steady idle agent (freshly connected / between turns) must NOT emit a
+        # spurious idle even if a stale reply sits in the transcript.
+        br = _BundleBridge([_bundle(entries=[ASSISTANT_ENTRY], screen=IDLE_SCREEN)])
+        d = _mk_driver(br)                 # _last_state="idle", _pending_turn=False
+        events = asyncio.run(_cycles(monkeypatch, d, n=1))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert idles == [], "no send outstanding => no completion signal"
+
+    def test_backstop_fires_exactly_once_across_repeated_idle_polls(
+            self, monkeypatch):
+        # After the reply-backed idle fires once, a second idle poll (coasted
+        # re-read) must not re-fire — `_pending_turn` was cleared.
+        br = _BundleBridge([
+            _bundle(entries=[USER_ENTRY, ASSISTANT_ENTRY], screen=IDLE_SCREEN),
+            _bundle(entries=(), screen=IDLE_SCREEN),
+        ])
+        d = _mk_driver(br)
+        d._pending_turn = True
+        events = asyncio.run(_cycles(monkeypatch, d, n=2))
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert len(idles) == 1, "repeated idle polls must not re-fire completion"
+
+    def test_caught_generating_then_idle_emits_running_then_single_idle(
+            self, monkeypatch):
+        # The normal path still works and does NOT double-fire: the poll catches
+        # generating (emit running), then idle with the reply (the completion
+        # branch emits idle), and nothing adds a second idle.
+        br = _BundleBridge([
+            _bundle(entries=(), screen=GENERATING_SCREEN),
+            _bundle(entries=[USER_ENTRY, ASSISTANT_ENTRY], screen=IDLE_SCREEN),
+        ])
+        d = _mk_driver(br)                 # _last_state="idle"
+        d._pending_turn = True
+        events = asyncio.run(_cycles(monkeypatch, d, n=2))
+        statuses = [e["status"] for e in events if e["type"] == "status_change"]
+        assert statuses == ["running", "idle"], \
+            "one running, exactly one idle — no duplicate completion"
+        assert d._pending_turn is False
+
+    def test_post_turn_background_spinner_emits_no_second_running(
+            self, monkeypatch):
+        # The live post-turn double (proven on agent c38e3037): after a turn
+        # completes, Claude Code auto-generates the conversation title — a brief
+        # `generating -> idle` spinner with NO dashboard turn pending. That cycle
+        # must emit NO running (so its idle carries no `_was_running` and cannot
+        # raise a second §7.8 card). Full sequence: send-turn generating -> reply
+        # idle (completion) -> post-turn generating -> settle idle.
+        br = _BundleBridge([
+            _bundle(entries=(), screen=GENERATING_SCREEN),                   # turn
+            _bundle(entries=[USER_ENTRY, ASSISTANT_ENTRY], screen=IDLE_SCREEN),
+            _bundle(entries=(), screen=GENERATING_SCREEN),                   # ai-title
+            _bundle(entries=(), screen=IDLE_SCREEN),                         # settle
+        ])
+        d = _mk_driver(br)                 # _last_state="idle"
+        d._pending_turn = True             # the dashboard turn is outstanding
+        events = asyncio.run(_cycles(monkeypatch, d, n=4))
+        runnings = [e for e in events
+                    if e["type"] == "status_change" and e["status"] == "running"]
+        idles = [e for e in events
+                 if e["type"] == "status_change" and e["status"] == "idle"]
+        assert len(runnings) == 1, \
+            "exactly one running — the post-turn ai-title spinner emits none"
+        # One completion idle (the turn) + one harmless settle idle (post-title);
+        # the settle carries no _was_running, so handle_event completes nothing.
+        assert len(idles) == 2
+        assert d._pending_turn is False
+
+    def test_reconciled_idle_drives_side_effects_exactly_once(self):
+        # End-to-end: the backstop-emitted idle, fed to a synthetically-running
+        # session (as _flush_queue leaves it), must bump the turn count and raise
+        # ONE §7.8 response card — and a second idle poll must not double either.
+        import main
+        import inbox
+        from main import SessionState
+        inbox.reset()
+        try:
+            s = SessionState(
+                session_id="recon-1", agent_type=None, model=None,
+                permission_mode="default", cwd=None, system_prompt=None,
+                driver_name="bridge",
+            )
+            # _flush_queue's synthetic running-set (pushed running event sets
+            # _was_running; status is forced to running before the await send).
+            s.status = "running"
+            s._was_running = True
+
+            def _idle():
+                return {"type": "status_change", "status": "idle",
+                        "timestamp": datetime_now_iso()}
+
+            s.handle_event(_idle())
+            assert s.status == "idle"
+            assert s.turn_count == 1
+            assert s.total_turns == 1     # surfaced on the API for bridge agents
+            cards = [it for it in inbox.items_for("recon-1")
+                     if it["type"] == "response"]
+            assert len(cards) == 1 and cards[0]["data"]["runs"] == 1
+
+            # A second idle (stray re-read) must not double-count the turn nor
+            # re-raise the card — the _was_running guard blocks it.
+            s.handle_event(_idle())
+            assert s.turn_count == 1
+            assert s.total_turns == 1
+            cards = [it for it in inbox.items_for("recon-1")
+                     if it["type"] == "response"]
+            assert len(cards) == 1 and cards[0]["data"]["runs"] == 1
+        finally:
+            inbox.reset()
+
+
+def datetime_now_iso():
+    from datetime import datetime
+    return datetime.now().isoformat()

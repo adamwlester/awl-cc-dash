@@ -297,6 +297,12 @@ class SessionState:
             if st == "idle":
                 if self._was_running:        # one completed turn (feeds the cap loop)
                     self.turn_count += 1
+                    # Surface the count on the API too: the bridge driver has no
+                    # SDK `result`/`num_turns`, so without this `total_turns`
+                    # (to_dict / the UI's turn readout) would sit at 0 forever for
+                    # every bridge agent. Keep it in lockstep with the local
+                    # per-turn counter.
+                    self.total_turns = self.turn_count
                     self._was_running = False
                     _raise_response_card(self)
                 # Reply-to: relay this finished turn back to a linked peer FIRST (uses

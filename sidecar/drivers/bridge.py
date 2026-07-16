@@ -500,6 +500,20 @@ class BridgeDriver(AgentDriver):
         self._seen = 0
         self._closed = False
         self._last_state: str | None = None
+        # Turn-completion tracking (see events() step 3). `_pending_turn`: a
+        # prompt was sent and its turn hasn't been observed complete yet — while
+        # it holds, the driver suppresses bare `_last_state`->idle emissions and
+        # lets the completion branch own the run->idle signal. `_saw_reply_since_
+        # send`: a NEW assistant entry has landed in the transcript since that
+        # send. The completion fires only when BOTH hold and the screen reads
+        # idle — so it never false-fires in the brief idle gap between send and
+        # the TUI entering `generating` (no reply yet), nor on a stale/None
+        # `_last_state`->idle right after an immediate send, yet still fires when
+        # the poll misses the whole `generating` phase (the turn ran and finished
+        # inside one coasted poll interval; the reply is already in the transcript
+        # when the poll wakes). Both reset on send().
+        self._pending_turn: bool = False
+        self._saw_reply_since_send: bool = False
         # §11 #34 — the batched, adaptive poll:
         #   * _cadence: 1 s while running/recently active, coasting to 5 s
         #     after ~30 s idle, snapped back by nudge() on any activity.
@@ -821,6 +835,13 @@ class BridgeDriver(AgentDriver):
     async def send(self, prompt: str) -> None:
         self.nudge()
         await asyncio.to_thread(self._bridge.send, self._name, prompt)
+        # A turn is now outstanding. Flag it (and reset the reply watermark) so
+        # the poll can emit the run->idle completion signal even if it never
+        # samples the `generating` phase (a turn can start and finish inside one
+        # coasted poll interval). Set only after the send succeeds — a throwing
+        # send starts no turn.
+        self._pending_turn = True
+        self._saw_reply_since_send = False
 
     def _resolve_and_persist_transcript_path(self) -> None:
         """Resolve this agent's transcript path once and persist it (§8.6/#4).
@@ -994,6 +1015,11 @@ class BridgeDriver(AgentDriver):
                 for entry in self._entries[self._seen:]:
                     event = _entry_to_event(entry)
                     if event:
+                        # A new assistant entry since the last send is the proof
+                        # the outstanding turn actually produced output — the gate
+                        # the idle backstop (step 3 below) keys off.
+                        if event.get("type") == "assistant":
+                            self._saw_reply_since_send = True
                         yield event
                 self._seen = len(self._entries)
 
@@ -1007,7 +1033,12 @@ class BridgeDriver(AgentDriver):
                     st, state = {}, None
             if state and state != "idle":
                 self.nudge()  # generating / permission prompt = activity
-            if state and state != self._last_state:
+            # An "unknown" screen read carries no state (it maps to no status): a
+            # transient mid-render — most visibly the instant after a prompt is
+            # submitted, before the TUI paints either the input box or the spinner.
+            # Skip it rather than recording it as `_last_state`, so it can't
+            # manufacture a spurious transition on the next read.
+            if state and state != "unknown" and state != self._last_state:
                 self.nudge()  # any state flip = activity
                 prev = self._last_state
                 self._last_state = state
@@ -1028,11 +1059,51 @@ class BridgeDriver(AgentDriver):
                             "timestamp": datetime.now().isoformat(),
                         }
                     mapped = _STATE_TO_STATUS.get(state)
-                    if mapped:
+                    if mapped == "running" and self._pending_turn:
+                        # Emit the run-state running ONLY while a dashboard turn is
+                        # outstanding. A `generating` screen with NO turn pending is
+                        # NOT a tracked turn — it is Claude Code's own post-turn
+                        # background work (auto-generating the conversation title /
+                        # metadata, which briefly spins) or manual terminal use.
+                        # Emitting running there would let its trailing idle fire a
+                        # phantom turn-completion (live-proven: the post-turn
+                        # ai-title spinner otherwise double-raised the §7.8 card).
                         yield {
-                            "type": "status_change", "status": mapped,
+                            "type": "status_change", "status": "running",
                             "timestamp": datetime.now().isoformat(),
                         }
+                    elif mapped == "idle" and not self._pending_turn:
+                        # A bare idle transition emits the run-state idle ONLY when
+                        # no turn is outstanding — the connect idle, the settle back
+                        # to idle between turns, and the settle after post-turn
+                        # background work (whose running was suppressed above, so
+                        # this idle carries no `_was_running` and completes nothing).
+                        # While a turn IS outstanding the completion branch below
+                        # owns the idle emission, so a stale / None `_last_state` ->
+                        # idle in the brief gap between send and the TUI entering
+                        # `generating` cannot fire a false, empty turn-completion
+                        # (live-proven: that `None -> idle` first-poll-after-an-
+                        # immediate-send race otherwise raised a phantom completion).
+                        yield {
+                            "type": "status_change", "status": "idle",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+            # Turn completion (§7.8): the outstanding turn has ended — the screen
+            # is idle AND its reply is in the transcript (`_saw_reply_since_send`,
+            # set in step 2). This single branch owns the run->idle signal for a
+            # turn whether the poll caught `generating` (normal) or missed the
+            # whole phase (the turn ran + finished inside one coasted poll
+            # interval; the reply is already present when the poll wakes). The
+            # reply gate is what distinguishes a real completion from the brief
+            # pre-`generating` idle gap. Fires EXACTLY ONCE — `_pending_turn` is
+            # set only in send() and cleared here — driving turn count, the §7.8
+            # response card, reply-relay, shared-context, and the queue flush.
+            if state == "idle" and self._pending_turn and self._saw_reply_since_send:
+                yield {
+                    "type": "status_change", "status": "idle",
+                    "timestamp": datetime.now().isoformat(),
+                }
+                self._pending_turn = False
 
             await asyncio.sleep(self._cadence.interval())
 
