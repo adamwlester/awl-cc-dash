@@ -30,6 +30,12 @@ What this file pins:
   * ``prepare_fork_filestate`` — the git-worktree isolation + honest fallback;
   * ``fork()`` launch-command construction end-to-end;
   * ``rewind()`` key/command sequence construction;
+  * the post-restore VERIFY-THEN-CLEAR (the 2026-07-16 e2e race: the TUI stages
+    the rewound prompt back into the input box asynchronously, so a blind
+    ``Ctrl-U`` can fire early) — ``parse_input_box_text`` emptiness (cursor
+    cell, ghost suggestion, staged text), one clear when the box is already
+    empty, bounded re-clear until empty, and bound exhaustion degrading to an
+    honest ``input_cleared: False`` flag (never a raise);
   * the driver's RuntimeError translation and the endpoints' honest error mapping
     (404 / 400 no-capability / 400 version-unsupported / 409 busy) + fork success.
 """
@@ -57,6 +63,7 @@ from bridge.bridge import (  # noqa: E402
     TmuxBridgeError,
     VersionUnsupportedError,
     parse_claude_version,
+    parse_input_box_text,
     version_at_least,
 )
 from bridge.paths import CLAUDE_BIN  # noqa: E402
@@ -389,40 +396,69 @@ _REWIND_CONFIRM = """\
    Cancel
 """
 
+# Post-restore screens read back by the VERIFIED clear. The empty box's cursor
+# cell renders as a no-break space (real capture — test_bridge_unit's idle
+# screens); the staged box shows the restored prompt the 2026-07-16 e2e race
+# left behind.
+_BOX_EMPTY = """\
+● Done.
+
+────────────────────────────────────────────────
+❯ \xa0
+────────────────────────────────────────────────
+  ← for agents
+"""
+
+_BOX_STAGED = """\
+● Done.
+
+────────────────────────────────────────────────
+❯ Remember this codeword: ALPHA-3. Reply with exactly: GOT-3
+────────────────────────────────────────────────
+  ← for agents
+"""
+
+
+def _scripted_rewind_bridge(monkeypatch, screens):
+    """A bridge with rewind's I/O faked: idle-gated True, version OK, and
+    read() serving the given screens in order (the LAST one repeats). Captures
+    send/keys in order."""
+    b = TmuxBridge()
+    actions = []
+    it = iter(screens)
+    last = {"s": screens[-1]}
+
+    def fake_read(name, lines=50):
+        try:
+            last["s"] = next(it)
+        except StopIteration:
+            pass
+        return {"content": last["s"]}
+
+    monkeypatch.setattr(b, "_run",
+                        lambda cmd, **kw: "2.1.198 (Claude Code)")
+    monkeypatch.setattr(b, "_require_session", lambda n: None)
+    monkeypatch.setattr(b, "_idle_gate", lambda n, **kw: True)
+    monkeypatch.setattr(b, "read", fake_read)
+    monkeypatch.setattr(b, "send",
+                        lambda name, text, press_enter=True:
+                        actions.append(("send", text)))
+    monkeypatch.setattr(b, "keys",
+                        lambda name, *ks: actions.append(("keys", ks)))
+    monkeypatch.setattr("bridge.bridge.time.sleep", lambda s: None)
+    return b, actions
+
 
 class TestRewindSequence:
     def _bridge(self, monkeypatch, screens):
-        """A bridge with rewind's I/O faked: idle-gated True, version OK, and
-        read() serving the given screens in order. Captures send/keys in order."""
-        b = TmuxBridge()
-        actions = []
-        it = iter(screens)
-        last = {"s": screens[-1]}
-
-        def fake_read(name, lines=50):
-            try:
-                last["s"] = next(it)
-            except StopIteration:
-                pass
-            return {"content": last["s"]}
-
-        monkeypatch.setattr(b, "_run",
-                            lambda cmd, **kw: "2.1.198 (Claude Code)")
-        monkeypatch.setattr(b, "_require_session", lambda n: None)
-        monkeypatch.setattr(b, "_idle_gate", lambda n, **kw: True)
-        monkeypatch.setattr(b, "read", fake_read)
-        monkeypatch.setattr(b, "send",
-                            lambda name, text, press_enter=True:
-                            actions.append(("send", text)))
-        monkeypatch.setattr(b, "keys",
-                            lambda name, *ks: actions.append(("keys", ks)))
-        monkeypatch.setattr("bridge.bridge.time.sleep", lambda s: None)
-        return b, actions
+        return _scripted_rewind_bridge(monkeypatch, screens)
 
     def test_sequence_for_one_prompt_back(self, monkeypatch):
-        b, actions = self._bridge(monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM])
+        b, actions = self._bridge(
+            monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM, _BOX_EMPTY])
         out = b.rewind("agent", to_prompt_index=1)
-        # /rewind -> Up×1 -> Enter (open confirm) -> Enter (restore) -> Ctrl-U.
+        # /rewind -> Up×1 -> Enter (open confirm) -> Enter (restore) -> one
+        # Ctrl-U, verified by the empty-box read-back.
         assert actions == [
             ("send", "/rewind"),
             ("keys", ("Up",)),
@@ -430,10 +466,12 @@ class TestRewindSequence:
             ("keys", ("Enter",)),
             ("keys", ("C-u",)),
         ]
-        assert out == {"status": "rewound", "name": "agent", "to_prompt_index": 1}
+        assert out == {"status": "rewound", "name": "agent",
+                       "to_prompt_index": 1, "input_cleared": True}
 
     def test_up_presses_scale_with_prompt_index(self, monkeypatch):
-        b, actions = self._bridge(monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM])
+        b, actions = self._bridge(
+            monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM, _BOX_EMPTY])
         b.rewind("agent", to_prompt_index=3)
         ups = [a for a in actions if a == ("keys", ("Up",))]
         assert len(ups) == 3
@@ -475,6 +513,105 @@ class TestRewindSequence:
         with pytest.raises(VersionUnsupportedError):
             b.rewind("agent", to_prompt_index=1)
         assert actions == []                         # nothing sent before the gate
+
+
+# -----------------------------------------------------------------------------
+# parse_input_box_text — the pure emptiness read the verified clear keys on.
+# The empty-box renderings are real captures (test_bridge_unit's idle screens):
+# the cursor cell is a no-break space, and an EMPTY box may carry a dim ghost
+# suggestion (`Try "…"`) either after the cursor cell or directly after ❯.
+# -----------------------------------------------------------------------------
+
+class TestParseInputBoxText:
+    def test_empty_box_cursor_cell_is_empty(self):
+        assert parse_input_box_text(_BOX_EMPTY) == ""
+
+    def test_ghost_suggestion_after_cursor_cell_is_empty(self):
+        screen = ('────────────────────\n❯ \xa0Try "fix typecheck errors"\n'
+                  '────────────────────\n  ? for shortcuts\n')
+        assert parse_input_box_text(screen) == ""
+
+    def test_ghost_suggestion_without_cursor_cell_is_empty(self):
+        # Real capture shape (CC >= 2.1.206): the ghost paints directly after ❯.
+        screen = ('────────────────────\n❯ Try "fix lint errors"\n'
+                  '────────────────────\n  ⏸ manual mode on\n')
+        assert parse_input_box_text(screen) == ""
+
+    def test_staged_text_is_returned(self):
+        assert parse_input_box_text(_BOX_STAGED) == (
+            "Remember this codeword: ALPHA-3. Reply with exactly: GOT-3")
+
+    def test_staged_multiline_prompt_counts_continuation_lines(self):
+        screen = ('────────────────────\n❯ first line\nsecond line\n'
+                  '────────────────────\n  ← for agents\n')
+        out = parse_input_box_text(screen)
+        assert "first line" in out and "second line" in out
+
+    def test_last_prompt_marker_wins_over_history_echo(self):
+        # A prompt echoed into history ABOVE the (empty) box must not read as
+        # staged — the input box is the LAST ❯ line.
+        screen = ('❯ Reply with exactly: CTX_OK\n\n● CTX_OK\n\n'
+                  '────────────────────\n❯ \xa0\n────────────────────\n')
+        assert parse_input_box_text(screen) == ""
+
+    def test_no_input_box_is_none_not_empty(self):
+        # No ❯ line = nothing to verify — must NOT read as "cleared".
+        assert parse_input_box_text("no box rendered here") is None
+        assert parse_input_box_text("") is None
+
+
+# -----------------------------------------------------------------------------
+# The post-restore VERIFY-THEN-CLEAR (the 2026-07-16 e2e race): Claude Code
+# stages the rewound prompt back INTO the input box ASYNCHRONOUSLY, so a single
+# blind Ctrl-U could fire before the prompt lands — the next send() would then
+# append to the stale prompt. rewind() now clears, reads the box back, and
+# re-clears bounded, degrading to an honest input_cleared: False on exhaustion.
+# -----------------------------------------------------------------------------
+
+class TestRewindVerifiedClear:
+    def test_one_clear_when_box_already_empty(self, monkeypatch):
+        # (a) The box reads back empty on the first verify — exactly ONE Ctrl-U
+        # (no behavior change from the pre-hardening sequence) + an honest flag.
+        b, actions = _scripted_rewind_bridge(
+            monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM, _BOX_EMPTY])
+        out = b.rewind("agent", to_prompt_index=1)
+        assert [a for a in actions if a == ("keys", ("C-u",))] == [
+            ("keys", ("C-u",))]
+        assert out["input_cleared"] is True
+        assert "warning" not in out
+
+    def test_reclears_until_empty_within_bound(self, monkeypatch):
+        # (b) The restore lands LATE: two read-backs still show the restored
+        # prompt staged — re-clear each time, stop at the first empty read.
+        b, actions = _scripted_rewind_bridge(
+            monkeypatch,
+            [_REWIND_MENU, _REWIND_CONFIRM, _BOX_STAGED, _BOX_STAGED, _BOX_EMPTY])
+        out = b.rewind("agent", to_prompt_index=1)
+        assert len([a for a in actions if a == ("keys", ("C-u",))]) == 3
+        assert out["input_cleared"] is True
+        assert "warning" not in out
+
+    def test_bound_exhaustion_flags_honestly_no_raise(self, monkeypatch):
+        # (c) The box NEVER reads back empty: rewind still succeeds (status
+        # "rewound", no raise) but flags input_cleared False + a warning.
+        b, actions = _scripted_rewind_bridge(
+            monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM, _BOX_STAGED])
+        out = b.rewind("agent", to_prompt_index=1, clear_tries=5)
+        assert out["status"] == "rewound"
+        assert out["input_cleared"] is False
+        assert "staged" in out["warning"]
+        # The initial clear + one re-clear per exhausted read-back (5 tries).
+        assert len([a for a in actions if a == ("keys", ("C-u",))]) == 6
+
+    def test_ghost_suggestion_reads_as_cleared(self, monkeypatch):
+        # An empty box repainted with the dim ghost suggestion must NOT count
+        # as staged (it would false-flag every rewind on CC >= 2.1.206).
+        ghost = _BOX_EMPTY.replace("❯ \xa0", '❯ Try "fix lint errors"')
+        b, actions = _scripted_rewind_bridge(
+            monkeypatch, [_REWIND_MENU, _REWIND_CONFIRM, ghost])
+        out = b.rewind("agent", to_prompt_index=1)
+        assert out["input_cleared"] is True
+        assert len([a for a in actions if a == ("keys", ("C-u",))]) == 1
 
 
 # -----------------------------------------------------------------------------

@@ -417,6 +417,54 @@ def version_at_least(version, minimum):
     return tuple(version) >= tuple(minimum)
 
 
+# The EMPTY input box's ghost-suggestion paint (real captures, CC 2.x — see
+# test_bridge_unit's idle screens): a dim `Try "<suggestion>"` rendered inside
+# the empty box. Styling is stripped from captures, so it is recognized by its
+# shape (straight or curly quotes).
+_GHOST_SUGGESTION_RE = re.compile(r'^Try ["“].*["”]$')
+
+
+def parse_input_box_text(content):
+    """The text currently STAGED in the TUI's input box, from a captured screen.
+
+    Pure function (hermetically unit-testable, like ``parse_mode_indicator``).
+    Anchors on the LAST prompt-marker (``❯``) line — the input box; earlier
+    ``❯`` lines are prompts echoed into history — and returns that line's text
+    after the marker plus any continuation lines down to the box's bottom rule,
+    stripped. Returns ``""`` for a verified-EMPTY box and ``None`` when the
+    capture shows no ``❯`` line at all (nothing to verify — callers treat that
+    as UNVERIFIED, never as empty).
+
+    Two empty-box renderings are treated as EMPTY (both real captures — see
+    test_bridge_unit's idle screens): the cursor cell renders as a no-break
+    space (``❯ \\xa0`` — staged text sits directly after the marker, so content
+    that only FOLLOWS the cursor cell is ghost paint, not input), and Claude
+    Code 2.x may paint a dim ghost SUGGESTION into the empty box (``Try "fix
+    lint errors"``), matched by shape via ``_GHOST_SUGGESTION_RE`` (a staged
+    prompt that IS exactly one ``Try "…"`` line would be misread as empty — an
+    accepted residual).
+    """
+    if not content or "❯" not in content:
+        return None
+    lines = content.rstrip("\n").split("\n")
+    idx = max(i for i, ln in enumerate(lines) if ln.lstrip().startswith("❯"))
+    first = lines[idx].lstrip()[len("❯"):]
+    parts = [first]
+    for ln in lines[idx + 1:]:
+        if re.match(r"\s*─{10,}", ln):       # the box's bottom rule
+            break
+        parts.append(ln)
+    text = "\n".join(parts).replace("\xa0", " ").strip()
+    if not text:
+        return ""
+    if len(parts) == 1:
+        if first.lstrip(" ").startswith("\xa0"):
+            return ""                         # cursor at column 0 — nothing typed
+        if _GHOST_SUGGESTION_RE.match(text):
+            return ""                         # the empty box's ghost suggestion
+    return text
+
+
 class TmuxBridge:
     """Programmatic control of Claude Code TUI sessions in WSL2/tmux.
 
@@ -1752,16 +1800,48 @@ class TmuxBridge:
             )
         return version
 
+    def _clear_input_box(self, name, tries=5, interval=0.6):
+        """Clear the TUI input box and VERIFY it actually reads back empty.
+
+        Sends ``Ctrl-U``, reads the box back (``parse_input_box_text``), and
+        re-clears while staged text is still visible — bounded at ``tries``
+        read-backs. Exists because the TUI stages content into the box
+        ASYNCHRONOUSLY (a /rewind restore puts the rewound prompt back into the
+        input field — the 2026-07-16 e2e race), so a single blind ``Ctrl-U``
+        can fire BEFORE the text lands: the box then re-fills after the
+        "clear" and the NEXT ``send()`` appends to the stale prompt. Returns
+        True when an empty box was read back, False when the bound exhausted
+        without one (the caller reports that honestly — no raise). An
+        unparseable screen (no ``❯`` line) counts as unverified, never as
+        empty.
+        """
+        self.keys(name, "C-u")
+        for _ in range(max(1, int(tries))):
+            time.sleep(interval)
+            if parse_input_box_text(self.read(name, lines=15)["content"]) == "":
+                return True
+            self.keys(name, "C-u")      # still staged (or unreadable) — re-clear
+        return False
+
     def rewind(self, name, to_prompt_index=1, *, check_version=True,
-               idle_timeout=5.0, menu_wait=3.0, step_delay=1.0, confirm_wait=2.0):
+               idle_timeout=5.0, menu_wait=3.0, step_delay=1.0, confirm_wait=2.0,
+               clear_tries=5, clear_interval=0.6):
         """Rewind a live session's CONVERSATION to an earlier prompt checkpoint.
 
         Drives the native ``/rewind`` menu over tmux — the exact keystroke
         sequence proven live (``test_rewind_handoff_live``, CC 2.1.198): open
         ``/rewind``; press ``Up`` × ``to_prompt_index`` to highlight "the point
         before the k-th-from-last prompt"; ``Enter`` to open the confirm dialog;
-        ``Enter`` to perform Restore-conversation (the default); ``Ctrl-U`` to
-        clear the restored prompt out of the input box. Restore-conversation
+        ``Enter`` to perform Restore-conversation (the default); then a
+        VERIFIED clear of the input box. Restore-conversation stages the
+        rewound prompt back INTO the input box ASYNCHRONOUSLY, so a single
+        blind ``Ctrl-U`` could fire before the prompt lands (the 2026-07-16 e2e
+        race) and leave it staged for the next ``send()`` to append to — the
+        clear therefore re-reads the box and re-clears on a short bound
+        (``clear_tries`` × ``clear_interval``, via ``_clear_input_box``). The
+        result carries an honest ``input_cleared`` flag: False (plus a
+        ``warning``) when the bound exhausts without an empty read-back — never
+        a raise, because the rewind itself succeeded. Restore-conversation
         rewinds IN-PLACE on the SAME session id — no new ``<id>.jsonl`` — so the
         agent genuinely loses the later turns from its live context while the
         transcript keeps them as history.
@@ -1806,9 +1886,20 @@ class TmuxBridge:
                 f"rewind: the confirm dialog did not appear:\n{confirm[-400:]}")
         self.keys(name, "Enter")           # confirm — default = Restore conversation
         time.sleep(step_delay)
-        self.keys(name, "C-u")             # clear the restored prompt from the input
-        return {"status": "rewound", "name": name,
-                "to_prompt_index": int(to_prompt_index)}
+        # Clear the restored prompt from the input box — VERIFIED, not blind:
+        # the TUI stages it back asynchronously, so an unverified Ctrl-U can
+        # lose the race and leave the prompt staged (2026-07-16 e2e).
+        cleared = self._clear_input_box(name, tries=clear_tries,
+                                        interval=clear_interval)
+        result = {"status": "rewound", "name": name,
+                  "to_prompt_index": int(to_prompt_index),
+                  "input_cleared": cleared}
+        if not cleared:
+            result["warning"] = (
+                "input box did not read back empty after the bounded clear — "
+                "the restored prompt may still be staged; a subsequent send() "
+                "would append to it.")
+        return result
 
     def prepare_fork_filestate(self, src_cwd, new_name, *, policy="worktree",
                                branch=None, isolate=True):

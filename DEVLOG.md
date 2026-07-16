@@ -851,6 +851,14 @@ Files: docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-16 10:50:19 — fix(bridge): rewind verify-then-clear — restored-prompt input-box race closed
+
+Fixed the rewind race the 2026-07-16 e2e found (recorded in §7.19's ⚠ Today marker): Claude Code stages the rewound prompt back into the input box asynchronously after a `/rewind` restore, so `TmuxBridge.rewind()`'s single blind `Ctrl-U` could fire before the prompt landed — the prompt stayed staged and the next `send()` appended to it. [rewind()](bridge/bridge.py) now clears VERIFIED: new pure helper `parse_input_box_text` (last-`❯` input box; the NBSP cursor cell and the `Try "…"` ghost suggestion read as empty) + `_clear_input_box` (Ctrl-U → read-back → re-clear, bounded at ~5 reads), and the result carries an honest `input_cleared` flag + warning on bound exhaustion — never a raise, since the rewind itself succeeded. 11 new hermetic units in [tests/test_rewind_fork_unit.py](tests/test_rewind_fork_unit.py) pin the emptiness parsing, one-clear-when-already-empty, bounded re-clear, bound exhaustion, and the ghost-suggestion false-flag guard; the live leg rides the existing `test_rewind_handoff_live` rewind proofs (its keystroke-sequence docstrings re-trued). ARCHITECTURE §7.19: the race sentence replaced with the settled hardening prose; the ⚠ Today marker keeps only the #46 rewind-anchor residual. Hermetic tier green: 1384 passed (baseline 1373 + 11).
+
+Files: bridge/bridge.py, tests/test_rewind_fork_unit.py, tests/test_rewind_handoff_live.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

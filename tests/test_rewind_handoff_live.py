@@ -21,7 +21,12 @@ were probed live before this test was written:
     `Up`×k highlights "before the k-th-from-last prompt"; Enter opens a confirm
     dialog ("The conversation will be forked. The code will be unchanged."); Enter
     again performs **Restore conversation**; the selected prompt is restored into
-    the input field (cleared here with Ctrl-U before interrogating).
+    the input field — ASYNCHRONOUSLY (the 2026-07-16 e2e race: a blind Ctrl-U can
+    fire before the prompt lands and leave it staged for the next send to append
+    to), so the product method `TmuxBridge.rewind()` clears VERIFIED (read the box
+    back, re-clear bounded, honest `input_cleared` flag on exhaustion — pinned
+    hermetically in test_rewind_fork_unit). The ad-hoc spike helper below predates
+    that hardening and clears blind after a settle sleep.
   * `/rewind` restore-conversation rewinds IN-PLACE on the same session-id (no new
     <id>.jsonl at rewind time; old lines stay as history, live model context drops
     them) — so it is a clean REWIND but not, by itself, a fork. `--fork-session`
@@ -122,7 +127,11 @@ def _plant_codewords(bridge, name: str, n: int = 3) -> None:
 def _rewind_to_before_last(bridge, name: str, ups: int) -> None:
     """Drive the `/rewind` menu to "the point before the ups-th-from-last prompt"
     and perform Restore-conversation. `ups=1` => discard only the last prompt.
-    (Menu navigation confirmed live on 2.1.198 — see module docstring.)"""
+    (Menu navigation confirmed live on 2.1.198 — see module docstring.) This is
+    the pre-product spike helper: it clears the restored prompt with a single
+    BLIND Ctrl-U after a settle sleep; the product method `TmuxBridge.rewind()`
+    (exercised by the *_via_bridge_method tests below) instead verifies the box
+    reads back empty and re-clears bounded (the 2026-07-16 race hardening)."""
     bridge.send(name, "/rewind")
     time.sleep(3)
     screen = bridge.read(name, lines=45)["content"]
@@ -218,7 +227,8 @@ def test_rewind_truncate_and_resume(rewind_bridge):
             "rewind: WORKS — /rewind restore-conversation over tmux dropped ALPHA-3 "
             "from live context while retaining ALPHA-1/2; transcript still parses. "
             "Detector/endpoint (§7.5/§9.2): /rewind -> Up*k -> Enter -> Enter "
-            "(Restore conversation) -> Ctrl-U, keyed to prompt checkpoints."
+            "(Restore conversation) -> verified Ctrl-U clear (bounded read-back), "
+            "keyed to prompt checkpoints."
         )
     finally:
         try:
