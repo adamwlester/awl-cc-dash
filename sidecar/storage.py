@@ -170,6 +170,18 @@ def _normalize_alias(cwd: str) -> str:
     return cwd
 
 
+def normalize_path_alias(path: str) -> str:
+    """Fold a path spelling to its canonical Windows-side form (public seam).
+
+    The general-purpose face of :func:`_normalize_alias` (which documents the
+    folding: ``/mnt/<drive>/…`` → ``X:\\…``, a WSL-internal POSIX root → the
+    ``\\\\wsl.localhost\\<distro>\\…`` UNC form, everything else unchanged).
+    Used by the Library's attached-doc resolver (§11 #44) so the WSL-side doc
+    spellings the launch preamble itself emits — and that agents/operators hand
+    back — land on the same file as their Windows spellings."""
+    return _normalize_alias(path)
+
+
 def _git_toplevel(path: Path) -> Path | None:
     """Nearest ancestor (including ``path`` itself) containing a ``.git`` entry.
 
@@ -399,3 +411,12 @@ def scratchpad_path_wsl(cwd: str | None) -> str | None:
 def plan_reviews_path_wsl(cwd: str | None) -> str | None:
     """The legacy plan-reviews side-store path, WSL-reachable."""
     return _to_wsl(plan_reviews_path(cwd))
+
+
+def doc_path_wsl(path: str | Path | None) -> str | None:
+    """An arbitrary document path, WSL-reachable (or ``None``).
+
+    The general form of the fixed ``*_wsl`` helpers above, for paths that are
+    resolved dynamically — e.g. the per-agent attached Library docs listed in
+    the launch preamble (§11 #44)."""
+    return _to_wsl(Path(path)) if path else None

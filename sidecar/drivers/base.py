@@ -64,6 +64,13 @@ class DriverConfig:
     # resolves it to a format instruction and appends it to the agent's system
     # prompt at launch (`--append-system-prompt`); other drivers ignore it.
     response_preset: Optional[str] = None
+    # Per-agent attached Library docs (§7.16, §11 #44 — the "light" v1): doc
+    # references (store/project paths or bare filenames) chosen at Create. The
+    # bridge driver resolves them to WSL-reachable absolute paths and leads the
+    # appended system prompt with a short consult-these-docs preamble, COMPOSED
+    # with the response-preset instruction (never clobbering it); other drivers
+    # ignore it. Automatic relevance retrieval stays out of scope (§10 #6).
+    attached_docs: Optional[list[str]] = None
 
 
 EventCallback = Callable[[dict[str, Any]], None]

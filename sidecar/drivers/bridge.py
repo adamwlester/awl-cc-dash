@@ -781,7 +781,22 @@ class BridgeDriver(AgentDriver):
             import response_presets as _presets  # sidecar dir on sys.path (runtime)
         except ImportError:  # pragma: no cover - package import (tests)
             from .. import response_presets as _presets  # type: ignore[no-redef]
-        append_system_prompt = _presets.instruction_for(self.config.response_preset) or None
+        preset_text = _presets.instruction_for(self.config.response_preset) or ""
+        # Attached docs (§7.16, §11 #44): resolve the agent's attached Library
+        # doc references to WSL-reachable absolute paths and render the short
+        # consult-these-docs preamble. COMPOSED with the preset instruction —
+        # docs preamble first, then the format instruction, joined by a blank
+        # line when both are present; neither ever clobbers the other. No docs
+        # (or none resolving) contributes nothing; neither present -> nothing
+        # appended at all.
+        try:
+            import library as _library  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import library as _library  # type: ignore[no-redef]
+        docs_text = _library.attached_docs_preamble(
+            self.config.cwd, self.config.attached_docs) or ""
+        append_system_prompt = \
+            "\n\n".join(t for t in (docs_text, preset_text) if t) or None
         info = self._bridge.create(
             self._name,
             cwd=self.config.cwd,
@@ -865,6 +880,10 @@ class BridgeDriver(AgentDriver):
                 # Per-agent reply-format preset id (§11 #39), persisted so the
                 # choice survives a restart (reconnect reads it back).
                 "response_preset": self.config.response_preset,
+                # Per-agent attached Library docs (§11 #44) — the launch-config
+                # doc references, persisted so the roster record carries what
+                # this agent was pointed at (and a resume/readback keeps it).
+                "attached_docs": self.config.attached_docs,
                 # The Workflow hook-client timeout baked into this agent's
                 # launch --settings (§11 #23) — persisted so a restarted
                 # sidecar clamps gate holds to the value the agent actually
@@ -1530,17 +1549,35 @@ class BridgeDriver(AgentDriver):
         descriptor (source id, the fork's fresh claude id, cwd, filestate,
         rewound_to); the sidecar adopts it as a live SessionState. Raises
         RuntimeError("version_unsupported" | "busy" | <message>) on failure.
+
+        Attached docs (§11 #44): the fork inherits the source's doc attachment,
+        and the inheritance is REAL at the fork's own launch — adoption is a
+        warm rebind (``_create_session`` never runs for the fork), so the
+        ``--fork-session`` spawn itself carries the consult-these-docs
+        preamble via ``append_system_prompt``. The preamble is composed against
+        the SOURCE's cwd (the refs were selected against the source project;
+        the resolved paths are absolute, so they stay valid in a fork
+        worktree). The #39 response preset is deliberately NOT inherited at
+        fork (the fork's readback honestly shows None), so only the docs
+        preamble rides along.
         """
         from bridge.bridge import (  # type: ignore[import-not-found]
             TmuxBridgeError, VersionUnsupportedError,
         )
+        try:
+            import library as _library  # sidecar dir on sys.path (runtime)
+        except ImportError:  # pragma: no cover - package import (tests)
+            from .. import library as _library  # type: ignore[no-redef]
+        docs_text = _library.attached_docs_preamble(
+            self.config.cwd, self.config.attached_docs) or None
         try:
             result = await asyncio.to_thread(
                 lambda: self._bridge.fork(
                     self._name, new_name, cwd=cwd, model=model,
                     to_prompt_index=to_prompt_index, isolate=isolate,
                     git_author_name=git_author_name,
-                    git_author_email=git_author_email))
+                    git_author_email=git_author_email,
+                    append_system_prompt=docs_text))
         except VersionUnsupportedError:
             raise RuntimeError("version_unsupported")
         except TmuxBridgeError as e:

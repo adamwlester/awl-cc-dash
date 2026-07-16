@@ -118,7 +118,8 @@ class SessionState:
                  enabled_plugins: dict[str, bool] | None = None,
                  mcp_servers: list[str] | None = None,
                  identity: dict[str, Any] | None = None,
-                 response_preset: str | None = None):
+                 response_preset: str | None = None,
+                 attached_docs: list[str] | None = None):
         self.session_id = session_id
         self.agent_type = agent_type
         self.model = model
@@ -136,6 +137,11 @@ class SessionState:
         # `--append-system-prompt` (the bridge driver resolves the instruction);
         # persisted in the roster record so it survives a restart.
         self.response_preset = response_preset
+        # Per-agent attached Library docs (§7.16, §11 #44): the doc references
+        # chosen at Create. The bridge driver resolves them to WSL paths and
+        # leads the appended system prompt with a consult-these-docs preamble;
+        # persisted in the roster record like the preset (launch config, §8.4).
+        self.attached_docs = attached_docs
         # Dashboard-owned identity (role/number/name/color/icon), assigned at
         # create and surfaced on to_dict so the UI reads it everywhere.
         self.identity = identity
@@ -234,6 +240,8 @@ class SessionState:
                 "mcp_servers": self.mcp_servers,
                 # Per-agent reply-format preset id (§11 #39); None = default style.
                 "response_preset": self.response_preset,
+                # Attached Library docs (§11 #44); None/[] = nothing attached.
+                "attached_docs": self.attached_docs,
             },
         }
 
@@ -915,6 +923,7 @@ async def start_session(session: SessionState):
         mcp_servers=session.mcp_servers,
         identity=session.identity,
         response_preset=session.response_preset,
+        attached_docs=session.attached_docs,
     )
     try:
         driver = create_driver(config, session.handle_event, session.driver_name)
@@ -1032,6 +1041,7 @@ async def reconnect_sessions(project_key: str | None = None):
             mcp_servers=rec.get("mcp_servers"),
             identity=identity,
             response_preset=rec.get("response_preset"),
+            attached_docs=rec.get("attached_docs"),
         )
         sessions[sid] = session
         config = DriverConfig(
@@ -1047,6 +1057,7 @@ async def reconnect_sessions(project_key: str | None = None):
             mcp_servers=rec.get("mcp_servers"),
             identity=identity,
             response_preset=rec.get("response_preset"),
+            attached_docs=rec.get("attached_docs"),
         )
         try:
             driver = BridgeDriver(
@@ -1173,6 +1184,9 @@ class CreateSessionRequest(BaseModel):
     mcp_servers: list[str] | None = None                   # subset; None = global
     identity: IdentityInput | None = None                  # dashboard-owned id fields
     response_preset: str | None = None                     # reply-format preset id (§11 #39)
+    # Library docs attached at launch (§7.16, §11 #44): store/project doc paths
+    # or bare filenames the agent is pointed at via a system-prompt preamble.
+    attached_docs: list[str] | None = None
     max_turns: int | None = None                           # lifecycle cap (notify-only)
     max_context_pct: float | None = None                   # lifecycle cap (notify-only)
 
@@ -1384,6 +1398,7 @@ async def create_session(req: CreateSessionRequest):
         mcp_servers=req.mcp_servers,
         identity=identity,
         response_preset=req.response_preset,
+        attached_docs=req.attached_docs,
     )
     session.max_turns = req.max_turns                  # notify-only caps
     session.max_context_pct = req.max_context_pct
@@ -1433,6 +1448,7 @@ def _resumable_from_roster(rec: dict[str, Any]) -> dict[str, Any]:
         "permission_rules": rec.get("permission_rules"),
         "enabled_plugins": rec.get("enabled_plugins"),
         "mcp_servers": rec.get("mcp_servers"),
+        "attached_docs": rec.get("attached_docs"),
         "created_at": rec.get("created_at"),
         "retired_at": None,
         "source": "roster",
@@ -1462,6 +1478,7 @@ def _resumable_from_archive(arc: dict[str, Any]) -> dict[str, Any]:
         "permission_rules": None,
         "enabled_plugins": None,
         "mcp_servers": None,
+        "attached_docs": None,
         "created_at": arc.get("created_at"),
         "retired_at": arc.get("retired_at"),
         "source": "archive",
@@ -1588,6 +1605,7 @@ async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
         enabled_plugins=d.get("enabled_plugins"),
         mcp_servers=d.get("mcp_servers"),
         identity=identity,
+        attached_docs=d.get("attached_docs"),
     )
     sessions[sid] = session
     config = DriverConfig(
@@ -1602,6 +1620,7 @@ async def _resume_agent_from_descriptor(d: dict[str, Any]) -> "SessionState":
         enabled_plugins=d.get("enabled_plugins"),
         mcp_servers=d.get("mcp_servers"),
         identity=identity,
+        attached_docs=d.get("attached_docs"),
     )
     driver = BridgeDriver(
         config, session.handle_event,
@@ -3486,6 +3505,10 @@ async def _adopt_forked_session(descriptor: dict[str, Any], *,
         enabled_plugins=source.enabled_plugins,
         mcp_servers=source.mcp_servers,
         identity=identity,
+        # #44: inherited doc attachment — REAL at the fork spawn (the source
+        # driver's fork() passes the docs preamble on the --fork-session
+        # launch), so this persisted field and the fork's behavior agree.
+        attached_docs=source.attached_docs,
     )
     sessions[new_sid] = session
     config = DriverConfig(
@@ -3500,6 +3523,7 @@ async def _adopt_forked_session(descriptor: dict[str, Any], *,
         enabled_plugins=source.enabled_plugins,
         mcp_servers=source.mcp_servers,
         identity=identity,
+        attached_docs=source.attached_docs,
     )
     driver = BridgeDriver(
         config, session.handle_event,

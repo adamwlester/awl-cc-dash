@@ -35,6 +35,12 @@ The Library surfaces the agents' own working artifacts to the dashboard:
     sidecars on first project read and renames it ``plan-reviews.json.migrated``
     so migration never re-runs.
 
+  * **Attached docs at launch (§7.16, §11 #44)** — resolve an agent's attached
+    Library-doc references to WSL-reachable absolute paths and render the short
+    consult-these-docs preamble the bridge driver appends to the agent's system
+    prompt at launch (:func:`resolve_attached_doc`, :func:`attached_docs_wsl`,
+    :func:`attached_docs_preamble`).
+
 Design seam: the core file functions are **path-explicit** — they take an
 explicit document / review-file path, so they're fully testable on a
 ``tmp_path`` with no ``cwd`` semantics. Thin ``*_for_cwd`` / cwd-taking
@@ -555,6 +561,112 @@ def resolve_document_for_write(cwd: str | None, filename: str) -> Path | None:
         if base is not None and (base / name).is_file():
             return base / name
     return None
+
+
+# ---------------------------------------------------------------------------
+# Attached docs at launch (§7.16, §11 #44 — the "light" v1)
+# ---------------------------------------------------------------------------
+
+# The one-line instruction that leads the launch preamble — tells the agent
+# what the listed paths are and to consult them. Kept short and task-neutral
+# (the preamble is context wiring, never task content).
+ATTACHED_DOCS_LEAD = (
+    "Reference docs attached to this session — read the file at a listed path "
+    "whenever it is relevant to your task:"
+)
+
+
+def resolve_attached_doc(cwd: str | None, ref: str) -> Path | None:
+    """Resolve ONE attached-doc reference (§11 #44) to an existing ``.md`` path.
+
+    A reference is either a **bare filename** (resolved exactly like
+    :func:`resolve_document`: store ``plans/``, then store ``docs/``, then the
+    project root) or a **path** to an existing ``.md`` file (the Library's
+    collections are markdown-only; non-``.md`` paths don't resolve). A path
+    reference accepts every spelling that naturally comes back to the sidecar:
+    a Windows-absolute path, a project-root-relative path (with or without a
+    leading ``/``), and the WSL-side spellings the storage layer already folds
+    for cwds — ``/mnt/<drive>/…`` (the exact form the launch preamble itself
+    emits, so preamble paths round-trip) and a WSL-internal POSIX root
+    (``/home/…`` → the ``\\\\wsl.localhost`` UNC form). Returns ``None`` for
+    anything that doesn't resolve: attachment is best-effort at launch, so a
+    doc deleted (or a reference mistyped) since selection must never fail the
+    launch — it simply doesn't materialize into the preamble.
+    """
+    ref = (ref or "").strip()
+    if not ref:
+        return None
+    if "/" not in ref and "\\" not in ref:
+        try:
+            return resolve_document(cwd, ref)
+        except ValueError:
+            return None
+    # A path reference. Build its candidate readings in probe order — the
+    # first existing .md wins. Probing must never raise (a NUL or other bad
+    # character in a ref degrades to None, never fails the launch).
+    candidates: list[Path] = []
+    posix = ref.replace("\\", "/")
+    if Path(ref).is_absolute():
+        candidates.append(Path(ref))
+    elif posix.startswith("/"):
+        # Rooted but driveless (Windows `is_absolute()` is False): either a
+        # project-rooted spelling (`/docs/x.md` ≡ `docs/x.md`) or a WSL-side
+        # absolute (`/mnt/c/…`, `/home/…`). Probe the cheap local reading
+        # first, then the storage-layer alias fold — the same folding project
+        # cwds get, so both spellings of one doc land on the same file.
+        root = storage.project_root(cwd)
+        if root is not None:
+            candidates.append(root / posix.lstrip("/"))
+        candidates.append(Path(storage.normalize_path_alias(ref)))
+    else:
+        root = storage.project_root(cwd)
+        if root is None:
+            return None
+        candidates.append(root / ref)
+    for cand in candidates:
+        try:
+            cand = cand.resolve()
+            if cand.suffix.lower() == _MD_SUFFIX and cand.is_file():
+                return cand
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def attached_docs_wsl(cwd: str | None, refs: list[str] | None) -> list[str]:
+    """Resolve attached-doc references to WSL-reachable ABSOLUTE paths (§11 #44).
+
+    Each reference resolves via :func:`resolve_attached_doc`, then translates to
+    the WSL-reachable form the agents actually open (``storage.doc_path_wsl`` —
+    the same translation the store's fixed ``*_wsl`` paths ride). Order is
+    preserved, duplicates collapse to the first occurrence, and unresolvable
+    references are skipped (best-effort — see :func:`resolve_attached_doc`).
+    """
+    out: list[str] = []
+    for ref in refs or []:
+        p = resolve_attached_doc(cwd, ref)
+        if p is None:
+            continue
+        w = storage.doc_path_wsl(p)
+        if w and w not in out:
+            out.append(w)
+    return out
+
+
+def attached_docs_preamble(cwd: str | None, refs: list[str] | None) -> str:
+    """The short launch preamble listing an agent's attached docs (§11 #44).
+
+    One lead line (:data:`ATTACHED_DOCS_LEAD` — consult these when relevant)
+    followed by one ``- <wsl path>`` bullet per resolved doc. ``""`` when no
+    reference resolves (no docs → no preamble — nothing is appended to the
+    agent's system prompt). The bridge driver composes this with the
+    response-preset instruction (§11 #39) at launch; automatic relevance
+    retrieval stays out of scope (§10 #6).
+    """
+    paths = attached_docs_wsl(cwd, refs)
+    if not paths:
+        return ""
+    return "\n".join([ATTACHED_DOCS_LEAD] + [f"- {p}" for p in paths])
 
 
 # ---------------------------------------------------------------------------
