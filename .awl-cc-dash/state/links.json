@@ -16,6 +16,38 @@
       "exchanges": 0,
       "tokens": 0,
       "active": true
+    },
+    {
+      "id": "lnk2",
+      "a": "f6d4d421",
+      "b": "eca6c5dc",
+      "direction": "both",
+      "relationship": "direct",
+      "shared_content": [],
+      "shared_backfill": false,
+      "trigger": "queue",
+      "end_after_exchanges": 2,
+      "end_after_tokens": null,
+      "messages": 4,
+      "exchanges": 2,
+      "tokens": 298,
+      "active": false
+    },
+    {
+      "id": "lnk3",
+      "a": "f6d4d421",
+      "b": "c42a9c7b",
+      "direction": "both",
+      "relationship": "direct",
+      "shared_content": [],
+      "shared_backfill": false,
+      "trigger": "queue",
+      "end_after_exchanges": 1,
+      "end_after_tokens": null,
+      "messages": 1,
+      "exchanges": 0,
+      "tokens": 90,
+      "active": false
     }
   ]
 }
