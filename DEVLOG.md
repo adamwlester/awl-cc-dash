@@ -843,6 +843,14 @@ Files: .awl-cc-dash/state/agents.json, .awl-cc-dash/state/links.json, .awl-cc-da
 
 ---
 
+### 2026-07-16 10:36:29 — build-run Phase 3 sweep: e2e-proven markers cleared + the rewind input-box race recorded
+
+Post-e2e doc truing in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Cleared the three markers the grand e2e proved in the real Electron window (Playwright-Electron, 2026-07-16): the §3.4 styled close dialog driven with real clicks in BOTH lifecycle modes (owned sidecar terminated; adopted sidecar survived), and the §7.16 `nativeImage` thumbnail IPC rendering a real PNG in the Assets tab; the §4 marker now carries only the genuine residual (the #46 rewind anchor). Recorded the e2e's one real finding as a second §7.19 seam: the bridge's post-`/rewind` `Ctrl-U` clear can race the TUI restoring the rewound prompt into the input box (hardening named: verify-empty + bounded re-clear in `TmuxBridge.rewind()` — fix dispatched separately). E2E evidence: 17 substantive proofs, 8 shots + machine-evidence JSONs in `.scratch/e2e-final/`, refreshed dogfood store committed at `89a5494`.
+
+Files: docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
