@@ -3,7 +3,16 @@
 Pure file logic — no driver, no WSL2/tmux, no live agent, no servers. Proves:
 
   * ``list_markdown`` enumerates ``.md`` files under a directory (optionally a
-    ``plans`` subdir), with size + modified, skipping non-``.md`` and missing dirs.
+    ``plans`` subdir), with size + modified + base-relative ``rel_path``,
+    skipping non-``.md`` and missing dirs. The default scan is flat/top-level
+    (the browse-read-only project-root surface); ``recursive=True`` (§7.16 —
+    the store's ``plans``/``docs`` collections) walks nested trees, entries
+    sorted by ``rel_path`` (== the old ``filename`` sort for flat dirs). The
+    recursive walk is **cycle-safe** — directory junctions/symlinks are never
+    traversed (a self-junction lists each real doc exactly once and
+    terminates; ``rglob`` would loop) — and ``exclude_top`` skips a named
+    top-level subtree (the docs collection's §11 #45 ``prompts/`` copy)
+    without touching same-named nested dirs.
   * ``read_document`` returns ``{filename, path, content}`` and raises on absent.
   * The LEGACY plan-review side-store (a JSON object keyed by plan FILENAME,
     carrying the plan↔agent owner mapping) round-trips through a real JSON file —
@@ -22,12 +31,16 @@ Pure file logic — no driver, no WSL2/tmux, no live agent, no servers. Proves:
     sidecar migration (non-destructive — existing sidecar fields win; legacy
     file renamed ``.migrated``; idempotent); ``aggregate_metas``'s
     filename-keyed shape (plans/ + docs/ + the project ROOT's top-level metas,
-    read-only, earlier dirs winning collisions); and the WRITE-scope guards:
-    mutations gate on ``document_in_content_dirs`` (only the store's ``plans/``
-    and ``docs/`` subtrees — ``state/``, bare store-root files, escapes, and
-    outside-store paths refused), deletes operate on the ``resolve()``d path
-    (alias spellings can't half-delete; the sidecar dies with its doc), and
-    ``resolve_document_for_write`` never lands on the repo root.
+    read-only, earlier dirs winning collisions — the store dirs walked
+    **recursively** like the listing, so a comment on a nested doc surfaces
+    instead of save-then-vanishing, with ``docs/prompts/`` excluded); and the
+    WRITE-scope guards: mutations gate on ``document_in_content_dirs`` (only
+    the store's ``plans/`` and ``docs/`` subtrees — ``state/``, bare
+    store-root files, escapes, and outside-store paths refused), deletes
+    operate on the ``resolve()``d path (alias spellings can't half-delete; the
+    sidecar dies with its doc), and ``resolve_document_for_write`` never lands
+    on the repo root — while it DOES find nested store docs (top level
+    preferred) and never lands in ``docs/prompts/``.
 
 Everything operates on ``tmp_path`` — never a real project dir. Sidecar-layer
 project dirs get a ``.git`` marker so ``storage.project_root`` pins to the tmp
@@ -114,6 +127,79 @@ class TestListMarkdown:
             (tmp_path / n).write_text("x", encoding="utf-8")
         names = [e["filename"] for e in library.list_markdown(str(tmp_path))]
         assert names == ["a.md", "b.md", "c.md"]
+
+    def test_default_scan_stays_top_level(self, tmp_path):
+        # The flat default (the browse-read-only root surface) must NOT walk
+        # nested trees — recursion is opt-in for the store collections (§7.16).
+        (tmp_path / "top.md").write_text("x", encoding="utf-8")
+        nested = tmp_path / "phase-1"
+        nested.mkdir()
+        (nested / "plan.md").write_text("x", encoding="utf-8")
+        names = {e["filename"] for e in library.list_markdown(str(tmp_path))}
+        assert names == {"top.md"}
+
+    def test_recursive_walks_nested_trees(self, tmp_path):
+        # §7.16: the store's plans/docs collections may nest — recursive=True
+        # lists the whole subtree, each entry carrying its base-relative
+        # rel_path (POSIX separators).
+        (tmp_path / "top.md").write_text("x", encoding="utf-8")
+        deep = tmp_path / "phase-1" / "notes"
+        deep.mkdir(parents=True)
+        (deep / "plan.md").write_text("x", encoding="utf-8")
+        entries = library.list_markdown(str(tmp_path), recursive=True)
+        rels = [e["rel_path"] for e in entries]
+        assert rels == ["phase-1/notes/plan.md", "top.md"]
+        by_rel = {e["rel_path"]: e for e in entries}
+        assert by_rel["phase-1/notes/plan.md"]["filename"] == "plan.md"
+        assert Path(by_rel["phase-1/notes/plan.md"]["path"]) == deep / "plan.md"
+
+    def test_recursive_skips_non_md_and_md_named_dirs(self, tmp_path):
+        deep = tmp_path / "sub"
+        deep.mkdir()
+        (deep / "real.md").write_text("x", encoding="utf-8")
+        (deep / "notes.txt").write_text("x", encoding="utf-8")
+        (deep / "weird.md").mkdir()
+        names = {e["filename"]
+                 for e in library.list_markdown(str(tmp_path), recursive=True)}
+        assert names == {"real.md"}
+
+    def test_flat_entries_carry_rel_path_equal_to_filename(self, tmp_path):
+        (tmp_path / "doc.md").write_text("x", encoding="utf-8")
+        e = library.list_markdown(str(tmp_path))[0]
+        assert e["rel_path"] == e["filename"] == "doc.md"
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="junctions are a Windows artifact")
+    def test_recursive_walk_never_follows_junction_cycles(self, tmp_path):
+        # Regression: Path.rglob on this Python follows directory junctions —
+        # a single self-junction turned one real doc into dozens of phantom
+        # rel_paths, and two junctions made GET /library/documents hang the
+        # whole sidecar. The cycle-safe walk lists each REAL doc exactly once
+        # and terminates (junctions are admin-free: any repo can contain one).
+        import _winapi
+        (tmp_path / "a.md").write_text("x", encoding="utf-8")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "b.md").write_text("x", encoding="utf-8")
+        _winapi.CreateJunction(str(tmp_path), str(tmp_path / "loop"))
+        _winapi.CreateJunction(str(tmp_path), str(sub / "loop2"))
+        entries = library.list_markdown(str(tmp_path), recursive=True)
+        assert [e["rel_path"] for e in entries] == ["a.md", "sub/b.md"]
+
+    def test_recursive_exclude_top_skips_named_subtree(self, tmp_path):
+        # exclude_top: the docs collection excludes its §11 #45 prompts/ copy —
+        # prompt overrides are /prompt-library data, never Library documents.
+        # Only the TOP-LEVEL subtree of that name is excluded; a nested dir
+        # that happens to share the name still lists.
+        (tmp_path / "team.md").write_text("x", encoding="utf-8")
+        prompts = tmp_path / "prompts"
+        prompts.mkdir()
+        (prompts / "actions.md").write_text("x", encoding="utf-8")
+        nested = tmp_path / "guides" / "prompts"
+        nested.mkdir(parents=True)
+        (nested / "tips.md").write_text("x", encoding="utf-8")
+        entries = library.list_markdown(str(tmp_path), recursive=True,
+                                        exclude_top=("prompts",))
+        assert [e["rel_path"] for e in entries] == ["guides/prompts/tips.md", "team.md"]
 
 
 # ---------------------------------------------------------------------------
@@ -667,6 +753,26 @@ class TestAggregateMetas:
     def test_empty_project_is_empty(self, tmp_path):
         assert library.aggregate_metas(str(_project(tmp_path))) == {}
 
+    def test_nested_doc_sidecars_surface_recursively(self, tmp_path):
+        # Regression (save-then-vanish): the recursive listing offers nested
+        # docs and comments on them save fine — so the reviews aggregate must
+        # walk the same subtrees, or a saved comment silently disappears from
+        # GET /library/reviews.
+        proj = _project(tmp_path)
+        nested = _md(proj / ".awl-cc-dash" / "docs" / "guides", "howto.md")
+        library.add_comment(nested, text="nice", author="op")
+        agg = library.aggregate_metas(str(proj))
+        assert agg["howto.md"]["comments"][0]["text"] == "nice"
+
+    def test_docs_prompts_subtree_excluded_from_aggregate(self, tmp_path):
+        # The §11 #45 prompt-library copy (docs/prompts/) is another surface's
+        # data — its sidecars (if any ever appear) stay out of the reviews
+        # aggregate, matching the listing's exclusion.
+        proj = _project(tmp_path)
+        item = _md(proj / ".awl-cc-dash" / "docs" / "prompts", "actions.md")
+        library.set_doc_review(item, owner="x")
+        assert library.aggregate_metas(str(proj)) == {}
+
 
 class TestCreateDeleteDocument:
     def test_create_defaults_to_docs(self, tmp_path):
@@ -829,3 +935,24 @@ class TestResolveDocumentAndScope:
         _md(proj / ".awl-cc-dash" / "docs", "x.md", "docs")
         assert (library.resolve_document_for_write(str(proj), "x.md")
                 == proj / ".awl-cc-dash" / "docs" / "x.md")
+
+    def test_resolve_for_write_finds_nested_docs(self, tmp_path):
+        # §7.16 consistency: a nested doc the recursive listing offers must
+        # also resolve for review/comment writes — never list-then-404.
+        proj = _project(tmp_path)
+        nested = _md(proj / ".awl-cc-dash" / "docs" / "guides", "howto.md")
+        assert library.resolve_document_for_write(str(proj), "howto.md") == nested
+        assert library.resolve_document(str(proj), "howto.md") == nested
+
+    def test_resolve_prefers_top_level_over_nested(self, tmp_path):
+        proj = _project(tmp_path)
+        _md(proj / ".awl-cc-dash" / "docs" / "guides", "x.md", "nested")
+        top = _md(proj / ".awl-cc-dash" / "docs", "x.md", "top")
+        assert library.resolve_document_for_write(str(proj), "x.md") == top
+
+    def test_resolve_for_write_never_lands_in_docs_prompts(self, tmp_path):
+        # The §11 #45 prompt copy is not a reviewable document: a filename
+        # that exists ONLY there resolves None (its surface is /prompt-library).
+        proj = _project(tmp_path)
+        _md(proj / ".awl-cc-dash" / "docs" / "prompts", "actions.md")
+        assert library.resolve_document_for_write(str(proj), "actions.md") is None

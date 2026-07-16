@@ -33,3 +33,11 @@ The one-line lead of the attached-docs launch preamble (§7.16, §11 #44) — th
 ### lead
 
 Reference docs attached to this session — read the file at a listed path whenever it is relevant to your task:
+
+## attachments
+
+The one-line lead of the message attachments block (§7.14, §10 #1) — when a prompt is sent carrying attachment references, the sidecar appends this line plus one `- <receiver-readable absolute path>` bullet per attached asset to the delivered text (`sidecar/attachments.py` keeps the in-code fallback).
+
+### lead
+
+[Attached files — read each at its listed absolute path]

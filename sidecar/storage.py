@@ -137,6 +137,14 @@ def projects_index_path() -> Path:
 
 _MNT_RE = re.compile(r"^/mnt/([A-Za-z])(/.*)?$")
 
+# The legacy \\wsl$\<distro>\… UNC spelling of a WSL-internal path (in posix
+# slashes here — _normalize_alias folds separators first). Windows still
+# accepts it, but ``Path.resolve()`` does NOT fold it into the
+# \\wsl.localhost\… form, so without this fold one WSL project could split
+# across two stores (and the *_wsl renderers would emit unopenable
+# ``//wsl$/…`` strings — see _WSL_UNC_RE below).
+_WSL_DOLLAR_RE = re.compile(r"^//wsl\$((?:/.*)?)$", re.IGNORECASE)
+
 
 def _normalize_alias(cwd: str) -> str:
     """Fold every cwd spelling to ONE canonical Windows-side form.
@@ -155,11 +163,18 @@ def _normalize_alias(cwd: str) -> str:
         the key.)
       * UNC inputs (``\\\\wsl.localhost\\…`` and other shares) pass through;
         ``Path.resolve()`` normalizes them, so both spellings of a WSL-internal
-        root yield ONE project key.
+        root yield ONE project key. The one exception is the legacy
+        ``\\\\wsl$\\<distro>\\…`` spelling: ``resolve()`` does NOT fold it into
+        the ``wsl.localhost`` form, so it is folded here — otherwise the same
+        WSL project would split across two stores and its WSL-reachable
+        renderings would break.
     """
     posix = cwd.replace("\\", "/")
     if posix.startswith("//"):
-        return cwd            # already UNC — resolve() normalizes it
+        m = _WSL_DOLLAR_RE.match(posix)
+        if m:  # \\wsl$\<distro>\… → the canonical \\wsl.localhost\<distro>\…
+            return "\\\\wsl.localhost" + (m.group(1) or "").replace("/", "\\")
+        return cwd            # other UNC — resolve() normalizes it
     if posix.startswith("/"):
         m = _MNT_RE.match(posix)
         if m:
@@ -373,8 +388,12 @@ def migrate_legacy_store(cwd: str | None) -> bool:
 # WSL-reachable forms (the agents read the project home from inside WSL2)
 # ---------------------------------------------------------------------------
 
-# \\wsl.localhost\<distro>\<path> — the in-WSL form is simply /<path>.
-_WSL_UNC_RE = re.compile(r"^[\\/]{2}wsl\.localhost[\\/][^\\/]+([\\/].*)?$",
+# \\wsl.localhost\<distro>\<path> — the in-WSL form is simply /<path>. The
+# legacy \\wsl$\<distro>\… spelling is accepted too (canonical paths never
+# carry it — _normalize_alias folds it — but doc_path_wsl also takes arbitrary
+# caller paths, and passing wsl$ through win_to_wsl would hand agents an
+# unopenable //wsl$/… string).
+_WSL_UNC_RE = re.compile(r"^[\\/]{2}(?:wsl\.localhost|wsl\$)[\\/][^\\/]+([\\/].*)?$",
                          re.IGNORECASE)
 
 

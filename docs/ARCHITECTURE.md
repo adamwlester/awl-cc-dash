@@ -311,7 +311,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Inbox** | `GET /inbox` · `POST /inbox/{agent}/{item}/resolve` |
 | **Linking** | `POST/GET /links` · `DELETE /links/{id}` · `POST /links/{id}/kickoff` |
 | **Scratchpad** | `GET /scratch` · `POST /scratch` (appends + pushes the delta to running co-located agents) |
-| **Library** | `GET /library/documents` · `GET /library/document` · `POST /library/document` (create) · `PUT /library/document` (edit-in-place, §7.16) · `DELETE /library/document` (delete the `.md` + its paired `.meta.json`) · rename + comment add/resolve (§8.5 sidecars) · `GET/POST /library/reviews` |
+| **Library** | `GET /library/documents` · `GET /library/document` · `POST /library/document` (create) · `PUT /library/document` (edit-in-place, §7.16) · `DELETE /library/document` (delete the `.md` + its paired `.meta.json`) · rename + comment add/resolve (§8.5 sidecars) · `GET/POST /library/reviews` · `POST /library/assets` (attachment/citation ingest, §7.14) · `GET /library/assets` (asset listing + per-receiver renderings, §7.16) |
 | **Console** | `GET /console/catalog` · `POST /sessions/{id}/console/run` · `POST /sessions/{id}/console/{attach,detach}` (the live streaming terminal — geometry-pinned `ttyd`/WebSocket attach, §7.13; consumed by the rebuilt renderer's xterm Console, e2e-proven 2026-07-15) |
 | **Readouts** | `GET /sessions/{id}/{context,context/breakdown,cost,subagents,checklist,marquee}` · `GET /usage` |
 | **Session control** | `POST /sessions/{id}/{interrupt,model,mode,permission,effort,fast,thinking}` — mode/fast/thinking drive the wired `keys()` levers and return the read-back state (409 `busy` / 400 `unreachable`·`credit_gated`, §6.2) · `POST /sessions/{id}/identity` (edit + `/rename` sync, §7.5) · `POST /sessions/{id}/plan/verdict` (§7.16) |
@@ -319,7 +319,7 @@ an honest `400` when the active driver cannot do the thing (§6.1).
 | **Templates** | `GET/POST /templates` · `DELETE /templates/{id}` |
 | **Projects** | `GET /projects` (picker feed + open flag) · `POST /projects/register` · `POST /projects/open` (409 when another is open) · `POST /projects/close` (`stop_agents` = the §3.4 second option) |
 | **Utility LLM** | `POST /utility/{revise,summarize}` — run on the in-process Claude Agent **SDK** path (they call SDK `query()` directly, not the `sdk` driver class), never the bridge |
-| **Assets** | `GET /assets/agent-icons/{name}?color=` — recolorable agent SVGs (§7.5) |
+| **Assets** | `GET /assets/agent-icons/{name}?color=` — recolorable agent SVGs (§7.5) · `GET /assets/{asset_id}/{filename}?cwd=` — project-asset byte streaming with the stored MIME (the renderer's render path, §7.14; registered after the icon route so icons keep precedence) |
 
 ### 5.3 Serialization
 
@@ -659,8 +659,7 @@ primitive (embed/template/citation), **Embed**, **Attach**, **Citations**, **Tem
 **Revise/Summarize**, **Send-as-agent**, a response-format preamble, a voice mic, History + Retry, and a
 merged Export control.
 
-- **Attach** requires Windows↔WSL2 path normalization — the decision is solve it, not dodge it. Citations
-  are built with Attach.
+- **Attach & Citations — path materialization (built 2026-07-16, resolving §10's old #1 per the research's Option A):** every attached or cited file is **copied** into the open project's store — `<project>/.awl-cc-dash/assets/<asset_id>/<original-filename>` with a paired `<filename>.meta.json` sidecar beside the bytes (§8.2; the §8.5 pairing convention on the FULL filename) holding `schema_version: 1` · sha256 · size · MIME · created · provenance (who/when/source/session) · the optional **citation anchor** (`{doc, location}` — Citations are built with Attach). Ingest is `POST /library/assets` ([`sidecar/attachments.py`](../sidecar/attachments.py)): a base64-JSON body or a local `source_path` in any spelling the storage layer folds (`C:\…`, `/mnt/c/…`, a WSL-internal `/home/…`, UNC — incl. the legacy `\\wsl$\` form, which now canonicalizes to `\\wsl.localhost\`), size-capped by `AWL_ASSET_MAX_MB` (default 256, enforced on `stat()` before any read), filenames sanitized to stay addressable from both sides of the WSL boundary (forbidden chars and reserved device names → `_`-prefixed/substituted; spaces/unicode/case preserved). Writes are atomic (tmp + rename) with a post-write hash verify on **both legs**, chosen automatically from the canonical root: plain Python I/O for Windows-drive stores; the researched WSL-native `wsl.exe -d <distro> -- bash -c 'mkdir -p … && cat > tmp && mv tmp final'` path (binary stdin, in-distro `sha256sum` verify) for WSL-internal stores. The canonical record is **project-relative** — absolute paths are per-receiver *renderings*: the receiving **agent** gets a WSL-readable absolute path (`/mnt/…` for Windows stores, native `/home/…` for WSL-internal ones), the **renderer** gets the sidecar HTTP URL (`GET /assets/{asset_id}/{filename}?cwd=` — the recommended localhost render path, sidestepping Electron CSP/UNC policy; direct `file://` loading was skipped per the ladder, traversal shapes and the `.meta.json` sidecars 404 case-insensitively). The send flow carries it: `POST /sessions/{id}/send` takes `attachments: [asset ids]` and appends ONE attributed block to the delivered text — a prompt-library lead (group `attachments`/item `lead`, §11 #45) plus one path bullet per asset, citations inline as `(cites <doc> @ <location>)` — on every disposition including inject; an unknown id or a cwd-less agent is an honest 400, never a silent drop. **Live-proven 2026-07-16** (`test_attachments_live.py`, 8 passed): leg A wrote a spaces+unicode binary asset into a real `/home/…` store inside distro Ubuntu via the WSL-native path (sha256 verified in-distro; `wslpath -w` round-trip opened byte-identical from Windows), leg B served the exact bytes with the stored content-type through the real router and a real uvicorn socket. The **Attach/Assets UI wiring rides #50**.
 - **Templates** are stored in the dashboard store (`sidecar/runtime/templates.json`) via `GET/POST
   /templates` and `DELETE /templates/{id}`. Templates are **project-agnostic by design**: the dashboard
   store is their only home, and no per-project template store exists.
@@ -700,10 +699,9 @@ Plan-approve from the dashboard resumes the agent out of plan mode — wired (§
 `POST /sessions/{id}/plan/verdict` drives the proven `keys()` Enter for **approve** (resolving the plan
 card + stamping the sidecar verdict), and **revise** sends Escape (keep planning) + queues the feedback at
 the head of the prompt queue (the Escape leg is ⚠ assumed pending the e2e drive — the approve leg is the
-live-proven one). Edit-in-place ships as `PUT /library/document` (store-scoped). ⚠ **Today:** listing is
-still **non-recursive** (the store's `plans/`/`docs/` dirs list first with a legacy `<root>/<subdir>`
-fallback; nested trees are not walked; [`sidecar/library.py`](../sidecar/library.py)), and no Assets
-surface exists yet (§10 #1 / design lane).
+live-proven one). Edit-in-place ships as `PUT /library/document` (store-scoped).
+
+Listing is **recursive** for the store's `plans/`/`docs/` collections (built 2026-07-16; [`sidecar/library.py`](../sidecar/library.py)): nested trees like `plans/phase-1/plan.md` list with a base-relative `rel_path` per entry (the store dirs list first, with the legacy `<root>/<subdir>` fallback walking the same way; the no-subdir project-root browse deliberately stays top-level — walking a whole repo would be pathological). The recursive scope is one decision applied uniformly — the reviews aggregate and bare-filename review/comment resolution reach the same nested docs, so a doc the listing offers accepts and surfaces comments (never list-then-404 or save-then-vanish) — the walk is **cycle-safe** (directory junctions/symlinks are never traversed; `rglob` would loop forever on a junction cycle and hang the sidecar — regression-proven in `test_library_unit`), and the docs collection **excludes its `docs/prompts/` subtree** (the §11 #45 prompt-library project copy is `/prompt-library`'s data, not documents — listing it would offer prompt overrides as ordinary deletable docs). The **Assets surface's data is served**: `GET /library/assets` lists every project asset with metadata + both per-receiver renderings (loose hand-dropped `assets/` files list honestly with `id: null` — visible media, not byte-endpoint-addressable), and `GET /assets/{asset_id}/{filename}` streams the bytes (§7.14). The Assets **tab UI (list + thumbnails, mechanism above) rides #50 / the design lane**.
 
 ### 7.17 Subagents
 
@@ -789,7 +787,10 @@ existing target).
 ├── docs/                      # dashboard-owned markdown docs + their sidecars
 │   ├── scratchpad.md          #   the shared team scratchpad (§7.7)
 │   └── <doc>.md / .meta.json  #   other dashboard-owned docs, same sidecar pattern
-├── assets/                    # Library → Assets tab media
+├── assets/                    # Library → Assets media (attachments/citations, §7.14)
+│   └── <asset_id>/            #   one dir per ingested asset — immutable after publication
+│       ├── <filename>         #   the bytes, original name preserved (sanitized)
+│       └── <filename>.meta.json  # paired sidecar — sha256/size/MIME/provenance/citation (§8.5 pairing)
 └── state/                     # dashboard-owned JSON state for THIS project
     ├── agents.json            #   the project's agent roster: sessions + identity + launch config
     │                          #   + claude_session_id + resolved transcript path + retired numbers
@@ -808,7 +809,10 @@ existing target).
   per-agent launch config (tools/plugins/MCP/permission rules) + `claude_session_id` + the resolved
   transcript path + retired identity numbers (never reused).
 - Giving Assets the `assets/` home is what makes the Library's Assets tab buildable — media has a place to
-  live with the project.
+  live with the project. Attachment/citation ingest (§7.14) materializes there: `assets/<asset_id>/<filename>`
+  plus the paired `<filename>.meta.json` sidecar (full-filename pairing — asset extensions vary, so the §8.5
+  stem pairing would be ambiguous); asset ids are short generated uuid-hex, and assets are immutable after
+  publication (re-attach = a new id, never an overwrite).
 
 **Self-dogfooding:** the awl-cc-dash repo itself gets its own committed `.awl-cc-dash/` when the dashboard
 runs against it — that is the product working correctly, not a special case. Dev agents treat it as
@@ -864,7 +868,7 @@ The single lookup tying **home ↔ path ↔ UI ↔ restart behavior**. UI anchor
 | Dashboard documents (content) | 📁 | `docs/*.md` | Work→Library Documents · `doc-editor` | matches target — create/delete/rename via `/library/document*` (§5.2) |
 | Doc/plan metadata (verdict, comments, anchors, provenance) | 📁 | `<doc>.meta.json` sidecar, next to its doc (§8.5) | `verdict-badge`, `feedback-card`, `comment-popover`, `review-chip` | matches target — the legacy central `plan-reviews.json` migrates on first read |
 | Shared scratchpad | 📁 | `docs/scratchpad.md` | Feed→Scratch · `scratch-post`; Prompt Target=Scratch | matches target — the `.md` is the store; the board reloads from it on project load |
-| Library Assets (media) | 📁 | `assets/` | Work→Library Assets · `asset-card` | no Assets surface exists yet |
+| Library Assets (media — attachments/citations, §7.14) | 📁 | `assets/<asset_id>/<file>` + `<file>.meta.json` | Work→Library Assets · `asset-card` | data endpoints built (`POST/GET /library/assets`, `GET /assets/{id}/{file}`); the tab UI rides #50 |
 | Inbox items | 📁 | `state/inbox.json` | Feed→Inbox · `*-inbox-card` | matches target (§8.3) |
 | Links | 📁 | `state/links.json` | Work→Links + Graph drawer · `link-drawer`, `link-list`, `link-edges` | matches target (§8.3) |
 | Routing overlay | 📁 | `state/routing.jsonl` | Feed · `recipient-badge`, From/To filter | matches target (§8.3) |
@@ -1048,10 +1052,7 @@ The single home for everything the system needs but the settled body can't yet s
 
 ### Build-path unknowns
 
-**1. Attachment / citation path materialization** *(→ §7.14, §7.16, §8.2)* — 🧪 **needs-spike (resolvable in-build)**
-- **Evidence:** research settled ([`attachment-citation-path-materialization-report.md`](../dev/notes/research/attachment-citation-path-materialization-report.md), 2026-07-02) — **Option A**: copy bytes into `<project>/.awl-cc-dash/assets/<id>/`; store a project-relative `rel_path` + SHA-256 + MIME + provenance; render per-receiver via a `ProjectPathContext`. Design plausible; no prototype built.
-- **Desired final behavior:** attachments and citations route to a real on-disk home a receiving agent can open (Citations are built with Attach, §7.14).
-- **Build ladder (decided, so the implementing agent can resolve this alone):** **(a)** ingest per Option A — the WSL-native write path (`wsl.exe … cat > tmp && mv` for atomicity), verifying the `wslpath -w` edge cases live (spaces, unicode, unusual distro names); **(b)** serve bytes to the renderer through a **sidecar HTTP asset endpoint** (`GET /assets/…`) — the *recommended default*, since the app already fetches everything over localhost HTTP and it sidesteps Electron CSP/UNC-path policy entirely; **(c)** direct `file:`/`\\wsl.localhost\…` loading is an optional optimization to try, never a dependency; **(d)** if ingestion itself proves shaky, attachments stay **display-only chips** (name/size/MIME) — the recorded fallback. Test, don't assume: the WSL write path and the endpoint render are the two legs to prove during the build.
+*(none open — the last one, **#1 attachment/citation path materialization**, was resolved and built 2026-07-16: both proof legs of its ladder passed live — the WSL-native write and the asset-endpoint render — and the settled mechanism now lives in §7.14/§7.16/§8.2, with the Attach/Assets UI remainder on the #50 row. The `file://` optimization leg was skipped per the ladder; the display-only-chips fallback was never needed.)*
 
 ### Parked & deferred (deliberate, with named revisit triggers)
 
@@ -1112,7 +1113,7 @@ One row per body section carrying ⚠ Today markers, so the doc's whole build de
 |--------|-------------------|------------|
 | §3.1–§3.5, §9.1 | Projects UI in the renderer (chip, close dialog, picker-first startup) — the mockup surfaces + the system side are built | #50 |
 | §7.11 | Bypass/Auto launch-gating UI (Create-panel flags + un-armed segment hiding) | #13 UI, #50 |
-| §7.16 | Listing non-recursive; no Assets surface | §10 #1 |
+| §7.16 | Assets tab UI (list + thumbnails) + Attach flow in the renderer — the data endpoints are built | #50 |
 | §7.17 | Subagent active-vs-quiet signal not surfaced in the UI roster | #50 |
 | §7.19 | Rewind/fork endpoints + the #46 per-turn capture built; the Timeline UI (and the row→rewind-checkpoint anchoring it needs) awaits #50 | #50 |
 
@@ -1173,7 +1174,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 39. *(backend built 2026-07-15 — 6-preset catalog incl. the operator's `tldr_table` (TL;DR + emoji) in `sidecar/response_presets.py`, per-agent set/get persisted to `state/agents.json`, injected at launch via `--append-system-prompt` (append, not replace — shapes format, keeps capabilities; applies at next launch/restart per §7.15); `GET /presets/response`, `GET|POST /sessions/{id}/response-preset`; api.ts wired. The preset-menu UI + per-message override ride #37. See DEVLOG)*
 40. *(backend built 2026-07-15 — `identity.draw_name()` draws an unused name from the shipped 179-name pool + `GET /identity/random-name?exclude=` (excludes live names); api.ts `randomName`. The Create-panel randomize/auto-name UI rides #37. See DEVLOG)*
 41. *(backend built 2026-07-15 — `library.doc_provenance()`; created-by/when/session provenance now rides `GET /library/documents` + `GET /library/document`; api.ts types. The Authors-lens consumption rides #37. See DEVLOG)*
-50. **Design surfaces + renderer wiring for the built backends** *(→ §3.1–§3.5, §7.11, §7.12, §7.16, §7.19, §9.1, §9.9; entered 2026-07-15 under the operator's design license)* — **design half BUILT 2026-07-16** (headed-verified, 37 screenshots): the **Bypass/Auto launch-arm gating** (#13 — `launch-arm` block, un-armed segments absent from the mode ring), the **Past tab** with resume picker + archive roster (#17/#18), the Inbox **Review card** with Approve/Reject (#23), the **Import control** in the Library header (#28 — host-panel decision + rationale recorded in DESIGN.md), and the **subagent activity dot** (§7.17); the **Projects** picker/chip/close-dialog surfaces already existed in the mockup and were verified. **Remaining:** the **Timeline surface design** (§7.19 — the #46 capture + `GET /sessions/{id}/timeline` now exist to design against) and the **renderer wiring half** for all of the above. Where: `design/` (Timeline), then [`frontend/src/renderer/`](../frontend/src/renderer/).
+50. **Design surfaces + renderer wiring for the built backends** *(→ §3.1–§3.5, §7.11, §7.12, §7.16, §7.19, §9.1, §9.9; entered 2026-07-15 under the operator's design license)* — **design half BUILT 2026-07-16** (headed-verified, 37 screenshots): the **Bypass/Auto launch-arm gating** (#13 — `launch-arm` block, un-armed segments absent from the mode ring), the **Past tab** with resume picker + archive roster (#17/#18), the Inbox **Review card** with Approve/Reject (#23), the **Import control** in the Library header (#28 — host-panel decision + rationale recorded in DESIGN.md), and the **subagent activity dot** (§7.17); the **Projects** picker/chip/close-dialog surfaces already existed in the mockup and were verified. **Remaining:** the **Timeline surface design** (§7.19 — the #46 capture + `GET /sessions/{id}/timeline` now exist to design against), the **Attach/Assets wiring** (§7.14/§7.16, backends built 2026-07-16 — the Compose Attach/Citations flow against `POST /library/assets` + `send` `attachments:`, and the Assets tab against `GET /library/assets` / `GET /assets/{id}/{filename}` with the decided thumbnail mechanism), and the **renderer wiring half** for all of the above. Where: `design/` (Timeline), then [`frontend/src/renderer/`](../frontend/src/renderer/).
 
 ### 11.7 Platform, hygiene & support (#42–49)
 
@@ -1198,7 +1199,7 @@ Implements the §8 storage model and §9 lifecycle flows — **§8/§9 own the d
 | [`sidecar/eventbus.py`](../sidecar/eventbus.py) · `hookbus.py` · `inbox.py` · `serialize.py` | Event ring + stamping · inject channel · inbox raising · driver→event normalization |
 | [`sidecar/drivers/`](../sidecar/drivers/) | `base.py` (seam) · `bridge.py` · `sdk.py` · `__init__.py` (selection) |
 | [`sidecar/runtime_store.py`](../sidecar/runtime_store.py) · `identity.py` · `deletion.py` · `storage.py` | Restart-surviving session records · identity assignment · hard-delete/tombstone · project-store paths |
-| `links.py` · `scratchpad.py` · `watermark.py` · `library.py` · `templates_store.py` · `console_catalog.py` · `checklist.py` · `marquee.py` · `subagents_naming.py` · `settings_io.py` · `utility_llm.py` | Coordination-spine feature modules: linking · scratchpad · read-watermarks · library · templates · console catalog · checklist parse · marquee tail · subagent naming · settings read/write · utility-LLM passes |
+| `links.py` · `scratchpad.py` · `watermark.py` · `library.py` · `attachments.py` · `templates_store.py` · `console_catalog.py` · `checklist.py` · `marquee.py` · `subagents_naming.py` · `settings_io.py` · `utility_llm.py` | Coordination-spine feature modules: linking · scratchpad · read-watermarks · library · attachment/citation asset materialization (§7.14) · templates · console catalog · checklist parse · marquee tail · subagent naming · settings read/write · utility-LLM passes |
 | [`bridge/bridge.py`](../bridge/bridge.py) · `transcript.py` · `paths.py` · `mcp.py` · `registry.py` | tmux/WSL2 control · JSONL transcript resolution · path/net translation · MCP sync · Settings reads |
 | [`start-dashboard.bat`](../start-dashboard.bat) | Launches sidecar + Electron together (§2) |
 | [`tests/`](../tests/) | The pytest suite — **and a primary spec source, not just verification.** Each `test_*_unit.py` opens with a docstring stating the *decided behavioral contract* its module must satisfy — **read it before building or changing that module.** The live tier (`test_tmux_bridge.py`, `test_bridge_finisher_live.py`, and the `tests/ui/` slice) proves bridge + client behavior end-to-end. Index + coverage map: [`tests/README.md`](../tests/README.md). |

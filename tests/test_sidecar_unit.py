@@ -17,7 +17,10 @@ functions are called directly via ``asyncio.run``). Proves:
     the sidecar; document create (409 on exists) / delete / rename and the
     comment add/resolve endpoints, including the 400 guards that scope every
     write to ``<project>/.awl-cc-dash/``; and the ``subdir=plans|docs`` store
-    listing with its legacy ``<root>/<subdir>`` fallback;
+    listing with its legacy ``<root>/<subdir>`` fallback (this file proves the
+    store-vs-legacy ROUTING on flat fixtures; the §7.16 recursive walk itself
+    is proven in ``test_attachments_unit.TestRecursiveDocumentListing`` and
+    ``test_library_unit.TestListMarkdown``);
   * **the live mode/fast/thinking control endpoints (§11 #12)** — POST
     ``/sessions/{id}/{mode,fast,thinking}`` return the driver's READ-BACK state
     and map the honest RuntimeError reasons to 409 (``busy``) / 400

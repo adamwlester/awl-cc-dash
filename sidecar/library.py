@@ -48,9 +48,20 @@ wrappers resolve the project-scoped paths via :mod:`storage`
 (``plans_dir`` / ``docs_dir`` / ``plan_reviews_path``) and delegate straight to
 the path-explicit core.
 
-Listing is **non-recursive**: Documents and Plans are flat collections (a docs
-dir, or a ``plans`` subdir), so a top-level scan is the intended scope — nested
-trees are not walked. Pass ``subdir`` to scope into e.g. ``"plans"``.
+Listing scope (§7.16): the store's Documents and Plans collections may nest
+(agents drop plan trees like ``plans/phase-1/plan.md``), so the store listings
+walk the whole subtree — ``list_markdown(..., recursive=True)``, each entry
+carrying its base-relative ``rel_path``. The recursive scope is ONE decision
+applied everywhere it reaches: the reviews aggregate and the bare-filename
+review/comment resolution walk the same subtrees (a nested doc the listing
+offers must accept and surface comments — never list-then-404 or
+save-then-vanish), every walk is cycle-safe (:func:`_walk_files` never
+traverses symlinks/junctions — ``rglob`` would loop forever on a junction
+cycle), and ``docs/``'s §11 #45 ``prompts/`` subtree (the prompt-library
+project copy — a different data type with its own surface) is excluded
+throughout. The default stays the flat top-level scan: the browse-read-only
+project-root surface deliberately does not walk a whole repo. Pass ``subdir``
+to scope into e.g. ``"plans"``.
 """
 
 from __future__ import annotations
@@ -69,6 +80,14 @@ _MD_SUFFIX = ".md"
 _META_SUFFIX = ".meta.json"
 _SCHEMA_VERSION = 1
 
+# The §11 #45 prompt-library project copy lives at <store>/docs/prompts/ (see
+# prompt_library.project_prompts_dir). Its .md files are response-preset /
+# revise / summarize overrides — data of the /prompt-library surface, NOT
+# Library documents — so every recursive walk of the store's docs/ collection
+# excludes this top-level subtree (listing it would offer prompt overrides as
+# ordinary deletable/commentable docs).
+PROMPT_LIBRARY_SUBDIR = "prompts"
+
 
 # ---------------------------------------------------------------------------
 # Documents & Plans — read + render (.md files in the project dir)
@@ -79,25 +98,79 @@ def _iso_mtime(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime).isoformat()
 
 
-def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
-    """List ``.md`` files directly under ``root_dir`` (or ``root_dir/subdir``).
+def _walk_files(base: Path, exclude_top: tuple[str, ...] = ()):
+    """Yield every file under ``base`` — WITHOUT ever traversing a link.
 
-    Non-recursive: only the immediate directory is scanned (Documents and Plans
-    are flat collections). Directories whose name ends in ``.md`` are skipped —
-    only regular files count. A missing directory (or a path that isn't a
+    The store walks must be cycle-safe: on this Python (3.12/Windows) both
+    ``Path.rglob`` and ``os.walk`` happily descend into directory junctions
+    (a junction reports ``is_symlink() == False``), so one self-junction in a
+    docs tree explodes the listing into phantom duplicates and two make the
+    walk effectively infinite — hanging the sidecar's event loop from a single
+    ``GET /library/documents``. This walk descends only into REAL directories
+    (``is_dir(follow_symlinks=False)`` and neither ``is_symlink()`` nor
+    ``is_junction()``), so a cycle is impossible; a linked *file* still lists
+    (same as the flat scan's ``is_file()``), a linked *dir* is simply not
+    walked. Deterministic order: breadth-first, name-sorted per directory —
+    shallow entries come before nested ones, so "first match wins" callers
+    prefer the top level. ``exclude_top`` names direct children of ``base``
+    that are not walked at all (the §11 #45 ``docs/prompts/`` copy).
+    Unreadable directories are skipped, never raised.
+    """
+    queue: list[tuple[Path, int]] = [(base, 0)]
+    i = 0
+    while i < len(queue):
+        d, depth = queue[i]
+        i += 1
+        try:
+            with os.scandir(d) as it:
+                children = sorted(it, key=lambda e: e.name)
+        except OSError:
+            continue
+        for entry in children:
+            try:
+                if entry.is_file():
+                    yield Path(entry.path)
+                elif (entry.is_dir(follow_symlinks=False)
+                        and not entry.is_symlink() and not entry.is_junction()):
+                    if depth == 0 and entry.name in exclude_top:
+                        continue
+                    queue.append((Path(entry.path), depth + 1))
+            except OSError:
+                continue
+
+
+def list_markdown(root_dir: str, subdir: str | None = None,
+                  recursive: bool = False,
+                  exclude_top: tuple[str, ...] = ()) -> list[dict]:
+    """List ``.md`` files under ``root_dir`` (or ``root_dir/subdir``).
+
+    By default only the immediate directory is scanned — the browse-read-only
+    project-root surface stays a flat top-level listing. With
+    ``recursive=True`` (§7.16 — the store's ``plans``/``docs`` collections)
+    the whole subtree is walked (cycle-safe: :func:`_walk_files` never
+    traverses symlinks/junctions), so nested trees like
+    ``plans/phase-1/plan.md`` list too; ``exclude_top`` skips named top-level
+    subtrees of the base (the docs collection passes
+    :data:`PROMPT_LIBRARY_SUBDIR` so the §11 #45 prompt copy never lists as
+    documents). Directories whose name ends in ``.md`` are skipped — only
+    regular files count. A missing directory (or a path that isn't a
     directory) yields ``[]`` rather than raising.
 
     Each entry::
 
-        {"filename": str, "path": str, "size": int, "modified": str(iso),
-         "provenance": {created_by?, created_at?, session?}}
+        {"filename": str, "path": str, "rel_path": str, "size": int,
+         "modified": str(iso), "provenance": {created_by?, created_at?, session?}}
 
-    The ``provenance`` block (§8.5, §11 #41) is lifted from the doc's paired
+    ``filename`` is the leaf name; ``rel_path`` is the path relative to the
+    listed base (POSIX separators — equals ``filename`` for top-level files),
+    so the renderer can show nested docs under their subtree. The
+    ``provenance`` block (§8.5, §11 #41) is lifted from the doc's paired
     ``.meta.json`` sidecar (created-by / when / session) so the renderer's Authors
     lens can group by author straight off the listing; it is ``{}`` for any doc
     with no sidecar or no recorded provenance (a browse-read-only ``.md`` outside
     the store, or a doc the dashboard never stamped). Results are sorted by
-    ``filename`` for a stable rendering order.
+    ``rel_path`` for a stable rendering order (identical to the old
+    ``filename`` sort for flat directories).
     """
     base = Path(root_dir)
     if subdir:
@@ -105,8 +178,9 @@ def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
     if not base.is_dir():
         return []
 
+    candidates = _walk_files(base, exclude_top) if recursive else base.iterdir()
     entries: list[dict] = []
-    for child in base.iterdir():
+    for child in candidates:
         if not child.is_file():
             continue
         if child.suffix.lower() != _MD_SUFFIX:
@@ -116,12 +190,13 @@ def list_markdown(root_dir: str, subdir: str | None = None) -> list[dict]:
             {
                 "filename": child.name,
                 "path": str(child),
+                "rel_path": child.relative_to(base).as_posix(),
                 "size": st.st_size,
                 "modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
                 "provenance": doc_provenance(child),
             }
         )
-    entries.sort(key=lambda e: e["filename"])
+    entries.sort(key=lambda e: e["rel_path"])
     return entries
 
 
@@ -537,16 +612,44 @@ def delete_document(path: str | Path, cwd: str | None) -> dict:
     return {"deleted": deleted}
 
 
+def _resolve_in_store_collections(cwd: str | None, name: str) -> Path | None:
+    """Find ``name`` (a validated ``.md`` leaf filename) in the store's
+    ``plans/`` then ``docs/`` collections — top level first (the filesystem
+    check, preserving the old flat semantics), then the nested subtree (§7.16:
+    the collections may nest, and a doc the recursive listing offers must also
+    resolve for review/comment writes — never list-then-404). The walk is the
+    same cycle-safe, shallow-first :func:`_walk_files`, with ``docs/``'s
+    §11 #45 ``prompts/`` copy excluded; nested matches are exact-name."""
+    docs_d = storage.docs_dir(cwd)
+    for base in (storage.plans_dir(cwd), docs_d):
+        if base is None:
+            continue
+        if (base / name).is_file():
+            return base / name
+        if not base.is_dir():
+            continue
+        exclude = (PROMPT_LIBRARY_SUBDIR,) if base == docs_d else ()
+        for f in _walk_files(base, exclude):
+            if f.name == name:
+                return f
+    return None
+
+
 def resolve_document(cwd: str | None, filename: str) -> Path | None:
-    """Find a document by bare filename: store ``plans/``, then store ``docs/``,
-    then the project root. Returns the first existing ``.md`` path, else
+    """Find a document by bare filename: store ``plans/``, then store ``docs/``
+    (each top-level-first, then their nested subtrees — see
+    :func:`_resolve_in_store_collections`), then the project root (top-level
+    only — the browse surface). Returns the first existing ``.md`` path, else
     ``None``. The filename is validated (no separators/``..``) so a crafted
-    value can't address outside those three collections. READ-side resolution —
+    value can't address outside those collections. READ-side resolution —
     review/comment writes resolve via :func:`resolve_document_for_write`."""
     name = _safe_md_filename(filename)
-    for base in (storage.plans_dir(cwd), storage.docs_dir(cwd), storage.project_root(cwd)):
-        if base is not None and (base / name).is_file():
-            return base / name
+    hit = _resolve_in_store_collections(cwd, name)
+    if hit is not None:
+        return hit
+    root = storage.project_root(cwd)
+    if root is not None and (root / name).is_file():
+        return root / name
     return None
 
 
@@ -557,10 +660,7 @@ def resolve_document_for_write(cwd: str | None, filename: str) -> Path | None:
     the repo root (§8.5 rule 5; the migration keeps its own recorded root-seam
     behavior for legacy entries)."""
     name = _safe_md_filename(filename)
-    for base in (storage.plans_dir(cwd), storage.docs_dir(cwd)):
-        if base is not None and (base / name).is_file():
-            return base / name
-    return None
+    return _resolve_in_store_collections(cwd, name)
 
 
 # ---------------------------------------------------------------------------
@@ -781,25 +881,36 @@ def aggregate_metas(cwd: str | None) -> dict:
     root-doc reviews stay visible) — as a **filename-keyed** dict: the
     ``GET /library/reviews`` response shape.
 
-    Keys are the paired ``.md`` filenames (``roadmap.md`` → its meta); orphaned
-    sidecars are included under their implied ``.md`` name (they still carry
-    review data worth showing). On a same-name collision the scan order wins:
-    ``plans/``, then ``docs/``, then the root (later entries are not merged).
-    The root scan is READ-side only — no write path creates sidecars there.
-    Missing dirs contribute nothing.
+    The two store collections are walked **recursively** (the same §7.16 scope
+    the listing uses, cycle-safe via :func:`_walk_files`, docs excluding the
+    §11 #45 ``prompts/`` copy) — a comment saved on a nested doc the listing
+    offers must surface here, never save-then-vanish. The root scan stays
+    top-level (browse surface). Keys are the paired ``.md`` **leaf** filenames
+    (``roadmap.md`` → its meta — the shape the renderer matches listings
+    against); orphaned sidecars are included under their implied ``.md`` name
+    (they still carry review data worth showing). On a same-name collision the
+    scan order wins: ``plans/`` (shallow before nested), then ``docs/``, then
+    the root (later entries are not merged). The root scan is READ-side only —
+    no write path creates sidecars there. Missing dirs contribute nothing.
     """
+    docs_d = storage.docs_dir(cwd)
     out: dict = {}
-    for d in (storage.plans_dir(cwd), storage.docs_dir(cwd),
-              storage.project_root(cwd)):
+    for d, recursive in ((storage.plans_dir(cwd), True), (docs_d, True),
+                         (storage.project_root(cwd), False)):
         if d is None or not d.is_dir():
             continue
-        for child in sorted(d.iterdir()):
-            if not child.is_file() or not child.name.endswith(_META_SUFFIX):
+        if recursive:
+            exclude = (PROMPT_LIBRARY_SUBDIR,) if d == docs_d else ()
+            children = _walk_files(d, exclude)
+        else:
+            children = (c for c in sorted(d.iterdir()) if c.is_file())
+        for child in children:
+            if not child.name.endswith(_META_SUFFIX):
                 continue
             md_name = child.name[: -len(_META_SUFFIX)] + _MD_SUFFIX
             if md_name in out:
                 continue  # earlier dirs win the collision (plans → docs → root)
-            out[md_name] = load_meta(d / md_name)
+            out[md_name] = load_meta(child.with_name(md_name))
     return out
 
 

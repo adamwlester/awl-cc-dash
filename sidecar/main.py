@@ -14,6 +14,7 @@ The sidecar itself is driver-agnostic.
 """
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -27,12 +28,13 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
 from identity import assign_identity, git_author, draw_name
+import attachments
 import response_presets
 import eventbus
 import hookbus
@@ -1256,6 +1258,12 @@ class SendPromptRequest(BaseModel):
     # (spike-proven on the installed build — lands at the next tool boundary
     # without stopping the turn; if the agent is idle it lands on its next run).
     disposition: Literal["now", "next", "queue", "hold", "inject"] = "queue"
+    # Attachment references (§10 #1, §7.14): asset ids from POST /library/assets,
+    # resolved against THIS agent's project store. The delivered text gains ONE
+    # attributed block listing each asset's receiver-readable absolute path
+    # (the WSL form a bridge agent can open — attachments.attachments_block);
+    # an unknown id is an honest 400, never a silent drop.
+    attachments: list[str] | None = None
 
 class SetResponsePresetRequest(BaseModel):
     # A known preset id from GET /presets/response (§11 #39). Unknown -> 400.
@@ -1938,7 +1946,15 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     An idle agent flushes immediately; a busy agent queues per disposition
     (`queue`/`next`), or — for `now` — is interrupted so the resulting idle
     flushes it at the head. `hold` stages for manual release. The entry
-    carries `source` + `recipients` (default the operator -> this agent)."""
+    carries `source` + `recipients` (default the operator -> this agent).
+
+    Attachments (§10 #1, §7.14): when the request carries asset ids, the
+    delivered text gains the ONE attributed attachments block — lead line +
+    one `- <WSL-readable absolute path>` bullet per asset (citation anchors
+    inline) — appended after the message, on EVERY disposition (inject rides
+    it too). The block is rendered here at send time (asset paths are static,
+    unlike the delivery-time queue-awareness note). Honest failures: 400 for
+    an unknown asset id or an agent with no cwd — never a silent drop."""
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
@@ -1948,30 +1964,64 @@ async def send_prompt(session_id: str, req: SendPromptRequest):
     # the poll so the flush-on-idle transition is seen promptly.
     _nudge_driver(session_id)
 
+    # §10 #1: resolve attachment references to the receiving agent's readable
+    # absolute paths and append the attributed block to the delivered text.
+    prompt_text = req.prompt
+    if req.attachments:
+        if not session.cwd:
+            raise HTTPException(
+                status_code=400,
+                detail="agent has no cwd; attachments need a project store to resolve from")
+
+        def _render_block(cwd: str, ids: list[str]) -> str:
+            # Sidecar reads (slow 9P/UNC on a WSL-internal store) — runs in a
+            # worker thread, never on the event loop.
+            records = []
+            for aid in ids:
+                rec = attachments.load_asset_record(cwd, aid)
+                if rec is None:
+                    raise ValueError(aid)
+                records.append(rec)
+            return attachments.attachments_block(cwd, records)
+
+        try:
+            block = await asyncio.to_thread(
+                _render_block, session.cwd, req.attachments)
+        except ValueError as e:
+            raise HTTPException(status_code=400,
+                                detail=f"unknown attachment asset id: {e.args[0]}")
+        if block:
+            prompt_text = f"{prompt_text}\n\n{block}" if prompt_text.strip() else block
+
     # `inject` rides the hook channel, not the prompt queue: it's pushed to
     # the agent mid-turn at its next tool boundary (no stop). Queue it on the
     # durable inbox and surface a synthesized feed event (the inject text is not
     # written to the agent's JSONL transcript, so the sidecar owns its visibility).
     if req.disposition == "inject":
-        inj = hookbus.enqueue_inject(session_id, req.prompt, kind="inject",
+        inj = hookbus.enqueue_inject(session_id, prompt_text, kind="inject",
                                      source=req.source)
-        session.push_event({
-            "type": "inject", "text": req.prompt, "kind": "inject",
+        event = {
+            "type": "inject", "text": prompt_text, "kind": "inject",
             "inject_id": inj["id"],
             "timestamp": datetime.now().isoformat(),
             "source": req.source,
             "recipients": req.recipients if req.recipients is not None else [session_id],
-        })
+        }
+        if req.attachments:
+            event["attachments"] = list(req.attachments)
+        session.push_event(event)
         return {"status": "injected", "session_id": session_id, "inject_id": inj["id"]}
 
     entry = {
         "id": str(uuid.uuid4())[:8],
-        "prompt": req.prompt,
+        "prompt": prompt_text,
         "source": req.source,
         "recipients": req.recipients if req.recipients is not None else [session_id],
         "disposition": req.disposition,
         "enqueued_at": datetime.now().isoformat(),
     }
+    if req.attachments:
+        entry["attachments"] = list(req.attachments)
     result = session.enqueue(entry, req.disposition)
     result["session_id"] = session_id
 
@@ -2678,9 +2728,17 @@ async def library_documents(cwd: str, subdir: str | None = None):
 
     ``subdir="plans"`` / ``"docs"`` list the project store
     (``<project>/.awl-cc-dash/<subdir>``), falling back to the legacy
-    ``<root>/<subdir>`` when the store dir doesn't exist yet. No ``subdir``
-    keeps listing the project root itself — the browse-read-only surface
-    (other ``subdir`` values likewise browse ``<root>/<subdir>`` read-only).
+    ``<root>/<subdir>`` when the store dir doesn't exist yet — both
+    **recursive** (§7.16): nested trees (e.g. ``plans/phase-1/plan.md``) are
+    walked (cycle-safe — junctions/symlinks are never traversed), each entry
+    carrying its base-relative ``rel_path``. The store's ``docs/prompts/``
+    subtree is excluded: that is the §11 #45 prompt-library project copy — the
+    ``/prompt-library`` surface's data, not documents (the legacy fallback has
+    no such carve-out; a repo's real ``docs/prompts/`` is ordinary browse
+    content). No ``subdir`` keeps listing the project root itself — the
+    browse-read-only surface, deliberately top-level only (walking a whole
+    repo would be pathological; other ``subdir`` values likewise browse
+    ``<root>/<subdir>`` read-only, top-level).
 
     Each entry carries a ``provenance`` block (created-by / when / session) from
     the doc's ``.meta.json`` sidecar (§8.5, §11 #41), so the renderer's Authors
@@ -2689,9 +2747,13 @@ async def library_documents(cwd: str, subdir: str | None = None):
     if not root:
         raise HTTPException(status_code=400, detail="cwd required")
     if subdir in ("plans", "docs"):
+        exclude = (library.PROMPT_LIBRARY_SUBDIR,) if subdir == "docs" else ()
         store_dir = storage.plans_dir(cwd) if subdir == "plans" else storage.docs_dir(cwd)
         if store_dir is not None and store_dir.is_dir():
-            return library.list_markdown(str(store_dir))
+            return await asyncio.to_thread(
+                library.list_markdown, str(store_dir), None, True, exclude)
+        return await asyncio.to_thread(
+            library.list_markdown, str(root), subdir, True)
     return library.list_markdown(str(root), subdir)
 
 
@@ -2750,11 +2812,13 @@ async def library_rename_document(req: DocumentRenameRequest):
 async def library_reviews(cwd: str):
     """Per-doc sidecar metadata for the whole project, filename-keyed (§8.5).
     Runs the one-time legacy ``plan-reviews.json`` → sidecar migration first,
-    then aggregates every sidecar under the store's ``plans/`` + ``docs/``."""
+    then aggregates every sidecar under the store's ``plans/`` + ``docs/`` —
+    recursively, the same §7.16 scope the Documents listing walks (a comment
+    on a nested doc must surface here), ``docs/prompts/`` excluded."""
     if not storage.project_root(cwd):
         raise HTTPException(status_code=400, detail="cwd required")
-    library.migrate_plan_reviews(cwd)
-    return library.aggregate_metas(cwd)
+    await asyncio.to_thread(library.migrate_plan_reviews, cwd)
+    return await asyncio.to_thread(library.aggregate_metas, cwd)
 
 
 @app.post("/library/reviews")
@@ -4078,6 +4142,131 @@ async def agent_icon(name: str, color: str | None = None):
         )
     return Response(content=svg, media_type="image/svg+xml",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ============================================================================
+# §10 #1 — Attachments / project assets (Option A materialization)
+#
+# Registered AFTER /assets/agent-icons/{name} above so the static icon route
+# keeps precedence over the {asset_id}/{filename} pattern.
+# ============================================================================
+
+class AssetIngestRequest(BaseModel):
+    """Ingest ONE attachment into the open project's asset store (§10 #1).
+
+    Exactly one byte source: ``content_base64`` (the upload body — base64
+    JSON, the decided upload form; requires ``filename``) or ``source_path``
+    (a local file in any spelling the storage layer folds — ``C:\\…``,
+    ``/mnt/c/…``, a WSL-internal ``/home/…``, UNC; ``filename`` defaults to
+    its basename). ``citation`` is the optional §7.14 anchor:
+    ``{"doc": …, "location": …}``."""
+    cwd: str
+    filename: str | None = None
+    content_base64: str | None = None
+    source_path: str | None = None
+    created_by: str = "user"                 # provenance: who attached it
+    session: str | None = None               # provenance: attaching session
+    citation: dict[str, Any] | None = None   # optional anchor (doc + location)
+
+
+@app.post("/library/assets")
+async def library_ingest_asset(req: AssetIngestRequest):
+    """Copy attachment bytes into ``<project>/.awl-cc-dash/assets/<id>/<name>``
+    (§10 #1 ladder leg a — Option A). Atomic (tmp + rename) with a post-write
+    hash verify on both write legs; the WSL-native leg engages automatically
+    for WSL-internal project roots. Returns the canonical asset record plus
+    the two receiver renderings (``agent_path`` — the WSL-readable absolute
+    path; ``http_url`` — the renderer's byte-endpoint URL). 400 on a bad
+    request (no project cwd, zero/both byte sources, bad base64/filename/
+    citation, over-size), 404 for a missing ``source_path``, 500 when the
+    write itself fails."""
+    if not storage.project_root(req.cwd):
+        raise HTTPException(status_code=400, detail="cwd required")
+    has_body = req.content_base64 is not None
+    has_path = bool(req.source_path)
+    if has_body == has_path:
+        raise HTTPException(
+            status_code=400,
+            detail="provide exactly one of content_base64 or source_path")
+    try:
+        if has_body:
+            if not req.filename:
+                raise HTTPException(status_code=400,
+                                    detail="content_base64 requires filename")
+            try:
+                data = base64.b64decode(req.content_base64 or "", validate=True)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400,
+                                    detail="content_base64 is not valid base64")
+            # The write leg may shell into WSL — keep the event loop free.
+            record = await asyncio.to_thread(
+                attachments.ingest_bytes, req.cwd, req.filename, data,
+                created_by=req.created_by, session=req.session,
+                citation=req.citation)
+        else:
+            record = await asyncio.to_thread(
+                attachments.ingest_source_path, req.cwd, req.source_path,
+                req.filename, created_by=req.created_by, session=req.session,
+                citation=req.citation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404,
+                            detail=f"source_path not found: {req.source_path}")
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=f"asset write failed: {e}")
+    except OSError as e:
+        # Any other filesystem refusal (disk full, permissions, an exotic
+        # name the sanitizer didn't foresee) is an honest 500 with the OS
+        # detail — never a raw traceback.
+        raise HTTPException(status_code=500, detail=f"asset write failed: {e}")
+    return {"asset": record,
+            "agent_path": attachments.render_wsl_path(req.cwd, record),
+            "http_url": attachments.render_http_url(req.cwd, record)}
+
+
+@app.get("/library/assets")
+async def library_list_assets(cwd: str):
+    """List the open project's assets with their metadata (§7.16 — the Assets
+    surface's data): id · filename · mime · size · created · provenance (+
+    rel_path/sha256/citation), each with the two receiver renderings. Loose
+    files dropped directly under ``assets/`` list honestly with ``id: null``
+    (visible media, not byte-endpoint-addressable)."""
+    if not storage.project_root(cwd):
+        raise HTTPException(status_code=400, detail="cwd required")
+
+    def _rows() -> list[dict]:
+        # One sidecar read + stat per asset — slow 9P/UNC reads on a
+        # WSL-internal store, so the whole scan runs off the event loop.
+        return [{**rec,
+                 "agent_path": attachments.render_wsl_path(cwd, rec),
+                 "http_url": attachments.render_http_url(cwd, rec)}
+                for rec in attachments.list_assets(cwd)]
+
+    return await asyncio.to_thread(_rows)
+
+
+@app.get("/assets/{asset_id}/{filename}")
+async def serve_asset(asset_id: str, filename: str, cwd: str):
+    """Stream one asset's bytes from the open project store (§10 #1 ladder
+    leg b — the renderer's recommended default render path: localhost HTTP,
+    no Electron CSP/UNC-path issues). Content-type comes from the asset's
+    stored ``mime`` (guess fallback). Path-traversal-safe: both segments must
+    be plain names and the resolved file must live strictly inside the store's
+    ``assets/`` dir (``attachments.asset_file_path``) — anything else is a
+    plain 404, including the ``.meta.json`` sidecars (metadata is
+    ``GET /library/assets``'s job)."""
+    def _resolve() -> tuple[Path | None, dict]:
+        # resolve() + sidecar read — off the event loop (slow over 9P/UNC).
+        p = attachments.asset_file_path(cwd, asset_id, filename)
+        rec = (attachments.load_asset_record(cwd, asset_id) or {}) if p else {}
+        return p, rec
+
+    path, record = await asyncio.to_thread(_resolve)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media = record.get("mime") if record.get("filename") == filename else None
+    return FileResponse(path, media_type=media or attachments.guess_mime(filename))
 
 
 # ============================================================================

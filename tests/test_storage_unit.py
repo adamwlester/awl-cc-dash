@@ -9,8 +9,10 @@ Pure path logic — no driver, no WSL2/tmux, no live agent. The decided contract
     with symlink and ``C:\\…``/``/mnt/c/…`` aliases resolved to ONE form, so a
     subfolder launch or a path alias still lands on the same store. WSL-internal
     cwds map to their ``\\\\wsl.localhost\\<distro>\\…`` UNC form (never the
-    Windows current drive), and their WSL-reachable accessors are
-    ``/home/…``-rooted.
+    Windows current drive; the legacy ``\\\\wsl$\\…`` spelling folds to the
+    same form — ``resolve()`` alone would not, splitting one project across
+    two stores), and their WSL-reachable accessors are ``/home/…``-rooted
+    (both UNC spellings strip to the native path).
   * §8.2 subdir taxonomy: ``plans/`` · ``docs/`` (scratchpad = ``docs/scratchpad.md``)
     · ``assets/`` · ``state/`` — created as first populated, never scaffolded.
   * One-time legacy migration: a pre-rename ``<project>/.awl/`` store folds into
@@ -74,6 +76,16 @@ class TestCanonicalRoot:
         a = storage.project_key("/home/awl-test-user/proj")
         b = storage.project_key(r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
         assert a == b
+
+    def test_wsl_dollar_spelling_folds_to_wsl_localhost(self):
+        # Regression: Path.resolve() does NOT fold the legacy \\wsl$\ UNC
+        # spelling into \\wsl.localhost\, so without the explicit fold the
+        # same WSL project split across two stores and its *_wsl renderings
+        # emitted unopenable //wsl$/… strings.
+        a = storage.project_key(r"\\wsl$\Ubuntu\home\awl-test-user\proj")
+        b = storage.project_key(r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
+        assert a == b
+        assert a.lower().startswith("\\\\wsl.localhost\\")
 
     def test_wsl_internal_root_never_anchors_to_a_windows_drive(self):
         # The old behavior resolved /home/… against the Windows current drive
@@ -272,6 +284,18 @@ class TestWslReachable:
         wsl = storage.scratchpad_path_wsl(
             r"\\wsl.localhost\Ubuntu\home\awl-test-user\proj")
         assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/docs/scratchpad.md"
+
+    def test_wsl_dollar_unc_root_translates_back_inside_wsl(self):
+        # The legacy \\wsl$\ spelling strips to the same native path — an
+        # agent must never be handed a //wsl$/… string it cannot open.
+        wsl = storage.scratchpad_path_wsl(r"\\wsl$\Ubuntu\home\awl-test-user\proj")
+        assert wsl == "/home/awl-test-user/proj/.awl-cc-dash/docs/scratchpad.md"
+
+    def test_doc_path_wsl_strips_both_unc_spellings(self):
+        assert storage.doc_path_wsl(
+            r"\\wsl.localhost\Ubuntu\home\u\p\f.md") == "/home/u/p/f.md"
+        assert storage.doc_path_wsl(
+            r"\\wsl$\Ubuntu\home\u\p\f.md") == "/home/u/p/f.md"
 
     def test_none_cwd_has_no_wsl_path(self):
         assert storage.project_awl_dir_wsl(None) is None
