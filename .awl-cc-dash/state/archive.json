@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "archived": {
+    "arc0d47e6de3829": {
+      "archive_id": "arc0d47e6de3829",
+      "session_id": "5b258b04",
+      "name": "e2e-alpha",
+      "identity": {
+        "role": "worker",
+        "number": 2,
+        "name": "e2e-alpha",
+        "color": "#008149",
+        "icon": "robot-helmet"
+      },
+      "color": "#008149",
+      "icon": "robot-helmet",
+      "created_at": "2026-07-15T17:41:44.832589",
+      "retired_at": "2026-07-15T18:22:29.965642",
+      "transcript": {
+        "claude_session_id": "977a576d-b97b-455f-9d02-8286be92ff8f",
+        "transcript_path": "/home/lester/.claude/projects/-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash/977a576d-b97b-455f-9d02-8286be92ff8f.jsonl"
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "model": "opus",
+      "driver": "bridge",
+      "permission_mode": "acceptEdits",
+      "git_author_name": "e2e-alpha",
+      "git_author_email": "e2e-alpha-2@agents.awl-cc-dash.invalid"
+    },
+    "arcee6eb7d2fcaf": {
+      "archive_id": "arcee6eb7d2fcaf",
+      "session_id": "992e2477",
+      "name": "e2e-beta",
+      "identity": {
+        "role": "worker",
+        "number": 3,
+        "name": "e2e-beta",
+        "color": "#006bbb",
+        "icon": "bear-head"
+      },
+      "color": "#006bbb",
+      "icon": "bear-head",
+      "created_at": "2026-07-15T18:08:22.375574",
+      "retired_at": "2026-07-15T18:22:35.795406",
+      "transcript": {
+        "claude_session_id": "3cb41e04-afdb-4e3e-81b2-ee3e1c7e2192",
+        "transcript_path": "/home/lester/.claude/projects/-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash/3cb41e04-afdb-4e3e-81b2-ee3e1c7e2192.jsonl"
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "model": "opus",
+      "driver": "bridge",
+      "permission_mode": "acceptEdits",
+      "git_author_name": "e2e-beta",
+      "git_author_email": "e2e-beta-3@agents.awl-cc-dash.invalid"
+    },
+    "arcc2ca3d480f50": {
+      "archive_id": "arcc2ca3d480f50",
+      "session_id": "8c44ddc2",
+      "name": "",
+      "identity": {
+        "role": "Agent",
+        "number": 4,
+        "name": "",
+        "color": "#aa4600",
+        "icon": "spartan-helmet"
+      },
+      "color": "#aa4600",
+      "icon": "spartan-helmet",
+      "created_at": "2026-07-15T18:06:13.383637",
+      "retired_at": "2026-07-15T18:22:39.498116",
+      "transcript": {
+        "claude_session_id": null,
+        "transcript_path": "/home/lester/.claude/projects/-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash/3cb41e04-afdb-4e3e-81b2-ee3e1c7e2192.jsonl"
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "/mnt/c/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "model": "opus",
+      "driver": "bridge",
+      "permission_mode": "acceptEdits",
+      "git_author_name": "Agent-4",
+      "git_author_email": "agent-4@agents.awl-cc-dash.invalid"
+    }
+  }
+}

@@ -697,6 +697,14 @@ Files: frontend/src/renderer/api.ts, frontend/src/renderer/components/AgentPanel
 
 ---
 
+### 2026-07-15 18:35:10 — build-sprint: e2e proof (real fleet) + dogfood `.awl-cc-dash/` committed (#10)
+
+Drove the full stack against a REAL agent fleet via the hydrated sidecar + the headed-parked renderer (`dev/tools/ui-verify`, `?sidecar=`). **PROVEN** (19 screenshots in `.scratch/e2e-proof/`): agent create + live reply; the per-turn context readout (#31, fully populated — tokens/model/effort/thinking/cost/limits); A↔B link with correct addressing + real bidirectional message delivery; scratchpad; the HIGH **Console live-streaming** a real tmux screen (real ttyd in WSL → xterm rendered the live TUI + moving status bar); response preset #39 (set Concise, persisted to `state/agents.json`); **fork #15** (new live agent, `forked_from` lineage); **archive→resume→un-retire #18/#17** (soft-retire → `GET /archive` LIGHT record carrying the #19 synthetic git author `e2e-beta-3@agents.awl-cc-dash.invalid` → resume by `archive_id` → live, same id + conversation, un-retired); the **#38 narrow-width guard** holding at 760px (horizontal scroll, no collapse); randomize #40; Authors lens #41; and `start-dashboard.bat` bringing up BOTH the sidecar (:7690) and Electron. **0 page errors.** **ONE real bug found (fix next):** the run→idle transition never fires after a live bridge turn — `session.status` stays `"running"`, `total_turns` stays 0, blocking the turn-completion side-effects (turn counters, response inbox card, link exchange counters, shared-context auto-fire, prompt-queue auto-flush). Root cause traced: `_flush_queue` sets status=running synthetically ([main.py:401](sidecar/main.py#L401)), but the bridge driver's screen-poll never emits the `status_change=idle` transition ([drivers/bridge.py:1008](sidecar/drivers/bridge.py#L1008)), and the Stop hook updates only the run-state arbiter, not `session.status` ([main.py:1946](sidecar/main.py#L1946)). **Dogfood #10:** committed the e2e run's `.awl-cc-dash/` store (`docs/` + `state/{agents,archive,links,bookmarks,routing}`) — proving the self-dogfooding store is created, valid, and travels with the repo (§8.2). Minor honesty notes: retire doesn't tombstone a link (`lnk1` stays active with both endpoints archived); a cosmetic Console header path label reads `.awl` vs `.awl-cc-dash/docs/scratchpad.md`; `start-dashboard.bat` has LF line endings (fine double-clicked, fragile piped).
+
+Files: .awl-cc-dash/ (new — dogfood #10), DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

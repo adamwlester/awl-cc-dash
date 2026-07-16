@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "links": [
+    {
+      "id": "lnk1",
+      "a": "5b258b04",
+      "b": "992e2477",
+      "direction": "both",
+      "relationship": "direct",
+      "shared_content": [],
+      "shared_backfill": false,
+      "trigger": "queue",
+      "end_after_exchanges": 25,
+      "end_after_tokens": null,
+      "messages": 0,
+      "exchanges": 0,
+      "tokens": 0,
+      "active": true
+    }
+  ]
+}
