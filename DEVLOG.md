@@ -292,6 +292,14 @@ Files: CLAUDE.md, AGENTS.md, DEVLOG.md, archive/devlog/DEVLOG-archive-06.md
 
 ---
 
+### 2026-07-16 19:16:33 — §11 #22 revise leg LIVE-PROVEN end to end (the last ⚠ assumed call) + 2.1.212 findings
+
+The plan-verdict revise leg — the one never-live-driven assumption left from the build run — is now proven: `test_plan_verdict_revise_then_approve_live` ([tests/test_plan_decision_hooks_live.py](tests/test_plan_decision_hooks_live.py), +309 lines, integration tier, 1 passed in 49s) creates a real plan-mode agent THROUGH the sidecar's own `POST /sessions` (sidecar-owned, so the REAL `POST /sessions/{id}/plan/verdict` is driven end to end), then proves: revise's Escape dismisses the parked review box AND keeps the agent in plan mode, the queued `disposition:"next"` feedback flushes and the agent produces a revised plan containing the instructed change (second plan card raised), and approve then executes the plan for real (files appear in the cwd). ARCHITECTURE trued: the §7.16 body + §11 #22 row lose the ⚠ assumed marker and record the proof + two CC 2.1.212 findings (the plan-review menu changed — Enter's approve default now lands the agent in `auto` mode) — and one NEW honest debt entered the queue: **#51** (the parked plan-review box reads `idle`, not `permission_prompt`, on 2.1.212 — a queued prompt would flush into it; §7.16 ⚠ + §11.1 row). Findings evidence in gitignored tests/log/plan_verdict_revise_findings_*.txt.
+
+Files: tests/test_plan_decision_hooks_live.py, docs/ARCHITECTURE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
