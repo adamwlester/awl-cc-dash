@@ -324,6 +324,22 @@ Files: docs/ARCHITECTURE.md, tests/README.md, tests/test_rewind_anchor_live.py, 
 
 ---
 
+### 2026-07-16 21:22:42 — fix(repo): `*.svg` un-ignored — the 167 shipped agent icons enter git for the first time
+
+The state-audit's headline repo-integrity finding fixed: [.gitignore](.gitignore) line 52's blanket `*.svg` rule had silently excluded ALL of `assets/icons/` from git since the icons landed — 167 game-icons.net agent tiles + 4 Lucide UI icons existed only on this machine while CLAUDE.md documented them as shipped product assets and `test_sidecar_unit`'s curated-pool tests depend on them (a fresh clone failed those tests iconless; the old build-sprint handoff note's "copy assets/icons/ into any new worktree" gotcha was this bug's symptom). The rule is removed (no other SVGs sweep in — verified: `assets/icons/` was the only newly-untracked path) and the icons are committed.
+
+Files: .gitignore, assets/icons/agents/*.svg (167), assets/icons/ui/*.svg (4)
+
+---
+
+### 2026-07-16 21:23:00 — fix(docs): CLAUDE.md rows restored (033ea8b clobber) + two audit row-fixes
+
+The standing-git-policy commit `033ea8b` had accidentally carried a stale on-disk copy of two FOLDER MAP rows, reverting what `83112c9` had just trued — restored verbatim from `83112c9`: the `frontend/` row (renderer rebuilt + wired + e2e-proven; the freeze is over) and the `assets/` row (names/ pool, prompts/ defaults, agents/ definitions alongside the icon sets). Two audit row-fixes in the same pass: the `dev/` row's tools enumeration gains `ui-verify/` + `variant-lint/` (both documented elsewhere in the file but missing from the map), and the `.awl-cc-dash/` row's subdir list trued to what exists (`docs/` · `assets/` · `state/`; `plans/` noted as materializing when plan-mode output first lands).
+
+Files: CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
