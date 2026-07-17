@@ -25,6 +25,14 @@ from .paths import (
 # (and clear of the spike's fixed 7691/7692) so a stray spike run can't collide.
 CONSOLE_PORT_RANGE = (7710, 7789)
 
+# Deliberate-resize clamps (§7.13): the bounds `console_resize` applies to a
+# viewer's requested geometry. The FLOOR is load-bearing — below ~60 columns
+# the TUI starts wrapping the permission menu's trailing hint into the
+# bottom-anchor slack (_MENU_BOTTOM_SLACK) and truncating the fixed phrases
+# the scraper matches on; the ceiling is sanity against a runaway request.
+CONSOLE_RESIZE_COLS = (60, 500)
+CONSOLE_RESIZE_ROWS = (15, 200)
+
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
 log = logging.getLogger("bridge")
@@ -1611,6 +1619,11 @@ class TmuxBridge:
     # pinned via `window-size manual` BEFORE ttyd starts, which fully isolates
     # the scraper (spike-proven). Interception stays on the JSONL transcript;
     # nothing machine-reads this stream (§7.13).
+    #
+    # Geometry stays pinned; changing it is a DELIBERATE, sidecar-mediated act:
+    # `console_resize` (tmux resize-window, which itself keeps `window-size
+    # manual` set) is the ONE sanctioned writer. The viewer never resizes
+    # directly — ttyd client resizes are ignored under `manual`; that's the point.
 
     def resolve_ttyd(self):
         """Absolute ttyd path inside WSL, or None when not installed.
@@ -1751,6 +1764,49 @@ class TmuxBridge:
             log.debug("console_detach(%s) cleanup: %s", name, e)
         return {"status": "detached", "name": name,
                 "port": (info or {}).get("port")}
+
+    def console_resize(self, name, cols, rows):
+        """Deliberately resize the session's pinned window (§7.13).
+
+        The ONE sanctioned geometry writer: the window stays under
+        ``window-size manual`` (a viewer's own resize is ignored by design —
+        the coexistence fix), and the sidecar mediates the viewer's fitted
+        size through this call instead. ``tmux resize-window -x -y`` itself
+        keeps ``window-size manual`` set (tmux semantics, spike-proven —
+        tests/test_console_stream_attach_live.py's ``_pin`` helper), so the
+        pin regime never toggles; attach/detach semantics are untouched.
+
+        Values are clamped to ``CONSOLE_RESIZE_COLS`` / ``CONSOLE_RESIZE_ROWS``
+        (floor 60x15 — the scraper's narrow-width protection, see the
+        constants' comment; ceiling 500x200 sanity).
+
+        Never raises — a failed resize must not break an attach.
+
+        Args:
+            name: Session name.
+            cols: Requested width in columns (int, or int-coercible).
+            rows: Requested height in rows (int, or int-coercible).
+
+        Returns:
+            ``{"ok": True, "cols": C, "rows": R}`` with the APPLIED (clamped)
+            values, or ``{"ok": False, "reason": "<short>"}`` on unknown
+            session, bad input, or tmux failure.
+        """
+        try:
+            cols = int(cols)
+            rows = int(rows)
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "cols/rows must be integers"}
+        cols = max(CONSOLE_RESIZE_COLS[0], min(CONSOLE_RESIZE_COLS[1], cols))
+        rows = max(CONSOLE_RESIZE_ROWS[0], min(CONSOLE_RESIZE_ROWS[1], rows))
+        try:
+            self._require_session(name)
+            self._run(
+                f"tmux resize-window -t {shlex.quote(name)} "
+                f"-x {cols} -y {rows}")
+        except TmuxBridgeError as e:
+            return {"ok": False, "reason": str(e)[:200]}
+        return {"ok": True, "cols": cols, "rows": rows}
 
     # --- Rewind / Fork — the Timeline (§7.19, §11 #15) -------------------------
     #

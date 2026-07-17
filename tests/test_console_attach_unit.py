@@ -12,6 +12,14 @@ The decided contract this file encodes:
     detach deliberately leaves it in place.
   * **One attach per session** — while the previous ttyd is alive a re-attach
     returns the existing one (``reused: True``), never a second server.
+  * **Resize is a deliberate, sidecar-mediated act — the ONE sanctioned
+    geometry writer** — ``console_resize`` issues ``tmux resize-window -x -y``
+    (which itself keeps ``window-size manual`` set — no mode toggling, ever),
+    clamps requests to 60..500 cols x 15..200 rows (the floor protects the
+    narrow-width scraper invariants), and NEVER raises: unknown session, bad
+    input, or a tmux failure return ``{"ok": False, "reason": …}`` — a failed
+    resize must not break an attach. Viewers never resize directly (ttyd
+    client resizes are ignored under ``manual``; that's the point).
   * Ports come from ``CONSOLE_PORT_RANGE`` via the pure ``pick_console_port``
     (``ss -ltn`` occupancy + in-process allocations; ``None`` when exhausted).
   * The sidecar surface is ``POST /sessions/{id}/console/attach`` →
@@ -201,6 +209,77 @@ class TestConsoleAttach:
                                 if "kill-session" in c)
         assert kill_idx < session_kill_idx
         assert "agent-x" not in b._console_attaches
+
+
+# -----------------------------------------------------------------------------
+# TmuxBridge.console_resize — the deliberate, sidecar-mediated geometry writer
+# -----------------------------------------------------------------------------
+
+class TestConsoleResize:
+    def test_resize_issues_exact_resize_window_command(self, monkeypatch):
+        b, calls = _scripted_bridge(monkeypatch)
+        out = b.console_resize("agent-x", 120, 35)
+        assert out == {"ok": True, "cols": 120, "rows": 35}
+        assert "tmux resize-window -t agent-x -x 120 -y 35" in calls
+
+    def test_clamp_floor_protects_scraper_invariants(self, monkeypatch):
+        # Below ~60 cols the permission menu's hint wraps into the
+        # bottom-anchor slack — the floor makes that geometry unreachable.
+        b, calls = _scripted_bridge(monkeypatch)
+        out = b.console_resize("agent-x", 20, 5)
+        assert out == {"ok": True, "cols": 60, "rows": 15}
+        assert "tmux resize-window -t agent-x -x 60 -y 15" in calls
+
+    def test_clamp_ceiling_is_sanity(self, monkeypatch):
+        b, calls = _scripted_bridge(monkeypatch)
+        out = b.console_resize("agent-x", 900, 900)
+        assert out == {"ok": True, "cols": 500, "rows": 200}
+        assert "tmux resize-window -t agent-x -x 500 -y 200" in calls
+
+    def test_int_coercible_strings_are_accepted(self, monkeypatch):
+        b, calls = _scripted_bridge(monkeypatch)
+        out = b.console_resize("agent-x", "120", "35")
+        assert out == {"ok": True, "cols": 120, "rows": 35}
+        assert "tmux resize-window -t agent-x -x 120 -y 35" in calls
+
+    def test_non_integer_input_is_ok_false_never_raises(self, monkeypatch):
+        b, calls = _scripted_bridge(monkeypatch)
+        for bad_cols, bad_rows in (("wide", 35), (120, None), (None, None)):
+            out = b.console_resize("agent-x", bad_cols, bad_rows)
+            assert out["ok"] is False
+            assert "integer" in out["reason"]
+        assert not any("resize-window" in c for c in calls)
+
+    def test_unknown_session_is_ok_false_never_raises(self, monkeypatch):
+        b, calls = _scripted_bridge(monkeypatch)
+        out = b.console_resize("nope", 120, 35)
+        assert out["ok"] is False
+        assert "not found" in out["reason"]
+        assert not any("resize-window" in c for c in calls)
+
+    def test_tmux_failure_is_ok_false_with_reason(self, monkeypatch):
+        # A failed resize must not break an attach — never an exception.
+        b, calls = _scripted_bridge(monkeypatch)
+        scripted = b._run
+
+        def failing_run(cmd, timeout=30, stdin_data=None):
+            if cmd.startswith("tmux resize-window"):
+                calls.append(cmd)
+                raise TmuxBridgeError("resize-window failed: no such window")
+            return scripted(cmd, timeout=timeout, stdin_data=stdin_data)
+
+        monkeypatch.setattr(b, "_run", failing_run)
+        out = b.console_resize("agent-x", 120, 35)
+        assert out["ok"] is False
+        assert "resize-window failed" in out["reason"]
+
+    def test_resize_never_toggles_window_size_mode(self, monkeypatch):
+        # `resize-window` itself keeps `window-size manual` (tmux semantics,
+        # spike-proven) — console_resize must issue NO set-option, ever.
+        b, calls = _scripted_bridge(monkeypatch)
+        b.console_resize("agent-x", 120, 35)
+        assert not any("set-option" in c for c in calls)
+        assert not any("window-size" in c for c in calls)
 
 
 # -----------------------------------------------------------------------------

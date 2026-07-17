@@ -267,15 +267,22 @@ def get_archive_record(project_key: str, archive_id: str) -> dict[str, Any] | No
 def save_archive_record(project_key: str, record: dict[str, Any]) -> None:
     """Insert one archived record into the project archive (write-through).
 
-    Keyed by the record's distinct ``archive_id``. A no-op when the record has
-    no ``archive_id`` or the project has no on-disk home (cwd-less agents don't
-    archive — the archive is per-project, §8.2). Atomic write-replace + stamped
-    ``schema_version`` like every other state file.
+    Keyed by the record's distinct ``archive_id``. Raises ``ValueError`` when
+    the record has no ``archive_id`` or the project has no on-disk home
+    (cwd-less agents can't archive — the archive is per-project, §8.2): the
+    old silent no-op let a caller mistake an unwritten archive for a written
+    one, and the retire path gates its teardown on this call actually landing
+    (the record's on-disk presence is the truth, never the call returning).
+    Atomic write-replace + stamped ``schema_version`` like every other state
+    file.
     """
     aid = record.get("archive_id")
     p = archive_path(project_key)
-    if not aid or p is None:
-        return
+    if not aid:
+        raise ValueError("archive record has no archive_id — nothing to key it by")
+    if p is None:
+        raise ValueError(
+            "project has no on-disk home (cwd-less/keyless) — cannot archive")
     with _IO_LOCK:
         data = _read_json(p)
         archived = data.get("archived")

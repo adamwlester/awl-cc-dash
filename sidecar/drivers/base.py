@@ -22,6 +22,10 @@ Contract:
                            with the underlying engine (§7.5 name registration).
   * `answer_permission(approve)` — answer a pending tool-permission prompt.
   * `get_context_usage()`— return context usage (or None if unsupported).
+  * `stop()`             — gracefully end the agent's process while KEEPING any
+                           persisted record (the §3.4 close-and-stop path; also
+                           the retire path's archive-failure degrade). Default
+                           is a safe no-op — see the method.
   * `close()`            — tear the agent down and stop `events()`.
 
 Drivers that surface tool-permission prompts emit a `permission_request` event
@@ -43,7 +47,12 @@ from typing import Any, AsyncIterator, Callable, Optional
 class DriverConfig:
     agent_type: Optional[str] = None
     model: Optional[str] = None
-    permission_mode: str = "acceptEdits"
+    # bypassPermissions is the product's launch default (2026-07-17 decision):
+    # launching in it arms the Bypass ring segment implicitly, so no arm_bypass
+    # is needed for a default create. Historical roster/archive read-backs keep
+    # their own "acceptEdits" fallback — that reflects what OLD records were
+    # launched with, not this default.
+    permission_mode: str = "bypassPermissions"
     cwd: Optional[str] = None
     system_prompt: Optional[str] = None
     # Per-agent launch config (applied AT LAUNCH only — a running TUI can't be
@@ -138,6 +147,21 @@ class AgentDriver:
 
     async def get_subagents(self) -> Any:
         """Return this agent's subagents (or None if the driver can't observe them)."""
+        return None
+
+    async def stop(self) -> None:
+        """Gracefully end the agent's process while KEEPING any persisted record.
+
+        The record-keeping counterpart of ``close()`` (whose bridge
+        implementation also removes the roster row): the §3.4 close-and-stop
+        path, and the retire path's degrade when the archive write fails. The
+        base default is a deliberate **no-op — NOT ``close()``**: for a driver
+        whose ``close()`` removes persisted records, inheriting a
+        record-destroying stop would silently reintroduce exactly the data
+        loss this split exists to prevent. Drivers with a real stop/close
+        distinction (the bridge driver) override this; callers treat an
+        un-overridden stop as "no record-keeping stop exists" and fall back
+        to ``close()`` only where that close is known record-safe."""
         return None
 
     async def close(self) -> None:

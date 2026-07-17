@@ -16,8 +16,9 @@ dashboard; Claude's own data is surfaced or referenced, never owned or copied.**
       everything about ONE project and its team, committed so it travels with
       the repo.
       Subdir taxonomy (§8.2): ``plans/`` · ``docs/`` (scratchpad lives here) ·
-      ``assets/`` · ``state/`` (dashboard-owned JSON state). Subdirs are created
-      as they are first populated — no empty scaffolding.
+      ``assets/`` · ``state/`` (dashboard-owned JSON state) · ``agents/``
+      (project ``agent.md`` role presets). Subdirs are created as they are
+      first populated — no empty scaffolding.
 
   👥 **Setup** — a reusable team (roster only). A dashboard concept saved in the
       dashboard store, *not* a folder.
@@ -91,6 +92,7 @@ _PLANS_SUBDIR = "plans"
 _DOCS_SUBDIR = "docs"
 _ASSETS_SUBDIR = "assets"
 _STATE_SUBDIR = "state"
+_AGENTS_SUBDIR = "agents"
 
 # Dashboard-store files (project-agnostic, reusable).
 _SETUPS_NAME = "setups.json"      # saved Setups (rosters)
@@ -289,6 +291,12 @@ def state_dir(cwd: str | None) -> Path | None:
     return None if awl is None else awl / _STATE_SUBDIR
 
 
+def agents_dir(cwd: str | None) -> Path | None:
+    """``<project>/.awl-cc-dash/agents/`` — project-scope ``agent.md`` role presets (the Role combobox's Project group)."""
+    awl = project_awl_dir(cwd)
+    return None if awl is None else awl / _AGENTS_SUBDIR
+
+
 def _ensure_subdir(cwd: str | None, sub: Path | None) -> Path:
     if sub is None:
         raise ValueError("agent has no cwd; cannot resolve a project home")
@@ -311,6 +319,10 @@ def ensure_assets_dir(cwd: str | None) -> Path:
 
 def ensure_state_dir(cwd: str | None) -> Path:
     return _ensure_subdir(cwd, state_dir(cwd))
+
+
+def ensure_agents_dir(cwd: str | None) -> Path:
+    return _ensure_subdir(cwd, agents_dir(cwd))
 
 
 def scratchpad_path(cwd: str | None) -> Path | None:

@@ -20,6 +20,26 @@ The decided contract this file encodes ("the system is not useful without it"):
     identity) — reserved here, populated later.
   * The archive is **per-project** (§8.2) and isolated across projects;
     ``all_archived_records`` aggregates project-first across the 🏠 index.
+  * **Teardown is GATED on the archive landing** (the retire data-loss fix):
+    an archive-write failure — or the cwd-less skip — must NOT take the
+    record-removing ``driver.close()``. The degrade is ``stop()`` semantics
+    (process ends, the persisted roster record SURVIVES as a resumable Past
+    row), the response says why (``archive_error`` / ``archive_skipped:
+    "no-project"``), and ``state_store.save_archive_record`` raises
+    ``ValueError`` instead of silently no-opping (missing ``archive_id`` or
+    no project home) so an unwritten archive can never look written.
+  * **The archive record's on-disk presence is the truth**: once
+    ``save_archive_record`` lands, the retire IS archived — a failure in the
+    best-effort ``touch_projects_index`` afterwards must not misclassify it
+    (no ``archive_error``, ``close()`` still taken).
+  * **Non-archived responses carry ``record_kept``** — True when the
+    overridden ``stop()`` kept the persisted roster row (bridge), False when
+    the ``close()`` fallback ran and nothing survives dashboard-side (sdk).
+    The archived happy path OMITS the flag (the frontend only consults it
+    when ``archived`` is null).
+  * ``GET /sessions/past`` never double-lists one ``session_id``: emitted
+    archive rows join the ``seen`` set, so duplicate archive records for the
+    same session (a partial-failure retire→resume→retire cycle) yield one row.
 
 No WSL, no network, no live agent — pure files on tmp_path; the ``close_session``
 endpoint is driven directly via ``asyncio.run`` with a fake driver.
@@ -39,6 +59,7 @@ if str(_SIDECAR) not in sys.path:
 import deletion  # noqa: E402
 import inbox  # noqa: E402
 import links  # noqa: E402
+import runtime_store  # noqa: E402
 import scratchpad  # noqa: E402
 import state_store  # noqa: E402
 import storage  # noqa: E402
@@ -69,25 +90,36 @@ def _proj(tmp_path, name="proj") -> str:
 
 class _FakeArchiveDriver:
     """A driver shaped like the bridge driver's persistence surface: it holds the
-    roster ``_record`` (from which the archive lifts the transcript reference) and
-    a stoppable async ``close``. No ``_bridge`` attr, so the hard-Delete path's
-    transcript-erasure guard is a clean no-op (nothing touches disk)."""
+    roster ``_record`` (from which the archive lifts the transcript reference),
+    and mimics the real close/stop SPLIT — ``close()`` (the retire path) also
+    removes the persisted roster record like ``BridgeDriver.close`` does, while
+    ``stop()`` ends the process but KEEPS the record. Both count their calls so
+    tests can assert which teardown was taken. No ``_bridge`` attr, so the
+    hard-Delete path's transcript-erasure guard is a clean no-op (nothing
+    touches disk)."""
 
     name = "bridge"
 
-    def __init__(self, record):
+    def __init__(self, record, session_id=None):
         self._record = dict(record)
+        self._session_id = session_id
         self.closed = 0
+        self.stopped = 0
 
     async def close(self):
         self.closed += 1
+        if self._session_id:   # mimic BridgeDriver.close → _remove_record
+            runtime_store.remove_record(self._session_id)
+
+    async def stop(self):
+        self.stopped += 1      # mimic BridgeDriver.stop → record KEPT
 
 
 def _seed_session(sid, cwd, identity, record):
     s = SessionState(session_id=sid, agent_type=None, model="claude-x",
                      permission_mode="default", cwd=cwd, system_prompt=None,
                      driver_name="bridge", identity=identity)
-    s.driver = _FakeArchiveDriver(record)
+    s.driver = _FakeArchiveDriver(record, session_id=sid)
     state_store.register_agent(sid, cwd)
     main.sessions[sid] = s
     return s
@@ -186,11 +218,24 @@ class TestArchivePersistence:
         # A real, irreversible wipe — a second delete finds nothing.
         assert state_store.remove_archive_record(key, "arcX") is False
 
-    def test_cwdless_agent_does_not_archive(self):
-        # The archive is per-project (§8.2): no project home -> a silent no-op.
-        state_store.save_archive_record(
-            None, deletion.build_archive_record("s1", archive_id="arcX"))
+    def test_cwdless_agent_cannot_archive_and_the_store_says_so(self):
+        # The archive is per-project (§8.2): no project home -> an HONEST
+        # ValueError, never the old silent no-op (the retire path gates its
+        # teardown on this call landing — a swallowed skip looked "written").
+        with pytest.raises(ValueError):
+            state_store.save_archive_record(
+                None, deletion.build_archive_record("s1", archive_id="arcX"))
         assert state_store.load_archive(None) == {}
+
+    def test_missing_archive_id_raises(self, tmp_path):
+        # The other silent-no-op guard, now honest: a record with no
+        # archive_id has nothing to key it by.
+        key = storage.project_key(_proj(tmp_path))
+        rec = deletion.build_archive_record("s1", archive_id="arcX")
+        rec["archive_id"] = ""
+        with pytest.raises(ValueError):
+            state_store.save_archive_record(key, rec)
+        assert state_store.load_archive(key) == {}
 
     def test_per_project_isolation(self, tmp_path):
         cwdA = _proj(tmp_path, "A")
@@ -236,6 +281,11 @@ class TestRetireArchivesByDefault:
         assert aid and aid.startswith("arc")
         assert "s1" not in main.sessions          # gone from the LIVE roster
         assert s.driver.closed == 1               # the live session was stopped
+        assert s.driver.stopped == 0              # full close, not the degrade
+        # A clean archive carries no failure/skip fields — and no record_kept
+        # (the flag belongs to the non-archived paths only).
+        assert "archive_error" not in out and "archive_skipped" not in out
+        assert "record_kept" not in out
 
         arch = state_store.load_archive(key)
         assert list(arch) == [aid]
@@ -262,6 +312,177 @@ class TestRetireArchivesByDefault:
         assert listing["archived"][0]["archive_id"] == out["archived"]
         got = asyncio.run(main.get_archive(out["archived"]))
         assert got["session_id"] == "s1"
+
+
+# ---------------------------------------------------------------------------
+# Retire teardown is GATED on the archive landing (the data-loss fix): a
+# failed/skipped archive keeps the persisted roster record (stop() semantics),
+# never the record-removing close().
+# ---------------------------------------------------------------------------
+
+class TestRetireGatesTeardownOnArchive:
+    def _roster_row(self, cwd):
+        rec = {"session_id": "s1", "cwd": cwd, "tmux_name": "awl-x",
+               "driver": "bridge"}
+        runtime_store.save_record(rec)
+        assert any(r["session_id"] == "s1" for r in runtime_store.all_records())
+        return rec
+
+    def test_archive_write_failure_keeps_roster_and_takes_stop(
+            self, tmp_path, monkeypatch):
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        s = _seed_session("s1", cwd, {"name": "nova", "number": 1},
+                          {"transcript_path": "/t/x.jsonl",
+                           "claude_session_id": "u1"})
+        self._roster_row(cwd)
+
+        def _boom(project_key, record):
+            raise RuntimeError("disk full")
+        monkeypatch.setattr(state_store, "save_archive_record", _boom)
+
+        out = asyncio.run(main.close_session("s1", hard=False))
+
+        # Honest response: closed, but the freeze did NOT land — and why.
+        assert out["status"] == "closed"
+        assert out["archived"] is None
+        assert "disk full" in out["archive_error"]
+        assert "archive_skipped" not in out
+        # The record-removing close() was NOT taken; stop() (record kept) was
+        # — and the response SAYS so (the honest-toast signal).
+        assert out["record_kept"] is True
+        assert s.driver.closed == 0
+        assert s.driver.stopped == 1
+        # The persisted roster record SURVIVES (the resumable Past row)...
+        assert any(r["session_id"] == "s1"
+                   for r in runtime_store.all_records())
+        # ...while the in-memory session is gone and nothing was archived.
+        assert "s1" not in main.sessions
+        assert state_store.load_archive(key) == {}
+
+    def test_cwdless_retire_skips_archive_but_keeps_record(self):
+        s = _seed_session("s1", None, {"name": "solo", "number": 2},
+                          {"transcript_path": None, "claude_session_id": None})
+        self._roster_row(None)   # cwd-less -> the app-level sessions.json home
+
+        out = asyncio.run(main.close_session("s1", hard=False))
+
+        # By-design unarchivable (per-project archive, §8.2) — an explicit
+        # machine-readable reason, never a bare null that reads as failure.
+        assert out["status"] == "closed"
+        assert out["archived"] is None
+        assert out["archive_skipped"] == "no-project"
+        assert "archive_error" not in out
+        assert out["record_kept"] is True   # stop() branch — roster row kept
+        assert s.driver.closed == 0
+        assert s.driver.stopped == 1
+        assert any(r["session_id"] == "s1"
+                   for r in runtime_store.all_records())
+        assert "s1" not in main.sessions
+
+    def test_successful_archive_takes_the_record_removing_close(self, tmp_path):
+        # The happy path is UNCHANGED by the gate: archive lands -> close()
+        # removes the roster row (its contents live on in archive.json).
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        s = _seed_session("s1", cwd, {"name": "nova", "number": 1},
+                          {"transcript_path": "/t/x.jsonl",
+                           "claude_session_id": "u1"})
+        self._roster_row(cwd)
+
+        out = asyncio.run(main.close_session("s1", hard=False))
+
+        assert out["archived"] and out["archived"].startswith("arc")
+        assert "record_kept" not in out   # archived path omits the flag
+        assert s.driver.closed == 1 and s.driver.stopped == 0
+        assert not any(r["session_id"] == "s1"
+                       for r in runtime_store.all_records())
+        assert list(state_store.load_archive(key)) == [out["archived"]]
+
+    def test_index_touch_failure_after_landed_archive_still_archived(
+            self, tmp_path, monkeypatch):
+        # The record's on-disk presence is the truth: once save_archive_record
+        # lands, a failure in the best-effort touch_projects_index must NOT
+        # misclassify the retire — archived id still reported, no
+        # archive_error, and the record-removing close() still taken.
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        s = _seed_session("s1", cwd, {"name": "nova", "number": 1},
+                          {"transcript_path": "/t/x.jsonl",
+                           "claude_session_id": "u1"})
+        self._roster_row(cwd)
+
+        def _boom(project_key):
+            raise RuntimeError("index write failed")
+        monkeypatch.setattr(state_store, "touch_projects_index", _boom)
+
+        out = asyncio.run(main.close_session("s1", hard=False))
+
+        assert out["archived"] and out["archived"].startswith("arc")
+        assert "archive_error" not in out
+        assert "record_kept" not in out
+        # Happy-path teardown: close() (roster row removed), not the degrade.
+        assert s.driver.closed == 1 and s.driver.stopped == 0
+        assert not any(r["session_id"] == "s1"
+                       for r in runtime_store.all_records())
+        # The archive record really is on disk in the project's archive.json.
+        assert list(state_store.load_archive(key)) == [out["archived"]]
+
+    def test_driver_without_stop_override_falls_back_to_close(
+            self, tmp_path, monkeypatch):
+        # A driver with NO stop/close split (the sdk shape — its close() never
+        # touches persisted records) closes instead of leaking its process;
+        # the base-class no-op stop() must NOT count as the record-keeping
+        # path (it would leave the engine running forever).
+        from drivers import AgentDriver, DriverConfig
+
+        class _SplitlessDriver(AgentDriver):
+            name = "sdk"
+
+            def __init__(self):
+                super().__init__(DriverConfig(), lambda e: None)
+                self._record = None
+                self.closed = 0
+
+            async def close(self):
+                self.closed += 1
+
+        cwd = _proj(tmp_path)
+        s = SessionState(session_id="s1", agent_type=None, model=None,
+                         permission_mode="default", cwd=cwd,
+                         system_prompt=None, driver_name="sdk")
+        s.driver = _SplitlessDriver()
+        state_store.register_agent("s1", cwd)
+        main.sessions["s1"] = s
+
+        def _boom(project_key, record):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(state_store, "save_archive_record", _boom)
+
+        out = asyncio.run(main.close_session("s1", hard=False))
+        assert out["archived"] is None and "boom" in out["archive_error"]
+        assert s.driver.closed == 1   # record-safe close taken, no leak
+        # close() fallback = nothing survives dashboard-side, and the response
+        # SAYS so — the frontend must not promise "kept on Past" here.
+        assert out["record_kept"] is False
+
+    def test_duplicate_archive_rows_for_one_session_list_once(self, tmp_path):
+        # The partial-failure tail: two archive records sharing one session_id
+        # (retire→resume→retire after an orphaned record) must yield ONE past
+        # row — emitted archive sids join the `seen` set.
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.save_archive_record(
+            key, deletion.build_archive_record("s1", archive_id="arcOld"))
+        state_store.save_archive_record(
+            key, deletion.build_archive_record("s1", archive_id="arcNew"))
+        state_store.touch_projects_index(key)
+
+        out = asyncio.run(main.list_past_agents())
+
+        rows = [r for r in out["past"] if r["session_id"] == "s1"]
+        assert len(rows) == 1
+        assert out["count"] == len(out["past"])
 
 
 # ---------------------------------------------------------------------------

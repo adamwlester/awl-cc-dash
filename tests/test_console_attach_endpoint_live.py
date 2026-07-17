@@ -18,6 +18,11 @@ file proves the BUILD end-to-end through the real sidecar:
     A real xterm.js client always drains, so the backend contract is
     unaffected; the hazard is recorded in the findings file.);
   * a re-attach returns the SAME port (``reused: true``);
+  * RESIZE round-trip: ``POST /sessions/{id}/console/resize`` — the ONE
+    sanctioned geometry writer (§7.13 deliberate resize; the window stays
+    ``window-size manual`` throughout) — applies 120x35 (tmux reports the new
+    ``#{pane_width}x#{pane_height}`` and the scraper keeps classifying), and a
+    below-floor request (40x10) applies as the 60x15 clamp floor;
   * ``POST /sessions/{id}/console/detach`` kills the ttyd and the port closes.
 
 Verdict recorded in ``tests/log/console_attach_endpoint_findings_latest.txt``.
@@ -479,9 +484,59 @@ def test_console_attach_endpoint_live(sidecar, wsl):
         assert code == 200 and again["port"] == port and again["reused"] is True
         findings.append("Re-attach: same port returned, reused=true.")
 
-        # --- DETACH: ttyd dies, port closes -----------------------------------
+        # --- RESIZE ROUND-TRIP: the ONE sanctioned geometry writer ------------
+        # (§7.13 deliberate resize: the window stays `window-size manual` —
+        # viewer resizes are ignored by design — and this sidecar-mediated
+        # endpoint is the only thing that moves geometry.) Runs AFTER the ws is
+        # closed: an open-but-undrained client would backpressure the resize
+        # repaint (the recorded stall hazard above); the attach itself stays
+        # live server-side, and `resize-window` under `manual` needs no client.
         ws.close()
         ws = None
+        code, rz = _req("POST", f"/sessions/{session_id}/console/resize",
+                        {"cols": 120, "rows": 35}, timeout=30)
+        assert code == 200, f"resize failed: {code} {rz}"
+        assert rz.get("ok") is True, f"resize not ok: {rz}"
+        assert rz.get("cols") == 120 and rz.get("rows") == 35, (
+            f"resize echoed wrong applied geometry: {rz}")
+        if tmux_name:
+            geo_rz = wsl._run(
+                f"tmux display-message -p -t {tmux_name} "
+                "'#{pane_width}x#{pane_height}'").strip()
+            assert geo_rz == "120x35", (
+                f"resize-window did not land: tmux geometry {geo_rz} != 120x35")
+            # The scraper keeps classifying at the new geometry (wider/taller
+            # is the parser-safe direction — the §4 audit).
+            states_rz = set()
+            for _ in range(3):
+                states_rz.add(wsl.status(tmux_name)["state"])
+                time.sleep(1.0)
+            assert states_rz <= {"idle", "generating", "permission_prompt"}, (
+                f"scraper produced non-classifiable reads after the resize: "
+                f"{states_rz}")
+            findings.append(f"Resize 120x35: applied (tmux geometry {geo_rz}); "
+                            f"classifier states={sorted(states_rz)} "
+                            "(never unknown).")
+
+        # Below-floor request clamps to 60x15 (the scraper's narrow-width
+        # protection — the honest applied values come back, not the request).
+        code, rz2 = _req("POST", f"/sessions/{session_id}/console/resize",
+                         {"cols": 40, "rows": 10}, timeout=30)
+        assert code == 200, f"clamped resize failed: {code} {rz2}"
+        assert rz2.get("ok") is True, f"clamped resize not ok: {rz2}"
+        assert rz2.get("cols") == 60 and rz2.get("rows") == 15, (
+            f"40x10 must clamp to the 60x15 floor, got: {rz2}")
+        if tmux_name:
+            geo_floor = wsl._run(
+                f"tmux display-message -p -t {tmux_name} "
+                "'#{pane_width}x#{pane_height}'").strip()
+            assert geo_floor == "60x15", (
+                f"clamped resize did not land: tmux geometry {geo_floor} != "
+                "60x15")
+            findings.append("Clamp floor: 40x10 request applied as 60x15 "
+                            f"(tmux geometry {geo_floor}).")
+
+        # --- DETACH: ttyd dies, port closes -----------------------------------
         code, det = _req("POST", f"/sessions/{session_id}/console/detach",
                          {}, timeout=30)
         assert code == 200 and det.get("status") == "detached"

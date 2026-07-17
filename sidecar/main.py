@@ -57,6 +57,7 @@ import utility_llm
 import handoff
 import subagents_naming
 import prompt_library
+import roles
 import import_context
 import changelog
 import system_check
@@ -1377,7 +1378,12 @@ class IdentityInput(BaseModel):
 class CreateSessionRequest(BaseModel):
     agent_type: str | None = None
     model: str | None = None
-    permission_mode: str = "acceptEdits"
+    # bypassPermissions is the launch default (2026-07-17 decision — matches
+    # DriverConfig): launching in it arms the Bypass segment implicitly, so a
+    # default create needs no arm_bypass. The rec.get(..., "acceptEdits")
+    # roster/archive read-back fallbacks are deliberately NOT flipped — they
+    # describe what old records were launched with.
+    permission_mode: str = "bypassPermissions"
     cwd: str | None = None
     system_prompt: str | None = None
     driver: str | None = None  # "sdk" | "bridge"; None -> AWL_DRIVER, else default "bridge"
@@ -1806,6 +1812,11 @@ async def list_past_agents():
         if sid and sid in seen:
             continue          # a roster record already covers this id
         out.append(_past_summary(_resumable_from_archive(arc), live_ids))
+        if sid:
+            # Guard against duplicate archive rows for one session_id (e.g. a
+            # retire→resume→retire cycle after a partial failure): the first
+            # emitted row wins, the same id never double-lists.
+            seen.add(sid)
     return {"past": out, "count": len(out)}
 
 
@@ -2105,8 +2116,17 @@ async def close_session(session_id: str, hard: bool = False):
     # Build the LIGHT archive record BEFORE closing, sourcing the transcript
     # reference from the persisted roster record (referenced in place, never
     # copied — §8.6). The archive is per-project; a cwd-less agent has no home,
-    # so save_archive_record is a no-op there and `archived` stays None.
+    # so archiving is skipped there (`archive_skipped: "no-project"`).
+    #
+    # Teardown is GATED on the archive landing (the retire data-loss fix):
+    # only a successful archive write may take `driver.close()` — the retire
+    # path that also removes the persisted roster row. When the write fails or
+    # is skipped, that roster row is the agent's ONLY remaining persisted
+    # trace, so the degrade is `stop()` semantics — end the process, KEEP the
+    # record (it stays a resumable Past row) — mirroring the resume side,
+    # which keeps the archive row on a failed relaunch (§9.9).
     archive_id = None
+    archive_error: str | None = None
     project_key = state_store.project_of(session_id) or storage.project_key(session.cwd)
     if project_key:
         rec = getattr(session.driver, "_record", None)
@@ -2132,22 +2152,75 @@ async def close_session(session_id: str, hard: bool = False):
         )
         try:
             state_store.save_archive_record(project_key, archive_record)
+            # The record's on-disk presence is the truth: the moment the write
+            # lands, the retire IS archived — assign the id here so a later
+            # index-touch failure can't misclassify a landed archive.
+            archive_id = archive_record["archive_id"]
+        except Exception as e:
+            archive_error = str(e) or e.__class__.__name__
+            logger.warning("archive-on-retire failed for %s: %s", session_id, e)
+        if archive_id:
             # Make the archive discoverable across projects (GET /archive reads
             # the 🏠 projects index, like the live roster's all_records()).
-            state_store.touch_projects_index(project_key)
-            archive_id = archive_record["archive_id"]
-        except Exception as e:  # pragma: no cover - archive is best-effort
-            logger.warning("archive-on-retire failed for %s: %s", session_id, e)
+            # Best-effort on its own: the project is almost always already in
+            # the index, so a failed touch loses nothing — it must never turn
+            # a landed archive into an archive_error.
+            try:
+                state_store.touch_projects_index(project_key)
+            except Exception as e:
+                logger.warning("projects-index touch failed for %s: %s",
+                               project_key, e)
 
+    # Which teardown ran on the NON-archived path: True = an overridden stop()
+    # kept the persisted roster row (bridge — a resumable Past row survives),
+    # False = the close() fallback ran and nothing survives dashboard-side
+    # (sdk — no roster record ever existed). On the archived happy path the
+    # flag is OMITTED from the response: the record lives in archive.json and
+    # the frontend only consults record_kept when `archived` is null.
+    record_kept: bool | None = None
     if session.driver:
         try:
-            await session.driver.close()
+            if archive_id:
+                # Archived: the record lives on in archive.json, so the retire
+                # close() — which also removes the roster row — is safe.
+                await session.driver.close()
+            else:
+                # NOT archived: the persisted record must survive. Prefer the
+                # driver's stop() (bridge: ends tmux, KEEPS the roster row +
+                # stamps stopped_at → a resumable Past row). The base-class
+                # stop() is a deliberate no-op, so only an OVERRIDDEN stop
+                # counts as the record-keeping path; a driver with no
+                # stop/close split (sdk — its close() never touches persisted
+                # records) closes instead of leaking its process.
+                stop = getattr(session.driver, "stop", None)
+                if callable(stop) and getattr(type(session.driver), "stop",
+                                              None) is not AgentDriver.stop:
+                    record_kept = True
+                    await stop()
+                else:
+                    record_kept = False
+                    await session.driver.close()
         except Exception:
             pass
+    elif not archive_id:
+        # No driver to tear down — nothing removed any persisted record.
+        record_kept = True
     session.status = "closed"
     del sessions[session_id]
     logger.info("Retired session %s (archived as %s)", session_id, archive_id)
-    return {"status": "closed", "session_id": session_id, "archived": archive_id}
+    out: dict[str, Any] = {"status": "closed", "session_id": session_id,
+                           "archived": archive_id}
+    if record_kept is not None:
+        # Non-archived path only: did a persisted (resumable) record survive?
+        out["record_kept"] = record_kept
+    if archive_error is not None:
+        # Machine-readable "the freeze did NOT land" — the roster row was kept.
+        out["archive_error"] = archive_error
+    if not project_key:
+        # By-design unarchivable (per-project archive, §8.2) — an explicit
+        # reason, never a bare null indistinguishable from a failure.
+        out["archive_skipped"] = "no-project"
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -3214,6 +3287,22 @@ class ConsoleRunRequest(BaseModel):
     command: str
 
 
+class ConsoleResizeRequest(BaseModel):
+    """Viewer-driven geometry for the pinned console pane (§7.13): the applied
+    size is clamped to the scraper-safe bounds below before reaching tmux."""
+    cols: int
+    rows: int
+
+
+# Scraper-safe console geometry bounds (§7.13): every capture-pane parser is
+# proven tolerant of WIDER/TALLER; NARROW is the hostile direction (menu
+# bottom-slack and TUI truncation start biting somewhere below ~60 columns) —
+# so the floor is the load-bearing guard. Clamping is belt-and-braces: the
+# bridge's console_resize clamps to the same bounds internally.
+CONSOLE_COLS_RANGE = (60, 500)
+CONSOLE_ROWS_RANGE = (15, 200)
+
+
 def _is_clear_command(command: str) -> bool:
     """True when a Console command is a ``/clear`` — the one slash-command that
     rotates the agent's JSONL transcript and orphans the pinned resolution
@@ -3312,6 +3401,34 @@ async def console_detach_endpoint(session_id: str):
         raise HTTPException(status_code=500, detail=f"console detach failed: {e}")
     return {"status": result.get("status", "detached"),
             "port": result.get("port")}
+
+
+@app.post("/sessions/{session_id}/console/resize")
+async def console_resize_endpoint(session_id: str, req: ConsoleResizeRequest):
+    """Resize the focused agent's pinned console pane (§7.13 geometry seam).
+
+    The pane stays under ``window-size manual`` — honoring a viewer's geometry
+    is a DELIBERATE, sidecar-mediated act (the bridge issues ``tmux
+    resize-window -x -y``, which keeps the manual pin by definition), never a
+    viewer side effect. cols/rows are clamped to the scraper-safe bounds
+    BEFORE the bridge call (the bridge clamps to the same bounds — belt and
+    braces), and the response carries the APPLIED values from the bridge's
+    ``{ok, cols, rows}``. A bridge ``{ok: False, reason}`` maps like the mode
+    endpoint: ``busy`` → 409 (retryable), anything else → 400.
+    """
+    drv = _require_bridge_console(session_id)
+    cols = max(CONSOLE_COLS_RANGE[0], min(CONSOLE_COLS_RANGE[1], req.cols))
+    rows = max(CONSOLE_ROWS_RANGE[0], min(CONSOLE_ROWS_RANGE[1], req.rows))
+    try:
+        result = await asyncio.to_thread(
+            drv._bridge.console_resize, drv.tmux_name, cols, rows)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"console resize failed: {e}")
+    if not result.get("ok"):
+        reason = str(result.get("reason") or "failed")
+        raise HTTPException(status_code=409 if reason == "busy" else 400,
+                            detail=f"console resize failed: {reason}")
+    return {"ok": True, "cols": result.get("cols"), "rows": result.get("rows")}
 
 
 # ============================================================================
@@ -3454,6 +3571,35 @@ async def write_prompt_library(req: PromptLibraryWriteRequest):
                                             req.text, file=req.file)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/roles")
+async def get_roles(cwd: str | None = None):
+    """The two-scope ``agent.md`` role catalog (DESIGN.md's ND 12 Role combobox).
+
+    ``system`` reads ``~/.claude/agents`` (surfaced, not owned;
+    ``AWL_SYSTEM_AGENTS_DIR`` overrides for tests); ``project`` reads
+    ``<project>/.awl-cc-dash/agents/`` under ``cwd``. With no ``cwd`` (or one
+    with no project home) the project scope degrades honestly — ``dir: null``
+    + empty roles — mirroring the prompt library's no-project read. Each role
+    is the parsed front matter (LIGHT — no markdown body) plus
+    ``file``/``scope``, and carries both the raw ``color`` and the mapped
+    ``color_hex`` (see :mod:`roles`); roles sort by name within each scope.
+    """
+    system_dir = roles.system_agents_dir()
+    project_dir = roles.project_agents_dir(cwd)
+    return {
+        "system": {
+            "label": roles.SYSTEM_LABEL,
+            "dir": str(system_dir),
+            "roles": roles.list_roles(system_dir, "system"),
+        },
+        "project": {
+            "label": roles.PROJECT_LABEL,
+            "dir": None if project_dir is None else str(project_dir),
+            "roles": roles.list_roles(project_dir, "project"),
+        },
+    }
 
 
 # ============================================================================

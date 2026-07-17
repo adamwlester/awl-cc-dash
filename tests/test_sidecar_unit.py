@@ -61,7 +61,7 @@ import asyncio  # noqa: E402
 import eventbus  # noqa: E402
 import main  # noqa: E402
 from main import SessionState  # noqa: E402
-from drivers import default_driver_name  # noqa: E402
+from drivers import default_driver_name, DriverConfig  # noqa: E402
 from identity import (  # noqa: E402
     assign_identity, AG_COLORS, AG_ICONS, AG_ICONS_CURATED,
 )
@@ -1881,9 +1881,22 @@ class TestArmedModes:
         assert d["launch_config"]["arm_bypass"] is False
 
     def test_create_request_carries_arm_bypass(self):
-        # The CreateSessionRequest field exists and defaults off.
+        # The CreateSessionRequest field exists and defaults off (launching in
+        # the bypassPermissions default arms Bypass implicitly — no flag needed).
         assert main.CreateSessionRequest().arm_bypass is False
         assert main.CreateSessionRequest(arm_bypass=True).arm_bypass is True
+
+    def test_bypass_is_the_launch_default(self):
+        # The 2026-07-17 default flip: a default create launches in
+        # bypassPermissions (API request model AND driver config agree), which
+        # arms the Bypass ring segment implicitly. The historical
+        # rec.get(..., "acceptEdits") roster/archive read-back fallbacks are
+        # deliberately NOT flipped — they describe what old records ran with.
+        req = main.CreateSessionRequest()
+        assert req.permission_mode == "bypassPermissions"
+        assert DriverConfig().permission_mode == "bypassPermissions"
+        armed = main.armed_modes_for(req.permission_mode, req.arm_bypass)
+        assert "bypassPermissions" in armed
 
     def test_setmode_accepts_auto_spelling(self):
         # The live path's Literal now carries `auto` (the launch path always
