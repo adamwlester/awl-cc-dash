@@ -44,15 +44,23 @@ export function useConsole(sessionId: string | null) {
     setAttachState('trying')
     if (!sessionId) { setAttachState('degraded'); return }
     let cancelled = false
-    api.consoleAttach(sessionId).then(r => {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    // Attach can fail transiently (live drive 2026-07-17: first attach failed,
+    // the tab sat degraded until a remount re-attached). Bounded recovery: one
+    // retry ~1.5s after a failed first attempt, then settle degraded — further
+    // recovery stays manual (next mount). A cancelled unmount never retries.
+    const attach = (attempt: number) => api.consoleAttach(sessionId).then(r => {
       if (cancelled) return
       if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws') }
-      else {
+      else if (attempt === 0) {
+        retryTimer = setTimeout(() => { if (!cancelled) attach(1) }, 1500)
+      } else {
         setAttachState('degraded')
         setLines(p => p.length ? p : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
       }
     })
-    return () => { cancelled = true }
+    attach(0)
+    return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
   }, [sessionId])
 
   const run = useCallback(async (cmd: string) => {

@@ -165,7 +165,12 @@ def draw_name(
     return chooser.choice(available)
 
 
-def assign_identity(requested: dict | None, ordinal: int) -> dict:
+def assign_identity(
+    requested: dict | None,
+    ordinal: int,
+    *,
+    taken_names: Iterable[str] | None = None,
+) -> dict:
     """Resolve a full identity for a new agent.
 
     Args:
@@ -173,17 +178,27 @@ def assign_identity(requested: dict | None, ordinal: int) -> dict:
             ``name`` / ``color`` / ``icon``); any omitted field gets a default.
         ordinal: a monotonic 0-based counter driving the round-robin
             color / icon / number.
+        taken_names: names already in use (live agents' identity names) —
+            excluded from the auto-name draw below, mirroring
+            ``GET /identity/random-name``. Never constrains an explicit name.
 
     Returns:
-        ``{role, number, name, color, icon}`` — every field populated.
+        ``{role, number, name, color, icon}`` — every field populated. An
+        absent/blank ``name`` is AUTO-NAMED from the curated pool
+        (:func:`draw_name`, §7.5/§11 #40): a nameless agent previously stored
+        ``""`` and the UI fell back to showing raw session ids. Only a truly
+        empty pool leaves the name blank (the old degrade, never a crash).
     """
     req = requested or {}
     _color_name, color_hex = AG_COLORS[ordinal % len(AG_COLORS)]
     icon = AG_ICONS_CURATED[ordinal % len(AG_ICONS_CURATED)]
+    name = str(req.get("name") or "").strip()
+    if not name:
+        name = draw_name(exclude=taken_names) or ""
     return {
         "role": (req.get("role") or "Agent"),
         "number": req["number"] if req.get("number") is not None else ordinal + 1,
-        "name": (req.get("name") or ""),
+        "name": name,
         "color": (req.get("color") or color_hex),
         "icon": (req.get("icon") or icon),
     }

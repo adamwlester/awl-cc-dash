@@ -275,6 +275,15 @@ def save_archive_record(project_key: str, record: dict[str, Any]) -> None:
     (the record's on-disk presence is the truth, never the call returning).
     Atomic write-replace + stamped ``schema_version`` like every other state
     file.
+
+    **Idempotent per session (§11 #18, the duplicate-archive fix):** one
+    session = at most ONE archive row. Any existing row carrying the same
+    ``session_id`` is REPLACED — dropped in the same write, with the new
+    record's data kept whole (nothing merged from the stale row). Without
+    this, a retire→resume(failed)→retire cycle minted a second row for the
+    same session (the un-retire delete is correctly skipped when the resume
+    errors, so the second retire found the first row still standing and
+    added a sibling — live-observed 2026-07-17).
     """
     aid = record.get("archive_id")
     p = archive_path(project_key)
@@ -283,11 +292,18 @@ def save_archive_record(project_key: str, record: dict[str, Any]) -> None:
     if p is None:
         raise ValueError(
             "project has no on-disk home (cwd-less/keyless) — cannot archive")
+    sid = record.get("session_id")
     with _IO_LOCK:
         data = _read_json(p)
         archived = data.get("archived")
         if not isinstance(archived, dict):
             archived = {}
+        if sid:
+            stale = [k for k, v in archived.items()
+                     if k != aid and isinstance(v, dict)
+                     and v.get("session_id") == sid]
+            for k in stale:
+                del archived[k]
         archived[aid] = record
         data["archived"] = archived
         _write_json(p, data)

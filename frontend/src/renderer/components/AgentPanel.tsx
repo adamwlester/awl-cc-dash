@@ -892,7 +892,11 @@ function TimelineSection({ s }: { s: Session }) {
 function CreateTab() {
   const d = useDash()
   const [role, setRole] = useState('agent')
-  const [num, setNum] = useState('01')
+  // No. defaults to '' = AUTO: the server's auto-numbering applies the retired-
+  // numbers skip set only when no explicit number is sent, so the UI must not
+  // volunteer one (the old '01' default made every UI create claim #1, even
+  // when 1 was retired). An explicit typed number is still honored verbatim.
+  const [num, setNum] = useState('')
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [tools, setTools] = useState<string[]>([])
@@ -1004,7 +1008,7 @@ function CreateTab() {
       // without the agent starting in it.
       permission_mode: LAUNCH_MODE_VALUE[mode] || 'default',
       cwd: d.projectCwd,
-      identity: { role: role.trim() || 'agent', number: parseInt(num, 10) || undefined, name: name.trim() || undefined, color, icon },
+      identity: { role: role.trim() || 'agent', number: num.trim() ? parseInt(num, 10) || undefined : undefined, name: name.trim() || undefined, color, icon },
       allowed_tools: tools.length ? tools : null,
       disallowed_tools: deny.length ? deny : null,
       max_turns: maxTurns, max_context_pct: maxCtx,
@@ -1055,7 +1059,7 @@ function CreateTab() {
           </div>
           <div className="field editing">
             <label className="lbl block mb-1">No.</label>
-            <input className="in text-center" value={num} placeholder="02" onChange={e => setNum(e.target.value)} />
+            <input className="in text-center" value={num} placeholder="auto" onChange={e => setNum(e.target.value)} />
           </div>
         </div>
         <div className="field editing">
@@ -1152,7 +1156,7 @@ function CreateTab() {
           above) — presets (pickRole) and arm toggles mutate color/model/effort/
           maxTurns/mode too, so a partial reset would leave preset residue. */}
       <CreateFooter busy={busy} onCreate={create} onReset={() => {
-        setRole('agent'); setNum('01'); setName(''); setDesc('')
+        setRole('agent'); setNum(''); setName(''); setDesc('')
         setTools([]); setDeny([]); setMcp([]); setPlugins([])
         setColor(JEWELS[11].hex); setIcon('wizard-face'); setModel('inherit')
         setMode('Bypass'); setArmBypass(true); setArmAuto(false)

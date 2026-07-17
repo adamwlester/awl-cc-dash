@@ -237,6 +237,38 @@ class TestArchivePersistence:
             state_store.save_archive_record(key, rec)
         assert state_store.load_archive(key) == {}
 
+    def test_rearchiving_a_session_replaces_its_stale_row(self, tmp_path):
+        # Idempotent per session (the duplicate-archive fix, live-observed
+        # 2026-07-17): one session = at most ONE archive row. A second
+        # archive write for the same session_id REPLACES the standing row —
+        # the new record's data whole, nothing preserved from the stale one.
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        old = deletion.build_archive_record("s1", archive_id="arcOLD",
+                                            model="m-old",
+                                            claude_session_id="c-old")
+        state_store.save_archive_record(key, old)
+        new = deletion.build_archive_record("s1", archive_id="arcNEW",
+                                            model="m-new",
+                                            claude_session_id="c-new")
+        state_store.save_archive_record(key, new)
+        got = state_store.load_archive(key)
+        assert set(got) == {"arcNEW"}                    # exactly one row
+        assert got["arcNEW"]["model"] == "m-new"         # the newest data
+        assert got["arcNEW"]["transcript"]["claude_session_id"] == "c-new"
+
+    def test_rearchive_replacement_is_scoped_to_the_session(self, tmp_path):
+        # Other sessions' rows are untouched by the same-session replace.
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        state_store.save_archive_record(
+            key, deletion.build_archive_record("s1", archive_id="arcA"))
+        state_store.save_archive_record(
+            key, deletion.build_archive_record("s2", archive_id="arcB"))
+        state_store.save_archive_record(
+            key, deletion.build_archive_record("s1", archive_id="arcC"))
+        assert set(state_store.load_archive(key)) == {"arcB", "arcC"}
+
     def test_per_project_isolation(self, tmp_path):
         cwdA = _proj(tmp_path, "A")
         cwdB = _proj(tmp_path, "B")
@@ -312,6 +344,32 @@ class TestRetireArchivesByDefault:
         assert listing["archived"][0]["archive_id"] == out["archived"]
         got = asyncio.run(main.get_archive(out["archived"]))
         assert got["session_id"] == "s1"
+
+    def test_second_retire_replaces_the_standing_row_not_duplicates(self, tmp_path):
+        # The live-observed 2026-07-17 cycle: retire → resume FAILS (the
+        # un-retire delete is correctly skipped on session.status == "error")
+        # → retire again. The second retire must REPLACE the still-standing
+        # row, never mint a sibling — one session, one archive row.
+        cwd = _proj(tmp_path)
+        key = storage.project_key(cwd)
+        identity = {"role": "roundtrip", "number": 8, "name": ""}
+        _seed_session("s1", cwd, identity,
+                      {"transcript_path": None, "claude_session_id": "c1"})
+        first = asyncio.run(main.close_session("s1", hard=False))
+        assert first["archived"]
+        # Failed resume: the agent is briefly live again; the archive row stays.
+        _seed_session("s1", cwd, identity,
+                      {"transcript_path": None, "claude_session_id": "c1"})
+        assert set(state_store.load_archive(key)) == {first["archived"]}
+        second = asyncio.run(main.close_session("s1", hard=False))
+        got = state_store.load_archive(key)
+        assert set(got) == {second["archived"]}          # exactly one row
+        assert second["archived"] != first["archived"]   # ... the NEWEST one
+        # And /sessions/past lists that session once.
+        past = asyncio.run(main.list_past_agents())
+        rows = [r for r in past["past"] if r["session_id"] == "s1"]
+        assert len(rows) == 1
+        assert rows[0]["archive_id"] == second["archived"]
 
 
 # ---------------------------------------------------------------------------

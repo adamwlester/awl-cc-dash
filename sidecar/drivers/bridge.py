@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import sys
 import time
 import uuid
@@ -762,17 +763,68 @@ class BridgeDriver(AgentDriver):
             self._bridge, self.config.mcp_servers, project_cwd=self.config.cwd,
         )
 
+    def _cold_restore_transcript_exists(self) -> bool:
+        """Whether the conversation a cold restore would ``--resume`` has a
+        transcript on disk (``<claude_session_id>.jsonl`` in the cwd's
+        ``~/.claude/projects`` dir).
+
+        Zero-turn guard (§9.9, live-proven 2026-07-17): Claude Code only writes
+        the transcript on the FIRST turn, so an agent that was spawned and
+        retired without ever being prompted has NO ``<id>.jsonl`` —
+        ``claude --resume <id>`` then prints "No conversation found with
+        session ID …" and exits immediately, the fresh tmux session dies with
+        it, and the resume lands in ``error``. ``_create_session`` uses this
+        check to fall back to a FRESH pinned-id launch for that case.
+
+        Fails toward the resume path: only a POSITIVE "the file is provably
+        absent" answers False — an unreadable probe answers True, so a
+        transient WSL hiccup can never silently discard a real conversation.
+        """
+        sid = self._claude_session_id
+        if not sid:
+            return False
+        path = self._transcript_path
+        if not path:
+            try:
+                from bridge.transcript import _resolve_project_dir  # type: ignore[import-not-found]
+                resolved_cwd = self._bridge._resolve_cwd(self.config.cwd)
+                project_dir = _resolve_project_dir(self._bridge, resolved_cwd) \
+                    if resolved_cwd else None
+            except Exception:  # pragma: no cover - environment dependent
+                return True  # can't tell — keep the legacy resume behavior
+            if not project_dir:
+                # The cwd has no projects dir at all — no conversation was
+                # ever written there, nothing to resume (and nothing a fresh
+                # pinned-id launch could clobber).
+                return False
+            path = f"{project_dir}/{sid}.jsonl"
+        try:
+            out = self._bridge._run(
+                f"test -f {shlex.quote(path)} && echo yes || echo no")
+        except Exception:  # pragma: no cover - environment dependent
+            return True
+        return out.strip() == "yes"
+
     def _create_session(self) -> None:
         """Sync: build the per-agent launch config and spawn the tmux session.
 
         All blocking work (MCP registry read + tmux create) runs here so
         ``start()`` can offload it to a thread in one hop. A cold-restore passes
         ``resume_session_id`` so the launch is ``claude --resume <id>`` — the
-        same conversation, rebuilt from its transcript (§9.9).
+        same conversation, rebuilt from its transcript (§9.9). A cold-restore
+        of a ZERO-TURN conversation (no transcript ever written — see
+        ``_cold_restore_transcript_exists``) instead relaunches FRESH pinned to
+        the SAME id (``--session-id <id>``, exactly the original launch): the
+        conversation was empty, so an empty session on the same id IS the same
+        agent returning — while ``--resume`` on a transcript-less id dies at
+        launch and lands the resume in ``error``.
         """
         kwargs: dict[str, Any] = {}
         if self._cold_restore:
-            kwargs["resume_session_id"] = self._claude_session_id
+            if self._cold_restore_transcript_exists():
+                kwargs["resume_session_id"] = self._claude_session_id
+            else:
+                kwargs["session_id"] = self._claude_session_id
         # Name registration (§7.5): the dashboard identity NAME doubles as the
         # Claude Code session display name, set at launch via `claude --name`.
         display_name = (self.config.identity or {}).get("name") or None

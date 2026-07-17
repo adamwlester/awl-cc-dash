@@ -1610,6 +1610,17 @@ async def health():
     }
 
 
+def _live_identity_names() -> set[str]:
+    """Every live agent's identity name — the auto-name draw's exclusion set
+    (mirrors ``GET /identity/random-name``)."""
+    taken: set[str] = set()
+    for s in list(sessions.values()):
+        nm = (s.identity or {}).get("name") if s.identity else None
+        if nm:
+            taken.add(nm)
+    return taken
+
+
 @app.post("/sessions")
 async def create_session(req: CreateSessionRequest):
     global _identity_ordinal
@@ -1619,9 +1630,11 @@ async def create_session(req: CreateSessionRequest):
     state_store.load_project(req.cwd)
     state_store.register_agent(session_id, req.cwd)
     # Resolve the dashboard-owned identity (round-robin color/icon/number, with
-    # any caller-provided overrides), then advance the round-robin counter.
+    # any caller-provided overrides; a blank name auto-draws from the curated
+    # pool, excluding live agents' names), then advance the round-robin counter.
     identity = assign_identity(
-        req.identity.model_dump() if req.identity else None, _identity_ordinal
+        req.identity.model_dump() if req.identity else None, _identity_ordinal,
+        taken_names=_live_identity_names(),
     )
     _identity_ordinal += 1
     # Retired numbers are NEVER reused (§7.12): an auto-assigned number that was
@@ -1665,7 +1678,9 @@ async def create_session(req: CreateSessionRequest):
 
 @app.get("/sessions")
 async def list_sessions_endpoint():
-    return [s.to_dict() for s in sessions.values()]
+    # Snapshot (list()) like every other `sessions` iteration: safe against a
+    # concurrent create/retire landing between suspension points.
+    return [s.to_dict() for s in list(sessions.values())]
 
 
 # ---------------------------------------------------------------------------
@@ -2782,7 +2797,8 @@ async def get_inbox():
     for agent_id, items in inbox.all_open().items():
         grouped.setdefault(agent_id, []).extend(items)
     # Merge in screen-anchored permission prompts (they live on SessionState).
-    for sid, s in sessions.items():
+    # (Snapshot against concurrent create/retire mutation, like GET /usage.)
+    for sid, s in list(sessions.items()):
         if s.pending_permission:
             grouped.setdefault(sid, []).append({
                 "id": f"perm:{sid}", "agent_id": sid, "type": "permission",
@@ -3252,7 +3268,8 @@ async def post_scratch(req: ScratchPostRequest):
         persist = None
     post = scratchpad.post(key, req.author, req.text, persist_path=persist)
     # live mid-run push to running co-located agents (canonical-key match)
-    for s in sessions.values():
+    # (Snapshot against concurrent create/retire mutation, like GET /usage.)
+    for s in list(sessions.values()):
         if s.status == "running" and _scratch_key(s) == key:
             _deliver_scratch_delta(s)
     return {"status": "posted", "post": post}
@@ -3831,7 +3848,7 @@ async def identity_random_name(exclude: str | None = None):
     taken: set[str] = set()
     if exclude:
         taken |= {n.strip() for n in exclude.split(",") if n.strip()}
-    for s in sessions.values():
+    for s in list(sessions.values()):
         nm = (s.identity or {}).get("name") if s.identity else None
         if nm:
             taken.add(nm)
@@ -4184,10 +4201,12 @@ async def fork_session(session_id: str, req: ForkRequest):
     source = sessions[session_id]
     if not (source.driver and source.driver.supports("fork")):
         raise HTTPException(status_code=400, detail="Driver has no fork support")
-    # Assign the FORK's own dashboard identity (round-robin + retired-skip, like
-    # create_session) so the branch is a distinct agent, not a clone of the source.
+    # Assign the FORK's own dashboard identity (round-robin + retired-skip +
+    # auto-name draw, like create_session) so the branch is a distinct agent,
+    # not a clone of the source.
     identity = assign_identity(
-        req.identity.model_dump() if req.identity else None, _identity_ordinal)
+        req.identity.model_dump() if req.identity else None, _identity_ordinal,
+        taken_names=_live_identity_names())
     _identity_ordinal += 1
     if not (req.identity and req.identity.number is not None):
         if deletion.is_retired(identity["number"]):
@@ -4747,7 +4766,10 @@ async def get_usage():
     """
     agents = []
     fleet_tokens = 0
-    for sid, session in sessions.items():
+    # Snapshot: the per-agent context read below AWAITS mid-iteration, so a
+    # concurrent create/retire mutating `sessions` raised "dictionary changed
+    # size during iteration" (intermittent 500, live-observed 2026-07-17).
+    for sid, session in list(sessions.items()):
         entry: dict[str, Any] = {
             "session_id": sid,
             "model": session.model,
@@ -4984,7 +5006,7 @@ async def session_git(session_id: str, req: GitActionRequest):
                    "writes; retry when idle")
     pkey = storage.project_key(session.cwd)
     if pkey:
-        busy = sorted(sid for sid, s in sessions.items()
+        busy = sorted(sid for sid, s in list(sessions.items())
                       if s.status == "running"
                       and storage.project_key(s.cwd) == pkey)
         if busy:
@@ -5006,8 +5028,9 @@ async def session_git(session_id: str, req: GitActionRequest):
             else:  # pragma: no cover - concurrent commits in one project
                 _git_commits_inflight[pkey] = left
             # Wake every flush this commit deferred (queued prompts must not
-            # sit stranded once the tree is safe again).
-            for s in sessions.values():
+            # sit stranded once the tree is safe again). (Snapshot: this
+            # finally runs right after an await — mutation-safe iteration.)
+            for s in list(sessions.values()):
                 if s.prompt_queue and storage.project_key(s.cwd) == pkey:
                     _schedule_flush(s)
 

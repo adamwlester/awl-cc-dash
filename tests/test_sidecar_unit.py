@@ -63,7 +63,7 @@ import main  # noqa: E402
 from main import SessionState  # noqa: E402
 from drivers import default_driver_name, DriverConfig  # noqa: E402
 from identity import (  # noqa: E402
-    assign_identity, AG_COLORS, AG_ICONS, AG_ICONS_CURATED,
+    assign_identity, AG_COLORS, AG_ICONS, AG_ICONS_CURATED, NAME_POOL,
 )
 
 
@@ -218,11 +218,32 @@ class TestIdentityAssignment:
         ident = assign_identity(None, 0)
         assert ident["role"] == "Agent"
         assert ident["number"] == 1
-        assert ident["name"] == ""
+        # A blank name AUTO-DRAWS from the curated pool (§7.5/§11 #40 — a
+        # nameless agent used to store "" and the UI fell back to session ids).
+        assert ident["name"] and ident["name"] in NAME_POOL
         assert ident["color"] == AG_COLORS[0][1]   # round-robin slot 0
         assert ident["icon"] == AG_ICONS_CURATED[0]  # round-robin over the curated 50
         # Color is a real hex value.
         assert ident["color"].startswith("#") and len(ident["color"]) == 7
+
+    def test_blank_or_whitespace_name_autodraws_from_pool(self):
+        # Absent, empty, and whitespace-only names all take the pool draw.
+        for req in (None, {}, {"name": ""}, {"name": "   "}):
+            ident = assign_identity(req, 0)
+            assert ident["name"] and ident["name"] in NAME_POOL, req
+
+    def test_autodraw_excludes_taken_names(self):
+        # With every pool name taken but one, the draw lands on that one —
+        # mirrors GET /identity/random-name's live-agent exclusion.
+        last = NAME_POOL[-1]
+        taken = [n for n in NAME_POOL if n != last]
+        ident = assign_identity(None, 0, taken_names=taken)
+        assert ident["name"] == last
+
+    def test_explicit_name_bypasses_the_draw_and_exclusion(self):
+        # A user-typed name is ALWAYS allowed — even one on the taken list.
+        ident = assign_identity({"name": "Ada"}, 0, taken_names=["Ada"])
+        assert ident["name"] == "Ada"
 
     def test_color_and_number_round_robin(self):
         # Ordinal n -> color slot n%len(palette) (=25 once the design stream lands

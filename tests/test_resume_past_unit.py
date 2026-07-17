@@ -394,6 +394,109 @@ class TestResumeReattachesTimelineStore:
 
 
 # ---------------------------------------------------------------------------
+# Cold restore of a ZERO-TURN conversation (§9.9 edge, live-proven 2026-07-17).
+# Claude Code writes `<claude_session_id>.jsonl` only on the FIRST turn, so an
+# agent retired without ever being prompted has NO transcript — and
+# `claude --resume <id>` then prints "No conversation found with session ID …"
+# and exits at launch: the fresh tmux session dies with it, the startup-gate
+# poll hits the dead pane ("can't find pane: awl-…"), and the resume lands in
+# `error`. The driver's decision point: a cold restore first probes for the
+# transcript; present → `resume_session_id` (`claude --resume <id>`, the
+# proven path); provably absent → a FRESH launch pinned to the SAME id
+# (`session_id=<id>`, exactly the original launch — the empty conversation
+# continuing); unknown (probe failed) → keep the resume path (fail-open, so a
+# WSL hiccup can never silently discard a real conversation).
+# ---------------------------------------------------------------------------
+
+
+class _ColdCreateBridge:
+    """Fake bridge for `_create_session`: answers the transcript probe and
+    captures the `create()` kwargs the decision produced."""
+
+    def __init__(self, probe="no"):
+        self.probe = probe        # "yes" | "no" | raise
+        self.created = []
+
+    def _resolve_cwd(self, cwd):
+        return cwd
+
+    def _run(self, cmd, **kw):
+        if self.probe == "raise":
+            raise RuntimeError("wsl unreachable")
+        return self.probe
+
+    def create(self, name, **kwargs):
+        self.created.append((name, kwargs))
+        return {"session_id": kwargs.get("resume_session_id")
+                or kwargs.get("session_id"), "name": name}
+
+    def session_id_for(self, name):
+        return None
+
+
+class TestColdRestoreZeroTurnFallsBackToFreshPinnedLaunch:
+    def _driver(self, bridge, *, transcript_path="/t/c-x.jsonl"):
+        from drivers.base import DriverConfig
+        from drivers.bridge import BridgeDriver
+        d = BridgeDriver(
+            DriverConfig(), lambda e: None,
+            resume_name="awl-x", session_id="s-x",
+            claude_session_id="c-x", cold_restore=True,
+            transcript_path=transcript_path,
+            persisted_record={"session_id": "s-x"})
+        d._bridge = bridge
+        return d
+
+    def test_missing_transcript_launches_fresh_on_the_same_id(self):
+        # The tonight-repro shape: dead tmux + no `<id>.jsonl` ever written.
+        b = _ColdCreateBridge(probe="no")
+        d = self._driver(b)
+        d._create_session()
+        name, kw = b.created[-1]
+        assert name == "awl-x"                       # same launch-config home
+        assert kw.get("session_id") == "c-x"         # fresh launch, SAME id
+        assert "resume_session_id" not in kw         # never a doomed --resume
+
+    def test_present_transcript_keeps_the_proven_resume_path(self):
+        b = _ColdCreateBridge(probe="yes")
+        d = self._driver(b)
+        d._create_session()
+        _, kw = b.created[-1]
+        assert kw.get("resume_session_id") == "c-x"
+        assert "session_id" not in kw
+
+    def test_unreadable_probe_fails_open_to_resume(self):
+        # A transient WSL failure must never discard a real conversation.
+        b = _ColdCreateBridge(probe="raise")
+        d = self._driver(b)
+        d._create_session()
+        _, kw = b.created[-1]
+        assert kw.get("resume_session_id") == "c-x"
+
+    def test_no_transcript_path_and_no_project_dir_means_fresh_launch(self,
+                                                                      monkeypatch):
+        # Descriptor without a verified path (the archived zero-turn agent
+        # carries transcript_path=None): the probe resolves the project dir —
+        # none at all → nothing was ever written → fresh pinned launch.
+        import bridge.transcript as bt
+        monkeypatch.setattr(bt, "_resolve_project_dir", lambda b, cwd: None)
+        b = _ColdCreateBridge(probe="yes")   # _run must not even be consulted
+        from drivers.base import DriverConfig
+        from drivers.bridge import BridgeDriver
+        d = BridgeDriver(
+            DriverConfig(cwd="/p"), lambda e: None,
+            resume_name="awl-y", session_id="s-y",
+            claude_session_id="c-y", cold_restore=True,
+            transcript_path=None,
+            persisted_record={"session_id": "s-y"})
+        d._bridge = b
+        d._create_session()
+        _, kw = b.created[-1]
+        assert kw.get("session_id") == "c-y"
+        assert "resume_session_id" not in kw
+
+
+# ---------------------------------------------------------------------------
 # Integrator fixes on the §7.19/§11 #17 batch — the Timeline store must
 # actually SURVIVE stop/retire (keeping the tmux name is useless if close()
 # rm -rf's the launch-config dir), a restored agent must shed a stale death

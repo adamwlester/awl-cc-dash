@@ -112,8 +112,10 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    // #38: the pinned side columns (400 + 700) plus the middle floor need ~1180px;
-    // below that the layout horizontal-scrolls (app.css guard) rather than breaking.
+    // #38: two floors. 1440 is the no-scroll layout floor (pinned 400 + 340
+    // middle-min + pinned 700); minWidth 1180 is the usable-with-inner-scroll
+    // floor so small laptops can still open the window — between 1180 and 1440
+    // the app.css horizontal-scroll guard covers it rather than breaking layout.
     minWidth: 1180,
     minHeight: 600,
     title: 'AWL Multi-Agent Dashboard',
