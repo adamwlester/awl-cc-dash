@@ -114,7 +114,9 @@
      replaces the <i> placeholder node, so textContent can't carry the icon. */
   function cycleDir(b){const o=['ab','ba','both'],g={ab:'arrow-right',ba:'arrow-left',both:'arrow-left-right'},t={ab:'A → B',ba:'B → A',both:'A ↔ B (both)'};let i=(o.indexOf(b.dataset.dir)+1)%3;b.dataset.dir=o[i];b.innerHTML='<i data-lucide="'+g[o[i]]+'"></i>';b.title=t[o[i]];LU();}
   function toggleLimit(b){b.classList.toggle('on');const i=b.parentElement.querySelector('.lim-in');if(i)i.disabled=!b.classList.contains('on');}
-  function toggleEdit(b){b.closest('.field').classList.toggle('editing');}
+  /* 2026-07-17: toggleEdit (the Details-tab pencil edit-lock) is RETIRED — the whole Details tab is view-only
+     (identity + config lock at create — ARCHITECTURE §7.15), so no pencil remains to serve. The .lockable grey
+     is the permanent locked state (.field:not(.editing) .lockable in styles.css). */
   function step(b,d){const i=b.parentElement.querySelector('input');if(!i)return;let v=parseInt(i.value||'0',10)+d;const mn=i.min!==''?parseInt(i.min,10):0;if(!isNaN(mn))v=Math.max(mn,v);const mx=i.max!==''?parseInt(i.max,10):null;if(mx!==null&&!isNaN(mx))v=Math.min(mx,v);i.value=v;}
   function autosize(el){el.style.height='auto';const cs=getComputedStyle(el);const b=(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);el.style.height=(el.scrollHeight+b)+'px';}
   function autosizeAll(){document.querySelectorAll('textarea.autosize').forEach(autosize);}
@@ -1226,24 +1228,30 @@
     toast('Link saved — '+dir+' · '+trig+' · '+rel);toggleDrawer();bumpLinks(1);}
   function linkDelete(){toast('Link removed');toggleDrawer();bumpLinks(-1);}
 
-  /* ===== v8p6 → ND 12: Role combobox — the agent.md PRESET LOADER. Its entries group by the settled two-scope
-     model: SYSTEM (the persistent cross-project store, incl. ~/.claude/agents — the old "User" scope folded in)
-     and PROJECT (<project>/.awl-cc-dash/agents). Picking an entry in Create auto-fills every Create field from
-     the file's front matter (prefillFromRole); in Details the Role field is VIEW-ONLY — a running agent's
-     agent.md can't be reassigned (config is create/launch-time — ARCHITECTURE §7.15), so the pencil is gone
-     and the field stays locked after session start. ===== */
+  /* ===== v8p6 → ND 12 → 2026-07-17: Role combobox — the agent.md PRESET LOADER. Its entries group by the settled
+     two-scope model: SYSTEM (the persistent cross-project store, incl. ~/.claude/agents — the old "User" scope
+     folded in) and PROJECT (<project>/.awl-cc-dash/agents). Picking an entry in Create auto-fills the Create
+     fields from the file's front matter (prefillFromRole) INCLUDING color — a `color:` front-matter key (the
+     named-color convention: orange · green · cyan · purple · pink …) maps onto the agent palette and sets the
+     Create color swatch; icon is NEVER prefilled (it differentiates same-role agents — always hand-chosen at
+     Create). In Details the ENTIRE tab is view-only (2026-07-17 — widens the original ND 12 Role-only lock):
+     identity + config are set at Create and lock once the session exists (config is create/launch-time —
+     ARCHITECTURE §7.15), so every pencil is gone, not just Role's. ===== */
   const ROLE_DEFS=[
     {group:'System agents (~/.claude/agents · cross-project)',items:[
-      {name:'gsd-debugger',desc:'Investigates bugs using the scientific method; manages debug sessions and checkpoints.',skills:[],tools:['Read','Write','Edit','Bash','Grep','Glob','WebSearch']},
-      {name:'gsd-planner',desc:'Creates executable phase plans with task breakdown and dependency analysis.',skills:[],tools:['Read','Grep','Glob','Bash']},
-      {name:'gsd-codebase-mapper',desc:'Explores a codebase and writes structured analysis docs (STACK, ARCHITECTURE, …).',skills:[],tools:['Read','Grep','Glob','Bash']},
-      {name:'gsd-ui-researcher',desc:'Produces UI-SPEC.md design contracts for frontend phases.',skills:[],tools:['Read','Grep','Glob','WebSearch','WebFetch']},
+      {name:'gsd-debugger',desc:'Investigates bugs using the scientific method; manages debug sessions and checkpoints.',skills:[],tools:['Read','Write','Edit','Bash','Grep','Glob','WebSearch'],color:'orange'},
+      {name:'gsd-planner',desc:'Creates executable phase plans with task breakdown and dependency analysis.',skills:[],tools:['Read','Grep','Glob','Bash'],color:'green'},
+      {name:'gsd-codebase-mapper',desc:'Explores a codebase and writes structured analysis docs (STACK, ARCHITECTURE, …).',skills:[],tools:['Read','Grep','Glob','Bash'],color:'cyan'},
+      {name:'gsd-ui-researcher',desc:'Produces UI-SPEC.md design contracts for frontend phases.',skills:[],tools:['Read','Grep','Glob','WebSearch','WebFetch']},   /* no color: key in its front matter (a hex there, actually) — demos the color-less prefill path */
     ]},
     {group:'Project agents (<project>/.awl-cc-dash/agents)',items:[
-      {name:'echo',desc:'Session distiller and intent archaeologist. Extracts structured implementation briefs from messy, multi-turn Claude Code sessions.',skills:['distill','session-brief'],tools:['Read','Glob','Grep','Bash','WebSearch','WebFetch']},
-      {name:'vibe-guide',desc:'Builds applications through conversation — turns user vision, references and vibes into working apps while handling the technical complexity.',skills:['ui-ux-pro-max:ui-styling','ui-ux-pro-max:design-system'],tools:['Read','Glob','Grep','Bash','Write','Edit','WebSearch','WebFetch']},
+      {name:'echo',desc:'Session distiller and intent archaeologist. Extracts structured implementation briefs from messy, multi-turn Claude Code sessions.',skills:['distill','session-brief'],tools:['Read','Glob','Grep','Bash','WebSearch','WebFetch'],color:'purple'},
+      {name:'vibe-guide',desc:'Builds applications through conversation — turns user vision, references and vibes into working apps while handling the technical complexity.',skills:['ui-ux-pro-max:ui-styling','ui-ux-pro-max:design-system'],tools:['Read','Glob','Grep','Bash','Write','Edit','WebSearch','WebFetch'],color:'pink'},
     ]},
   ];
+  /* front-matter named colors (Claude Code's subagent color: set) → the nearest existing --ag-* palette token
+     (names only — the swatch grid already carries the var(--ag-*) values; no new color values are minted here) */
+  const AG_FROM_NAMED={red:'vermilion',orange:'amber',yellow:'citron',green:'emerald',cyan:'cyan',blue:'cobalt',purple:'violet',pink:'magenta'}; /* mirrors sidecar/roles.py NAMED_COLOR_TO_HEX — the product authority for named→token mapping */
   function buildCombo(el){const pop=el.querySelector('.combo-pop');if(!pop)return;
     pop.innerHTML=ROLE_DEFS.map(g=>'<div class="combo-gh">'+g.group+'</div>'+g.items.map(it=>'<button type="button" class="combo-opt" onclick="pickCombo(event,this)" data-name="'+it.name+'"><b>'+it.name+'</b><span class="sub">'+it.desc+'</span></button>').join('')).join('');}
   function toggleCombo(btn){const el=btn.closest('.combo');const pop=el.querySelector('.combo-pop');const open=pop.classList.contains('open');closeAllPopups();if(!open){buildCombo(el);pop.classList.add('open');}}
@@ -1251,7 +1259,11 @@
   function prefillFromRole(name){const def=ROLE_DEFS.flatMap(g=>g.items).find(d=>d.name===name);if(!def)return;const root=document.getElementById('mid-create');if(!root)return;
     const desc=root.querySelector('textarea');if(desc){desc.value=def.desc;if(desc.classList.contains('autosize'))autosize(desc);}
     const sk=root.querySelector('[data-msel="skills"]');if(sk){sk._sel=new Set(def.skills);buildMsel(sk);}
-    const tl=root.querySelector('[data-msel="tools"]');if(tl){tl._sel=new Set(def.tools);buildMsel(tl);}}
+    const tl=root.querySelector('[data-msel="tools"]');if(tl){tl._sel=new Set(def.tools);buildMsel(tl);}
+    /* 2026-07-17: color prefills too — a color: front-matter key maps (AG_FROM_NAMED) onto the palette and picks
+       the matching swatch via pickColor (the picker's own state-setter, so swatch + name + --cur-color all move);
+       no color: key → the current pick stands. Icon is deliberately NOT prefilled — always hand-chosen. */
+    if(def.color){const ag=AG_FROM_NAMED[def.color]||def.color;const sw=root.querySelector('[data-colorgrid] .sw[data-name="'+ag+'"]');if(sw)pickColor(sw);}}
 
   /* ===== v8p6: multi-select dropdowns (Skills from skills files · Tools = native Claude Code tools) ===== */
   const MSEL_CATALOG={

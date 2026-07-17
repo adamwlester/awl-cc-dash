@@ -12,7 +12,8 @@
         pointer, with Resume + a confirmed true-delete). Rendered from PAST/ARCHIVE by renderPast().
       • LAUNCH PERMISSIONS (Create): Arm Auto / Arm Bypass switches (Bypass fills danger when on) — an un-armed
         mode is SILENTLY ABSENT from the mode ring (.seg-unarmed), in Create live via armToggle and in Details
-        per the focused agent's AG[k].armed flags (applyArmGate in repaintAgentPanel). Create ships un-armed.
+        per the focused agent's AG[k].armed flags (applyArmGate in repaintAgentPanel). Create ships with Bypass
+        armed + selected by default (operator decision 2026-07-17 — supersedes the old un-armed default); Auto still ships un-armed.
       • INBOX WORKFLOW CARD: the Review-section workflow card gains the Approve/Reject ROUND-TRIP (allow=launch ·
         deny=abort): wfResolve shows the resolved state in place (approved/rejected variants — edge + banner,
         actions gone, script dimmed) for a beat, then the card completes; Review (planned) + Reply stay.
@@ -541,9 +542,11 @@
 
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div class="field">
-                <!-- ND 12: the Role pencil is GONE — Role is editable in Create only; once a session has started
-                     the field is view-only (a running agent's agent.md can't be reassigned — ARCHITECTURE §7.15;
-                     the field's .lockable grey is the locked state, permanently). -->
+                <!-- ND 12 → 2026-07-17: the WHOLE Details tab is view-only — identity + config are set at Create
+                     and lock once the session exists (config is create/launch-time — ARCHITECTURE §7.15). This
+                     supersedes the per-field pencils (Role locked first under ND 12; every other edit-ic pencil is
+                     now gone too, retiring the edit-lock pattern here). The .lockable grey is the permanent locked
+                     state on every field; the FOOTER actions (Save / Retire / Delete) are not pencils and stay. -->
                 <div class="flex items-center justify-between mb-1"><label class="lbl">Role</label></div>
                 <div data-comp="role-combobox" class="lockable combo" data-rolecombo title="Role is set at create — a running agent's agent.md can't be reassigned">
                   <div class="combo-trig"><input class="combo-in" value="researcher" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Choose from agent.md files"><i data-lucide="chevrons-up-down"></i></button></div>
@@ -551,23 +554,23 @@
                 </div>
               </div>
               <div class="field">
-                <div class="flex items-center justify-between mb-1"><label class="lbl">No.</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+                <div class="flex items-center justify-between mb-1"><label class="lbl">No.</label></div>
                 <input class="lockable in text-center" value="01">
               </div>
             </div>
 
-            <div data-comp="edit-lock" class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Name</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+            <div class="field">
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Name</label></div>
               <input data-comp="text-input" data-variants="empty disabled" class="lockable in" value="sandy">
             </div>
 
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Description</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Description</label></div>
               <textarea class="lockable in autosize">Security researcher focused on auth vulnerabilities. Probes token handling, session lifecycle, and secret management; posts findings to the shared scratchpad.</textarea>
             </div>
 
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Skills</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Skills</label></div>
               <div data-comp="multi-select" class="lockable msel" data-msel="skills" data-sel='["security-review","threat-model"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
@@ -575,7 +578,7 @@
             </div>
 
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Tools</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Tools</label></div>
               <div data-comp="multi-select" class="lockable msel" data-msel="tools" data-sel='["Bash","Read","Write","Grep","WebSearch"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
@@ -584,7 +587,7 @@
 
             <!-- per-agent scoping — which MCP servers / plugins this agent may use + the deny rules that hard-block it. Lockable like the rest of the on-demand config; MCP/plugins take effect at the agent's next launch, deny is the reliable hard-block. -->
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">MCP servers</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">MCP servers</label></div>
               <div data-comp="multi-select" class="lockable msel" data-msel="mcp" data-sel='["playwright","github"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
@@ -593,7 +596,7 @@
             </div>
 
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Plugins</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Plugins</label></div>
               <div data-comp="multi-select" class="lockable msel" data-msel="plugins" data-sel='["superpowers"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
@@ -602,7 +605,7 @@
             </div>
 
             <div class="field">
-              <div class="flex items-center justify-between mb-1"><label class="lbl">Deny rules</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
+              <div class="flex items-center justify-between mb-1"><label class="lbl">Deny rules</label></div>
               <div data-comp="multi-select" class="lockable msel" data-msel="denyrules" data-sel='["Bash(rm -rf:*)","Bash(sudo:*)"]'>
                 <div class="msel-box" onclick="toggleMsel(this)"></div>
                 <div class="msel-pop"></div>
@@ -610,27 +613,20 @@
               <div class="text-[10px] text-muted-2 mt-1 normal-case font-semibold">the reliable hard-block (allow-lists are ignored under bypass) · applies at next launch</div>
             </div>
 
-            <!-- COLOR + ICON pickers (same interface; current selection always shown) -->
+            <!-- COLOR + ICON — plain LOCKED display rows (2026-07-17: identity is set at Create — the live pickers
+                 live there; these keep the picker-trig display shape + the data-picker/data-icopicker hooks so
+                 repaintAgentPanel still repaints the swatch/glyph/name, but there is no popup and no pencil). -->
             <div class="field grid grid-cols-2 gap-3" style="--cur-color:var(--ag-emerald)">
               <div>
-                <div class="flex items-center justify-between mb-1.5"><label class="lbl">Color</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-                <div class="lockable picker" data-picker>
-                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="picker-sw" style="background:var(--ag-emerald)"></span><span class="picker-val">emerald</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
-                  <div class="picker-pop">
-                    <div class="picker-grid" data-colorgrid>
-                      <button class="sw" style="background:var(--ag-crimson)" data-name="crimson" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-scarlet)" data-name="scarlet" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-vermilion)" data-name="vermilion" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-amber)" data-name="amber" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-gold)" data-name="gold" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-topaz)" data-name="topaz" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-citron)" data-name="citron" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-chartreuse)" data-name="chartreuse" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-lime)" data-name="lime" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-peridot)" data-name="peridot" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-fern)" data-name="fern" onclick="pickColor(this)"></button><button class="sw on" style="background:var(--ag-emerald)" data-name="emerald" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-teal)" data-name="teal" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-turquoise)" data-name="turquoise" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cyan)" data-name="cyan" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cerulean)" data-name="cerulean" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-azure)" data-name="azure" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-cobalt)" data-name="cobalt" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-sapphire)" data-name="sapphire" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-indigo)" data-name="indigo" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-violet)" data-name="violet" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-orchid)" data-name="orchid" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-fuchsia)" data-name="fuchsia" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-magenta)" data-name="magenta" onclick="pickColor(this)"></button><button class="sw" style="background:var(--ag-rose)" data-name="rose" onclick="pickColor(this)"></button>
-                    </div>
-                  </div>
+                <div class="flex items-center justify-between mb-1.5"><label class="lbl">Color</label></div>
+                <div class="lockable picker" data-picker title="Color is set at create — locked once the session exists">
+                  <div class="picker-trig"><span class="picker-sw" style="background:var(--ag-emerald)"></span><span class="picker-val">emerald</span></div>
                 </div>
               </div>
               <div>
-                <div class="flex items-center justify-between mb-1.5"><label class="lbl">Icon</label><button class="edit-ic" onclick="toggleEdit(this)"><i data-lucide="square-pen" class="ic-pencil w-3.5 h-3.5"></i><i data-lucide="check" class="ic-save w-3.5 h-3.5"></i></button></div>
-                <div class="lockable picker" data-picker data-icopicker>
-                  <button class="picker-trig" type="button" onclick="togglePicker(this)"><span class="agtile picker-ico" style="color:var(--cur-color)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="picker-val">wizard-face</span><i data-lucide="chevrons-up-down" class="picker-cv"></i></button>
-                  <div class="picker-pop picker-pop--wide">
-                    <div class="picker-search"><i data-lucide="search"></i><input placeholder="Search 167 icons…" oninput="filterIcons(this)"></div>
-                    <div class="picker-grid ico-grid" data-icogrid></div>
-                  </div>
+                <div class="flex items-center justify-between mb-1.5"><label class="lbl">Icon</label></div>
+                <div class="lockable picker" data-picker data-icopicker title="Icon is set at create — locked once the session exists">
+                  <div class="picker-trig"><span class="agtile picker-ico" style="color:var(--cur-color)"><svg class="ag-svg"><use href="#ag-wizard"/></svg></span><span class="picker-val">wizard-face</span></div>
                 </div>
               </div>
             </div>
@@ -763,9 +759,9 @@
             </div>
             <div class="grid grid-cols-[1fr_70px] gap-2">
               <div><label class="lbl mb-1">Role</label>
-                <!-- ND 12: the Role combobox IS the agent.md preset loader — entries grouped System / Project (the two-scope model); picking one auto-fills every Create field from the file's front matter -->
+                <!-- ND 12: the Role combobox IS the agent.md preset loader — entries grouped System / Project (the two-scope model); picking one auto-fills the Create fields from the file's front matter INCLUDING color (a color: key maps onto the agent palette). Icon is NEVER prefilled — it differentiates same-role agents and is always hand-chosen at Create (2026-07-17). -->
                 <div data-comp="role-combobox" class="combo" data-rolecombo data-create>
-                  <div class="combo-trig"><input class="combo-in" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Load an agent.md preset (System / Project) — auto-fills every field below"><i data-lucide="chevrons-up-down"></i></button></div>
+                  <div class="combo-trig"><input class="combo-in" placeholder="Select or type a role…"><button class="combo-cv" type="button" onclick="toggleCombo(this)" title="Load an agent.md preset (System / Project) — auto-fills the fields below from its front matter, color included (icon stays hand-chosen)"><i data-lucide="chevrons-up-down"></i></button></div>
                   <div class="combo-pop"></div>
                 </div>
               </div>
@@ -836,14 +832,17 @@
               <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div data-comp="version-popout" class="ver-panel"></div>
             </div>
-            <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg" id="create-mode-seg"><button class="active" onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="seg-unarmed" data-mode="auto" onclick="segPick(this)">Auto</button><button class="seg-danger seg-unarmed" data-mode="bypass" onclick="segPick(this)">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
+            <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg" id="create-mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="seg-unarmed" data-mode="auto" onclick="segPick(this)">Auto</button><button class="seg-danger active" data-mode="bypass" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
             <!-- LAUNCH PERMISSIONS — Bypass/Auto pre-arming (a launch-time flag, not a live knob): an un-armed
                  mode is silently ABSENT from the agent's mode ring after launch, so the Create ring above hides
-                 its Auto/Bypass segments until armed here. The ring never shows a segment that would no-op. -->
-            <div><label class="ro-label block mb-1.5" data-hc-title="Launch permissions" data-hc="Auto and Bypass must be pre-armed at launch. An un-armed mode is silently absent from the agent's mode ring — not a greyed no-op — and arming can't be granted mid-run: relaunch to change it. The ring above hides its Auto/Bypass segments until armed here.">Launch permissions</label>
+                 its Auto/Bypass segments until armed here. The ring never shows a segment that would no-op.
+                 2026-07-17: Bypass is the DEFAULT launch mode — Create opens with Arm Bypass ON and the Bypass
+                 segment selected (supersedes the old "Create always starts un-armed" default); Auto still starts
+                 un-armed, and disarming Bypass falls the selection back to Edit as before. -->
+            <div><label class="ro-label block mb-1.5" data-hc-title="Launch permissions" data-hc="Auto and Bypass must be pre-armed at launch. An un-armed mode is silently absent from the agent's mode ring — not a greyed no-op — and arming can't be granted mid-run: relaunch to change it. Bypass ships armed and selected by default (the operator's default launch mode); disarm it here to remove it from the ring.">Launch permissions</label>
               <div data-comp="launch-arm" class="arm-box">
                 <div class="arm-row"><span class="arm-lab">Arm Auto</span><span class="arm-note">adds Auto to the mode ring at launch</span><button data-comp="switch" class="swh" onclick="armToggle(this,'auto')" title="Un-armed — Auto is absent from the mode ring"></button></div>
-                <div class="arm-row arm-row--danger"><span class="arm-lab">Arm Bypass</span><span class="arm-note">skips approvals — dangerous</span><button data-comp="switch" class="swh swh--danger" onclick="armToggle(this,'bypass')" title="Un-armed — Bypass is absent from the mode ring"></button></div>
+                <div class="arm-row arm-row--danger"><span class="arm-lab">Arm Bypass</span><span class="arm-note">skips approvals — dangerous</span><button data-comp="switch" class="swh swh--danger on" onclick="armToggle(this,'bypass')" title="Armed — Bypass joins the mode ring at launch"></button></div>
               </div>
             </div>
             <div><label class="ro-label block mb-1.5">Effort</label><div data-comp="segmented-control" class="seg"><button onclick="segPick(this)">Low</button><button class="active" onclick="segPick(this)">Med</button><button onclick="segPick(this)">High</button><button onclick="segPick(this)">Extra</button><button onclick="segPick(this)">Max</button><button onclick="segPick(this)">Ultra</button></div></div>
