@@ -67,14 +67,17 @@ export function Library() {
       ])
       if (cancelled) return
       if (pl == null && dc == null && root == null) return   // sidecar unreachable — freeze on last-known (#38)
-      const meta = (p: string): DocMeta | null => (reviews && (reviews[p] || reviews[p.replace(/\\/g, '/')])) || null
-      if (pl != null) setPlans(pl.map(doc => ({ id: `plan-${doc.filename}`, doc, meta: meta(doc.path), kind: 'plan' as const })))
+      // GET /library/reviews keys by LEAF FILENAME with owner/state/verdict
+      // NESTED under `review` (comments/provenance are top-level) — key by
+      // filename and flatten the review block up so lifeOf/counters read flat.
+      const meta = (fn: string): DocMeta | null => { const m: any = reviews?.[fn]; return m ? { ...m, ...(m.review || {}) } : null }
+      if (pl != null) setPlans(pl.map(doc => ({ id: `plan-${doc.filename}`, doc, meta: meta(doc.filename), kind: 'plan' as const })))
       const seen = new Set<string>()
       const dd: Entry[] = []
       for (const doc of [...(dc || []), ...(root || [])]) {
         if (seen.has(doc.path)) continue
         seen.add(doc.path)
-        dd.push({ id: `doc-${doc.filename}-${dd.length}`, doc, meta: meta(doc.path), kind: 'doc' })
+        dd.push({ id: `doc-${doc.filename}-${dd.length}`, doc, meta: meta(doc.filename), kind: 'doc' })
       }
       if (dc != null || root != null) setDocs(dd)
     }

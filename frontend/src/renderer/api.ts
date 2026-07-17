@@ -275,6 +275,10 @@ export interface DocComment {
   anchor_quote?: string | null
   anchor_heading?: string | null
 }
+// NOTE the wire shape: GET /library/reviews keys entries by LEAF FILENAME (not
+// path) and nests owner/state/verdict under `review` — comments/provenance are
+// top-level. Consumers flatten `review` up before reading those fields (the
+// Library's `meta()` helper does this).
 export interface DocMeta {
   schema_version?: number
   owner?: string
@@ -282,6 +286,7 @@ export interface DocMeta {
   verdict?: string
   verdict_by?: string
   verdict_at?: string
+  review?: Review
   comments?: DocComment[]
   provenance?: DocProvenance
   updated_at?: string
@@ -457,6 +462,36 @@ export interface CreatePayload {
   arm_bypass?: boolean
 }
 
+// ---- agent.md role presets (GET /roles) -------------------------------------
+// The Create tab's Role combobox preset loader: parsed agent.md front matter
+// from the two-scope store — System (~/.claude/agents · cross-project) and
+// Project (<project>/.awl-cc-dash/agents). Nullable fields are null when the
+// front matter omits them; `color_hex` is the named `color` pre-mapped to an
+// --ag-* hex by the sidecar (IdentityInput.color expects hex).
+export interface RolePreset {
+  name: string
+  description: string | null
+  color: string | null
+  color_hex: string | null
+  model: string | null
+  tools: string[] | null
+  skills: string[] | null
+  permission_mode: string | null
+  max_turns: number | null
+  effort: string | null
+  file: string
+  scope: string
+}
+export interface RoleScope {
+  label: string
+  dir: string | null
+  roles: RolePreset[]
+}
+export interface RolesResponse {
+  system: RoleScope & { dir: string }
+  project: RoleScope
+}
+
 export type Disposition = 'now' | 'next' | 'queue' | 'hold' | 'inject'
 
 export interface SendOpts {
@@ -570,8 +605,16 @@ export const api = {
   sessions: () => getJSON<Session[]>('/sessions'),
   session: (id: string) => getJSON<Session>(`/sessions/${id}`),
   create: (payload: CreatePayload) => postJSON<Session>('/sessions', payload),
-  retire: (id: string) => delJSON<any>(`/sessions/${id}`),
-  hardDelete: (id: string) => delJSON<any>(`/sessions/${id}?hard=true`),
+  // Status-aware retire/delete: retire's 200 carries the archive outcome —
+  // `archived` is the arc-id on success, null when the record was NOT written
+  // (with `archive_error` / `archive_skipped` saying why) — and failures keep
+  // the sidecar's `{detail}` instead of collapsing into a bare null.
+  // `record_kept` (non-archived outcomes): whether a persisted roster record
+  // survives (bridge stop() keeps it; the sdk close() fallback keeps nothing).
+  retire: (id: string) =>
+    reqJSON<{ status: string; session_id: string; archived: string | null; archive_error?: string; archive_skipped?: string; record_kept?: boolean }>('DELETE', `/sessions/${id}`),
+  hardDelete: (id: string) =>
+    reqJSON<{ status: string; session_id: string }>('DELETE', `/sessions/${id}?hard=true`),
 
   // ---- merged event history (backfill for the SSE stream) -----------------
   eventsHistory: (opts?: { since?: number; source?: string; recipient?: string }) =>
@@ -613,6 +656,10 @@ export const api = {
   // (e.g. one staged in the Create form). A user-typed name is always allowed.
   randomName: (exclude?: string[]) =>
     getJSON<{ name: string | null }>(`/identity/random-name${qs({ exclude: exclude?.length ? exclude.join(',') : undefined })}`),
+  // agent.md role presets for the Create Role combobox: the two-scope store
+  // (System ~/.claude/agents · Project <cwd>/.awl-cc-dash/agents) with parsed
+  // front matter per role. No cwd → the project group degrades to empty.
+  roles: (cwd?: string | null) => getJSON<RolesResponse>(`/roles${qs({ cwd })}`),
 
   // ---- response-format presets (§7.14/§11 #39) ----------------------------
   // The menu, plus per-agent get/set. A set persists to state/agents.json and
@@ -697,6 +744,11 @@ export const api = {
   // POST /sessions/{id}/console/attach → { ws_url } (ttyd-style raw WebSocket).
   // Null → endpoint not merged yet; the Console degrades to catalog-only.
   consoleAttach: (id: string) => postJSON<{ ws_url: string }>(`/sessions/${id}/console/attach`),
+  // Deliberate, sidecar-mediated pane geometry (the `window-size manual` pin
+  // stays the standing regime — `resize-window` keeps it set): the topmost
+  // viewer POSTs its fitted cols×rows, debounced, and the sidecar clamps.
+  consoleResize: (id: string, cols: number, rows: number) =>
+    postJSON<{ ok: boolean; cols: number; rows: number }>(`/sessions/${id}/console/resize`, { cols, rows }),
 
   // ---- templates -------------------------------------------------------------
   templates: () => getJSON<Template[]>('/templates'),

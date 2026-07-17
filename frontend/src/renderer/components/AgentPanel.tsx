@@ -11,7 +11,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset,
   type PastAgent, type ArchiveRecord, type TimelineTurn, type TimelineResponse,
-  type Identity,
+  type Identity, type RolePreset, type RolesResponse,
 } from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph, SPRITE_BY_FILE } from '../lib/icons'
@@ -74,7 +74,7 @@ function EditField({ label, value, onSave, textarea, center, disabled, note }: {
   useEffect(() => { if (!editing) setV(value) }, [value, editing])
   const commit = () => { setEditing(false); if (onSave && v !== value) onSave(v) }
   return (
-    <div data-comp="edit-lock" className={`field${editing ? ' editing' : ''}`}>
+    <div className={`field${editing ? ' editing' : ''}`}>
       <div className="flex items-center justify-between mb-1">
         <label className="lbl">{label}</label>
         {onSave && !disabled && (
@@ -83,9 +83,29 @@ function EditField({ label, value, onSave, textarea, center, disabled, note }: {
           </button>
         )}
       </div>
+      {/* readOnly when not editing: the .lockable CSS only kills pointer events —
+          without it the control stays Tab-reachable and locally typable, a lie
+          when locked (no commit path). */}
       {textarea
-        ? <textarea className="lockable in autosize" value={v} rows={3} onChange={e => setV(e.target.value)} />
-        : <input data-comp="text-input" className={`lockable in${center ? ' text-center' : ''}`} value={v} onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') commit() }} />}
+        ? <textarea className="lockable in autosize" value={v} rows={3} readOnly={!editing} onChange={e => setV(e.target.value)} />
+        : <input data-comp="text-input" className={`lockable in${center ? ' text-center' : ''}`} value={v} readOnly={!editing} onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') commit() }} />}
+      {note && <div className="text-[10px] text-muted-2 mt-1 normal-case font-semibold">{note}</div>}
+    </div>
+  )
+}
+
+// Fully-locked text display for the Details identity fields (view-only from
+// Role through Icon — config is create-time): EditField's non-editing render
+// minus the pencil, with the input truly readOnly (no commit machinery at all).
+function LockedText({ label, value, center, title, note }: {
+  label: string; value: string; center?: boolean; title?: string; note?: string
+}) {
+  return (
+    <div className="field" title={title}>
+      <div className="flex items-center justify-between mb-1">
+        <label className="lbl">{label}</label>
+      </div>
+      <input data-comp="text-input" className={`lockable in${center ? ' text-center' : ''}`} value={value} readOnly />
       {note && <div className="text-[10px] text-muted-2 mt-1 normal-case font-semibold">{note}</div>}
     </div>
   )
@@ -196,9 +216,13 @@ function IconPicker({ icon, color, onPick, locked }: { icon: string; color: stri
         <div className="picker-search"><Ic name="search" /><input placeholder={`Search ${names.length} icons…`} value={q} onChange={e => setQ(e.target.value)} /></div>
         <div className="picker-grid ico-grid">
           {names.filter(n => !q || n.includes(q.toLowerCase())).map(n => (
-            <button key={n} className={`icotile${n === icon ? ' on' : ''}`} data-name={n} title={n} style={{ color }}
+            <button key={n} className={`icotile${n === icon ? ' on' : ''}`} data-name={n} title={n}
               onClick={() => { onPick(n); setOpen(false) }}>
-              <svg className="ag-svg"><use href={`#${SPRITE_BY_FILE[n]}`} /></svg>
+              {/* the .agtile wrap is load-bearing: `.icotile .agtile` carries the
+                  26px tile size (a bare .ag-svg falls back to the browser's
+                  300×150 svg default) and its currentColor drives the recolor —
+                  mirrors the mockup's buildIconGrids (design/behavior.js). */}
+              <span className="agtile" style={{ color }}><AgGlyph icon={n} /></span>
             </button>
           ))}
         </div>
@@ -427,15 +451,15 @@ function DetailsTab({ s }: { s: Session }) {
             <div className="combo-trig"><input className="combo-in" value={a.role} readOnly /><button className="combo-cv" type="button"><Ic name="chevrons-up-down" /></button></div>
           </div>
         </div>
-        <EditField label="No." value={a.name.split(' ')[0] || '01'} center
-          onSave={async v => { const r = await api.updateIdentity(s.session_id, { number: parseInt(v, 10) || 1 }); if (!r) toast('Number rejected (already taken?)') }} />
+        <LockedText label="No." value={a.name.split(' ')[0] || '01'} center
+          title="Set at create — view-only on a live session" />
       </div>
 
-      <EditField label="Name" value={a.short}
-        onSave={async v => { const r = await api.updateIdentity(s.session_id, { name: v.trim() }); if (!r) toast('Rename rejected') }} />
+      <LockedText label="Name" value={a.short}
+        title="Set at create — view-only on a live session" />
 
       <EditField label="Description" value={(s as any).description || ''} textarea disabled
-        note="stored with the agent.md — not editable on a live session yet" />
+        note="stored with the agent.md — config is create-time, view-only on a live session" />
 
       <LockField label="Skills" title="Create/launch-time config — view-only on a live session" noPencil>
         {() => <MSel kind="skills" sel={[]} disabled />}
@@ -453,14 +477,28 @@ function DetailsTab({ s }: { s: Session }) {
         {() => <MSel kind="denyrules" sel={lc.disallowed_tools || []} disabled />}
       </LockField>
 
+      {/* Color + Icon — locked displays (view-only from Role through Icon —
+          identity is create-time): the pickers' closed-trigger look, but
+          genuinely non-interactive markup — no button, no popover, no onClick
+          (the pickers' `locked` prop only adds a class and does NOT gate the
+          trigger click, so it is not relied on here). */}
       <div className="field grid grid-cols-2 gap-3" style={{ ['--cur-color' as any]: a.color }}>
         <div>
           <div className="flex items-center justify-between mb-1.5"><label className="lbl">Color</label></div>
-          <ColorPicker color={a.color} onPick={async hex => { const r = await api.updateIdentity(s.session_id, { color: hex }); if (!r) toast('Color update rejected') }} />
+          <div data-comp="color-picker" className="picker lockable" title="Set at create — view-only on a live session">
+            <div className="picker-trig">
+              <span className="picker-sw" style={{ background: a.color }} /><span className="picker-val">{jewelName(a.color)}</span>
+            </div>
+          </div>
         </div>
         <div>
           <div className="flex items-center justify-between mb-1.5"><label className="lbl">Icon</label></div>
-          <IconPicker icon={a.icon} color={a.color} onPick={async n => { const r = await api.updateIdentity(s.session_id, { icon: n }); if (!r) toast('Icon update rejected') }} />
+          <div data-comp="icon-picker" className="picker lockable" title="Set at create — view-only on a live session">
+            <div className="picker-trig">
+              <span className="agtile picker-ico" style={{ color: a.color }}><AgGlyph icon={a.icon} /></span>
+              <span className="picker-val">{a.icon || '—'}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -864,10 +902,14 @@ function CreateTab() {
   const [color, setColor] = useState(JEWELS[11].hex)   // emerald
   const [icon, setIcon] = useState('wizard-face')
   const [model, setModel] = useState<string>('inherit')
-  const [mode, setMode] = useState('Ask')
-  // #13 — Launch permissions: Create ALWAYS starts un-armed (both off); arming
-  // is an explicit per-create act (DESIGN.md → Create), never prepopulated.
-  const [armBypass, setArmBypass] = useState(false)
+  const [mode, setMode] = useState('Bypass')
+  // #13 — Launch permissions (operator decision 2026-07-17): Bypass is the
+  // DEFAULT launch mode and its arming is prepopulated ON — supersedes the
+  // earlier "Create ALWAYS starts un-armed, never prepopulated" stance.
+  // Disarming (or picking a tamer mode) stays an explicit per-create act;
+  // Auto still starts un-armed. Launching IN Bypass arms it implicitly, so
+  // the payload's `arm_bypass` flag stays reserved for arm-without-activate.
+  const [armBypass, setArmBypass] = useState(true)
   const [armAuto, setArmAuto] = useState(false)
   const [effort, setEffort] = useState('Med')
   const [maxTurns, setMaxTurns] = useState(40)
@@ -888,6 +930,58 @@ function CreateTab() {
     const r = await api.randomName(name.trim() ? [name.trim()] : [])
     if (r && r.name) setName(r.name)
     else setName(FALLBACK_NAMES[Math.floor(Math.random() * FALLBACK_NAMES.length)])
+  }
+
+  // ND 12 — the Role combobox IS the agent.md preset loader: the chevron opens
+  // a System/Project grouped popup off GET /roles (fetched lazily on open,
+  // cached; a reopen refreshes it cheaply); free-typing the input stays as-is.
+  const [roleOpen, setRoleOpen] = useState(false)
+  const [rolesCat, setRolesCat] = useState<RolesResponse | null>(null)
+  // Honest failure state for the preset fetch: without it a failed GET /roles
+  // leaves the "reading agent.md presets…" row up forever. Cleared on each
+  // open, so reopening retries.
+  const [rolesErr, setRolesErr] = useState(false)
+  const comboRef = useRef<HTMLDivElement>(null)
+  const toggleRoles = () => {
+    setRoleOpen(o => !o)
+    if (!roleOpen) {
+      setRolesErr(false)
+      api.roles(d.projectCwd).then(r => { if (r) setRolesCat(r); else setRolesErr(true) })
+    }
+  }
+  useEffect(() => {
+    if (!roleOpen) return
+    const onDown = (e: MouseEvent) => { if (comboRef.current && !comboRef.current.contains(e.target as Node)) setRoleOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRoleOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [roleOpen])
+  // Picking a preset prefills the Create state from the file's front matter.
+  // Icon is NEVER prefilled — the icon is the per-agent differentiator, not a
+  // front-matter field. Skills: the Create Skills MSel is still a stub, so the
+  // skills prefill lands with the skills catalog endpoint.
+  const pickRole = (r: RolePreset) => {
+    setRoleOpen(false)
+    setRole(r.name)
+    setDesc(r.description || '')
+    if (r.color_hex) setColor(r.color_hex)
+    // Accept exactly the families the Create ModelTabs offers (incl. 'inherit');
+    // unknown values / full model IDs still skip — the segment can't show them.
+    if (r.model && (MODEL_FAMILIES as readonly string[]).includes(r.model)) setModel(r.model)
+    if (r.tools?.length) setTools(r.tools)
+    if (r.max_turns) setMaxTurns(r.max_turns)
+    if (r.effort) {
+      const e = r.effort.toLowerCase()
+      const label = e === 'med' ? 'Med' : Object.entries(EFFORT_VALUE).find(([, v]) => v === e)?.[0]
+      if (label) setEffort(label)   // only values the Effort segment actually has
+    }
+    if (r.permission_mode) {
+      const label = Object.entries(LAUNCH_MODE_VALUE).find(([, v]) => v === r.permission_mode)?.[0]
+      // Only armed-reachable segments: an un-armed Auto/Bypass label would
+      // select a segment `shownModes` hides — skip the prefill instead.
+      if (label && (label !== 'Bypass' || armBypass) && (label !== 'Auto' || armAuto)) setMode(label)
+    }
   }
 
   // The Create ring never shows a segment that would silently no-op: Auto and
@@ -938,8 +1032,25 @@ function CreateTab() {
         <div className="grid grid-cols-[1fr_70px] gap-2">
           <div className="field editing">
             <label className="lbl block mb-1">Role</label>
-            <div data-comp="role-combobox" className="combo">
-              <div className="combo-trig"><input className="combo-in" value={role} placeholder="Select or type a role…" onChange={e => setRole(e.target.value)} /><button className="combo-cv" type="button" title="agent.md preset loading lands with the roles endpoint"><Ic name="chevrons-up-down" /></button></div>
+            <div data-comp="role-combobox" className="combo" ref={comboRef}>
+              <div className="combo-trig"><input className="combo-in" value={role} placeholder="Select or type a role…" onChange={e => setRole(e.target.value)} /><button className="combo-cv" type="button" title="Load an agent.md preset (System / Project)" onClick={toggleRoles}><Ic name="chevrons-up-down" /></button></div>
+              <div className={`combo-pop${roleOpen ? ' open' : ''}`}>
+                {rolesCat
+                  ? [rolesCat.system, rolesCat.project].map(g => (
+                    <React.Fragment key={g.label}>
+                      <div className="combo-gh">{g.label}</div>
+                      {g.roles.map(r => (
+                        <button type="button" key={`${g.label}:${r.name}`} className="combo-opt" data-name={r.name} onClick={() => pickRole(r)}>
+                          <b>{r.name}</b><span className="sub">{r.description || ''}</span>
+                        </button>
+                      ))}
+                      {!g.roles.length && <div className="combo-opt" style={{ cursor: 'default' }}><span className="sub">no agent.md files in this scope</span></div>}
+                    </React.Fragment>
+                  ))
+                  : rolesErr
+                    ? <div className="combo-gh">couldn't load presets — sidecar unreachable</div>
+                    : <div className="combo-gh">reading agent.md presets…</div>}
+              </div>
             </div>
           </div>
           <div className="field editing">
@@ -1037,7 +1148,16 @@ function CreateTab() {
         </div>
       </div>
       </div>
-      <CreateFooter busy={busy} onCreate={create} onReset={() => { setRole('agent'); setNum('01'); setName(''); setDesc(''); setTools([]); setDeny([]); setMcp([]); setPlugins([]) }} />
+      {/* Reset restores the FULL default create state (the useState initializers
+          above) — presets (pickRole) and arm toggles mutate color/model/effort/
+          maxTurns/mode too, so a partial reset would leave preset residue. */}
+      <CreateFooter busy={busy} onCreate={create} onReset={() => {
+        setRole('agent'); setNum('01'); setName(''); setDesc('')
+        setTools([]); setDeny([]); setMcp([]); setPlugins([])
+        setColor(JEWELS[11].hex); setIcon('wizard-face'); setModel('inherit')
+        setMode('Bypass'); setArmBypass(true); setArmAuto(false)
+        setEffort('Med'); setMaxTurns(40); setMaxCtx(75); setRespPreset('default')
+      }} />
     </>
   )
 }
@@ -1262,8 +1382,25 @@ function DetailsFooter({ s }: { s: Session }) {
   const a = identOf(s)
   const [confirm, setConfirm] = useState<null | 'retire' | 'delete' | 'save'>(null)
   const [fname, setFname] = useState(`${a.role || 'agent'}.md`)
-  const retire = async () => { setConfirm(null); const r = await api.retire(s.session_id); toast(r ? `Retired ${a.short}` : 'Retire failed') }
-  const del = async () => { setConfirm(null); const r = await api.hardDelete(s.session_id); toast(r ? `Deleted ${a.short} — configuration + transcripts wiped` : 'Delete failed') }
+  // Honest retire toast: a 200 does NOT mean archived — the response's
+  // `archived` field is the truth (null = the record was skipped or the write
+  // failed). Whether anything survives depends on the driver: `record_kept`
+  // says if a persisted roster row remains (bridge stop() keeps one; the sdk
+  // close() fallback keeps nothing) — only then is "kept on Past" true.
+  const retire = async () => {
+    setConfirm(null)
+    const r = await api.retire(s.session_id)
+    const reason = r.data?.archive_error || r.data?.archive_skipped || 'no archive record written'
+    if (r.ok && r.data?.archived) toast(`Retired ${a.short} (archived)`)
+    else if (r.ok && r.data?.record_kept) toast(`Retired ${a.short} — not archived (kept on Past): ${reason}`)
+    else if (r.ok) toast(`Retired ${a.short} — not archived — record not kept: ${reason}`)
+    else toast(`Retire failed: ${r.detail || 'sidecar error'}`)
+  }
+  const del = async () => {
+    setConfirm(null)
+    const r = await api.hardDelete(s.session_id)
+    toast(r.ok ? `Deleted ${a.short} — configuration + transcripts wiped` : `Delete failed: ${r.detail || 'sidecar error'}`)
+  }
   return (
     <div className="pcard-foot px-2 py-2.5">
       {confirm === null && (
@@ -1322,7 +1459,9 @@ function ConsoleTab({ s }: { s: Session | null }) {
           <span className="con-live"><i className="con-dot" />{con.attachState === 'ws' ? 'raw feed' : 'catalog only'}</span>
           <button data-comp="button" className="btn btn-sm con-expand" title="Expand the Console to a step-into view" onClick={() => d.setConsoleExpanded(true)}><Ic name="maximize-2" className="w-3.5 h-3.5" />Expand</button>
         </div>
-        <ConsoleFeed id="con-feed-col" con={con} />
+        {/* single-writer rule: while the expanded overlay is open it is the
+            topmost view — this in-column instance stops driving pane geometry */}
+        <ConsoleFeed id="con-feed-col" con={con} sendResize={!d.consoleExpanded} />
         <div data-comp="command-palette" className={`con-catalog${catOpen ? ' open' : ''}`}>
           <div className="con-cat-head">
             <span className="con-cat-title">Commands</span>

@@ -1,5 +1,5 @@
 // Use require() directly for Electron CJS compatibility
-const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, nativeImage, Menu } = require('electron')
 const { join } = require('path')
 import type { BrowserWindow as BrowserWindowType, Event as ElectronEvent } from 'electron'
 import { ensureSidecar, requestGracefulStop, sidecarSummary, stopOwnedSidecar } from './sidecar'
@@ -125,6 +125,19 @@ function createWindow() {
     backgroundColor: '#fef6e4', // --background (cream canvas) — matches the rebuilt renderer
   })
 
+  // Default menu removed product-wide (Menu.setApplicationMenu(null) below) —
+  // its role accelerators went with it, so the dev loop keeps its devtools +
+  // reload keys via this dev-gated shim (ELECTRON_RENDERER_URL = electron-vite
+  // dev, the same discriminator the loader below uses).
+  if (process.env.ELECTRON_RENDERER_URL) {
+    win.webContents.on('before-input-event', (_e: ElectronEvent, input: { type: string; key: string; control: boolean; shift: boolean }) => {
+      if (input.type !== 'keyDown') return
+      const key = (input.key || '').toLowerCase()
+      if (key === 'f12' || (input.control && input.shift && key === 'i')) win.webContents.toggleDevTools()
+      else if (input.control && !input.shift && key === 'r') win.webContents.reload()
+    })
+  }
+
   // Intercept close: the §3.4 dialog decides detach vs graceful-stop vs cancel.
   win.on('close', (event: ElectronEvent) => {
     if (quitConfirmed) return
@@ -158,6 +171,10 @@ ipcMain.handle('awl:thumb', async (_e: unknown, absPath: unknown): Promise<strin
 })
 
 app.whenReady().then(() => {
+  // The default File/Edit/View/Window/Help strip is gone product-wide; the
+  // dev-gated before-input-event shim in createWindow() keeps F12/Ctrl+Shift+I
+  // (devtools) and Ctrl+R (reload) alive for the dev loop.
+  Menu.setApplicationMenu(null)
   createWindow()
   // Own the sidecar (adopt-or-spawn) without blocking the window — the
   // renderer's /health handling covers the gap while a cold sidecar binds.

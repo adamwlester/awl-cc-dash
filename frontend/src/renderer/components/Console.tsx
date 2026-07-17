@@ -64,12 +64,34 @@ export function useConsole(sessionId: string | null) {
     setLines(p => [...p, ...screen.slice(-30).map(t => ({ c: 'l-out', t }))])
   }, [sessionId, setLines])
 
-  return { lines, wsUrl, attachState, catalog, run }
+  return { sessionId, lines, wsUrl, attachState, catalog, run }
 }
 
 // ---- xterm host --------------------------------------------------------------
-function XtermFeed({ wsUrl }: { wsUrl: string }) {
+// `sendResize` is the SINGLE-WRITER rule for pane geometry: the in-column tab
+// and the expanded overlay both mount an XtermFeed while expanded (two WS
+// clients, one tmux window) — only the topmost view may drive the sidecar's
+// POST /sessions/{id}/console/resize (debounced ~350ms trailing; the pin —
+// `window-size manual` — stays, `resize-window` keeps it set). The ttyd
+// '1{columns,rows}' message still goes up either way — harmless, tmux ignores
+// a client resize under the pin.
+function XtermFeed({ wsUrl, sessionId, sendResize }: { wsUrl: string; sessionId: string | null; sendResize: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  // Ref, not an effect dep: flipping topmost-ness (expand/collapse) must not
+  // tear down and rebuild the live terminal.
+  const sendResizeRef = useRef(sendResize)
+  sendResizeRef.current = sendResize
+  // Regaining the writer role (sendResize false→true — e.g. the expanded
+  // overlay closed and this in-column feed drives geometry again) must
+  // RE-ASSERT geometry: the host's size didn't change, so the ResizeObserver
+  // won't fire, yet tmux is still pinned at the departed view's size. Guarded
+  // so it never fires on initial mount (ws.onopen already pushes then).
+  const pushGeomRef = useRef<() => void>(() => {})
+  const wasWriterRef = useRef(sendResize)
+  useEffect(() => {
+    if (sendResize && !wasWriterRef.current) pushGeomRef.current()
+    wasWriterRef.current = sendResize
+  }, [sendResize])
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
@@ -81,6 +103,18 @@ function XtermFeed({ wsUrl }: { wsUrl: string }) {
     term.loadAddon(fit)
     term.open(host)
     try { fit.fit() } catch { /* not yet laid out */ }
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null
+    const pushGeometry = () => {
+      if (!sendResizeRef.current || !sessionId) return
+      if (resizeTimer) clearTimeout(resizeTimer)
+      // Gate re-checked at FIRE time too: a pending in-column timer must not
+      // land after the expanded view has become the writer.
+      // Below-floor clamp (viewer smaller than the sidecar's 60×15 scraper
+      // floor renders tmux-clipped): accepted degrade — the applied values in
+      // the response are deliberately not reconciled here.
+      resizeTimer = setTimeout(() => { if (sendResizeRef.current && sessionId) void api.consoleResize(sessionId, term.cols, term.rows) }, 350)
+    }
+    pushGeomRef.current = pushGeometry
     let ws: WebSocket | null = null
     try {
       ws = new WebSocket(wsUrl, ['tty'])
@@ -88,6 +122,7 @@ function XtermFeed({ wsUrl }: { wsUrl: string }) {
       ws.onopen = () => {
         try { ws!.send(JSON.stringify({ AuthToken: '' })) } catch { /* ttyd handshake — optional */ }
         try { ws!.send('1' + JSON.stringify({ columns: term.cols, rows: term.rows })) } catch { }
+        pushGeometry()
       }
       ws.onmessage = (m) => {
         if (typeof m.data === 'string') {
@@ -104,11 +139,11 @@ function XtermFeed({ wsUrl }: { wsUrl: string }) {
       term.onData(d => { try { ws && ws.readyState === 1 && ws.send('0' + d) } catch { } })
     } catch { term.write('[attach failed]') }
     const ro = new ResizeObserver(() => {
-      try { fit.fit(); ws && ws.readyState === 1 && ws.send('1' + JSON.stringify({ columns: term.cols, rows: term.rows })) } catch { }
+      try { fit.fit(); ws && ws.readyState === 1 && ws.send('1' + JSON.stringify({ columns: term.cols, rows: term.rows })); pushGeometry() } catch { }
     })
     ro.observe(host)
-    return () => { ro.disconnect(); try { ws?.close() } catch { }; term.dispose() }
-  }, [wsUrl])
+    return () => { ro.disconnect(); if (resizeTimer) clearTimeout(resizeTimer); try { ws?.close() } catch { }; term.dispose() }
+  }, [wsUrl, sessionId])
   return <div className="awl-xterm-host" ref={hostRef} />
 }
 
@@ -122,11 +157,11 @@ function conMarkup(t: string): React.ReactNode {
   return t
 }
 
-export function ConsoleFeed({ id, con }: { id: string; con: ReturnType<typeof useConsole> }) {
+export function ConsoleFeed({ id, con, sendResize = true }: { id: string; con: ReturnType<typeof useConsole>; sendResize?: boolean }) {
   const feedRef = useRef<HTMLDivElement>(null)
   useEffect(() => { const el = feedRef.current; if (el) el.scrollTop = el.scrollHeight }, [con.lines])
   if (con.attachState === 'ws' && con.wsUrl) {
-    return <div data-comp="console-feed" className="con-feed awl-xterm" id={id}><XtermFeed wsUrl={con.wsUrl} /></div>
+    return <div data-comp="console-feed" className="con-feed awl-xterm" id={id}><XtermFeed wsUrl={con.wsUrl} sessionId={con.sessionId} sendResize={sendResize} /></div>
   }
   return (
     <div data-comp="console-feed" className="con-feed" id={id} ref={feedRef}>
@@ -216,7 +251,8 @@ export function ConsoleView() {
           <div className="con-cat-list">{d.consoleExpanded && <CommandList catalog={con.catalog} filter={filter} onPick={c => setCmd(c + ' ')} />}</div>
         </aside>
         <main className="con-main">
-          {d.consoleExpanded && <ConsoleFeed id="con-feed-full" con={con} />}
+          {/* the expanded overlay is always the topmost view → it drives geometry */}
+          {d.consoleExpanded && <ConsoleFeed id="con-feed-full" con={con} sendResize />}
           <div data-comp="console-runbar" className="con-run con-run--full">
             <button className="con-cmds-btn" title="Jump to the command filter" onClick={() => { const el = viewRef.current?.querySelector('.con-search input') as HTMLInputElement | null; el?.focus() }}><Ic name="terminal" className="w-3.5 h-3.5" /><span>/</span></button>
             <input className="con-input" placeholder="Type a command, or pick one from the list…" value={cmd}
