@@ -93,6 +93,105 @@
       "permission_mode": "acceptEdits",
       "git_author_name": "Agent-4",
       "git_author_email": "agent-4@agents.awl-cc-dash.invalid"
+    },
+    "arc2bb70ab0907f": {
+      "archive_id": "arc2bb70ab0907f",
+      "session_id": "3279d256",
+      "name": "arch-proof",
+      "identity": {
+        "role": "throwaway",
+        "number": 4,
+        "name": "arch-proof",
+        "color": "#5f6b7a",
+        "icon": "wizard-face"
+      },
+      "color": "#5f6b7a",
+      "icon": "wizard-face",
+      "created_at": "2026-07-17T02:02:25.995988",
+      "retired_at": "2026-07-17T02:02:31.117802",
+      "transcript": {
+        "claude_session_id": "13064118-6850-451b-ac76-0cf35fcb9eab",
+        "transcript_path": null
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "c:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "model": "haiku",
+      "driver": "bridge",
+      "permission_mode": "bypassPermissions",
+      "tmux_name": "awl-4a1a6b90",
+      "arm_bypass": false,
+      "git_author_name": "arch-proof",
+      "git_author_email": "arch-proof-4@agents.awl-cc-dash.invalid"
+    },
+    "arcddd0ed3a702c": {
+      "archive_id": "arcddd0ed3a702c",
+      "session_id": "d81eb6e1",
+      "name": "",
+      "identity": {
+        "role": "roundtrip",
+        "number": 8,
+        "name": "",
+        "color": "#5f6b7a",
+        "icon": "fox-head"
+      },
+      "color": "#5f6b7a",
+      "icon": "fox-head",
+      "created_at": "2026-07-17T02:12:52.606594",
+      "retired_at": "2026-07-17T02:13:31.665958",
+      "transcript": {
+        "claude_session_id": "ac747c53-00ab-4cbc-9078-e2738364ce33",
+        "transcript_path": null
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "c:/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "model": "haiku",
+      "driver": "bridge",
+      "permission_mode": "bypassPermissions",
+      "tmux_name": "awl-e634123d",
+      "arm_bypass": false,
+      "git_author_name": "roundtrip-8",
+      "git_author_email": "roundtrip-8@agents.awl-cc-dash.invalid"
+    },
+    "arcc777cdfcb2bc": {
+      "archive_id": "arcc777cdfcb2bc",
+      "session_id": "d81eb6e1",
+      "name": "",
+      "identity": {
+        "role": "roundtrip",
+        "number": 8,
+        "name": "",
+        "color": "#5f6b7a",
+        "icon": "fox-head"
+      },
+      "color": "#5f6b7a",
+      "icon": "fox-head",
+      "created_at": "2026-07-17T02:13:36.409686",
+      "retired_at": "2026-07-17T02:16:45.792086",
+      "transcript": {
+        "claude_session_id": null,
+        "transcript_path": null
+      },
+      "lineage": {
+        "parent": null,
+        "fork": null,
+        "handoff": null
+      },
+      "cwd": "c:/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "model": "haiku",
+      "driver": "bridge",
+      "permission_mode": "bypassPermissions",
+      "tmux_name": "awl-e634123d",
+      "arm_bypass": false,
+      "git_author_name": "roundtrip-8",
+      "git_author_email": "roundtrip-8@agents.awl-cc-dash.invalid"
     }
   }
 }

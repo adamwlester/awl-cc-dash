@@ -17,3 +17,4 @@
 {"anchor_id": "eca6c5dc:s:seq49", "source": "f6d4d421", "recipients": ["eca6c5dc"]}
 {"anchor_id": "f6d4d421:s:seq50", "source": "eca6c5dc", "recipients": ["f6d4d421"]}
 {"anchor_id": "f6d4d421:s:seq71", "source": "scratch", "recipients": ["f6d4d421"]}
+{"anchor_id": "4a6b34b5:s:seq10", "source": "scratch", "recipients": ["4a6b34b5"]}

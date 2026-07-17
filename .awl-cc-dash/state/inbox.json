@@ -1,4 +1,37 @@
 {
   "schema_version": 1,
-  "items": {}
+  "items": {
+    "4a6b34b5": [
+      {
+        "id": "ibx1",
+        "agent_id": "4a6b34b5",
+        "type": "response",
+        "data": {
+          "runs": 1,
+          "last_turn_at": "2026-07-17T02:03:50.857736"
+        },
+        "sticky": false,
+        "dedup_key": "response:4a6b34b5",
+        "resolved": false,
+        "answer": null,
+        "created_at": "2026-07-17T02:03:50.857736"
+      }
+    ],
+    "1137bd82": [
+      {
+        "id": "ibx2",
+        "agent_id": "1137bd82",
+        "type": "response",
+        "data": {
+          "runs": 1,
+          "last_turn_at": "2026-07-17T02:17:07.005553"
+        },
+        "sticky": false,
+        "dedup_key": "response:1137bd82",
+        "resolved": false,
+        "answer": null,
+        "created_at": "2026-07-17T02:17:07.005553"
+      }
+    ]
+  }
 }

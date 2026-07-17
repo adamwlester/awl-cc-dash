@@ -48,6 +48,22 @@
       "exchanges": 0,
       "tokens": 90,
       "active": false
+    },
+    {
+      "id": "lnk4",
+      "a": "4a6b34b5",
+      "b": "bbdb9332",
+      "direction": "both",
+      "relationship": "direct",
+      "shared_content": [],
+      "shared_backfill": false,
+      "trigger": "queue",
+      "end_after_exchanges": 25,
+      "end_after_tokens": null,
+      "messages": 0,
+      "exchanges": 0,
+      "tokens": 0,
+      "active": true
     }
   ]
 }
