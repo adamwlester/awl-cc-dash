@@ -340,6 +340,14 @@ Files: CLAUDE.md, DEVLOG.md
 
 ---
 
+### 2026-07-16 21:38:41 — docs: ARCHITECTURE currency pass (audit findings) + build-sprint notes archived
+
+The state-audit's doc-currency list applied to [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), every claim code-verified before writing, checker-verified clean after: the ~8 stale "queued (§11 #NN)" cross-refs trued to built (#12 ×2, #22, #29, #36, #38, #40, #44 — plus the #37 tombstone's residual clause rewritten as dated since-closed history); §4.4's opening retensed to past (the freeze-and-rebuild strategy kept as dated history); §4.2 rewritten to the REAL rebuilt renderer tree (components/ ×11, design/, lib/, `store.tsx` DashProvider state model); the §5.2 endpoint map caught up to the shipped surface (+~24 endpoints across new Archive / Timeline-rewind / Prompt-library / Import rows and extended rows — a full 96-decorator sweep of main.py confirms the map is now complete both directions); §12's repo map gains the 9 missing sidecar modules + `store.tsx` + the bridge CLI files. Three of the handoff note's orphan facts ported as settled prose (retired-numbers skip set process-global §8.4; synthesized-event routing rows don't re-join on replay §8.6; cwd-less records' app-level sessions.json fallback §8.1); the fourth ("legacy root review sidecars unlisted") was NOT ported — code shows `aggregate_metas` gained the root scan in `7f857ee`, so the seam is closed, not an accepted limit. With nothing left unported, both build-sprint notes retired: [2026-07-10-build-sprint-handoff.md](archive/dev/notes/2026-07-10-build-sprint-handoff.md) + [2026-07-15-stage5-build-plan.md](archive/dev/notes/2026-07-15-stage5-build-plan.md) → `archive/dev/notes/` (no live references outside DEVLOG history). Correction to the 21:22:42 entry: the icons commit carried **218** SVGs — 167 agent tiles + the Lucide `ui/` set across its 4 subdirs — not "4 UI icons".
+
+Files: docs/ARCHITECTURE.md, archive/dev/notes/2026-07-10-build-sprint-handoff.md, archive/dev/notes/2026-07-15-stage5-build-plan.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
