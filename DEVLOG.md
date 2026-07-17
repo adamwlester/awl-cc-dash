@@ -308,6 +308,22 @@ Files: sidecar/timeline.py, sidecar/main.py, sidecar/drivers/bridge.py, frontend
 
 ---
 
+### 2026-07-16 19:42:00 — §11 #46 rewind anchor LIVE-PROVEN (durable test) + a post-restore capture race caught
+
+The #46 build's durable live proof landed and runs GREEN: the new [tests/test_rewind_anchor_live.py](tests/test_rewind_anchor_live.py) (integration+slow, sidecar-owned session via its own `POST /sessions`, restartable sidecar-subprocess controller on one runtime dir) drives 3 real sonnet turns, asserts every timeline row's `prompt_uuid`/`reply_uuid` EQUALS the matching raw-transcript entry uuids (anchor truth, the headline), rewinds (`to_prompt_index: 1` → 200, typed `{type:"rewind"}` line read raw from turns.jsonl, replay rolls exactly row 3 with `rolled_ranges=[{from:2,to:3}]`), then KILLS the sidecar and boots a fresh one on the same runtime (`AWL_STARTUP_RESTORE=all` warm rebind) — the rolled truth (rows/anchors/ranges/rewinds) is served IDENTICAL by the fresh process (reload amnesia closed at the server level), and a post-rewind DELTA turn lands live (row 4, `rolled:false`, anchors == the new branch entries; summary 'DELTA'). Evidence: `tests/log/rewind_anchor_findings_latest.txt`. ⚠ Product finding (reported, NOT patched): the first run caught a real post-restore race — a prompt sent before the restored driver's FIRST transcript poll replays history into `session.events` gets its whole capture window polluted by the replay burst (the flush's synthetic `running` sets `_turn_start_idx` pre-burst), so row 4's `prompt_uuid` came back as the ALPHA prompt's uuid and a replayed assistant entry can satisfy `_saw_reply_since_send` (reply gate defeated). The durable test now gates stage 5 on an adopt-settled poll (`GET /sessions/{id}/history` shows the known prompt anchors) — the race path stays open in the product for the first prompt sent immediately after a restore.
+
+Files: tests/test_rewind_anchor_live.py, DEVLOG.md
+
+---
+
+### 2026-07-16 19:57:57 — #46/#22 close-out: headed reload-survival proof + full docs sweep (markers cleared, #52 queued)
+
+The headed half of the #46 proof passed — 40/40 scripted checks via ui-verify (parked headed Chromium) against a live sidecar + real tab-less sonnet agent on the standalone renderer dev server: a UI-driven rewind dims the rolled row, and the marking **survives `page.reload()` twice** (single and merged ranges — the exact residual this build closes), post-reload rewinds target correctly over server ranges, width extremes clamp at the pinned 400px with no overflow, and the tri-tab / confirm / cancel paths all behave (screenshots in `.scratch/anchor-headed/`; zero renderer console errors). Docs trued to the proven state: [ARCHITECTURE](docs/ARCHITECTURE.md) §7.19 and §4 ⚠ markers cleared into settled prose (anchors + rewind events + server replay + both proofs + the spike-recorded honest limits), the §11 #46 and #50 rows record the close, §11.1 drops the two cleared rows and gains **#52** — the post-restore capture-window race the live proof caught (history replay can mis-anchor the first post-restore turn and satisfy the reply gate; new §11.7 queue item with direction + evidence pointer). [tests/README.md](tests/README.md): the readouts-unit row extended with the #46 contract (~95 cases), the plandec live row records the #22 endpoint proof, and `test_rewind_anchor_live.py` gets its live-table row. One first-run UX note from the headed drive, recorded for future drives: on a fresh runtime store the renderer auto-opens the Projects picker, which overlays the shell — open or dismiss it before driving.
+
+Files: docs/ARCHITECTURE.md, tests/README.md, tests/test_rewind_anchor_live.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
