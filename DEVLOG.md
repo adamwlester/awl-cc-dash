@@ -348,6 +348,14 @@ Files: docs/ARCHITECTURE.md, archive/dev/notes/2026-07-10-build-sprint-handoff.m
 
 ---
 
+### 2026-07-16 22:57:16 — docs: prune the 19 finished [ND] items from TODO.md
+
+Pruned all 19 items from the **[ND] NEXT UP — DESIGN** section of [dev/notes/TODO.md](dev/notes/TODO.md), leaving the section empty per the doc's leave-empty-sections-empty convention. A per-item cross-check confirmed every [ND] item is built across the five design files (each carries its `ND N` tag in `behavior.js`/`styles.css`, and the cross-cutting model changes are synced in `DESIGN.md`), so removal loses nothing. Three carry a built-vs-example nuance, each already recorded durably elsewhere and re-noted here so it survives the delete: **ND-5** — the dense-default `.badge` deliberately stays 26px rather than the minted M tier (rationale in a `styles.css` comment + `DESIGN.md`); **ND-15** — the timeline row shows the bare turn number, with count/max living on the card's Turns bar rather than in the row; **ND-17** — the cream/pink window chrome is built as specified now, but `DESIGN.md`'s north-star records the intent to strip cream/pink later. Backlog sections [BD]/[BH] were verified still-pending and left untouched; no design-system or app code changed (a backlog-doc prune only). Guarded edit via `.scratch/prune-todo-nd.py`, which asserted the ND/NB heading boundaries and a 19-item count before writing.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
