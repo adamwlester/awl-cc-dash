@@ -356,6 +356,38 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-17 02:10:00 — build sprint 2b: five-lane implementation + adversarial review (roles, archive gating, console resize, Details lock, Bypass default, menu, demo seed)
+
+The 2026-07-17 sprint's implementation phase, run as five parallel file-disjoint lanes off a fresh six-mapper anchor pass, then adversarially reviewed (6 dimension reviewers → 23 findings → per-finding refutation → 21 confirmed, all fixed) before committing. **Sidecar+bridge** (`e42e235`): the retire data-loss fix — `save_archive_record` raises on no-op and `close_session` gates teardown on the archive landing (failure → overridden-`stop()` fallback keeps the roster row; response gains `archived`/`archive_error`/`archive_skipped`/`record_kept`); the new `GET /roles` two-scope agent.md preset catalog ([sidecar/roles.py](sidecar/roles.py) hand parser — quoted scalars, any-indent block lists, snake_case wire — + `storage.agents_dir`, named-color→`--ag-*` hex mapping); `TmuxBridge.console_resize` + `POST /sessions/{id}/console/resize` (clamps 60–500×15–200; the `window-size manual` pin stands — resize-window is the one sanctioned geometry writer); Bypass as the default launch mode. **Renderer+shell** (`8622c33`): Details tab fully locked (operator decision — no pencils Role→Icon, identity edits removed), the Create Role combobox live as the preset loader (grouped popup, prefill incl. color; icon never), the giant-icon fix (`.agtile` wrapper restored → 26px), honest retire/delete toasts on `ApiResult`, the Library review-rail keying fix (filename-keyed + nested-review flatten — review sidecars had NEVER rendered), console resize sends under a single-writer rule, `Menu.setApplicationMenu(null)` + dev-gated devtools shim. **Design sync** (`457c45f`): mockup pencils removed, Create ships Bypass-armed, `ROLE_DEFS` color prefill, `AG_FROM_NAMED` aligned to the sidecar map, DESIGN.md trued (styles.css untouched — no color values anywhere, palette stays a separate lane). **Demo seed** (`12b1db0`): `.awl-cc-dash/agents/` five role presets + provenance-sidecar'd demo docs/plan. Hermetic tier 1418 → 1464 green; tsc clean; variant-lint clean.
+
+Files: sidecar/main.py, sidecar/state_store.py, sidecar/storage.py, sidecar/roles.py, sidecar/identity.py, sidecar/drivers/base.py, bridge/bridge.py, frontend/src/renderer/api.ts, frontend/src/renderer/components/AgentPanel.tsx, frontend/src/renderer/components/Console.tsx, frontend/src/renderer/components/Library.tsx, frontend/src/main/index.ts, design/mockup.html, design/behavior.js, design/DESIGN.md, .awl-cc-dash/agents/*, .awl-cc-dash/docs/*, .awl-cc-dash/plans/*, tests/* (6 files)
+
+---
+
+### 2026-07-17 02:45:00 — Phase-3 live drive: the whole product exercised at width extremes — sprint features proven, 13 findings
+
+The systematic render-and-check the operator asked for, against the real stack (fresh sidecar on the sprint code, standalone renderer on :5199, ui-verify parked headed Chromium, 4 real tab-less haiku agents spawned as the demo team). **Proven live:** archive-gated retire (200 + arc id, on disk, Past-listed), `GET /roles` (5 project + 18 system, correct hexes), preset prefill in the real UI (color/desc/tools land, icon untouched), Details fully view-only, 26px icon tiles, Bypass default end to end (`bypassPermissions` + armed ring, zero permission prompts), console expand fills the panel with **no dot-fill** (geometry 60×44@1440 → 211×58@2560, collapse re-asserts), the seeded plan's Approved chip + handbook comment rendering (the review rail's first-ever real render), scratch/graph/inbox/feed all live, width extremes 900/1180/1440/2560 + pane-splitter floors all sane. **13 findings**, headline three: resume-from-archive landed ERROR (`can't find pane`), `GET /usage` intermittent 500 (dict mutated during iteration), duplicate archive rows after retire→resume→retire. Evidence: 48 shots + 31 JSONs under `.scratch/sprint-live/`. The Electron leg ran separately: menu bar proven gone (`Menu.getApplicationMenu() === null` in the real main process) and the adopted sidecar survived the shell close.
+
+Files: (read-only drive — evidence in .scratch/sprint-live/; no repo changes)
+
+---
+
+### 2026-07-17 03:05:00 — Phase-4: the six actionable findings fixed and live-re-proven; dogfood store refreshed
+
+All six actionable Phase-3 findings fixed (`affb33f`), each re-proven against the live stack. The headline root-cause: resume-from-archive failed not at the warm/cold split but because **Claude Code writes the transcript only on the first turn** — cold-restoring a zero-turn agent ran `claude --resume` against a nonexistent conversation and the fresh tmux died with it; [BridgeDriver](sidecar/drivers/bridge.py) now probes transcript existence first (present → `--resume`; provably absent → fresh launch pinned to the same session id; unreadable → fail open). Retire→resume→**idle**→retire round trip green live. Also: `save_archive_record` replaces a standing same-session row (one archive row per session, endpoint-cycle test); the `/usage` iteration race snapshotted plus six sibling `sessions` loops; blank names now auto-draw from the curated pool (`assign_identity` — the live demo team drew **ecto/fnord/goop/taro**); the Create No. field defaults to auto (no more silent `number: 1` claiming retired numbers); in-column console attach retries once. Hermetic 1464 → **1474** green, tsc clean. The refreshed dogfood store committed deliberately (`67261d0`): the named 4-agent roster, builder↔reviewer link, deduped archive rows, drive scratch post.
+
+Files: sidecar/main.py, sidecar/identity.py, sidecar/state_store.py, sidecar/drivers/bridge.py, frontend/src/main/index.ts, frontend/src/renderer/components/AgentPanel.tsx, frontend/src/renderer/components/Console.tsx, tests/test_archive_unit.py, tests/test_resume_past_unit.py, tests/test_sidecar_unit.py, .awl-cc-dash/state/*, .awl-cc-dash/docs/scratchpad.md
+
+---
+
+### 2026-07-17 03:16:42 — docs: sprint currency pass (ARCHITECTURE §5.2/§7.5/§7.11/§7.12/§7.13/§8.2/§8.4/§9.9/§11/§12, tests/README, CLAUDE.md store row)
+
+The consolidated docs pass closing the sprint, every claim code-verified: [ARCHITECTURE](docs/ARCHITECTURE.md) — §7.5 rewritten (identity+config **set at Create, locked after** — supersedes "editable after create"; blank-name auto-draw; the new Role-presets/agent.md-loader block with the two-scope catalog and color-prefill mapping); §7.11 records Bypass as the default launch mode; §7.12 the gated archive-on-retire contract; §7.13 the sanctioned console-resize doctrine; §8.2/§8.4 gain the `agents/` subdir + role-presets row; §9.9 the zero-turn cold-restore exception; §5.2/§12 the new endpoint + module; §11 gains built row **#53** (roles) and queue rows **#54–#58** (expanded-console widths, the 1180-vs-1440 floor decision, icon picker 50-of-167, the warm-resume race fall-through, cosmetics batch), ⚠ index synced. [tests/README.md](tests/README.md): rows for the two new test files + five extended rows with trued counts; one stale docstring line in `test_ui_slice_live.py` trued to the bypass default. [CLAUDE.md](CLAUDE.md): the `.awl-cc-dash/` FOLDER MAP row rewritten to the seeded demo-store reality (`agents/` · `docs/` · `plans/` · `state/`, the 2026-07-17 demo baseline, state-vs-content handling split).
+
+Files: docs/ARCHITECTURE.md, tests/README.md, tests/ui/test_ui_slice_live.py, CLAUDE.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

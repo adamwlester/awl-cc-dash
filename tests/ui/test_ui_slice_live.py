@@ -28,7 +28,7 @@ WHAT WAS LEARNED (durable notes)
 * Run-state is derived two ways and both agree: SSE ``status_change`` events AND
   ``GET /sessions/{id}.status``. The harness polls the session record every 1s as
   the authoritative source and reacts to SSE for snappiness. Permission mode MUST
-  be ``default`` at create (the CreateSessionRequest default is ``acceptEdits``,
+  be ``default`` at create (the CreateSessionRequest default is ``bypassPermissions``,
   which auto-approves writes → NO prompt would ever appear).
 * ``has_pending_permission`` on the session record is the reliable "is a card up?"
   signal; the ``permission_request`` / ``permission_resolved`` SSE events give the
