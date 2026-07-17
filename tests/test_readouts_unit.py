@@ -54,6 +54,55 @@ The decided contracts this file encodes:
     ``GET /sessions/{id}/timeline`` serves the ordered list with ``turn``
     re-minted 1..N in stored order (monotonic across sidecar restarts).
 
+    The rewind-anchor residual rides the same record (spike-proven facts:
+    the JSONL transcript is append-only — a rewind writes NOTHING at rewind
+    time, and no engine checkpoint id exists anywhere). Each turn record
+    additively carries the turn's TRANSCRIPT ANCHORS — ``prompt_uuid`` (the
+    user-prompt JSONL entry uuid) and ``reply_uuid`` (the closing assistant
+    entry uuid), lifted at capture from the turn's events (the same
+    ``anchor``/``source_kind='t'`` fields the event bus mints deterministic
+    ids from; ``timeline.turn_anchors``) — null-safe: an SDK-driven or
+    synthesized turn records nulls, never a fabricated anchor. The lift
+    honors LIVE bridge ordering: the driver polls the turn's prompt entry in
+    BEFORE it emits the boundary's ``running`` flip (and a mid-turn
+    permission prompt re-emits ``running``), so when the forward window
+    misses the prompt the lift scans BACKWARD, walking through intermediate
+    ``running`` flips and stopping at the previous turn's completion; tool
+    results (type-"user" transcript entries too), CLI meta lines, and a
+    subagent's sidechain entries (both flagged by the driver's
+    ``_entry_to_event``) never anchor a turn; and because the screen flips
+    idle ~1s before the transcript tail is polled into events (the
+    reply-relay's exact lag), the capture SETTLES — re-lifts summary +
+    anchors until two consecutive lifts agree, bounded
+    (``main._CAPTURE_SETTLE_SECS``/``_ATTEMPTS``; hermetic runs zero the
+    sleep, the re-lift logic still runs). Each
+    SUCCESSFUL dashboard rewind appends a typed REWIND EVENT record
+    (``{"type": "rewind", timestamp, to_prompt_index}``) to the SAME
+    ``turns.jsonl`` through the SAME per-session serialization
+    (``_capture_tail`` chain + the ``_turns_pending`` in-order drain — a
+    rewind record can never land ahead of a turn record still draining), and
+    mirrors it into ``session.turns``; a FAILED rewind appends nothing. New
+    turn records carry ``"type": "turn"``; any line WITHOUT a type is a turn
+    (old files replay identically). The read surface REPLAYS the interleaved
+    stream (``timeline.replay_timeline``): ordinals are minted over TURN
+    records only (pure-turn files keep today's numbering exactly), a live
+    stack pushes each turn and each rewind pops/marks the top
+    ``k = to_prompt_index`` ordinals rolled (clamped honestly at the stack
+    size — never a crash), so post-rewind turns stay live and chained
+    rewinds compose. The response gains per-row ``rolled`` plus top-level
+    ``rolled_ranges`` (merged ascending, exclusive-``from``: a row t is
+    rolled iff ``from < t <= to``) and ``rewinds``, keeping the
+    ``{session_id, count, turns}`` shape otherwise (count = turn rows).
+    The read also MERGES records still queued on the transient-persist-
+    failure path (``_turns_pending``, snapshotted BEFORE the file read with
+    the drained prefix deduped off the file tail) — a rewind event whose
+    append hiccuped must still roll its rows, never silently serve un-rolled
+    state the renderer's k-from-last arithmetic would act on.
+    Manual-terminal rewinds write no event and stay unmarked — the settled
+    scope (the Timeline logs dashboard turns); the replay mirrors the
+    renderer's k-from-last arithmetic and diverges only if manual TUI turns
+    interleave (the pre-existing limit).
+
 No WSL, no tmux, no model — fakes throughout. Live proofs:
 ``test_context_breakdown_live.py``, ``test_statusline_capture_live.py``,
 ``test_cost_endpoint_live.py``.
@@ -79,6 +128,17 @@ from main import SessionState  # noqa: E402
 from bridge.transcript import (  # noqa: E402
     compact_history, find_context_markdown, parse_context_output,
 )
+
+
+@pytest.fixture(autouse=True)
+def _zero_capture_settle(monkeypatch):
+    """Zero the #46 capture's trailing-entry settle SLEEP for hermetic runs —
+    the re-lift loop still executes (TestCaptureSettle pins its logic), only
+    the between-attempt wait is removed. Returns the live value so the budget
+    test can assert it stays a real positive settle."""
+    original = main._CAPTURE_SETTLE_SECS
+    monkeypatch.setattr(main, "_CAPTURE_SETTLE_SECS", 0)
+    return original
 
 
 # -----------------------------------------------------------------------------
@@ -678,6 +738,234 @@ class TestModelFromSnapshot:
 
 
 # -----------------------------------------------------------------------------
+# #46 — the transcript anchors (build_record fields + the turn_anchors lift)
+# -----------------------------------------------------------------------------
+
+class TestBuildRecordAnchors:
+    def test_carries_anchor_fields_additively_and_types_new_writes(self):
+        rec = timeline.build_record(turn=1, timestamp="t",
+                                    prompt_uuid="u-1", reply_uuid="a-9")
+        assert rec["prompt_uuid"] == "u-1" and rec["reply_uuid"] == "a-9"
+        # New writes are explicitly typed; readers treat typeless as turn.
+        assert rec["type"] == "turn"
+
+    def test_defaults_are_null_safe(self):
+        rec = timeline.build_record(turn=1, timestamp="t")
+        assert rec["prompt_uuid"] is None and rec["reply_uuid"] is None
+
+
+class TestTurnAnchors:
+    # Live bridge ordering (drivers/bridge.py events()): within one poll cycle
+    # step 2 polls transcript entries BEFORE step 3 emits the screen's
+    # `running` flip, and the send path pushed its own synthetic `running`
+    # before the driver could poll anything — so the turn's prompt entry
+    # normally sits BETWEEN the two, BEFORE the boundary the capture snapshots.
+    def test_live_ordering_prompt_sits_before_the_boundary(self):
+        events = [
+            {"type": "status_change", "status": "running"},  # synthetic (send)
+            {"type": "user", "source_kind": "t", "anchor": "u-prompt",
+             "content": "read file X and fix it"},
+            {"type": "status_change", "status": "running"},  # driver flip
+            {"type": "assistant", "source_kind": "t", "anchor": "a-close",
+             "content": [{"type": "text", "text": "done"}]},
+        ]
+        assert timeline.turn_anchors(events, 3) == ("u-prompt", "a-close")
+
+    def test_tool_results_never_masquerade_as_the_prompt(self):
+        # Tool results are type-"user" transcript entries too — in a tool
+        # turn the window's first user entry is a tool_result; the real
+        # prompt sits before the boundary and must still win.
+        events = [
+            {"type": "status_change", "status": "running"},
+            {"type": "user", "source_kind": "t", "anchor": "u-prompt",
+             "content": "fix it"},
+            {"type": "status_change", "status": "running"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-tool",
+             "content": [{"type": "tool_use", "id": "t1"}]},
+            {"type": "user", "source_kind": "t", "anchor": "u-toolresult",
+             "content": [{"type": "tool_result", "tool_use_id": "t1"}]},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-close",
+             "content": [{"type": "text", "text": "done"}]},
+        ]
+        assert timeline.turn_anchors(events, 3) == ("u-prompt", "a-close")
+
+    def test_backward_scan_walks_through_a_mid_turn_permission_running(self):
+        # A permission prompt mid-turn re-emits `running` on resolution and
+        # moves the boundary AGAIN — the backward scan walks through
+        # intermediate running flips (only a non-running status_change stops
+        # it) to reach the prompt.
+        events = [
+            {"type": "status_change", "status": "idle"},     # prev turn's end
+            {"type": "status_change", "status": "running"},  # synthetic (send)
+            {"type": "user", "source_kind": "t", "anchor": "u-prompt",
+             "content": "write the file"},
+            {"type": "status_change", "status": "running"},  # driver flip
+            {"type": "assistant", "source_kind": "t", "anchor": "a-tool",
+             "content": [{"type": "tool_use", "id": "t1"}]},
+            {"type": "permission_request", "data": {}},
+            {"type": "permission_resolved"},
+            {"type": "status_change", "status": "running"},  # post-permission
+            {"type": "user", "source_kind": "t", "anchor": "u-toolresult",
+             "content": [{"type": "tool_result", "tool_use_id": "t1"}]},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-close",
+             "content": [{"type": "text", "text": "written"}]},
+        ]
+        assert timeline.turn_anchors(events, 8) == ("u-prompt", "a-close")
+
+    def test_backward_scan_never_bleeds_past_the_previous_turns_end(self):
+        # No prompt entry for THIS turn (nothing polled yet): the scan stops
+        # at the previous completion idle — it must not steal the previous
+        # turn's prompt.
+        events = [
+            {"type": "user", "source_kind": "t", "anchor": "u-prev",
+             "content": "earlier ask"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-prev",
+             "content": [{"type": "text", "text": "earlier answer"}]},
+            {"type": "status_change", "status": "idle"},     # prev turn's end
+            {"type": "status_change", "status": "running"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-2",
+             "content": [{"type": "text", "text": "hi"}]},
+        ]
+        assert timeline.turn_anchors(events, 4) == (None, "a-2")
+
+    def test_polled_late_prompt_is_found_in_the_forward_window(self):
+        # The rarer ordering: the prompt entry lags a poll cycle behind the
+        # screen flip and lands INSIDE the window.
+        events = [
+            {"type": "status_change", "status": "running"},
+            {"type": "user", "source_kind": "t", "anchor": "u-late",
+             "content": "do the thing"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-1",
+             "content": [{"type": "text", "text": "ok"}]},
+        ]
+        assert timeline.turn_anchors(events, 1) == ("u-late", "a-1")
+
+    def test_stops_at_the_next_turn_boundary(self):
+        events = [
+            {"type": "user", "source_kind": "t", "anchor": "u-1",
+             "content": "q"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-1"},
+            {"type": "status_change", "status": "running"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-next-turn"},
+        ]
+        assert timeline.turn_anchors(events, 0) == ("u-1", "a-1")
+
+    def test_sidechain_and_meta_entries_never_anchor_the_parent_turn(self):
+        # A Task-spawning turn interleaves the subagent's own sidechain
+        # prompt/replies into the same transcript, and the CLI writes meta
+        # user lines — the driver flags both; neither is the parent's prompt
+        # or closing reply.
+        events = [
+            {"type": "status_change", "status": "running"},
+            {"type": "user", "source_kind": "t", "anchor": "u-meta",
+             "content": "Caveat: the messages below…", "meta": True},
+            {"type": "user", "source_kind": "t", "anchor": "u-side",
+             "content": "subagent task prompt", "sidechain": True},
+            {"type": "user", "source_kind": "t", "anchor": "u-prompt",
+             "content": "spawn a subagent"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-side",
+             "content": [{"type": "text", "text": "subagent says"}],
+             "sidechain": True},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-close",
+             "content": [{"type": "text", "text": "parent close"}]},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-side2",
+             "content": [{"type": "text", "text": "late sidechain"}],
+             "sidechain": True},
+        ]
+        assert timeline.turn_anchors(events, 1) == ("u-prompt", "a-close")
+
+    def test_unanchored_events_are_null_safe(self):
+        # SDK/synthesized events carry no transcript anchor — an honest miss,
+        # never a fabricated one.
+        events = [
+            {"type": "user", "content": []},
+            {"type": "assistant", "source_kind": "s"},
+        ]
+        assert timeline.turn_anchors(events, 0) == (None, None)
+        assert timeline.turn_anchors([], 0) == (None, None)
+
+
+# -----------------------------------------------------------------------------
+# #46 — replay_timeline (the interleaved turn/rewind stream → rolled state)
+# -----------------------------------------------------------------------------
+
+def _t(n):
+    return {"type": "turn", "turn": n, "timestamp": f"t{n}", "summary": f"s{n}"}
+
+
+def _rw(k, ts="rw"):
+    return {"type": "rewind", "timestamp": ts, "to_prompt_index": k}
+
+
+class TestReplayTimeline:
+    def test_pure_turn_file_is_all_live_with_todays_numbering(self):
+        # No rewind records: count/ordinals exactly as before the residual.
+        out = timeline.replay_timeline([_t(7), _t(1)])
+        assert [r["turn"] for r in out["turns"]] == [1, 2]
+        assert [r["rolled"] for r in out["turns"]] == [False, False]
+        assert out["rolled_ranges"] == [] and out["rewinds"] == []
+
+    def test_single_rewind_k1_rolls_the_head(self):
+        out = timeline.replay_timeline([_t(1), _t(2), _rw(1)])
+        assert [r["rolled"] for r in out["turns"]] == [False, True]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 2}]
+        assert out["rewinds"] == [{"timestamp": "rw", "to_prompt_index": 1}]
+
+    def test_single_rewind_k2_rolls_the_top_two(self):
+        out = timeline.replay_timeline([_t(1), _t(2), _t(3), _rw(2)])
+        assert [r["rolled"] for r in out["turns"]] == [False, True, True]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 3}]
+
+    def test_post_rewind_turns_stay_live(self):
+        out = timeline.replay_timeline([_t(1), _t(2), _rw(1), _t(3)])
+        assert [r["rolled"] for r in out["turns"]] == [False, True, False]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 2}]
+
+    def test_chained_rewinds_with_a_fresh_turn_between_compose(self):
+        # k=1, a fresh turn, k=1 again: the live stack is [1,2]→[1]→[1,3]→[1],
+        # so ordinals 2 and 3 are rolled — adjacent, merged into one range.
+        out = timeline.replay_timeline([_t(1), _t(2), _rw(1), _t(3), _rw(1)])
+        assert [r["rolled"] for r in out["turns"]] == [False, True, True]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 3}]
+        assert [r["to_prompt_index"] for r in out["rewinds"]] == [1, 1]
+
+    def test_disjoint_rolled_runs_stay_separate_ranges(self):
+        # Rolled 2, then two live turns, then rolled 4: a live ordinal (3)
+        # sits between the runs — the merge must NOT bridge it.
+        out = timeline.replay_timeline([_t(1), _t(2), _rw(1), _t(3), _t(4),
+                                        _rw(1)])
+        assert [r["rolled"] for r in out["turns"]] == \
+            [False, True, False, True]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 2},
+                                        {"from": 3, "to": 4}]
+
+    def test_k_over_stack_clamps_honestly_and_never_crashes(self):
+        out = timeline.replay_timeline([_t(1), _rw(5)])
+        assert [r["rolled"] for r in out["turns"]] == [True]
+        assert out["rolled_ranges"] == [{"from": 0, "to": 1}]
+        assert out["rewinds"] == [{"timestamp": "rw", "to_prompt_index": 5}]
+        # A rewind event with no turns at all is replayable too.
+        out = timeline.replay_timeline([_rw(2)])
+        assert out["turns"] == [] and out["rolled_ranges"] == []
+        assert [r["to_prompt_index"] for r in out["rewinds"]] == [2]
+
+    def test_typeless_old_lines_replay_as_turns(self):
+        # Backward compat: pre-residual files carry no "type" — they must
+        # replay identically to typed turn records.
+        old = {"turn": 1, "timestamp": "t1", "summary": "old"}
+        out = timeline.replay_timeline([old, _t(2), _rw(1)])
+        assert [r["turn"] for r in out["turns"]] == [1, 2]
+        assert [r["rolled"] for r in out["turns"]] == [False, True]
+
+    def test_unknown_typed_lines_are_skipped_not_rows(self):
+        # Forward compat: a future typed line is neither a turn row nor a
+        # rewind — ordinals stay stable around it.
+        out = timeline.replay_timeline([_t(1), {"type": "mystery"}, _t(2)])
+        assert [r["turn"] for r in out["turns"]] == [1, 2]
+        assert all(r["rolled"] is False for r in out["turns"])
+
+
+# -----------------------------------------------------------------------------
 # #46 — the capture join (main._capture_turn_record) + exactly-once scheduling
 # -----------------------------------------------------------------------------
 
@@ -793,6 +1081,66 @@ class TestTurnCaptureRecord:
         assert rec["settings"] == "sonnet · plan"
         assert rec["summary"] is None      # honest miss, never fabricated
 
+    def test_capture_lifts_anchors_in_live_bridge_event_ordering(self):
+        # LIVE ordering (not the polled-late one): the driver polls the
+        # prompt entry in BEFORE it emits the running flip the capture window
+        # starts at (the send already pushed a synthetic running before
+        # either) — the lift reaches BACK for the prompt and forward for the
+        # closing reply.
+        drv = _TimelineDriver()
+        s = _register(drv)
+        s.events = [
+            {"type": "status_change", "status": "running"},  # synthetic (send)
+            {"type": "user", "source_kind": "t", "anchor": "u-abc",
+             "content": "do the thing"},
+            {"type": "status_change", "status": "running"},  # driver flip
+            {"type": "assistant", "source_kind": "t", "anchor": "a-def",
+             "content": [{"type": "text", "text": "Fixed the poll race."}]},
+        ]
+        s._turn_start_idx = 3
+        asyncio.run(main._capture_turn_record(s, 1, 3))
+        rec = s.turns[0]
+        assert rec["prompt_uuid"] == "u-abc"
+        assert rec["reply_uuid"] == "a-def"
+        assert rec["type"] == "turn"       # new writes are explicitly typed
+        assert drv.appended == [rec]       # anchors persist thin, additively
+
+    def test_capture_tool_turn_never_anchors_a_tool_result_as_the_prompt(self):
+        # A tool turn's window starts with a tool_result user entry — the
+        # persisted prompt_uuid must be the real prompt (before the
+        # boundary), never the tool result.
+        drv = _TimelineDriver()
+        s = _register(drv)
+        s.events = [
+            {"type": "status_change", "status": "running"},
+            {"type": "user", "source_kind": "t", "anchor": "u-prompt",
+             "content": "read file X and fix it"},
+            {"type": "status_change", "status": "running"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-tool",
+             "content": [{"type": "tool_use", "id": "t1"}]},
+            {"type": "user", "source_kind": "t", "anchor": "u-toolresult",
+             "content": [{"type": "tool_result", "tool_use_id": "t1"}]},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-close",
+             "content": [{"type": "text", "text": "Fixed."}]},
+        ]
+        s._turn_start_idx = 3
+        asyncio.run(main._capture_turn_record(s, 1, 3))
+        rec = s.turns[0]
+        assert rec["prompt_uuid"] == "u-prompt"    # never "u-toolresult"
+        assert rec["reply_uuid"] == "a-close"
+
+    def test_capture_without_anchors_records_nulls(self):
+        # SDK-driven / synthesized events carry no transcript anchor — the
+        # fields stay null-safe, never fabricated.
+        drv = _TimelineDriver()
+        s = _register(drv)
+        s.events = list(_TURN_EVENTS)      # no anchor / source_kind fields
+        s._turn_start_idx = 1
+        asyncio.run(main._capture_turn_record(s, 1, 1))
+        rec = s.turns[0]
+        assert rec["prompt_uuid"] is None and rec["reply_uuid"] is None
+        assert rec["summary"] == "Fixed the poll race."
+
     def test_persist_failure_keeps_the_in_memory_record(self):
         drv = _TimelineDriver(fail_append=True)
         s = _register(drv)
@@ -835,6 +1183,58 @@ class TestTurnCaptureRecord:
         asyncio.run(main._capture_turn_record(s, 1, 1))
         assert s.turns[0]["model"] == "opus"
         assert s.turns[0]["summary"] == "Fixed the poll race."
+
+
+class TestCaptureSettle:
+    """The trailing-entry settle: the bridge flips generating->idle off SCREEN
+    state ~1s before the transcript tail is polled into events (the exact lag
+    `_maybe_relay_reply` retries for), so a multi-entry reply could otherwise
+    persist `reply_uuid` anchored mid-reply. The capture re-lifts summary +
+    anchors until two consecutive lifts agree (bounded)."""
+
+    def teardown_method(self):
+        main.sessions.pop("s1", None)
+        runstate.reset()
+
+    def test_capture_relifts_until_the_window_is_stable(self, monkeypatch):
+        drv = _TimelineDriver()
+        s = _register(drv)
+        s.events = [
+            {"type": "status_change", "status": "running"},
+            {"type": "user", "source_kind": "t", "anchor": "u-1",
+             "content": "long ask"},
+            {"type": "status_change", "status": "running"},
+            {"type": "assistant", "source_kind": "t", "anchor": "a-mid",
+             "content": [{"type": "text", "text": "First entry…"}]},
+        ]
+        s._turn_start_idx = 3
+
+        real_anchors = main.timeline.turn_anchors
+        lifts = {"n": 0}
+
+        def lift_with_late_tail(events, start_idx=0):
+            # The closing entry flushes between lift 1 and lift 2 — exactly
+            # the screen-idle-before-transcript-tail lag.
+            lifts["n"] += 1
+            if lifts["n"] == 2:
+                s.events.append(
+                    {"type": "assistant", "source_kind": "t",
+                     "anchor": "a-close",
+                     "content": [{"type": "text", "text": "Closing entry."}]})
+            return real_anchors(events, start_idx)
+
+        monkeypatch.setattr(main.timeline, "turn_anchors", lift_with_late_tail)
+        asyncio.run(main._capture_turn_record(s, 1, 3))
+        rec = s.turns[0]
+        assert rec["reply_uuid"] == "a-close"   # the closing entry, not a-mid
+        assert lifts["n"] >= 3                  # re-lifted until stable
+
+    def test_live_settle_budget_is_a_real_bounded_wait(self, _zero_capture_settle):
+        # The autouse fixture zeroes the sleep for hermetic speed and hands
+        # back the LIVE value — production must keep a real positive settle
+        # with a bounded attempt budget (the relay's shape).
+        assert _zero_capture_settle > 0
+        assert 1 <= main._CAPTURE_SETTLE_ATTEMPTS <= 10
 
 
 class TestTurnCaptureScheduling:
@@ -1103,12 +1503,169 @@ class TestTimelineEndpoint:
     def test_no_turns_yet_is_an_empty_list_never_an_error(self):
         _register(_TimelineDriver(records=[]))
         out = asyncio.run(main.get_timeline_endpoint("s1"))
-        assert out == {"session_id": "s1", "count": 0, "turns": []}
+        assert out == {"session_id": "s1", "count": 0, "turns": [],
+                       "rolled_ranges": [], "rewinds": []}
 
     def test_unknown_session_404(self):
         with pytest.raises(HTTPException) as ei:
             asyncio.run(main.get_timeline_endpoint("nope"))
         assert ei.value.status_code == 404
+
+    def test_rewind_records_replay_into_rolled_state(self):
+        # The persisted rewind event is replayed at the read surface: per-row
+        # `rolled`, merged `rolled_ranges`, the `rewinds` list — and `count` /
+        # ordinals cover TURN rows only (the rewind line is not a row).
+        records = [_t(1), _t(2), _rw(1, ts="rw1"), _t(3)]
+        _register(_TimelineDriver(records=records))
+        out = asyncio.run(main.get_timeline_endpoint("s1"))
+        assert out["count"] == 3
+        assert [r["turn"] for r in out["turns"]] == [1, 2, 3]
+        assert [r["rolled"] for r in out["turns"]] == [False, True, False]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 2}]
+        assert out["rewinds"] == [{"timestamp": "rw1", "to_prompt_index": 1}]
+
+    def test_mirror_fallback_replays_the_same_rolled_truth(self):
+        # A driver with no persist surface still gets consistent rolled state:
+        # the rewind record is mirrored into session.turns alongside the turn
+        # records, and the same replay runs over the mirror.
+        s = _register(_ReadoutDriver(caps=set()))
+        s.turns = [_t(1), _t(2), _rw(1)]
+        out = asyncio.run(main.get_timeline_endpoint("s1"))
+        assert out["count"] == 2
+        assert [r["rolled"] for r in out["turns"]] == [False, True]
+        assert out["rolled_ranges"] == [{"from": 1, "to": 2}]
+
+    def test_pending_rewind_record_is_served_before_it_drains(self):
+        # A rewind event whose turns.jsonl append transiently failed sits on
+        # _turns_pending until the next capture drains it. The read surface
+        # must still serve the rolled truth: the renderer keeps NO client-side
+        # marking anymore, and a user rewinding again over silently un-rolled
+        # rows would compute k one prompt too deep.
+        drv = _TimelineDriver(records=[_t(1), _t(2), _t(3)])
+        s = _register(drv)
+        rw = _rw(1, ts="rw-pending")
+        s.turns = [_t(1), _t(2), _t(3), rw]
+        s._turns_pending.append(rw)
+        out = asyncio.run(main.get_timeline_endpoint("s1"))
+        assert out["count"] == 3
+        assert [r["rolled"] for r in out["turns"]] == [False, False, True]
+        assert out["rolled_ranges"] == [{"from": 2, "to": 3}]
+        assert out["rewinds"] == [{"timestamp": "rw-pending",
+                                   "to_prompt_index": 1}]
+
+    def test_pending_records_already_on_the_file_tail_are_not_doubled(self):
+        # Snapshot-then-read means a drain racing the GET can land the
+        # snapshot prefix on the file tail — the merge dedupes it (a doubled
+        # rewind would roll k extra turns).
+        rw = _rw(1, ts="rw-dup")
+        drv = _TimelineDriver(records=[_t(1), _t(2), rw])
+        s = _register(drv)
+        s._turns_pending.append(dict(rw))  # value-equal, as a JSON round trip
+        out = asyncio.run(main.get_timeline_endpoint("s1"))
+        assert out["count"] == 2
+        assert [r["rolled"] for r in out["turns"]] == [False, True]
+        assert out["rewinds"] == [{"timestamp": "rw-dup",
+                                   "to_prompt_index": 1}]
+
+    def test_pending_turn_record_is_served_too(self):
+        # The merge is record-agnostic: a still-pending TURN record shows as
+        # its row (the pre-existing pending gap closed for turns as well).
+        drv = _TimelineDriver(records=[_t(1)])
+        s = _register(drv)
+        t2 = _t(2)
+        s.turns = [_t(1), t2]
+        s._turns_pending.append(t2)
+        out = asyncio.run(main.get_timeline_endpoint("s1"))
+        assert out["count"] == 2
+        assert [r["turn"] for r in out["turns"]] == [1, 2]
+
+
+# -----------------------------------------------------------------------------
+# #46 — the rewind event record (POST /sessions/{id}/rewind → turns.jsonl)
+# -----------------------------------------------------------------------------
+
+class _RewindRecordDriver(_TimelineDriver):
+    """#46 rewind-event surface: a bridge-shaped driver with BOTH the rewind
+    lever and the turns.jsonl persist surface (append_turn_record via
+    _TimelineDriver)."""
+
+    def __init__(self, error=None, **kw):
+        super().__init__(**kw)
+        self._error = error
+
+    def supports(self, cap):
+        return cap in {"rewind", "timeline"}
+
+    async def rewind(self, to_prompt_index):
+        if self._error:
+            raise RuntimeError(self._error)
+        return {"status": "rewound", "name": "s1",
+                "to_prompt_index": to_prompt_index}
+
+
+class TestRewindEventRecord:
+    def teardown_method(self):
+        main.sessions.pop("s1", None)
+
+    def test_success_appends_the_typed_record_and_mirrors_it(self):
+        drv = _RewindRecordDriver()
+        s = _register(drv)
+        out = asyncio.run(main.rewind_session(
+            "s1", main.RewindRequest(to_prompt_index=2)))
+        assert out["status"] == "ok"       # the endpoint envelope is unchanged
+        assert len(drv.appended) == 1
+        rec = drv.appended[0]
+        assert rec["type"] == "rewind" and rec["to_prompt_index"] == 2
+        assert rec["timestamp"]
+        assert s.turns == [rec]            # mirrored alongside session.turns
+
+    def test_bridge_rewind_failure_appends_nothing(self):
+        # A failed rewind (busy / version-gated / bridge error) must leave the
+        # record untouched — no phantom rewind event, mirror included.
+        for reason, code in (("busy", 409), ("version_unsupported", 400),
+                             ("tmux exploded", 500)):
+            drv = _RewindRecordDriver(error=reason)
+            s = _register(drv)
+            with pytest.raises(HTTPException) as ei:
+                asyncio.run(main.rewind_session("s1", main.RewindRequest()))
+            assert ei.value.status_code == code
+            assert drv.appended == [] and s.turns == []
+
+    def test_rewind_record_drains_behind_a_still_pending_turn_record(self):
+        # File-order guarantee: a turn record whose persist failed transiently
+        # (queued on _turns_pending) drains FIRST — the rewind event can never
+        # land ahead of a turn record still draining.
+        drv = _RewindRecordDriver()
+        s = _register(drv)
+        stuck = _t(1)
+        s.turns.append(stuck)
+        s._turns_pending.append(stuck)     # turn 1's append failed earlier
+        asyncio.run(main.rewind_session(
+            "s1", main.RewindRequest(to_prompt_index=1)))
+        assert [r.get("type") for r in drv.appended] == ["turn", "rewind"]
+        assert s._turns_pending == []
+
+    def test_rewind_record_chains_behind_an_in_flight_capture(self):
+        # The rewind append rides the SAME per-session _capture_tail chain as
+        # turn captures: a capture stalled on its statusline snapshot still
+        # lands its turn record BEFORE the rewind event.
+        class _SlowSnapRewind(_RewindRecordDriver):
+            async def get_statusline_snapshot(self):
+                await asyncio.sleep(0.05)
+                return None
+
+        async def flow():
+            drv = _SlowSnapRewind()
+            s = _register(drv)
+            s.events = list(_TURN_EVENTS)
+            s._turn_start_idx = 1
+            main._capture_turn(s)          # schedules; stalls on the snapshot
+            await main.rewind_session(
+                "s1", main.RewindRequest(to_prompt_index=1))
+            assert [r.get("type") for r in drv.appended] == ["turn", "rewind"]
+            assert [r.get("type") for r in s.turns] == ["turn", "rewind"]
+
+        asyncio.run(flow())
 
 
 class _EffortLever:

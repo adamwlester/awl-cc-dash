@@ -10,7 +10,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset,
-  type PastAgent, type ArchiveRecord, type TimelineTurn, type Identity,
+  type PastAgent, type ArchiveRecord, type TimelineTurn, type TimelineResponse,
+  type Identity,
 } from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph, SPRITE_BY_FILE } from '../lib/icons'
@@ -42,17 +43,15 @@ const LAUNCH_MODE_VALUE: Record<string, string> = {
 }
 
 // ---- §7.19 Timeline — per-session client-side state that must survive a
-// focus switch: the post-rewind rolled-back ranges and the proven version gate.
-// The record is APPEND-ONLY (a rewind never trims turns.jsonl), so after a
-// rewind the record ordinals over-count the live conversation's prompt stack.
-// Each successful rewind therefore logs the rolled ordinal range (from = the
-// rewind target, still live; to = the newest ordinal at rewind time): rows
-// inside a range are dimmed AND excluded from the k-from-last arithmetic, so a
-// second rewind / a handoff after a rewind targets the real prompt stack, and
-// turns appended AFTER a rewind (ordinals past every range) stay live and
-// undimmed. Client-memory only — a reload forgets it (the records carry no
-// anchor; the documented §7.19 gap stands).
-const TL_ROLLED: Record<string, { ranges: { from: number; to: number }[]; lastTarget: number }> = {}
+// focus switch: the proven version gate. The rolled-back ranges are NOT client
+// state anymore: the sidecar persists a typed rewind event to turns.jsonl on
+// each successful rewind and replays the interleaved stream at the read
+// surface, so GET /timeline itself carries per-row `rolled` + the merged
+// `rolled_ranges` (same exclusive-`from` representation the arithmetic below
+// uses) — the marking survives a reload. Rows inside a range are dimmed AND
+// excluded from the k-from-last arithmetic, so a second rewind / a handoff
+// after a rewind targets the real prompt stack, and turns appended AFTER a
+// rewind (ordinals past every range) stay live and undimmed.
 const TL_GATED: Record<string, string> = {}
 
 // Nice labels for the /context per-category keys (§11 #30). Falls back to a
@@ -617,8 +616,8 @@ function usageBits(u: any): string[] {
 // Handoff forks via POST /sessions/{id}/fork (+ the #16 handoff-report switch,
 // the file-state note read honestly off the response's `filestate`). Edge
 // states render off the REAL responses: 409 → busy · 400 version → gated ·
-// no rows → empty · post-rewind → the no-anchor caveat (rows marked, never
-// truncated).
+// no rows → empty · post-rewind → rolled rows dimmed off the server-replayed
+// `rolled_ranges` (marked, never truncated — the record is append-only).
 function tlChip({ icon, title, val }: { icon: string; title: string; val: string }) {
   return <span className="node-chip" title={title}><Ic name={icon} />{val}</span>
 }
@@ -627,43 +626,55 @@ function TimelineSection({ s }: { s: Session }) {
   const d = useDash()
   const a = identOf(s)
   const sid = s.session_id
-  const [rows, setRows] = useState<TimelineTurn[] | null>(null)
+  const [tl, setTl] = useState<TimelineResponse | null>(null)
   const [triMode, setTriMode] = useState<null | 'rewind' | 'handoff'>(null)
   const [confirm, setConfirm] = useState<{ mode: 'rewind' | 'handoff'; n: number } | null>(null)
   const [handoffReport, setHandoffReport] = useState(true)
   const [acting, setActing] = useState(false)
   const [busy409, setBusy409] = useState(false)
-  const [, setTick] = useState(0)   // re-render after TL_ROLLED / TL_GATED updates
+  const [, setTick] = useState(0)   // re-render after TL_GATED updates
   const running = runStateOf(s) === 'active'
   const gated = TL_GATED[sid] || null
-  const roll = TL_ROLLED[sid] || null
-  const ranges = roll?.ranges || []
-  const anchor = roll ? roll.lastTarget : null
+  // Server-replayed rolled truth (persisted rewind events — survives a reload);
+  // the anchor note names the last rewind's still-live target: the top merged
+  // range's exclusive `from`.
+  const ranges = tl?.rolled_ranges || []
+  const anchor = ranges.length ? ranges[ranges.length - 1].from : null
+  // A full-depth (clamped) rewind's still-live target is ordinal 0 — read it
+  // as "the beginning", never a nonexistent "Turn 0".
+  const anchorLabel = anchor == null ? 'the end of Turn n' : anchor === 0 ? 'the beginning' : `the end of Turn ${anchor}`
   // Rolled-row + live-position arithmetic over the append-only record: a row
   // inside a rolled range no longer exists in the live conversation; livePos
   // maps a LIVE ordinal to its position in the real prompt stack.
   const rolledOf = (t: number) => ranges.some(r => t > r.from && t <= r.to)
   const livePos = (t: number) => t - ranges.reduce((acc, r) => acc + (r.to <= t ? r.to - r.from : 0), 0)
 
+  // Every timeline fetch (the 5s poll AND doRewind's refetch) takes a seq off
+  // this ref and only the newest issued fetch may land in state — a slow poll
+  // response resolving AFTER the post-rewind refetch would otherwise clobber
+  // the fresh server-replayed rolled truth with stale (un-rolled) state.
+  const tlSeq = useRef(0)
+  const pullTl = async () => {
+    const seq = ++tlSeq.current
+    const r = await api.timeline(sid)
+    if (r && seq === tlSeq.current) setTl(r)
+  }
+
   // Own light poll (5s, in-flight-guarded) — never bundled into the roster poll.
   useEffect(() => {
     let cancelled = false
     let inflight = false
     const pull = async () => {
-      if (inflight) return
+      if (cancelled || inflight) return
       inflight = true
-      try {
-        const r = await api.timeline(sid)
-        if (!cancelled && r) setRows(r.turns)
-      } finally { inflight = false }
+      try { await pullTl() } finally { inflight = false }
     }
     pull()
     const i = setInterval(pull, 5000)
     return () => { cancelled = true; clearInterval(i) }
   }, [sid])
 
-  const turns = rows || []
-  const head = turns.length ? turns[turns.length - 1].turn : 0          // newest RECORD ordinal
+  const turns = tl?.turns || []
   const liveTurns = turns.filter(t => !rolledOf(t.turn))
   const liveHead = liveTurns.length ? liveTurns[liveTurns.length - 1].turn : 0   // newest LIVE ordinal
   // k-from-last over the LIVE prompt stack (rolled rows excluded) — the record
@@ -721,17 +732,12 @@ function TimelineSection({ s }: { s: Session }) {
     setActing(false)
     setConfirm(null)
     if (rr.ok) {
-      // Log the rolled range: everything live above n (which spans any prior
-      // rolled ranges up to the newest record ordinal) is now rolled back.
-      const prior = TL_ROLLED[sid]?.ranges || []
-      const kept = prior.filter(r => r.from < n)
-      const to = Math.max(head, ...prior.filter(r => r.from >= n).map(r => r.to))
-      TL_ROLLED[sid] = { ranges: [...kept, { from: n, to }], lastTarget: n }
-      setTick(t => t + 1)
       setTriMode(null)
       toast(`Rewound ${a.short} to the end of Turn ${n} — rolled back ${k} prompt${k === 1 ? '' : 's'}`)
-      const r = await api.timeline(sid)
-      if (r) setRows(r.turns)
+      // The refetch carries the server-replayed rolled truth — the sidecar
+      // persisted a rewind event to turns.jsonl, so no client-side range merge
+      // (and the seq guard keeps a slower in-flight poll from clobbering it).
+      await pullTl()
     } else failHonestly(rr, 'rewind')
   }
 
@@ -807,7 +813,7 @@ function TimelineSection({ s }: { s: Session }) {
           <div className="tl-note tl-note--fresh"><Ic name="clock" /><span>No turns yet — a row lands here as each dashboard-initiated turn completes.</span></div>
           <div className="tl-note tl-note--running"><Ic name="clock" /><span>{a.short} is mid-run — Rewind &amp; Handoff need an idle agent. The log stays readable; the actions return when the run completes.</span></div>
           <div className="tl-note tl-note--version"><Ic name="shield" /><span>{gated || 'Rewind & Handoff need Claude Code ≥ 2.1.191 — relaunch this agent on a newer CLI to enable both.'}</span></div>
-          <div className="tl-note tl-note--anchor"><Ic name="triangle-alert" /><span>Rewound to the end of Turn {anchor ?? 'n'} — records carry no rewind anchor, so the rolled-back rows stay in the log (dimmed) and new turns will append after them.</span></div>
+          <div className="tl-note tl-note--anchor"><Ic name="triangle-alert" /><span>Rewound to {anchorLabel} — the record is append-only, so the rolled-back rows stay in the log (dimmed; the rewind is recorded, so this marking survives a reload) and new turns will append after them.</span></div>
           {turns.map(t => {
             const rolled = rolledOf(t.turn)
             const cur = t.turn === liveHead

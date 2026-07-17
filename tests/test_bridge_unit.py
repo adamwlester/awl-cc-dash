@@ -1512,6 +1512,29 @@ class TestEntryToEventAnchor:
     def test_non_message_entry_skipped(self):
         assert _entry_to_event({"type": "file-history-snapshot"}) is None
 
+    def test_sidechain_and_meta_entries_are_flagged_additively(self):
+        # §11 #46: the timeline anchor lift must skip a subagent's sidechain
+        # entries and CLI meta lines — the driver flags them additively
+        # (absent when false, so ordinary events keep their exact old shape).
+        ev = _entry_to_event({
+            "type": "user", "uuid": "u-s", "isSidechain": True,
+            "message": {"content": "subagent prompt"},
+        })
+        assert ev["sidechain"] is True
+        ev = _entry_to_event({
+            "type": "assistant", "uuid": "a-s", "isSidechain": True,
+            "message": {"content": []},
+        })
+        assert ev["sidechain"] is True
+        ev = _entry_to_event({
+            "type": "user", "uuid": "u-m", "isMeta": True,
+            "message": {"content": "Caveat: the messages below…"},
+        })
+        assert ev["meta"] is True
+        ev = _entry_to_event({"type": "user", "uuid": "u-9",
+                              "message": {"content": "hi"}})
+        assert "sidechain" not in ev and "meta" not in ev
+
 
 # -----------------------------------------------------------------------------
 # WSL2 -> Windows-host gateway resolution (the hook URL must be host-reachable;

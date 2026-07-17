@@ -409,14 +409,18 @@ def _entry_to_event(entry: dict) -> dict | None:
     ``uuid`` and ``source_kind='t'`` so the sidecar can mint a *deterministic*
     event id (``{agent_id}:t:{uuid}``). Re-polling the same entry then dedups to
     a no-op and a reconnect replays without duplicates. A missing uuid leaves
-    ``anchor=None`` (the sidecar falls back to a seq-based id).
+    ``anchor=None`` (the sidecar falls back to a seq-based id). Subagent
+    sidechain entries and CLI meta lines are flagged additively (``sidechain``
+    / ``meta``, present only when true) so consumers that must see only the
+    parent's main line — the §11 #46 anchor lift above all — can skip them
+    without changing what the feed carries.
     """
     etype = entry.get("type")
     msg = entry.get("message", {}) or {}
     ts = entry.get("timestamp") or datetime.now().isoformat()
     anchor = entry.get("uuid")
     if etype == "assistant":
-        return {
+        event = {
             "type": "assistant",
             "sdk_type": "AssistantMessage",
             "content": msg.get("content", []),
@@ -425,8 +429,8 @@ def _entry_to_event(entry: dict) -> dict | None:
             "anchor": anchor,
             "source_kind": "t",
         }
-    if etype == "user":
-        return {
+    elif etype == "user":
+        event = {
             "type": "user",
             "sdk_type": "UserMessage",
             "content": msg.get("content", []),
@@ -434,7 +438,13 @@ def _entry_to_event(entry: dict) -> dict | None:
             "anchor": anchor,
             "source_kind": "t",
         }
-    return None
+    else:
+        return None
+    if entry.get("isSidechain"):
+        event["sidechain"] = True
+    if entry.get("isMeta"):
+        event["meta"] = True
+    return event
 
 
 def _save_record(record: dict) -> None:
@@ -1348,22 +1358,27 @@ class BridgeDriver(AgentDriver):
     # --- Timeline per-turn capture (§7.19/§7.14, §11 #46) ----------------------
 
     async def append_turn_record(self, record: dict) -> None:
-        """Persist one per-turn Timeline record (§11 #46) — thin, append-only.
+        """Persist one Timeline record (§11 #46) — thin, append-only.
 
         One compact JSON line appended to this agent's launch-config dir
         (``~/.awl-cc-dash-agents/<name>/turns.jsonl``, beside the §11 #31
         ``statusline.jsonl``). The sidecar calls this at the exactly-once
         turn-completion it derives from this driver's completion branch (see
-        ``events()`` step 3 — ``_pending_turn``/``_saw_reply_since_send``); the
+        ``events()`` step 3 — ``_pending_turn``/``_saw_reply_since_send``; the
         settings-at-turn snapshot is NOT in the transcript, so per §8.3 it
-        persists thin here. Failures raise; the caller treats them as
-        best-effort (the in-memory mirror keeps the record).
+        persists thin here) AND on each successful dashboard rewind — the
+        typed ``{"type": "rewind"}`` event record (the transcript itself is
+        append-only and writes nothing at rewind time). Failures raise; the
+        caller treats them as best-effort (the in-memory mirror keeps the
+        record).
         """
         line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         await asyncio.to_thread(self._bridge.turns_append, self._name, line)
 
     async def get_timeline(self) -> list[dict]:
-        """The ordered per-turn Timeline records (§11 #46), oldest first.
+        """The ordered Timeline records (§11 #46), oldest first — turn
+        records interleaved with any typed rewind event records, exactly as
+        stored (the read surface's replay owns the rolled-state semantics).
 
         Reads the whole per-agent ``turns.jsonl`` back and parses each line;
         blank and torn/corrupt lines are skipped (best-effort, like the

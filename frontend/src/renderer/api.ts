@@ -342,7 +342,7 @@ export interface ArchiveResponse { archived: ArchiveRecord[]; count: number }
 
 // ---- Timeline (§7.19/§11 #46) — one thin record per dashboard-initiated turn.
 export interface TimelineTurn {
-  turn: number                 // ordinal re-minted 1..N in stored order
+  turn: number                 // ordinal re-minted 1..N in stored order (turn records only)
   timestamp: string | null
   model: string | null
   mode: string | null
@@ -350,8 +350,22 @@ export interface TimelineTurn {
   thinking: boolean | null
   settings: string | null     // the rendered settings string (row tooltip)
   summary: string | null      // one-line reply summary; null = honest "—"
+  type?: string | null        // "turn" on new records; absent = turn (old lines)
+  prompt_uuid?: string | null // transcript anchor: the turn's user-prompt JSONL uuid (null-safe)
+  reply_uuid?: string | null  // transcript anchor: the closing assistant entry uuid (null-safe)
+  rolled?: boolean            // server-replayed rolled state (persisted rewind events)
 }
-export interface TimelineResponse { session_id: string; count: number; turns: TimelineTurn[] }
+// A rolled range in the renderer's exclusive-`from` representation: `from` is the
+// still-live rewind-target ordinal, `to` the newest rolled ordinal — a row t is
+// rolled iff from < t <= to. Merged, ascending, replayed server-side from the
+// persisted rewind event records (so the marking survives a reload).
+export interface TimelineRolledRange { from: number; to: number }
+export interface TimelineRewind { timestamp: string | null; to_prompt_index: number }
+export interface TimelineResponse {
+  session_id: string; count: number; turns: TimelineTurn[]
+  rolled_ranges?: TimelineRolledRange[]
+  rewinds?: TimelineRewind[]
+}
 
 // ---- Import (§11 #28) — pull an external Claude session into the workspace.
 export interface ImportSessionRow {

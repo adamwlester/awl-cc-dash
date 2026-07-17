@@ -300,6 +300,14 @@ Files: tests/test_plan_decision_hooks_live.py, docs/ARCHITECTURE.md, DEVLOG.md
 
 ---
 
+### 2026-07-16 19:20:00 — §11 #46 rewind anchor BUILT: record anchors + persisted rewind events + server replay (adversarially hardened)
+
+The last open backend residual is built (spike-informed: the transcript is append-only — a rewind writes nothing until the next prompt branches via sibling parentUuid, and NO engine checkpoint id exists anywhere, so the anchor is the transcript entry uuid the sidecar already held and discarded). (1) Turn records ([sidecar/timeline.py](sidecar/timeline.py)) additively gain `type:"turn"` + `prompt_uuid`/`reply_uuid`, lifted at capture by the new `turn_anchors` — forward window for the reply + bounded backward scan for the prompt (live bridge ordering puts the prompt event BEFORE the turn boundary; both refuters caught the builder's forward-only lift recording None/tool-result uuids), with `_prompt_like` excluding tool results, meta, and sidechain entries (now flagged additively by `_entry_to_event` in [sidecar/drivers/bridge.py](sidecar/drivers/bridge.py)). (2) A successful `POST /sessions/{id}/rewind` now appends a typed `{type:"rewind", to_prompt_index}` record to the same turns.jsonl through the same `_capture_tail`-serialized path (never lands ahead of an in-flight capture), mirrored in memory. (3) `GET /sessions/{id}/timeline` replays the interleaved stream server-side (`timeline.replay_timeline`): ordinals minted over turn records only, k pops the top live turns per rewind with honest clamping, response gains per-row `rolled` + merged `rolled_ranges` + `rewinds`; still-pending records are merged deduped so a transient WSL append flake can't hide a rewind. Captures now SETTLE (re-lift until two consecutive agree, bounded) so `reply_uuid` anchors the closing entry, not a mid-reply one. (4) Renderer ([AgentPanel.tsx](frontend/src/renderer/components/AgentPanel.tsx), [api.ts](frontend/src/renderer/api.ts)): TL_ROLLED client memory DELETED — rolled truth comes from the response (arithmetic byte-identical), with a monotonic fetch-seq guard against stale-poll clobber and an honest "Rewound to the beginning" label. Hermetic tier 1384 → **1418 green**, frontend typecheck clean. Live proof + marker clears ride the next entry.
+
+Files: sidecar/timeline.py, sidecar/main.py, sidecar/drivers/bridge.py, frontend/src/renderer/api.ts, frontend/src/renderer/components/AgentPanel.tsx, tests/test_readouts_unit.py, tests/test_bridge_unit.py, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

@@ -228,9 +228,10 @@ class SessionState:
         # levers, tracked when set through the dashboard endpoints (None until
         # then — neither the run-state arbiter nor the statusline payload
         # reports them, so the endpoints are the join's only source), plus the
-        # in-memory per-turn record mirror. The bridge driver ALSO persists
-        # each record thin to its launch-config turns.jsonl (§8.3); the mirror
-        # is the serve fallback for drivers with no persist surface.
+        # in-memory record mirror (per-turn records AND typed rewind events,
+        # in stored order). The bridge driver ALSO persists each record thin
+        # to its launch-config turns.jsonl (§8.3); the mirror is the serve
+        # fallback for drivers with no persist surface.
         self.last_effort: str | None = None
         self.last_thinking: bool | None = None
         self.turns: list[dict[str, Any]] = []
@@ -879,6 +880,19 @@ def _raise_response_card(session: "SessionState") -> None:
         pass
 
 
+# §11 #46: the bridge flips generating->idle off *screen* state ~1s before the
+# turn's trailing transcript entries are polled into `events` (the exact lag
+# `_maybe_relay_reply` retries for), so a capture that lifted summary + anchors
+# immediately could anchor `reply_uuid` mid-reply. The capture instead SETTLES:
+# it re-lifts until two consecutive lifts agree, sleeping one poll cycle between
+# attempts (bounded — the same 6-attempt budget as the relay). Hermetic tests
+# zero the sleep; the re-lift logic still runs. Honest limit: a trailing entry
+# that lands after a QUEUED next turn's boundary is outside this turn's window
+# and stays missed (the pre-existing window semantics).
+_CAPTURE_SETTLE_SECS = 1.5
+_CAPTURE_SETTLE_ATTEMPTS = 6
+
+
 def _capture_turn(session: "SessionState") -> None:
     """Per-turn settings + summary capture (§7.19/§7.14, §11 #46) — scheduler.
 
@@ -928,16 +942,38 @@ async def _capture_turn_record(session: "SessionState", turn_no: int,
     fallback), and the session-tracked effort/thinking levers. The one-line
     summary is the leading line of the turn's assistant reply (the §11 #39
     preamble lean; first-sentence fallback, sanely truncated —
-    ``timeline.turn_summary``). The record lands in the in-memory mirror and —
-    for drivers with a persist surface (bridge) — appends thin to the
-    per-agent ``turns.jsonl`` (§8.3: the settings snapshot is NOT in the
-    transcript, so it must persist). Best-effort throughout: a failed join
-    source degrades to its fallback; a failed persist logs, keeps the
-    in-memory record, AND queues it for an in-order re-append ahead of the
-    next turn's record (``_turns_pending``), so a transient WSL hiccup never
-    permanently holes ``turns.jsonl``.
+    ``timeline.turn_summary``), and the turn's transcript anchors
+    (``prompt_uuid``/``reply_uuid`` — the JSONL entry uuids the event stream
+    already carries as ``anchor`` on ``source_kind='t'`` events) are lifted
+    from the turn's events (``timeline.turn_anchors`` — forward window for
+    the closing reply, a bounded backward scan for the prompt, which live
+    ordering polls in BEFORE the boundary's running flip; null-safe — an
+    SDK-driven or synthesized turn simply records nulls), both under the
+    bounded trailing-entry settle (``_CAPTURE_SETTLE_SECS``). The record lands in
+    the in-memory mirror and — for drivers with a persist surface (bridge) —
+    appends thin to the per-agent ``turns.jsonl`` (§8.3: the settings
+    snapshot is NOT in the transcript, so it must persist). Best-effort
+    throughout: a failed join source degrades to its fallback; a failed
+    persist logs, keeps the in-memory record, AND queues it for an in-order
+    re-append ahead of the next turn's record (``_turns_pending``), so a
+    transient WSL hiccup never permanently holes ``turns.jsonl``.
     """
     text = _last_turn_assistant_text(session, start_idx)
+    prompt_uuid, reply_uuid = timeline.turn_anchors(session.events, start_idx)
+    # Trailing-entry settle (see _CAPTURE_SETTLE_SECS above): re-lift until the
+    # window is stable across a poll cycle, so `reply_uuid` anchors the CLOSING
+    # assistant entry — not whichever mid-reply entry had polled in when the
+    # screen flipped idle. The anchor lift walks the FULL event list from the
+    # boundary: live ordering polls the prompt entry in BEFORE the boundary's
+    # running flip, so `turn_anchors` looks backward for it (timeline.py).
+    for _ in range(_CAPTURE_SETTLE_ATTEMPTS):
+        if _CAPTURE_SETTLE_SECS:
+            await asyncio.sleep(_CAPTURE_SETTLE_SECS)
+        text2 = _last_turn_assistant_text(session, start_idx)
+        anchors2 = timeline.turn_anchors(session.events, start_idx)
+        if text2 == text and anchors2 == (prompt_uuid, reply_uuid):
+            break  # stable — the transcript tail has flushed
+        text, (prompt_uuid, reply_uuid) = text2, anchors2
     summary = timeline.turn_summary(text)
     drv = session.driver
     snap = None
@@ -952,13 +988,26 @@ async def _capture_turn_record(session: "SessionState", turn_no: int,
     record = timeline.build_record(
         turn=turn_no, timestamp=ts or datetime.now().isoformat(), model=model,
         mode=mode, effort=session.last_effort, thinking=session.last_thinking,
-        summary=summary)
+        summary=summary, prompt_uuid=prompt_uuid, reply_uuid=reply_uuid)
+    await _store_turn_line(session, record)
+
+
+async def _store_turn_line(session: "SessionState",
+                           record: dict[str, Any]) -> None:
+    """Mirror + thin-persist one ``turns.jsonl`` line (turn OR rewind event).
+
+    The shared tail of ``_capture_turn_record`` and ``_append_rewind_record``:
+    the record lands in the in-memory mirror (``session.turns``) and — for
+    drivers with a persist surface (bridge) — drains to ``turns.jsonl`` IN
+    ORDER: any earlier record whose persist failed goes FIRST
+    (``_turns_pending``), so the file keeps completion order and a rewind
+    event can never land ahead of a turn record still draining. Callers are
+    serialized per session (the ``_capture_tail`` chain), so this drain never
+    races another one.
+    """
     session.turns.append(record)
+    drv = session.driver
     if drv is not None and hasattr(drv, "append_turn_record"):
-        # Drain in order: any earlier record whose persist failed goes FIRST,
-        # so the file keeps completion order. Captures are serialized per
-        # session (the `_capture_tail` chain), so this drain never races
-        # another capture's.
         session._turns_pending.append(record)
         while session._turns_pending:
             head = session._turns_pending[0]
@@ -971,6 +1020,39 @@ async def _capture_turn_record(session: "SessionState", turn_no: int,
                     session.session_id, len(session._turns_pending), e)
                 break
             session._turns_pending.pop(0)
+
+
+async def _append_rewind_record(session: "SessionState",
+                                to_prompt_index: int) -> None:
+    """Persist one typed rewind event to the session's Timeline (§11 #46).
+
+    Called ONLY after a SUCCESSFUL driver rewind (a failed rewind appends
+    nothing): the JSONL transcript is append-only — the rewind itself writes
+    NOTHING at rewind time and no engine checkpoint id exists anywhere — so
+    this event line is the only persisted trace, and the read surface's
+    replay (``timeline.replay_timeline``) is what turns it into rolled-row
+    truth that survives a reload. Chained through the SAME per-session
+    ``_capture_tail`` serialization as turn captures and awaited, so the
+    record can never land ahead of an in-flight turn capture and is on disk
+    (or honestly queued on ``_turns_pending``) before the endpoint responds.
+    Manual-terminal rewinds (outside the dashboard) write no event and stay
+    unmarked — the settled scope: the Timeline logs dashboard turns.
+    """
+    record = timeline.build_rewind_record(
+        timestamp=datetime.now().isoformat(), to_prompt_index=to_prompt_index)
+    prev = session._capture_tail
+
+    async def _chained() -> None:
+        if prev is not None:
+            try:
+                await prev
+            except Exception:  # pragma: no cover - predecessor already logged
+                pass
+        await _store_turn_line(session, record)
+
+    task = asyncio.get_running_loop().create_task(_chained())
+    session._capture_tail = task
+    await task
 
 
 def _scratch_key(session: "SessionState") -> str:
@@ -3814,7 +3896,11 @@ async def rewind_session(session_id: str, req: RewindRequest):
     turns from its live context. Requires Claude Code >= 2.1.191: a too-old (or
     unresolvable) CLI degrades to an honest 400, never a silent no-op. 409 `busy`
     when the agent's screen isn't idle (a slash command can only land at an idle
-    boundary); 400 for drivers without the capability.
+    boundary); 400 for drivers without the capability. On success the sidecar
+    appends a typed rewind event to the session's Timeline record
+    (``_append_rewind_record`` — the transcript is append-only and writes
+    nothing at rewind time, so this is the persisted trace the timeline read
+    surface replays rolled state from); a failed rewind appends nothing.
     """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -3825,6 +3911,7 @@ async def rewind_session(session_id: str, req: RewindRequest):
         result = await session.driver.rewind(req.to_prompt_index)
     except RuntimeError as e:
         raise _rewind_fork_http_error(e, "rewind")
+    await _append_rewind_record(session, req.to_prompt_index)
     # Spread the driver's rewind detail (name, to_prompt_index) but keep the
     # endpoint envelope's status "ok" (the driver's inner "rewound" must not
     # clobber it).
@@ -4084,31 +4171,65 @@ async def get_timeline_endpoint(session_id: str):
     levers — rendered as a ``settings`` string) plus a concise one-line
     ``summary`` (the reply's leading line per the §11 #39 preamble lean;
     first-sentence fallback). Rows come from the per-agent ``turns.jsonl`` for
-    drivers that persist it (bridge — survives a sidecar restart), else the
-    session's in-memory mirror; ``turn`` is re-minted 1..N in stored order so
-    the index stays monotonic across restarts (the session-local count resets,
-    the file does not). An empty list before the first completed turn — never
-    an error. Manual-terminal turns are absent by design: the dashboard tracks
-    turns IT initiated (the driver's completion gate).
+    drivers that persist it (bridge — survives a sidecar restart) PLUS any
+    records still queued on the transient-persist-failure path
+    (``_turns_pending`` — so a rewind event whose append hiccuped still rolls
+    its rows instead of silently serving un-rolled state), else the
+    session's in-memory mirror; ``turn`` is re-minted 1..N in stored order
+    over TURN records only, so the index stays monotonic across restarts (the
+    session-local count resets, the file does not) and pure-turn files keep
+    exactly today's numbering. The interleaved rewind event records (§11 #46
+    — appended on each successful dashboard rewind, since the transcript
+    itself is append-only and no engine checkpoint id exists) are REPLAYED
+    server-side (``timeline.replay_timeline``): each row gains ``rolled``,
+    and the response gains ``rolled_ranges`` (merged, ascending) +
+    ``rewinds`` — the rolled marking survives a reload instead of living in
+    renderer memory. An empty list before the first completed turn — never an
+    error. Manual-terminal turns AND manual-terminal rewinds are absent by
+    design: the dashboard tracks turns it initiated (the driver's completion
+    gate), so the replay mirrors the renderer's k-from-last arithmetic and
+    diverges only if manual TUI turns interleave (the pre-existing limit).
     """
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
     records: list[dict[str, Any]] | None = None
+    pending: list[dict[str, Any]] = []
     drv = session.driver
     if drv is not None and drv.supports("timeline"):
+        # Snapshot the not-yet-persisted queue BEFORE the file read: a record
+        # whose append transiently failed sits on `_turns_pending` until the
+        # next capture drains it, and serving the file WITHOUT it would lie —
+        # most critically for a rewind event, whose absence silently un-rolls
+        # rows and skews the renderer's k-from-last arithmetic until the queue
+        # drains. Snapshot-then-read means a drain racing this GET can only
+        # DUPLICATE a snapshot prefix onto the file tail (deduped below),
+        # never hide a record from both sides. (A sidecar restart before the
+        # drain still loses the queued record — the persist is best-effort by
+        # design; this closes the read gap, not that one.)
+        pending = list(session._turns_pending)
         try:
             records = await drv.get_timeline()
         except Exception:  # pragma: no cover - fall back to the mirror
-            records = None
+            records, pending = None, []  # the mirror already holds the queue
+    if records is None:
+        records = []
+    if pending:
+        # Drop the snapshot prefix a concurrent drain already appended to the
+        # file — order is preserved end to end, so a drained record can only
+        # be a snapshot PREFIX sitting at the file tail.
+        for i in range(min(len(pending), len(records)), 0, -1):
+            if records[-i:] == pending[:i]:
+                pending = pending[i:]
+                break
+        records = records + pending
     if not records:
         records = list(session.turns)
-    turns: list[dict[str, Any]] = []
-    for i, rec in enumerate(records, start=1):
-        row = dict(rec) if isinstance(rec, dict) else {"summary": None}
-        row["turn"] = i
-        turns.append(row)
-    return {"session_id": session_id, "count": len(turns), "turns": turns}
+    replayed = timeline.replay_timeline(records)
+    turns = replayed["turns"]
+    return {"session_id": session_id, "count": len(turns), "turns": turns,
+            "rolled_ranges": replayed["rolled_ranges"],
+            "rewinds": replayed["rewinds"]}
 
 
 @app.get("/sessions/{session_id}/context/breakdown")
