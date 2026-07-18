@@ -388,6 +388,14 @@ Files: docs/ARCHITECTURE.md, tests/README.md, tests/ui/test_ui_slice_live.py, CL
 
 ---
 
+### 2026-07-18 16:01:47 — docs: TODO restructured — [ND]/[NB] merged into one [NU] NEXT UP; 7 items queued (4 handoff answers + 3 inbox notes)
+
+Per the operator (handing off the 2026-07-17 sprint session): the two Next-up queues in [dev/notes/TODO.md](dev/notes/TODO.md) merged into a single **[NU] NEXT UP** — design and app work now land as one build effort, so the queue split stopped earning its keep; the backlogs keep their lanes ([BD] here, build in ARCHITECTURE §11, [BH] chores). Top matter, sections table, and the implementing/inbox rules updated to match. **Queued 7 approved items** (priority order): panel label renames (Team Graph→Team, Team Feed→Feed); Past tab → a Team-panel drawer (Link-Config-style Sheet); Library Plans/Documents accordion vertical fill + the comment-popout-not-showing fix; the fnord invisible-icon fix (11 curated-list vs sprite-map name mismatches + the hardcoded-white img fallback); icon picker serving all 167 icons (stages §11 #56); console expand reusing the live attach (no second wait); and Model **Inherit removal** — app default **Opus**, Fork's "inherit ← parent" stays (different concept), role presets hard-pin `model: fable` — a decision change superseding the 2026-07-17 inherit doctrine, ARCHITECTURE text update rides the build. [IN] emptied (3 notes filed). Also fixed BD10's stale "already queued ([ND] 15)" ref (that item built 2026-07-08).
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
