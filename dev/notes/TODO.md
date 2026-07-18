@@ -1,4 +1,4 @@
-# DASHBOARD TODO — DESIGN BACKLOG & WORK QUEUES
+# DASHBOARD TODO — BACKLOGS & WORK QUEUE
 
 > **Backlog is reference-only; [NU] NEXT UP is the only actionable section.** For the backlog sections ([BD] · [BH]), agents must not implement anything, and must not treat any entry as confirmed, approved, or scoped, unless the human points them at a specific item. The exception is **[NU] NEXT UP**: items there are approved for work, and being directed to that section is itself the signal to build them. This is otherwise a capture-and-triage doc.
 >

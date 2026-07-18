@@ -396,6 +396,14 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-18 16:12:00 — docs: TODO title trued to the merged structure
+
+Alignment straggler from the [NU] merge caught on re-verify: the doc title still read "DESIGN BACKLOG & WORK QUEUES" (plural queues, and [BH] isn't design) — now "BACKLOGS & WORK QUEUE".
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
