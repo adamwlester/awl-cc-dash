@@ -84,11 +84,13 @@
 - Need to integrate workflow support In terms of intercepting /workflows and approving via the inbox. The approval might require some means of displaying the proposed workflow as well, ideally rendered in the inbox card content. Need to consider if this fits in one of the existing inbox sections or it needs its own.
 - I want the menus for skills/tools/servers/plugins and possibly deny rules to be formatted more nicely with clear categories and nice visible helper text giving a brief description for each tool with the tool name. 
 - Our gallery is not being well maintained. It is missing badge/chip entries as well. The naming is off and the groupings have drifted. The whole thing needs a refactor.
-
 - I want to switch from the cream background (#fef6e4) to something darker, like a charcoal. I want to keep the lighter cream for the main footer and the panel headers but for subheader within the panels I want to move to a darker charcoal (or whatever we use for the new main surface fill/background). 
 - We need to standardize our count chips better. I am partial to just using teal for all these, not including the ones related to editing (approve, revise, etc). 
 - We need to standardizes the sizing of all our badge/chips so we have a fixed set of sizes. Likely all can be covered with just a small medium large in terms of height and text font size and padding.
 - I want to decrease the border radius for all of our components. I want to move to a more sharp neobrutalism style in terms of radiuses.
+- Move content of the "past" tab into the team graph as tab's "Resumable" and "Archive". Make them agent cards like existing cards in team graph. Put the associated action buttons on the card surface in front of a gray out mask. Put the existing team  graph cards in "Active". So tab order is active, resumable and archive. Better, just make it another drawer in the Team Graph panel, same drawer behavior as "Link config"
+- Change panel labels. Change "Team Graph" to "Team". Change "Team Feed" to "Feed".
+- Have accordions in Library tabs Plans and Documents fill the whole vertical panel height when expanded. Fix the comment popup as it currently does not show when active, presumably due to issues in the layout config.
 
 ### Big picture and/or Needs more research 
 - We need to make sure we build both the ui and other elements in a modular enough way that we can easily modify and add features.
