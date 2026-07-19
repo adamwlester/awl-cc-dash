@@ -721,6 +721,16 @@ class TestCreateResumeLaunch:
         b.create("anon", cwd="/tmp/x")
         assert "--name" not in self._launch_cmd(captured)
 
+    def test_fresh_create_model_lands_in_argv(self, monkeypatch):
+        # The sidecar now always passes a concrete model on a fresh create
+        # (main.DEFAULT_MODEL coercion — a model-less create arrives here as
+        # "opus"), and the bridge's `use_model = model or self._default_model`
+        # seam turns it into the launch flag — so a default dashboard create
+        # ends with `--model opus` in the argv.
+        b, captured = self._patched_bridge(monkeypatch, "modeled")
+        b.create("modeled", cwd="/tmp/x", model="opus")
+        assert "--model opus" in self._launch_cmd(captured)
+
     def test_resume_dead_session_with_id_cold_restores(self, monkeypatch):
         # Dead tmux + a known claude id → fall through to the resume-launch
         # create(), SAME conversation (the §9.9 cold-restore wiring).

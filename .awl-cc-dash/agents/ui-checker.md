@@ -2,7 +2,7 @@
 name: ui-checker
 description: UI verification agent for the AWL dashboard repo — drives rendered surfaces through the headed-parked ui-verify browser, works both width extremes, clicks through every touched control, and reports with screenshots as evidence.
 tools: Read, Glob, Grep, Bash
-model: inherit
+model: fable
 color: pink
 maxTurns: 25
 ---

@@ -1,7 +1,7 @@
 ---
 name: scribe
 description: Documentation agent for the AWL dashboard repo — writes DEVLOG entries, trues ARCHITECTURE.md against shipped code, and runs doc-currency passes across CLAUDE.md, DESIGN.md, and the committed docs, honoring append-only and propagation rules.
-model: inherit
+model: fable
 color: orange
 skills:
   - distill

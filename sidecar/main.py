@@ -33,7 +33,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from drivers import create_driver, default_driver_name, AgentDriver, DriverConfig
-from identity import assign_identity, git_author, draw_name
+from identity import assign_identity, git_author, draw_name, AG_ICONS
 import attachments
 import response_presets
 import eventbus
@@ -1375,6 +1375,16 @@ class IdentityInput(BaseModel):
     color: str | None = None   # hex; default round-robin from the 16 --ag-* tokens
     icon: str | None = None    # icon name from assets/icons/agents/
 
+# The product-owned model default (2026-07-18 decision): the app defines its
+# own default — Opus — instead of falling through to whatever Claude Code's
+# config would pick (the retired "no --model flag" path). create_session
+# coerces a missing/empty/"inherit" model to this so every NEW session
+# persists a concrete model and the bridge always emits --model. The request
+# field below stays Optional (an explicit JSON null from older clients must
+# not 422); historical roster/archive read-backs and the fork's
+# "inherit ← parent" derivation keep their own semantics.
+DEFAULT_MODEL = "opus"
+
 class CreateSessionRequest(BaseModel):
     agent_type: str | None = None
     model: str | None = None
@@ -1643,10 +1653,19 @@ async def create_session(req: CreateSessionRequest):
         if deletion.is_retired(identity["number"]):
             identity["number"] = deletion.next_free_number(identity["number"])
             _identity_ordinal = max(_identity_ordinal, identity["number"])
+    # Model coercion (the DEFAULT_MODEL decision): an explicit model passes
+    # through verbatim, but None/empty/"inherit" (case-insensitive, stripped —
+    # the retired Claude-Code-default passthrough) become DEFAULT_MODEL, so
+    # every NEW session carries a concrete model down to the driver (the
+    # bridge then always emits --model). Resume/reconnect read-backs and the
+    # fork's `req.model or source.model` parent-inherit are deliberately NOT
+    # coerced — historical records keep what they recorded.
+    _model = (req.model or "").strip()
+    model = DEFAULT_MODEL if (not _model or _model.lower() == "inherit") else req.model
     session = SessionState(
         session_id=session_id,
         agent_type=req.agent_type,
-        model=req.model,
+        model=model,
         permission_mode=req.permission_mode,
         cwd=req.cwd,
         system_prompt=req.system_prompt,
@@ -4599,6 +4618,18 @@ async def agent_icon(name: str, color: str | None = None):
         )
     return Response(content=svg, media_type="image/svg+xml",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/agent-icons")
+async def list_agent_icons():
+    """The full shipped agent-icon set (§11 #56) — every SVG stem in
+    ``assets/icons/agents/``, sorted, so the manual icon picker can offer all
+    of them (the curated 50 stay the auto-assign pool only); each listed name
+    is servable through the recolor route above. Discovered once at sidecar
+    import (identity.AG_ICONS, with its single-default degrade on an
+    unreadable asset tree) — icons added on disk mid-run appear after a
+    restart, not live. Read-only, no auth, cheap (mirrors GET /roles)."""
+    return {"icons": AG_ICONS, "count": len(AG_ICONS)}
 
 
 # ============================================================================

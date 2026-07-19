@@ -1,7 +1,7 @@
 ---
 name: builder
 description: Implementation agent for the AWL dashboard repo — reads ARCHITECTURE.md before touching code, follows CLAUDE.md rules end to end (tokens, DEVLOG, propagation), ships changes with real pytest coverage.
-model: inherit
+model: fable
 color: blue
 maxTurns: 60
 effort: high

@@ -1952,6 +1952,113 @@ class TestArmedModes:
 
 
 # ---------------------------------------------------------------------------
+# Product model default (2026-07-18 decision) — the app owns its default
+# model (main.DEFAULT_MODEL = "opus"): create_session coerces a missing/
+# empty/"inherit" model (case-insensitive, stripped — the retired
+# Claude-Code-default passthrough) to it, an explicit model passes through
+# verbatim, and the coerced model is what the driver's config receives, so
+# the bridge always emits --model. The request field stays Optional (an
+# explicit JSON null must not 422). The fork's parent-inherit derivation
+# (`req.model or source.model`) and the roster/archive read-backs stay
+# uncoerced — pinned in test_rewind_fork_unit / the resume descriptor tests.
+# ---------------------------------------------------------------------------
+
+class TestModelDefault:
+    @pytest.fixture(autouse=True)
+    def _clean(self, tmp_path, monkeypatch):
+        import state_store
+        monkeypatch.setenv("AWL_SIDECAR_RUNTIME", str(tmp_path / "rt"))
+        state_store.reset()
+        main.sessions.clear()
+        self.tmp_path = tmp_path
+        yield
+        state_store.reset()
+        main.sessions.clear()
+
+    def _cwd(self) -> str:
+        cwd = self.tmp_path / "proj"
+        (cwd / ".git").mkdir(parents=True, exist_ok=True)
+        return str(cwd)
+
+    def _create(self, monkeypatch, req):
+        async def _stub_start(session):
+            session.status = "idle"
+
+        monkeypatch.setattr(main, "start_session", _stub_start)
+        return asyncio.run(main.create_session(req))
+
+    def test_default_model_constant_is_opus(self):
+        assert main.DEFAULT_MODEL == "opus"
+
+    def test_create_with_no_model_defaults_to_opus(self, monkeypatch):
+        out = self._create(monkeypatch, main.CreateSessionRequest(
+            cwd=self._cwd(), driver="bridge"))
+        assert out["model"] == "opus"
+        assert main.sessions[out["session_id"]].model == "opus"
+
+    def test_driver_receives_the_coerced_model(self, monkeypatch):
+        # The REAL start_session path: the DriverConfig the driver is built
+        # from carries the coerced model — no None ever reaches the bridge's
+        # `use_model = model or self._default_model` seam on a fresh create.
+        captured = {}
+
+        class _Driver:
+            name = "captured"
+
+            def __init__(self, config):
+                self.config = config
+
+            def bind_session_id(self, sid):
+                pass
+
+            async def start(self):
+                return None
+
+            async def events(self):
+                return
+                yield  # pragma: no cover — makes this an async generator
+
+        def _fake_create_driver(config, on_event, driver_name=None):
+            captured["config"] = config
+            return _Driver(config)
+
+        monkeypatch.setattr(main, "create_driver", _fake_create_driver)
+        out = asyncio.run(main.create_session(
+            main.CreateSessionRequest(cwd=self._cwd(), driver="bridge")))
+        assert captured["config"].model == "opus"
+        assert out["model"] == "opus"
+
+    def test_explicit_model_passes_verbatim(self, monkeypatch):
+        out = self._create(monkeypatch, main.CreateSessionRequest(
+            cwd=self._cwd(), driver="bridge", model="sonnet"))
+        assert out["model"] == "sonnet"
+        assert main.sessions[out["session_id"]].model == "sonnet"
+
+    @pytest.mark.parametrize(
+        "spelling", ["inherit", "Inherit", "INHERIT", "  inherit  "])
+    def test_inherit_any_case_coerces_to_opus(self, monkeypatch, spelling):
+        out = self._create(monkeypatch, main.CreateSessionRequest(
+            cwd=self._cwd(), driver="bridge", model=spelling))
+        assert out["model"] == "opus"
+
+    def test_empty_string_coerces_to_opus(self, monkeypatch):
+        out = self._create(monkeypatch, main.CreateSessionRequest(
+            cwd=self._cwd(), driver="bridge", model="   "))
+        assert out["model"] == "opus"
+
+    def test_explicit_json_null_parses_and_coerces_no_422(self, monkeypatch):
+        # Older clients send `"model": null` explicitly — the annotation stays
+        # Optional so the request PARSES (the 422 would happen here), then the
+        # create coerces it to the product default.
+        req = main.CreateSessionRequest.model_validate_json(
+            '{"model": null, "driver": "bridge"}')
+        assert req.model is None
+        req.cwd = self._cwd()
+        out = self._create(monkeypatch, req)
+        assert out["model"] == "opus"
+
+
+# ---------------------------------------------------------------------------
 # Startup restore policy (§9.1 picker-first) — sidecar startup restores
 # NOTHING by default; the restore point is POST /projects/open
 # (reconnect_sessions(project_key=…)). AWL_STARTUP_RESTORE=all keeps the old

@@ -2,7 +2,7 @@
 name: reviewer
 description: Adversarial code reviewer for the AWL dashboard repo — verifies every claim against the actual code, hunts silent data loss, contract drift, and doc/code divergence, and reports findings with file:line evidence.
 tools: Read, Glob, Grep, Bash
-model: inherit
+model: fable
 #model: opus
 color: purple
 ---

@@ -2,7 +2,7 @@
 name: researcher
 description: Investigation and mapping agent for the AWL dashboard repo — read-only exploration that produces evidence-backed reports with exact file:line anchors, for handing to planners and implementation lanes.
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
-model: inherit
+model: fable
 color: green
 maxTurns: 30
 effort: max
