@@ -10,8 +10,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   api, type CreatePayload, type Session, type ContextBreakdown, type ResponsePreset,
-  type PastAgent, type ArchiveRecord, type TimelineTurn, type TimelineResponse,
-  type Identity, type RolePreset, type RolesResponse,
+  type TimelineTurn, type TimelineResponse,
+  type RolePreset, type RolesResponse,
 } from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph, SPRITE_BY_FILE } from '../lib/icons'
@@ -20,7 +20,7 @@ import {
   NB_CLASS, NB_LABEL, fmtTokens, MODE_VALUE, clockTime, timeAgo,
 } from '../lib/identity'
 import { toast } from '../lib/toast'
-import { useConsole, ConsoleFeed, CommandList } from './Console'
+import { useConsole, ConsoleFeed, CommandList, clearAttachCache } from './Console'
 
 const DEFAULT_MAX_TURNS = 50
 const CTX_CUTOFF = 80
@@ -201,14 +201,41 @@ function ColorPicker({ color, onPick, locked }: { color: string; onPick: (hex: s
   )
 }
 
+// NU-5: the picker serves the FULL shipped icon set (assets/icons/agents/, 167
+// stems) off GET /assets/agent-icons — fetched once per app run (module-level
+// cache, first open triggers it). Sprite <use> stays the fast path for
+// sprite-known names; the rest render lazily through the recolor endpoint
+// (the NU-4 colored path). On fetch failure the picker degrades to the
+// sprite-embedded set (today's 50) so it never comes up empty — and the
+// cleared in-flight slot lets the next open retry.
+let ICON_NAMES: string[] | null = null
+let ICON_NAMES_REQ: Promise<string[]> | null = null
+function fetchIconNames(): Promise<string[]> {
+  if (ICON_NAMES) return Promise.resolve(ICON_NAMES)
+  if (!ICON_NAMES_REQ) {
+    ICON_NAMES_REQ = api.iconNames().then(r => {
+      if (r && r.icons?.length) { ICON_NAMES = r.icons; return r.icons }
+      ICON_NAMES_REQ = null
+      return Object.keys(SPRITE_BY_FILE)
+    })
+  }
+  return ICON_NAMES_REQ
+}
+
 function IconPicker({ icon, color, onPick, locked }: { icon: string; color: string; onPick: (name: string) => void; locked?: boolean }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
-  const names = Object.keys(SPRITE_BY_FILE)
+  const [names, setNames] = useState<string[]>(() => ICON_NAMES || Object.keys(SPRITE_BY_FILE))
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    fetchIconNames().then(list => { if (!cancelled) setNames(list) })
+    return () => { cancelled = true }
+  }, [open])
   return (
     <div data-comp="icon-picker" className={`picker${locked ? ' lockable' : ''}`}>
       <button className="picker-trig" type="button" onClick={() => setOpen(o => !o)}>
-        <span className="agtile picker-ico" style={{ color }}><AgGlyph icon={icon} /></span>
+        <span className="agtile picker-ico" style={{ color }}><AgGlyph icon={icon} color={color} /></span>
         <span className="picker-val">{icon || '—'}</span>
         <Ic name="chevrons-up-down" className="picker-cv" />
       </button>
@@ -222,7 +249,7 @@ function IconPicker({ icon, color, onPick, locked }: { icon: string; color: stri
                   26px tile size (a bare .ag-svg falls back to the browser's
                   300×150 svg default) and its currentColor drives the recolor —
                   mirrors the mockup's buildIconGrids (design/behavior.js). */}
-              <span className="agtile" style={{ color }}><AgGlyph icon={n} /></span>
+              <span className="agtile" style={{ color }}><AgGlyph icon={n} color={color} /></span>
             </button>
           ))}
         </div>
@@ -232,12 +259,16 @@ function IconPicker({ icon, color, onPick, locked }: { icon: string; color: stri
 }
 
 // ---- model tabs ------------------------------------------------------------------
-const MODEL_FAMILIES = ['inherit', 'opus', 'sonnet', 'haiku', 'fable'] as const
+// NU-7: the Claude-Code-default "Inherit" option is retired — the app defines
+// its own default (Opus) and always pins the model explicitly. 'fable' MUST
+// stay in this list: the reseeded role presets pin it and pickRole gates on it.
+const MODEL_FAMILIES = ['opus', 'sonnet', 'haiku', 'fable'] as const
 function ModelTabs({ current, onPick }: { current: string | null; onPick?: (family: string) => void }) {
+  // An unrecognized or null (legacy) model highlights NO tab — never fake-Opus.
   const fam = (() => {
     const m = (current || '').toLowerCase()
-    for (const f of MODEL_FAMILIES) if (f !== 'inherit' && m.includes(f)) return f
-    return current ? 'inherit' : 'inherit'
+    for (const f of MODEL_FAMILIES) if (m.includes(f)) return f
+    return null
   })()
   return (
     <div data-comp="model-selector" className="model-tabs">
@@ -431,7 +462,7 @@ function DetailsTab({ s }: { s: Session }) {
   return (
     <div data-group="mid" className="p-3 space-y-3 flex flex-col min-h-full">
       <div data-comp="agent-panel-head" className="agent-head">
-        <span data-comp="agent-tile" className="agtile" style={{ width: 'var(--size-40)', height: 'var(--size-40)', color: a.color }}><AgGlyph icon={a.icon} /></span>
+        <span data-comp="agent-tile" className="agtile" style={{ width: 'var(--size-40)', height: 'var(--size-40)', color: a.color }}><AgGlyph icon={a.icon} color={a.color} /></span>
         <div className="min-w-0 flex-1">
           <div className="text-[9px] text-muted font-bold uppercase tracking-wide truncate">{a.role}</div>
           <div className="text-[15px] font-heading text-foreground leading-tight truncate" style={{ fontWeight: 900 }}>{a.name}</div>
@@ -495,7 +526,7 @@ function DetailsTab({ s }: { s: Session }) {
           <div className="flex items-center justify-between mb-1.5"><label className="lbl">Icon</label></div>
           <div data-comp="icon-picker" className="picker lockable" title="Set at create — view-only on a live session">
             <div className="picker-trig">
-              <span className="agtile picker-ico" style={{ color: a.color }}><AgGlyph icon={a.icon} /></span>
+              <span className="agtile picker-ico" style={{ color: a.color }}><AgGlyph icon={a.icon} color={a.color} /></span>
               <span className="picker-val">{a.icon || '—'}</span>
             </div>
           </div>
@@ -505,7 +536,6 @@ function DetailsTab({ s }: { s: Session }) {
       <div>
         <div className="ro-head"><span className="ro-label">Model</span><span className="ml-auto text-[9.5px] text-muted font-mono font-semibold">{modelLabel(s.model)}</span></div>
         <ModelTabs current={s.model} onPick={async f => {
-          if (f === 'inherit') return
           const r = await api.setModel(s.session_id, f)
           if (!r) toast(`Model ${f} rejected by the sidecar`)
         }} />
@@ -555,7 +585,7 @@ function DetailsTab({ s }: { s: Session }) {
                     <span className="pc">{Math.round(r.percent)}%</span>
                   </div>
                 ))}
-                <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx?.model || s.model || 'inherit'}</span><span className="t">{hasTok ? `${fmtTokens(ctx!.window)} window` : ''}</span></div></div>
+                <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx?.model || s.model || '—'}</span><span className="t">{hasTok ? `${fmtTokens(ctx!.window)} window` : ''}</span></div></div>
                 {bd.compact_history && bd.compact_history.count > 0 && (
                   <div className="bd-sub"><h5>Compactions</h5><div className="ml"><span className="p">{bd.compact_history.count} compaction{bd.compact_history.count === 1 ? '' : 's'}</span></div></div>
                 )}
@@ -564,7 +594,7 @@ function DetailsTab({ s }: { s: Session }) {
               <div className="bd-rows">
                 <div className="cat"><span className="sw2" style={{ background: ctxColor(ctxPct || 0) }} /><span className="nm">Used context</span><span className="tk" style={{ marginLeft: 'auto' }}>{fmtTokens(ctx.tokens)}</span><span className="pc">{ctxPct}%</span></div>
                 <div className="cat"><span className="sw2" style={{ background: 'var(--surface-3)' }} /><span className="nm">Free space</span><span className="tk" style={{ marginLeft: 'auto' }}>{fmtTokens(Math.max(0, ctx.window - ctx.tokens))}</span><span className="pc">{100 - (ctxPct || 0)}%</span></div>
-                <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx.model || s.model || 'inherit'}</span><span className="t">{fmtTokens(ctx.window)} window</span></div></div>
+                <div className="bd-sub"><h5>/ Model</h5><div className="ml"><span className="p">{ctx.model || s.model || '—'}</span><span className="t">{fmtTokens(ctx.window)} window</span></div></div>
                 <div className="text-[9px] text-muted-2 mt-2 font-semibold">{bdLoading ? 'reading the deep /context breakdown…' : (bdMsg || 'the per-category breakdown pulls on open')}</div>
               </div>
             ) : <div className="awl-empty">{bdLoading ? 'reading context…' : 'no context reading yet'}</div>}
@@ -612,7 +642,7 @@ function DetailsTab({ s }: { s: Session }) {
                     <span data-comp="subagent-badge" className={`sbadge ${sub.status === 'error' ? 'sb-error' : sub.status === 'done' ? 'sb-idle' : 'sb-active'}`}>{sub.id}</span>
                     <span className="sa-type">{sub.type || 'subagent'}</span>
                     <span className={`sa-status sa-st-${sub.status === 'done' ? 'done' : sub.status === 'error' ? 'error' : 'running'}`}>{sub.status}</span>
-                    <button data-comp="ghost-icon-button" className="ghost-ic sa-tx" title={`Scope the Team Feed to ${sub.id}`} onClick={() => { d.setFeedTab('transcript'); d.gotoSubagent(s.session_id, sub.id) }}><Ic name="file-text" /></button>
+                    <button data-comp="ghost-icon-button" className="ghost-ic sa-tx" title={`Scope the Feed to ${sub.id}`} onClick={() => { d.setFeedTab('transcript'); d.gotoSubagent(s.session_id, sub.id) }}><Ic name="file-text" /></button>
                   </div>
                   {sub.description && <div className="sa-task">{sub.description}</div>}
                   {sub.usage && <div className="sa-usage">{usageBits(sub.usage).map((b, i, arr) => <React.Fragment key={i}><span>{b}</span>{i < arr.length - 1 && <span className="sep">·</span>}</React.Fragment>)}</div>}
@@ -905,7 +935,9 @@ function CreateTab() {
   const [plugins, setPlugins] = useState<string[]>([])
   const [color, setColor] = useState(JEWELS[11].hex)   // emerald
   const [icon, setIcon] = useState('wizard-face')
-  const [model, setModel] = useState<string>('inherit')
+  // NU-7: the app's own default model is Opus — Create opens on it; the
+  // Claude-Code-default "Inherit" path is retired.
+  const [model, setModel] = useState<string>('opus')
   const [mode, setMode] = useState('Bypass')
   // #13 — Launch permissions (operator decision 2026-07-17): Bypass is the
   // DEFAULT launch mode and its arming is prepopulated ON — supersedes the
@@ -970,8 +1002,9 @@ function CreateTab() {
     setRole(r.name)
     setDesc(r.description || '')
     if (r.color_hex) setColor(r.color_hex)
-    // Accept exactly the families the Create ModelTabs offers (incl. 'inherit');
-    // unknown values / full model IDs still skip — the segment can't show them.
+    // Accept exactly the families the Create ModelTabs offers ('fable' incl. —
+    // the reseeded presets pin it); unknown values / full model IDs still skip —
+    // the segment can't show them.
     if (r.model && (MODEL_FAMILIES as readonly string[]).includes(r.model)) setModel(r.model)
     if (r.tools?.length) setTools(r.tools)
     if (r.max_turns) setMaxTurns(r.max_turns)
@@ -1000,7 +1033,9 @@ function CreateTab() {
   const create = async () => {
     setBusy(true)
     const payload: CreatePayload = {
-      model: model === 'inherit' ? null : model,
+      // NU-7: always the explicit model — the old inherit→null mapping (no
+      // --model flag → Claude Code's own config default) is retired.
+      model,
       // Arming (§7.11/#13): launching IN a mode arms it (`--permission-mode`);
       // the Bypass switch additionally maps to the backend's arm-without-
       // activate flag (`arm_bypass` → --allow-dangerously-skip-permissions)
@@ -1086,7 +1121,7 @@ function CreateTab() {
 
         <div>
           <div className="ro-head"><span className="ro-label">Model</span></div>
-          <ModelTabs current={model === 'inherit' ? null : model} onPick={setModel} />
+          <ModelTabs current={model} onPick={setModel} />
         </div>
 
         <div>
@@ -1158,7 +1193,7 @@ function CreateTab() {
       <CreateFooter busy={busy} onCreate={create} onReset={() => {
         setRole('agent'); setNum(''); setName(''); setDesc('')
         setTools([]); setDeny([]); setMcp([]); setPlugins([])
-        setColor(JEWELS[11].hex); setIcon('wizard-face'); setModel('inherit')
+        setColor(JEWELS[11].hex); setIcon('wizard-face'); setModel('opus')
         setMode('Bypass'); setArmBypass(true); setArmAuto(false)
         setEffort('Med'); setMaxTurns(40); setMaxCtx(75); setRespPreset('default')
       }} />
@@ -1179,207 +1214,6 @@ function CreateFooter({ busy, onCreate, onReset }: { busy: boolean; onCreate: ()
   )
 }
 
-// ---- Past tab — the resume picker + the per-agent archive (#17/#18, §7.12) ------
-// RESUMABLE: GET /sessions/past — every persisted agent that isn't live (dead
-// roster records + archived/retired ones), source-tagged, each with an honest
-// `resumable` flag (a row with no conversation id reads greyed, Resume
-// disabled). Resume → POST /sessions/resume: relaunch on the SAME conversation
-// (never a fork); resuming an archived row also un-retires it. ARCHIVE: the
-// deep-freeze records behind the rows (GET /archive) — expandable key/value
-// cards over Resume + the true-delete (DELETE /archive/{id}, behind the
-// designed inline danger confirm; the referenced transcript is untouched).
-function pastStampFmt(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d2 = new Date(iso)
-  if (isNaN(d2.getTime())) return String(iso).slice(0, 16)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d2.getMonth() + 1)}-${p(d2.getDate())} ${p(d2.getHours())}:${p(d2.getMinutes())}`
-}
-function pastIdentBits(identity: Identity | null, fallbackName?: string | null, sessionId?: string | null) {
-  const num = identity?.number != null ? String(identity.number).padStart(2, '0') : ''
-  // A fork's backend-assigned identity can carry an empty name (backend gap):
-  // fall back to the session id it always has rather than a blank / bare "—".
-  const idShort = sessionId ? sessionId.replace(/^awl-/, '').slice(0, 8) : ''
-  return {
-    role: identity?.role || 'agent',
-    display: `${num ? num + ' ' : ''}${identity?.name || fallbackName || idShort || '—'}`,
-    color: identity?.color || 'var(--muted)',
-    icon: identity?.icon || '',
-  }
-}
-
-function PastTab() {
-  const d = useDash()
-  const [past, setPast] = useState<PastAgent[] | null>(null)
-  const [arch, setArch] = useState<ArchiveRecord[] | null>(null)
-  const [openArc, setOpenArc] = useState<Set<string>>(new Set())
-  const [confirmArc, setConfirmArc] = useState<string | null>(null)
-  const [busyKey, setBusyKey] = useState<string | null>(null)
-
-  // Own 5s cadence while the tab is open (in-flight guarded) — never bundled
-  // into the roster poll (#33's lesson).
-  useEffect(() => {
-    let cancelled = false
-    let inflight = false
-    const pull = async () => {
-      if (inflight) return
-      inflight = true
-      try {
-        const [p, ar] = await Promise.all([api.sessionsPast(), api.archive()])
-        if (cancelled) return
-        if (p) setPast(p.past)
-        if (ar) setArch(ar.archived)
-      } finally { inflight = false }
-    }
-    pull()
-    const i = setInterval(pull, 5000)
-    return () => { cancelled = true; clearInterval(i) }
-  }, [])
-
-  const refresh = async () => {
-    const [p, ar] = await Promise.all([api.sessionsPast(), api.archive()])
-    if (p) setPast(p.past)
-    if (ar) setArch(ar.archived)
-  }
-
-  const doResume = async (sel: { session_id?: string; archive_id?: string }, label: string) => {
-    const key = sel.archive_id || sel.session_id || ''
-    setBusyKey(key)
-    const r = await api.resumeSession(sel.archive_id ? { archive_id: sel.archive_id } : { session_id: sel.session_id })
-    setBusyKey(null)
-    if (r.ok && r.data) {
-      toast(`Resumed ${label} — same conversation, same identity${r.data.resumed_from === 'archive' ? ' (un-retired from the archive)' : ''}`)
-      d.select(r.data.session_id)
-      d.setAgentTab('details')
-      refresh()
-    } else {
-      toast(`Resume failed: ${r.detail || 'sidecar error'}`)   // honest 400/404/409 verbatim
-    }
-  }
-
-  const doArcDelete = async (arcId: string, label: string) => {
-    setConfirmArc(null)
-    const r = await api.deleteArchive(arcId)
-    toast(r.ok ? `Archive record ${arcId} deleted forever (${label}'s transcript is untouched)` : `Delete failed: ${r.detail || 'sidecar error'}`)
-    refresh()
-  }
-
-  const rows = past || []
-  const arcs = arch || []
-  const rez = rows.filter(p => p.resumable).length
-  const kv = (k: string, v: React.ReactNode, plain?: boolean) => (
-    <div className="arch-kv"><span className="k">{k}</span><span className={`v${plain ? ' plain' : ''}`}>{v}</span></div>
-  )
-
-  return (
-    <div data-group="mid" className="p-3 space-y-3">
-      <div className="agent-head">
-        <span className="agtile agtile--user" style={{ width: 'var(--size-40)', height: 'var(--size-40)' }}><Ic name="history" className="agtile-luc" /></span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-heading text-foreground leading-tight" style={{ fontWeight: 900 }}>Past agents</div>
-          <div className="text-[10px] text-muted font-semibold">resume a dead or archived agent — same conversation, same identity</div>
-        </div>
-      </div>
-
-      <div>
-        <div className="ro-head">
-          <span className="ro-label" title="Every persisted agent that isn't live right now — dead roster records plus the archive, merged and source-tagged. Resume relaunches the agent on its own conversation (never a fork); a row with no conversation id can't resume and reads greyed.">Resumable</span>
-          <span className="ml-auto text-[9.5px] text-muted font-mono font-semibold">{past == null ? '…' : `${rows.length} past · ${rez} resumable`}</span>
-        </div>
-        <div data-comp="past-agent-picker" className="aglist past-list">
-          {rows.map(p => {
-            const b = pastIdentBits(p.identity, p.name, p.session_id)
-            // Roster rows carry the mockup's "died …" stamp when the sidecar
-            // witnessed the stop/death (#17 died_at); legacy records and
-            // unwitnessed deaths (reboot) fall back to the created stamp.
-            const stamp = p.source === 'archive' ? `retired ${pastStampFmt(p.retired_at)}`
-              : p.died_at ? `died ${pastStampFmt(p.died_at)}` : `created ${pastStampFmt(p.created_at)}`
-            const key = p.archive_id || p.session_id || b.display
-            return (
-              <div key={key} data-comp="past-agent-row" className={`agrow past-row${p.resumable ? '' : ' past-row--norez'}`}
-                title={p.resumable ? `${p.model || 'model inherit'} · ${stamp}` : 'No conversation id persisted — can’t resume onto its conversation'}>
-                <span className="agtile" style={{ width: 'var(--size-28)', height: 'var(--size-28)', color: b.color }}><AgGlyph icon={b.icon} /></span>
-                <span className="ag-lab">
-                  <span className="ag-role">{b.role}{p.model ? ` · ${modelLabel(p.model)}` : ''}</span>
-                  <span className="ag-name">{b.display}</span>
-                </span>
-                <span data-comp="past-source-badge" className={`past-src${p.source === 'archive' ? ' past-src--archive' : ''}`}
-                  title={p.source === 'archive' ? 'From the archive — Resume un-retires it' : 'A dead roster record — the agent process is gone, the record persists'}>{p.source}</span>
-                <span className="past-stamp">{stamp}</span>
-                <button data-comp="button" className="btn btn-sm past-resume" disabled={!p.resumable || busyKey === key}
-                  title={p.resumable ? 'Resume — relaunch on the same conversation, same identity' : 'Can’t resume — no conversation id to resume onto'}
-                  onClick={() => doResume(p.source === 'archive' && p.archive_id ? { archive_id: p.archive_id } : { session_id: p.session_id || undefined }, b.display)}>
-                  <Ic name="rotate-ccw" className="w-3 h-3" />{busyKey === key ? 'Resuming…' : 'Resume'}
-                </button>
-              </div>
-            )
-          })}
-          {past != null && !rows.length && <div className="awl-empty">No past agents — everything persisted is live.</div>}
-          {past == null && <div className="awl-empty">reading the past-agents feed…</div>}
-        </div>
-      </div>
-
-      <div>
-        <div className="ro-head">
-          <span className="ro-label" title="Retire = deep-freeze: a light archive record — identity snapshot, created/retired stamps, lineage, per-agent git author — with the transcript referenced in place, never copied. Resume un-retires the agent; Delete forever true-deletes the record (the referenced transcript is untouched).">Archive</span>
-          <span className="ml-auto text-[9.5px] text-muted font-mono font-semibold">{arch == null ? '…' : `${arcs.length} archived`}</span>
-        </div>
-        <div data-comp="archive-roster" className="arch-list">
-          {arcs.map(rec => {
-            const b = pastIdentBits((rec.identity as Identity) || null, rec.name, rec.session_id)
-            const lin = rec.lineage || {}
-            const linBits = [
-              lin.parent ? `parent ${lin.parent}` : null,
-              lin.fork ? `fork${typeof lin.fork === 'object' && lin.fork?.rewound_to != null ? ` @ turn ${lin.fork.rewound_to}` : ''}` : null,
-              lin.handoff ? `handoff ${typeof lin.handoff === 'string' ? lin.handoff : ''}`.trim() : null,
-            ].filter(Boolean).join(' · ')
-            const isOpen = openArc.has(rec.archive_id)
-            return (
-              <div key={rec.archive_id} data-comp="archive-row" className={`fcard arch-card${isOpen ? ' open' : ''}`}>
-                <div className="fcard-head">
-                  <button className="fcard-exp" onClick={() => setOpenArc(prev => { const n = new Set(prev); n.has(rec.archive_id) ? n.delete(rec.archive_id) : n.add(rec.archive_id); return n })} title="Expand the archive record">
-                    <span className="agtile" style={{ width: 'var(--size-28)', height: 'var(--size-28)', color: b.color }}><AgGlyph icon={b.icon} /></span>
-                    <span className="ag-lab"><span className="ag-role">{b.role}</span><span className="ag-name">{b.display}</span></span>
-                    <span className="fcard-time">retired {pastStampFmt(rec.retired_at)}</span>
-                  </button>
-                  <button className="fcard-chevbtn" onClick={() => setOpenArc(prev => { const n = new Set(prev); n.has(rec.archive_id) ? n.delete(rec.archive_id) : n.add(rec.archive_id); return n })} title="Expand / collapse"><Ic name="chevron-right" className="fcard-chev" /></button>
-                </div>
-                {confirmArc === rec.archive_id && (
-                  <div data-comp="inline-confirm" className="tl-confirm foot-confirm--danger arch-del-confirm" style={{ display: 'flex' }}>
-                    <span>Delete {b.display}&#8217;s archive record forever? This can&#8217;t be undone (the transcript it references is untouched).</span>
-                    <button className="btn btn-sm ml-auto" onClick={() => setConfirmArc(null)}>Cancel</button>
-                    <button className="btn-danger-solid btn-sm" onClick={() => doArcDelete(rec.archive_id, b.display)}><Ic name="trash-2" className="w-3.5 h-3.5" />Delete forever</button>
-                  </div>
-                )}
-                <div className="fcard-body arch-body">
-                  {kv('Archive id', rec.archive_id)}
-                  {kv('Created', pastStampFmt(rec.created_at))}
-                  {kv('Retired', pastStampFmt(rec.retired_at))}
-                  {kv('Model · mode', `${modelLabel(rec.model)} · ${rec.permission_mode || '—'}`, true)}
-                  {kv('CWD', rec.cwd || '—')}
-                  {kv('Lineage', linBits || '—', !linBits)}
-                  {kv('Git author', (rec as any).git_author_email || '—')}
-                  {kv('Transcript', rec.transcript?.transcript_path || '—')}
-                  <div className="arch-acts">
-                    <button data-comp="button" className="btn btn-sm" disabled={!rec.transcript?.claude_session_id}
-                      title={rec.transcript?.claude_session_id ? 'Resume — un-retires the agent back onto the roster, same conversation' : 'Can’t resume — no conversation id referenced'}
-                      onClick={() => doResume({ archive_id: rec.archive_id }, b.display)}><Ic name="rotate-ccw" className="w-3 h-3" />Resume</button>
-                    <span className="flex-1" />
-                    <button data-comp="button" className="btn-danger btn-sm" title="Delete forever — true-deletes this archive record (the referenced transcript is untouched)"
-                      onClick={() => setConfirmArc(rec.archive_id)}><Ic name="trash-2" className="w-3 h-3" />Delete forever</button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          {arch != null && !arcs.length && <div className="awl-empty">No archived agents — Retire deep-freezes an agent here.</div>}
-          {arch == null && <div className="awl-empty">reading the archive…</div>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ---- Details footer (Save / Retire / Delete with inline confirms) --------------
 function DetailsFooter({ s }: { s: Session }) {
   const d = useDash()
@@ -1394,6 +1228,7 @@ function DetailsFooter({ s }: { s: Session }) {
   const retire = async () => {
     setConfirm(null)
     const r = await api.retire(s.session_id)
+    clearAttachCache(s.session_id)   // NU-6: a later resume must re-attach fresh, never reuse the dead console attach
     const reason = r.data?.archive_error || r.data?.archive_skipped || 'no archive record written'
     if (r.ok && r.data?.archived) toast(`Retired ${a.short} (archived)`)
     else if (r.ok && r.data?.record_kept) toast(`Retired ${a.short} — not archived (kept on Past): ${reason}`)
@@ -1403,6 +1238,7 @@ function DetailsFooter({ s }: { s: Session }) {
   const del = async () => {
     setConfirm(null)
     const r = await api.hardDelete(s.session_id)
+    clearAttachCache(s.session_id)   // NU-6: drop the console-attach entry with the agent
     toast(r.ok ? `Deleted ${a.short} — configuration + transcripts wiped` : `Delete failed: ${r.detail || 'sidecar error'}`)
   }
   return (
@@ -1455,7 +1291,7 @@ function ConsoleTab({ s }: { s: Session | null }) {
       <div className="pcard-body flex flex-col overflow-hidden" style={{ background: 'var(--background)' }}>
       <div data-group="mid" className="flex flex-col console-pane" style={{ flex: 1, minHeight: 0 }}>
         <div className="con-agentbar">
-          {a && <span className="agtile" style={{ width: 'var(--size-24)', height: 'var(--size-24)', color: a.color }}><AgGlyph icon={a.icon} /></span>}
+          {a && <span className="agtile" style={{ width: 'var(--size-24)', height: 'var(--size-24)', color: a.color }}><AgGlyph icon={a.icon} color={a.color} /></span>}
           <div className="min-w-0 flex-1 leading-tight">
             <div className="text-[8px] text-muted font-bold uppercase tracking-wide">{a?.role || '—'}</div>
             <div className="text-[11px] font-heading text-foreground" style={{ fontWeight: 900 }}>{a?.name || 'no agent'}</div>
@@ -1500,31 +1336,18 @@ export function AgentPanel() {
         <div data-comp="tab-bar" className="tabset">
           <button className={`tab-btn${d.agentTab === 'details' ? ' active' : ''}`} onClick={() => d.setAgentTab('details')}>Details</button>
           <button className={`tab-btn${d.agentTab === 'create' ? ' active' : ''}`} onClick={() => d.setAgentTab('create')}>Create</button>
-          <button className={`tab-btn${d.agentTab === 'past' ? ' active' : ''}`} onClick={() => d.setAgentTab('past')}>Past</button>
           <button className={`tab-btn${d.agentTab === 'console' ? ' active' : ''}`} onClick={() => d.setAgentTab('console')}>Console</button>
         </div>
       </div>
       {d.agentTab === 'details' && (
         <>
           <div className="pcard-body flex flex-col overflow-y-auto" style={{ background: 'var(--background)' }}>
-            {s ? <DetailsTab s={s} key={s.session_id} /> : <div className="awl-empty">No agent focused — select a card in the Team Graph, or create one.</div>}
+            {s ? <DetailsTab s={s} key={s.session_id} /> : <div className="awl-empty">No agent focused — select a card in the Team, or create one.</div>}
           </div>
           {s && <DetailsFooter s={s} />}
         </>
       )}
       {d.agentTab === 'create' && <CreateTab />}
-      {d.agentTab === 'past' && (
-        <>
-          <div className="pcard-body flex flex-col overflow-y-auto" style={{ background: 'var(--background)' }}>
-            <PastTab />
-          </div>
-          <div className="pcard-foot px-2 py-2.5">
-            <div className="flex items-center">
-              <span className="text-[9.5px] text-muted font-mono font-semibold">Resume relaunches on the same conversation, never a fork — actions are per-row.</span>
-            </div>
-          </div>
-        </>
-      )}
       {d.agentTab === 'console' && <ConsoleTab s={s} />}
     </section>
   )

@@ -1,6 +1,6 @@
 // ============================================================================
 // Link Config drawer — create/inspect agent-to-agent links (opens against the
-// right column's left edge, keeping the Team Graph visible). Live /links.
+// right column's left edge, keeping the Team panel visible). Live /links.
 // ============================================================================
 
 import React, { useEffect, useState } from 'react'
@@ -64,7 +64,7 @@ export function LinkDrawer() {
   const [tokVal, setTokVal] = useState('100000')
   const [selLink, setSelLink] = useState<string | null>(null)
 
-  useEffect(() => { if (!a && d.selectedId) setA(d.selectedId) }, [d.selectedId, d.drawerOpen])
+  useEffect(() => { if (!a && d.selectedId) setA(d.selectedId) }, [d.selectedId, d.drawer])
 
   const nextDir = () => setDir(p => p === 'a2b' ? 'b2a' : p === 'b2a' ? 'both' : 'a2b')
   const dirIcon = dir === 'a2b' ? 'arrow-right' : dir === 'b2a' ? 'arrow-left' : 'arrow-left-right'
@@ -100,10 +100,10 @@ export function LinkDrawer() {
   const active = d.links.links.filter(l => l.active)
   const expired = d.links.links.filter(l => !l.active)
 
-  if (!d.drawerOpen) return null
+  if (d.drawer !== 'link') return null
   return (
     <div data-comp="link-drawer" className="drawer">
-      <div className="pcard-head"><h3>Link Config</h3><button className="ghost-ic" title="Close" onClick={() => d.setDrawerOpen(false)}><Ic name="x" /></button></div>
+      <div className="pcard-head"><h3>Link Config</h3><button className="ghost-ic" title="Close" onClick={() => d.setDrawer(null)}><Ic name="x" /></button></div>
       <div className="p-3 space-y-3">
         <div className="link-pair flex items-center gap-2">
           <EndpointDD sel={a} onSel={setA} />

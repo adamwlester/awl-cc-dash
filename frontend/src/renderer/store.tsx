@@ -80,8 +80,12 @@ export type LinkState = 'connecting' | 'connected' | 'reconnecting' | 'offline'
 
 export type FeedTab = 'transcript' | 'scratch' | 'log' | 'inbox'
 export type PromptTab = 'compose' | 'history'
-export type AgentTab = 'details' | 'create' | 'past' | 'console'
+export type AgentTab = 'details' | 'create' | 'console'
 export type LibTab = 'plan' | 'documents' | 'assets'
+
+// The Team panel's single drawer slot (Link Config | Past) — one drawer at a
+// time by construction: opening one closes the other.
+export type DrawerKind = 'link' | 'past'
 
 export interface Jump {
   seq: number
@@ -129,7 +133,7 @@ interface Dash {
   settingsOpen: boolean
   settingsTab: string
   consoleExpanded: boolean
-  drawerOpen: boolean
+  drawer: DrawerKind | null
   jump: Jump
   pendingCompose: PendingCompose
   // actions
@@ -141,7 +145,7 @@ interface Dash {
   openSettings: (tab?: string) => void
   closeSettings: () => void
   setConsoleExpanded: (b: boolean) => void
-  setDrawerOpen: (b: boolean | ((b: boolean) => boolean)) => void
+  setDrawer: (v: DrawerKind | null | ((p: DrawerKind | null) => DrawerKind | null)) => void
   statusJump: (state: 'active' | 'idle' | 'pending' | 'error', agent?: string) => void
   gotoInbox: (agent: string, type?: string) => void
   gotoSubagent: (agent: string, subId: string) => void
@@ -192,7 +196,7 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState('projects')
   const [consoleExpanded, setConsoleExpanded] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawer, setDrawer] = useState<DrawerKind | null>(null)
   const [jump, setJump] = useState<Jump>({ seq: 0, target: 'inbox' })
   const [pendingCompose, setPendingCompose] = useState<PendingCompose>({ seq: 0 })
 
@@ -440,7 +444,7 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
   }, [bumpJump])
 
   // Subagent-badge action (§7.17): focus parent (caller) + open the Details
-  // Subagents accordion to the row + scope the Team Feed to that subagent.
+  // Subagents accordion to the row + scope the Feed to that subagent.
   const gotoSubagent = useCallback((agent: string, subId: string) => {
     bumpJump({ target: 'subagents', agent, type: subId })
   }, [bumpJump])
@@ -489,10 +493,10 @@ export function DashProvider({ children }: { children: React.ReactNode }) {
   const value: Dash = {
     linkState, healthVersion, sessions, usageBy, tokenPill, inbox, links, checklistBy, marqueeBy,
     subagentsBy, events, ctx, ctxLoading, scratch, projects, templates, nowMs, sessionStart,
-    selectedId, agentTab, feedTab, promptTab, libTab, settingsOpen, settingsTab, consoleExpanded, drawerOpen,
+    selectedId, agentTab, feedTab, promptTab, libTab, settingsOpen, settingsTab, consoleExpanded, drawer,
     jump, pendingCompose,
     select, setAgentTab, setFeedTab, setPromptTab, setLibTab, openSettings, closeSettings,
-    setConsoleExpanded, setDrawerOpen, statusJump, gotoInbox, gotoSubagent, replyTo, attachToCompose,
+    setConsoleExpanded, setDrawer, statusJump, gotoInbox, gotoSubagent, replyTo, attachToCompose,
     refreshInbox, refreshLinks, refreshProjects, refreshCtx, sendPrompt, projectCwd,
   }
   return <DashCtx.Provider value={value}>{children}</DashCtx.Provider>

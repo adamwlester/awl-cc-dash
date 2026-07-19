@@ -1,6 +1,6 @@
 // ============================================================================
 // The merged Export control — ONE selection-gated dropdown (Copy · Export→file
-// · Embed · Attach) reused by the Team Feed, History, and Library footers.
+// · Embed · Attach) reused by the Feed, History, and Library footers.
 // DOM mirrors expMenuHTML in design/behavior.js.
 // ============================================================================
 

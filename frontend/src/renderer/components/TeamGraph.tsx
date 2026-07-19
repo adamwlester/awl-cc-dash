@@ -1,5 +1,5 @@
 // ============================================================================
-// Team Graph — one agent-node-card per live session (mockup DOM, live data).
+// Team — one agent-node-card per live session (mockup DOM, live data).
 // Identity row · model badge + created stamp + status badge · settings chips ·
 // Ctx/Turns health bars · run strip (segmented from the checklist, barber-pole
 // floor) · marquee · subagent strip + per-card node-inbox envelope.
@@ -112,11 +112,11 @@ function NodeCard({ s }: { s: Session }) {
       className={`node${selected ? ' selected' : ''}${inboxOpen ? ' ninb-open' : ''}`}
       onClick={() => { d.select(s.session_id); d.setAgentTab('details') }}
       style={{ ['--nc' as any]: a.color }}>
-      <svg className="node-bg" aria-hidden="true">{/* watermark uses the sprite when available */}
-        {a.icon && <AgGlyphUse icon={a.icon} />}
+      <svg className="node-bg" aria-hidden="true">{/* watermark — sprite <use> fast path, recolor-endpoint <image> for the rest */}
+        {a.icon && <AgGlyphUse icon={a.icon} color={a.color} />}
       </svg>
       <div className="node-id">
-        <span className="agtile" style={{ color: a.color }}><AgGlyph icon={a.icon} /></span>
+        <span className="agtile" style={{ color: a.color }}><AgGlyph icon={a.icon} color={a.color} /></span>
         <div className="node-idblk"><div className="node-role">{a.role}</div><div className="node-name">{a.name}</div></div>
       </div>
       <div className="node-mrow">
@@ -180,11 +180,23 @@ function NodeCard({ s }: { s: Session }) {
   )
 }
 
-// The node-bg watermark <use> (kept separate so the outer <svg className="node-bg"> matches the mockup DOM).
-import { SPRITE_BY_FILE } from '../lib/icons'
-function AgGlyphUse({ icon }: { icon: string }) {
-  const sym = SPRITE_BY_FILE[icon]
-  return sym ? <use href={`#${sym}`} /> : null
+// The node-bg watermark (kept separate so the outer <svg className="node-bg"> matches the mockup DOM):
+// sprite <use> when the icon (or its base name) is in the curated 50; otherwise an SVG <image> off the
+// sidecar recolor endpoint, tinted to the design's watermark formula — color-mix(nc 5%, white) — so all
+// 167 icons watermark instead of vanishing (NU-4).
+import { spriteSymOf, glyphHex } from '../lib/icons'
+import { api } from '../api'
+function watermarkHex(color: string): string {
+  const hex = glyphHex(color)
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex
+  const n = parseInt(hex.slice(1), 16)
+  const mix = (c: number) => Math.round(c * 0.05 + 255 * 0.95)
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map(c => mix(c).toString(16).padStart(2, '0')).join('')}`
+}
+function AgGlyphUse({ icon, color }: { icon: string; color: string }) {
+  const sym = spriteSymOf(icon)
+  if (sym) return <use href={`#${sym}`} />
+  return <image href={api.iconUrl(icon, watermarkHex(color))} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
 }
 
 export function inboxTitle(it: InboxItem): string {
@@ -197,8 +209,9 @@ export function TeamGraph() {
   return (
     <section className="rz-panel" id="pGraph" style={{ flex: '1 1 52%', minHeight: 'var(--pane-graph-min-h)', maxHeight: 'var(--pane-graph-max-h)' }}>
       <div className="pcard-head">
-        <h3>Team Graph</h3>
-        <button className="btn btn-sm" onClick={() => d.setDrawerOpen(o => !o)}><Ic name="link-2" className="w-3.5 h-3.5" />Link Config</button>
+        <h3>Team</h3>
+        <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'link' ? null : 'link')}><Ic name="link-2" className="w-3.5 h-3.5" />Link Config</button>
+        <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'past' ? null : 'past')}><Ic name="history" className="w-3.5 h-3.5" />Past</button>
       </div>
       <div className="pcard-body overflow-auto" style={{ background: 'var(--background)' }}>
         <div className="graph-wrap p-3.5" data-status="planned">

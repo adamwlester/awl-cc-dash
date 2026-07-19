@@ -24,6 +24,17 @@ interface ConLine { c: string; t: string }
 // show the same feed for a session (the mockup shares one CON_FEED the same way).
 const LINE_CACHE = new Map<string, ConLine[]>()
 
+// Module-level attach cache (NU-6 — console expand reuses the live attach):
+// keyed by SESSION ID ONLY (ConsoleView is always-mounted, keyed by the
+// sessionId flip), storing the IN-FLIGHT attach promise. Two views asking
+// concurrently (the mount+expand race) share one POST; an expand onto an
+// already-attached session resolves synchronously to 'ws' with zero POST.
+// Entries are populated on issue, kept on success, and cleared on terminal
+// failure, socket death (onDead), and retire/hard-delete (clearAttachCache) so
+// a resumed agent re-attaches fresh.
+const ATTACH_CACHE = new Map<string, Promise<{ ws_url: string } | null>>()
+export function clearAttachCache(sessionId: string) { ATTACH_CACHE.delete(sessionId) }
+
 // ---- shared console session state (one per focused agent) -------------------
 export function useConsole(sessionId: string | null) {
   const [lines, setLinesRaw] = useState<ConLine[]>(() => (sessionId && LINE_CACHE.get(sessionId)) || [])
@@ -38,10 +49,17 @@ export function useConsole(sessionId: string | null) {
 
   useEffect(() => { api.consoleCatalog().then(c => { if (c) setCatalog(c) }) }, [])
 
+  // NU-6 onDead bookkeeping (declared before the attach effect that resets it):
+  // the live session id, and the session already given its one recovery.
+  const sidRef = useRef<string | null>(sessionId)
+  sidRef.current = sessionId
+  const recoveredRef = useRef<string | null>(null)
+
   useEffect(() => {
     setLinesRaw((sessionId && LINE_CACHE.get(sessionId)) || [])
     setWsUrl(null)
     setAttachState('trying')
+    recoveredRef.current = null
     if (!sessionId) { setAttachState('degraded'); return }
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -49,19 +67,67 @@ export function useConsole(sessionId: string | null) {
     // the tab sat degraded until a remount re-attached). Bounded recovery: one
     // retry ~1.5s after a failed first attempt, then settle degraded — further
     // recovery stays manual (next mount). A cancelled unmount never retries.
-    const attach = (attempt: number) => api.consoleAttach(sessionId).then(r => {
-      if (cancelled) return
-      if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws') }
-      else if (attempt === 0) {
-        retryTimer = setTimeout(() => { if (!cancelled) attach(1) }, 1500)
-      } else {
-        setAttachState('degraded')
-        setLines(p => p.length ? p : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
-      }
-    })
-    attach(0)
+    // NU-6: the module ATTACH_CACHE fronts the ladder — a cache hit resolves
+    // to 'ws' with zero POST (the expand lag dies); a miss runs the real
+    // ladder, caching its in-flight promise so concurrent mounts share one
+    // POST. Terminal failure clears the entry (only if it's still ours).
+    const attach = (attempt: number) => {
+      const p = api.consoleAttach(sessionId)
+      ATTACH_CACHE.set(sessionId, p)
+      p.then(r => {
+        if (cancelled) return
+        if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws'); return }
+        if (ATTACH_CACHE.get(sessionId) === p) ATTACH_CACHE.delete(sessionId)
+        if (attempt === 0) {
+          retryTimer = setTimeout(() => { if (!cancelled) attach(1) }, 1500)
+        } else {
+          setAttachState('degraded')
+          setLines(p2 => p2.length ? p2 : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
+        }
+      })
+    }
+    const cached = ATTACH_CACHE.get(sessionId)
+    if (cached) {
+      cached.then(r => {
+        if (cancelled) return
+        if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws') }
+        else attach(0)   // stale failed entry (its owner already cleared it) — run the real ladder
+      })
+    } else attach(0)
     return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
   }, [sessionId])
+
+  // NU-6 invalidation: a WS that dies WITHOUT a clean unmount-close (XtermFeed
+  // onDead) means the cached attach is stale — drop the entry and re-run the
+  // attach ladder ONCE for this session; if that recovery also fails, settle
+  // 'degraded' (strictly better than the old dead '[terminal detached]').
+  const onDead = useCallback(() => {
+    const sid = sessionId
+    if (!sid) return
+    ATTACH_CACHE.delete(sid)
+    if (sidRef.current !== sid) return
+    if (recoveredRef.current === sid) {
+      setWsUrl(null)
+      setAttachState('degraded')
+      setLines(p => p.length ? p : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
+      return
+    }
+    recoveredRef.current = sid
+    setWsUrl(null)
+    setAttachState('trying')
+    const p = api.consoleAttach(sid)
+    ATTACH_CACHE.set(sid, p)
+    p.then(r => {
+      if (sidRef.current !== sid) return
+      if (r && r.ws_url) { setWsUrl(r.ws_url); setAttachState('ws') }
+      else {
+        if (ATTACH_CACHE.get(sid) === p) ATTACH_CACHE.delete(sid)
+        setWsUrl(null)
+        setAttachState('degraded')
+        setLines(p2 => p2.length ? p2 : [{ c: 'l-status', t: 'live terminal attach not available yet — slash commands below run for real; output lands here' }])
+      }
+    })
+  }, [sessionId, setLines])
 
   const run = useCallback(async (cmd: string) => {
     if (!sessionId) { toast('No agent focused'); return }
@@ -72,7 +138,7 @@ export function useConsole(sessionId: string | null) {
     setLines(p => [...p, ...screen.slice(-30).map(t => ({ c: 'l-out', t }))])
   }, [sessionId, setLines])
 
-  return { sessionId, lines, wsUrl, attachState, catalog, run }
+  return { sessionId, lines, wsUrl, attachState, catalog, run, onDead }
 }
 
 // ---- xterm host --------------------------------------------------------------
@@ -83,12 +149,15 @@ export function useConsole(sessionId: string | null) {
 // `window-size manual` — stays, `resize-window` keeps it set). The ttyd
 // '1{columns,rows}' message still goes up either way — harmless, tmux ignores
 // a client resize under the pin.
-function XtermFeed({ wsUrl, sessionId, sendResize }: { wsUrl: string; sessionId: string | null; sendResize: boolean }) {
+function XtermFeed({ wsUrl, sessionId, sendResize, onDead }: { wsUrl: string; sessionId: string | null; sendResize: boolean; onDead?: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null)
   // Ref, not an effect dep: flipping topmost-ness (expand/collapse) must not
   // tear down and rebuild the live terminal.
   const sendResizeRef = useRef(sendResize)
   sendResizeRef.current = sendResize
+  // Ref for the same reason: a changing onDead identity must not rebuild the WS.
+  const onDeadRef = useRef(onDead)
+  onDeadRef.current = onDead
   // Regaining the writer role (sendResize false→true — e.g. the expanded
   // overlay closed and this in-column feed drives geometry again) must
   // RE-ASSERT geometry: the host's size didn't change, so the ResizeObserver
@@ -124,6 +193,16 @@ function XtermFeed({ wsUrl, sessionId, sendResize }: { wsUrl: string; sessionId:
     }
     pushGeomRef.current = pushGeometry
     let ws: WebSocket | null = null
+    // NU-6: a socket death WITHOUT a clean unmount-close invalidates the shared
+    // attach cache (onDead). Guarded so onerror+onclose report once, and the
+    // unmount cleanup (or a wsUrl swap) never reports at all.
+    let closedByUnmount = false
+    let deadFired = false
+    const reportDead = () => {
+      if (closedByUnmount || deadFired) return
+      deadFired = true
+      onDeadRef.current?.()
+    }
     try {
       ws = new WebSocket(wsUrl, ['tty'])
       ws.binaryType = 'arraybuffer'
@@ -143,14 +222,15 @@ function XtermFeed({ wsUrl, sessionId, sendResize }: { wsUrl: string; sessionId:
           else term.write(buf)
         }
       }
-      ws.onclose = () => term.write('\r\n\x1b[2m[terminal detached]\x1b[0m\r\n')
+      ws.onerror = () => reportDead()
+      ws.onclose = () => { term.write('\r\n\x1b[2m[terminal detached]\x1b[0m\r\n'); reportDead() }
       term.onData(d => { try { ws && ws.readyState === 1 && ws.send('0' + d) } catch { } })
-    } catch { term.write('[attach failed]') }
+    } catch { term.write('[attach failed]'); reportDead() }
     const ro = new ResizeObserver(() => {
       try { fit.fit(); ws && ws.readyState === 1 && ws.send('1' + JSON.stringify({ columns: term.cols, rows: term.rows })); pushGeometry() } catch { }
     })
     ro.observe(host)
-    return () => { ro.disconnect(); if (resizeTimer) clearTimeout(resizeTimer); try { ws?.close() } catch { }; term.dispose() }
+    return () => { closedByUnmount = true; ro.disconnect(); if (resizeTimer) clearTimeout(resizeTimer); try { ws?.close() } catch { }; term.dispose() }
   }, [wsUrl, sessionId])
   return <div className="awl-xterm-host" ref={hostRef} />
 }
@@ -169,7 +249,7 @@ export function ConsoleFeed({ id, con, sendResize = true }: { id: string; con: R
   const feedRef = useRef<HTMLDivElement>(null)
   useEffect(() => { const el = feedRef.current; if (el) el.scrollTop = el.scrollHeight }, [con.lines])
   if (con.attachState === 'ws' && con.wsUrl) {
-    return <div data-comp="console-feed" className="con-feed awl-xterm" id={id}><XtermFeed wsUrl={con.wsUrl} sessionId={con.sessionId} sendResize={sendResize} /></div>
+    return <div data-comp="console-feed" className="con-feed awl-xterm" id={id}><XtermFeed wsUrl={con.wsUrl} sessionId={con.sessionId} sendResize={sendResize} onDead={con.onDead} /></div>
   }
   return (
     <div data-comp="console-feed" className="con-feed" id={id} ref={feedRef}>

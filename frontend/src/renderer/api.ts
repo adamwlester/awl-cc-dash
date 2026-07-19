@@ -824,4 +824,8 @@ export const api = {
   // ---- assets --------------------------------------------------------------
   iconUrl: (icon: string, color: string) =>
     `${API}/assets/agent-icons/${encodeURIComponent(icon)}.svg?color=${encodeURIComponent(color)}`,
+  // The full agent-icon inventory (§11 #56): every stem on disk under
+  // assets/icons/agents/, sorted — the picker serves all of them, not just the
+  // sprite-embedded 50. Null → endpoint absent; callers degrade to the sprite set.
+  iconNames: () => getJSON<{ icons: string[]; count: number }>('/assets/agent-icons'),
 }

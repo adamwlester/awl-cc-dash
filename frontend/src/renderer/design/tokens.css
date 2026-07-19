@@ -1,4 +1,4 @@
-/* VERBATIM COPY of design/tokens.css — copied 2026-07-16 for the renderer wiring pass (§11 #50).
+/* VERBATIM COPY of design/tokens.css — copied 2026-07-18 for the [NU] NEXT UP run.
    Do NOT edit here; edit design/tokens.css and re-copy. */
 /* ============================================================================
    AWL Multi-Agent Dashboard — Design Tokens (single source of truth)
@@ -35,7 +35,7 @@
   --main-soft:#f9c8da;         /* lighter pink — the PANEL-level divider tier (panel header/subheader/footer strips on --surface-3); the window frame (topbar/footbar bounds + pane splitters) stays --main (ND 17) */
 
   /* ---- Surfaces — deliberately just 3 warm surfaces + button + hairline ---- */
-  --background:#fef6e4;            /* canvas — app background + Team Graph scroll-well */
+  --background:#fef6e4;            /* canvas — app background + Team scroll-well */
   --secondary-background:#ffffff;  /* card — cards, inputs, panel bodies, Feed tab wells */
   --surface-3:#f5ecd9;             /* chrome — panel headers/footers, toolbars, segmented tracks */
   --surface-btn:#fbf5e8;           /* warm cream — low-emphasis action buttons (lighter than chrome so buttons pop on --surface-3; form inputs/selector fields stay white) */
@@ -118,7 +118,7 @@
   --spacing-reverseBoxShadowY:-4px;
 
   /* ---- Agent-card icon-fill knobs ---------------------------------------- */
-  /* Global lightness knobs for the Team Graph cards' light agent-colour tint +
+  /* Global lightness knobs for the Team cards' light agent-colour tint +
      watermark glyph (the "icon-fill" card treatment). The per-card agent COLOUR
      itself is the inline --nc binding (per-instance — deliberately NOT a token,
      since it binds one of the --ag-* palette to a single agent). */
@@ -221,8 +221,19 @@
   --col-left-min:400px;    --col-left-max:400px;         /* Agent column — pinned */
   --col-right-min:700px;  --col-right-max:700px;       /* right column — pinned */
   /* middle column: flex only (no width token) — fills the remainder (~1196px) */
-  --pane-graph-min-h:300px;    --pane-graph-max-h:1200px;    /* mid col, top — Team Graph */
+  --pane-graph-min-h:300px;    --pane-graph-max-h:1200px;    /* mid col, top — Team */
   --pane-docs-min-h:300px;     --pane-docs-max-h:1200px;     /* mid col, bottom — Plans/Documents */
-  --pane-feed-min-h:300px;     --pane-feed-max-h:1200px;     /* right col, top — Team Feed/Inbox */
+  --pane-feed-min-h:300px;     --pane-feed-max-h:1200px;     /* right col, top — Feed/Inbox */
   --pane-prompts-min-h:300px;  --pane-prompts-max-h:1200px;  /* right col, bottom — Prompt/Compose */
+
+  /* Team-panel drawer (Sheet) widths — the two drawers share one absolute slot in #pRight (open one closes
+     the other). The Past drawer is wider: its rows (tile · role+model · source badge · stamp · Resume) were
+     designed for the ~400px Agent column, so the Link sheet's 266px crushes them (416 + the two-line stamp
+     ratified in the NU-2 headed pass — at 352/400 the longest role·model label still ellipsized). */
+  --drawer-w:266px;        /* the base drawer — Link Config */
+  --drawer-w-past:416px;   /* the Past drawer (.drawer--past) */
+
+  /* Library accordion fill (NU-3): the open plan/doc card flex-fills its list, floored here so that when many
+     cards + a short pane compete, the LIST scrolls instead of crushing the open editor below usability. */
+  --card-open-min-h:280px;
 }

@@ -604,7 +604,11 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
   }
 
   return (
-    <div data-comp="plan-card" className={`plan-card${open ? ' open' : ''}`} id={e.id}>
+    // NU-3: `pop-open` releases the card's overflow clip (design styles.css
+    // "R11 item 5") whenever a footer/editor popout is up — the reviewer
+    // .rev-pop dropdown was certainly clipped without it, and the comment
+    // composer rides the same release.
+    <div data-comp="plan-card" className={`plan-card${open ? ' open' : ''}${(composer || revOpen) ? ' pop-open' : ''}`} id={e.id}>
       <button className="plan-head" onClick={onToggle}>
         <div className="plan-head-main">
           <div className="plan-row r1">
@@ -738,22 +742,33 @@ function PlanCard({ e, open, onToggle, onChanged }: { e: Entry; open: boolean; o
                     })}
                     <div className="md-row md-fill" aria-hidden="true"><span className="md-rail md-rail--fill" /><span className="md-line" /></div>
                   </div>
+                  {/* NU-3: the design markup — .cmt-pop-head (selection badge +
+                      label + ghost-x) over .cmt-pop-body (which owns the 300px
+                      internal-scroll cap) — replaces the old bare Tailwind div;
+                      all composer behavior (verdict, note, submit) unchanged. */}
                   <div data-comp="comment-popover" className={`plan-cmt-pop${composer ? ' open' : ''}`}>
                     {composer && (
-                      <div className="p-2 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <IdentBadge a={USER_IDENT} />
-                          <select className="in" style={{ width: 110, height: 26, fontSize: 10 }} value={verdict} onChange={ev => setVerdict(ev.target.value as any)}>
-                            <option value="approve">Approve</option><option value="revise">Revise</option><option value="block">Block</option>
-                          </select>
-                          <span className="text-[9px] text-muted-2">{sel?.kind === 'doc' ? 'whole doc' : sel ? `${sel.kind} @ line ${sel.line}` : ''}</span>
+                      <>
+                        <div className="cmt-pop-head">
+                          <span className="sel-badge">{sel?.kind === 'doc' ? 'whole doc' : sel ? `${sel.kind} @ line ${sel.line}` : ''}</span>
+                          <span className="cph-lab">New comment</span>
+                          <span className="flex-1" />
+                          <button data-comp="ghost-icon-button" className="ghost-ic" title="Close" onClick={() => setComposer(false)}><Ic name="x" /></button>
                         </div>
-                        <textarea className="in" rows={2} placeholder={verdict === 'approve' ? 'Optional note…' : 'Revise/Block needs a comment'} value={note} onChange={ev => setNote(ev.target.value)} />
-                        <div className="flex gap-2">
-                          <button className="btn-main btn-sm cmt-save" disabled={verdict !== 'approve' && !note.trim()} onClick={addComment}>Save</button>
-                          <button className="btn btn-sm" onClick={() => setComposer(false)}>Cancel</button>
+                        <div className="cmt-pop-body">
+                          <div className="flex items-center gap-2">
+                            <IdentBadge a={USER_IDENT} />
+                            <select className="in" style={{ width: 110, height: 26, fontSize: 10 }} value={verdict} onChange={ev => setVerdict(ev.target.value as any)}>
+                              <option value="approve">Approve</option><option value="revise">Revise</option><option value="block">Block</option>
+                            </select>
+                          </div>
+                          <textarea className="in" rows={2} placeholder={verdict === 'approve' ? 'Optional note…' : 'Revise/Block needs a comment'} value={note} onChange={ev => setNote(ev.target.value)} />
+                          <div className="flex gap-2">
+                            <button className="btn-main btn-sm cmt-save" disabled={verdict !== 'approve' && !note.trim()} onClick={addComment}>Save</button>
+                            <button className="btn btn-sm" onClick={() => setComposer(false)}>Cancel</button>
+                          </div>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>

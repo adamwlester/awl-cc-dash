@@ -22,7 +22,7 @@ import {
   CircleCheck, CircleX, TriangleAlert, type LucideIcon,
 } from 'lucide-react'
 import { AGENT_SPRITE } from '../design/sprite'
-import { API } from '../api'
+import { api } from '../api'
 
 const MAP: Record<string, LucideIcon> = {
   'activity': Activity, 'alert-triangle': AlertTriangle, 'arrow-down-left': ArrowDownLeft,
@@ -81,11 +81,31 @@ export const SPRITE_BY_FILE: Record<string, string> = {
   'death-skull': 'ag-deathskull', 'squid-head': 'ag-squid',
 }
 
-/** The agent glyph inside a tile — sprite <use> for the curated 50, sidecar
-    recolor endpoint (white glyph) as the fallback for the rest. */
-export function AgGlyph({ icon }: { icon: string }) {
-  const sym = SPRITE_BY_FILE[icon]
+/** Sprite symbol lookup with the raw-file-name fallback (NU-4): the sidecar's
+    curated auto-assign list carries raw stems like `dragon-head__lorc` while
+    the sprite map keys plain `dragon-head` — strip the `__author` suffix on a
+    miss so those 11 names hit the sprite. ALL existing keys stay (old
+    persisted picks depend on them). */
+export function spriteSymOf(icon: string): string | undefined {
+  return SPRITE_BY_FILE[icon] ?? SPRITE_BY_FILE[icon.replace(/__.*$/, '')]
+}
+
+/** Honest glyph color for the recolor-endpoint path (NU-4): the endpoint needs
+    a literal hex, so token strings (`var(--…)`) and missing values fall back to
+    a visible muted ink (tokens.css --muted) — never the old invisible
+    white-on-white. */
+const GLYPH_FALLBACK_HEX = '#5b5f86'   // tokens.css --muted
+export function glyphHex(color?: string | null): string {
+  return color && color.startsWith('#') ? color : GLYPH_FALLBACK_HEX
+}
+
+/** The agent glyph inside a tile — sprite <use> for the curated 50 (raw stems
+    included via spriteSymOf), sidecar recolor endpoint painted with the
+    AGENT'S color as the fallback for the rest (NU-4 — the old hardcoded white
+    was invisible on the light UI). */
+export function AgGlyph({ icon, color }: { icon: string; color?: string }) {
+  const sym = icon ? spriteSymOf(icon) : undefined
   if (sym) return <svg className="ag-svg"><use href={`#${sym}`} /></svg>
-  if (icon) return <img className="ag-svg" src={`${API}/assets/agent-icons/${encodeURIComponent(icon)}.svg?color=%23ffffff`} alt="" />
+  if (icon) return <img className="ag-svg" loading="lazy" src={api.iconUrl(icon, glyphHex(color))} alt="" />
   return <svg className="ag-svg"><use href="#ag-wizard" /></svg>
 }

@@ -1,5 +1,5 @@
 // ============================================================================
-// Team Feed — Transcript · Scratch · Log · Inbox over the shared From/To
+// Feed — Transcript · Scratch · Log · Inbox over the shared From/To
 // filter accordion (right column, top). Mockup DOM + live data.
 // ============================================================================
 
@@ -218,7 +218,7 @@ export function TeamFeed() {
   return (
     <section className="rz-panel" id="pFeed" style={{ flex: '1 1 52%', minHeight: 'var(--pane-feed-min-h)', maxHeight: 'var(--pane-feed-max-h)' }}>
       <div className="pcard-head">
-        <h3>Team Feed</h3>
+        <h3>Feed</h3>
         <div data-comp="tab-bar" className="tabset">
           {(['transcript', 'scratch', 'log', 'inbox'] as const).map(t => (
             <button key={t} className={`tab-btn${d.feedTab === t ? ' active' : ''}`} onClick={() => { d.setFeedTab(t); setSelCards(new Set()); setBlockSel(null) }}>

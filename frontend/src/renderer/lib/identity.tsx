@@ -122,9 +122,12 @@ export const MODE_VALUE: Record<string, string> = {
   Plan: 'plan', Ask: 'default', Edit: 'acceptEdits', Auto: 'auto', Bypass: 'bypassPermissions',
 }
 
-/** Short model label ("opus 4.8" from "claude-opus-4-8" etc.). */
+/** Short model label ("opus 4.8" from "claude-opus-4-8" etc.). A null/absent
+ * model reads an honest '—' — the Claude-Code-default "inherit" path is
+ * retired (NU-7: the app pins its own default, Opus); legacy null-model
+ * records simply show no model. */
 export function modelLabel(model: string | null | undefined): string {
-  if (!model) return 'inherit'
+  if (!model) return '—'
   const m = model.match(/(opus|sonnet|haiku|fable)[-_ ]?(\d+)(?:[-._](\d+))?/i)
   if (m) return `${m[1].toLowerCase()}${m[2] ? ` ${m[2]}${m[3] ? '.' + m[3] : ''}` : ''}`
   return model.replace(/^claude-/, '')
@@ -136,7 +139,7 @@ export function AgTile({ a, style, className }: { a: Ident; style?: React.CSSPro
   if (a.user) return <span className={`agtile agtile--user agtile--me ${className || ''}`} style={style}><Ic name="user" className="agtile-luc" /></span>
   if (a.system) return <span className={`agtile agtile--system ${className || ''}`} style={style}><Ic name="settings" className="agtile-luc" /></span>
   if (a.scratch) return <span className={`agtile agtile--user ${className || ''}`} style={{ background: 'var(--ag-azure)', ...style }}><Ic name="file-text" className="agtile-luc" /></span>
-  return <span className={`agtile ${className || ''}`} style={{ color: a.color, ...style }}><AgGlyph icon={a.icon} /></span>
+  return <span className={`agtile ${className || ''}`} style={{ color: a.color, ...style }}><AgGlyph icon={a.icon} color={a.color} /></span>
 }
 
 /** Dense-default two-line identity badge (.badge badge-c). */

@@ -2,7 +2,7 @@
 // AWL Multi-Agent Dashboard — the rebuilt renderer shell (§11 #37).
 // ----------------------------------------------------------------------------
 // Reproduces the design system's frame: title bar · three resizable columns
-// (Agent | Team Graph / Library | Team Feed / Prompt) · status footer, with the
+// (Agent | Team / Library | Feed / Prompt) · status footer, with the
 // Settings and Console step-into views. The mockup's fixed dev window is the
 // one sanctioned divergence — the app fills its window (design/app.css).
 // ============================================================================
@@ -17,6 +17,7 @@ import { TeamFeed } from './components/TeamFeed'
 import { PromptPanel } from './components/PromptPanel'
 import { Library } from './components/Library'
 import { LinkDrawer } from './components/LinkDrawer'
+import { PastDrawer } from './components/PastDrawer'
 import { SettingsView } from './components/SettingsView'
 import { ConsoleView } from './components/Console'
 
@@ -45,6 +46,7 @@ function Shell() {
 
           <div className="rz-panel" id="pRight" style={{ flex: '1 1 36%', minWidth: 'var(--col-right-min)', maxWidth: 'var(--col-right-max)' }}>
             <LinkDrawer />
+            <PastDrawer />
             <div className="rz-group vertical" id="rzRight">
               <TeamFeed />
               <RzHandle orient="v" />
