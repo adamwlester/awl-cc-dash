@@ -64,7 +64,7 @@
     .pcard-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-8); flex-shrink:0;
       height:var(--size-36); min-height:var(--size-36); padding:0 var(--space-10); background:var(--surface-3); border-bottom:var(--border-width) solid var(--main-soft); }
     .pcard-head h3{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--foreground); white-space:nowrap; }
-    .pcard-body{ flex:1 1 auto; min-height:0; background:var(--background); }   /* v9p5: cream is the content surface for all panel bodies (matches the Team Graph well); cards/inputs/lists keep their own fills so they pop. The Settings step-into view is separate (.set-*) and unaffected. */
+    .pcard-body{ flex:1 1 auto; min-height:0; background:var(--background); }   /* v9p5: cream is the content surface for all panel bodies (matches the Team panel's scroll-well); cards/inputs/lists keep their own fills so they pop. The Settings step-into view is separate (.set-*) and unaffected. */
     .pcard-foot{ flex-shrink:0; background:var(--surface-3); border-top:var(--border-width) solid var(--main-soft); }
     .rz-panel + .rz-handle.hstyle + .rz-panel .pcard-head{ } /* (handle owns the divider line) */
 
@@ -143,7 +143,7 @@
       background-size:cover; background-position:center top; background-repeat:no-repeat; }
     .agtile--me .agtile-luc{ display:none; }
 
-    /* ============================ Team Graph node ============================ */
+    /* ============================ Team node ============================ */
     .graph-wrap{ position:relative; }
     .graph-grid{ position:relative; z-index:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:var(--space-14); align-items:start; }   /* R-batch item 3: align-items:start so a card whose subagent drawer is open (taller than a square) grows its row without stretching its square row-mates */
     .edge-layer{ position:absolute; inset:0; z-index:1; pointer-events:none; overflow:visible; }
@@ -270,7 +270,7 @@
        (white) id text — the exact .node-badge .nb-* treatment (--success active / --warning pending / --muted idle,
        #fff ink). The id (group + member — A1/A2/B1…, no `s` prefix) is the label, not a count. A badge
        click is isolated from the parent card (stopPropagation), then runs subBadgeClick — focus the parent +
-       open Details → Subagents (scrolled/highlighted) + scope the Team Feed to that subagent (resolved OQ-1).
+       open Details → Subagents (scrolled/highlighted) + scope the Feed to that subagent (resolved OQ-1).
        R-batch item 3: the strip is an IN-FLOW ACCORDION DRAWER (replaces the old +N popover). Collapsed shows only
        the first row of badges (vertically centred in the trigger) + a chevron on the right; clicking the strip
        toggles it OPEN, which grows the card downward (.node.subs-open drops the square) to reveal the remaining
@@ -307,7 +307,7 @@
 
     /* ===== Per-card inbox footer — a small envelope+count on the RIGHT of the footer bar (subagents keep the left).
        A FAITHFUL MIRROR of the agent's open Inbox items (the parallel path to the status badge): teal + count when there
-       are open items, expandable to a drawer of typed rows that deep-link into the Team Feed → Inbox; dimmed + non-
+       are open items, expandable to a drawer of typed rows that deep-link into the Feed → Inbox; dimmed + non-
        expandable when there are none. Count = OPEN/unaddressed items (not read) — the count can be >1 and can be >0 while
        the binary status badge reads *active* (a non-blocking Warning is an open item that doesn't block). The drawer is
        INDEPENDENT of the subagents drawer (both may be open) and grows the card downward (.node.ninb-open, like
@@ -883,12 +883,20 @@
        overlay within the editor, never clipped. Two-class selector so it beats the base .src-pop (top/right) it extends. */
     .src-pop.rev-pop{ left:0; right:auto; min-width:210px; top:auto; bottom:calc(100% + var(--space-6)); }
 
-    /* ============================ link drawer (Sheet) ============================ */
-    /* v1.x #3 (rev): the Link Config drawer opens against the LEFT edge of the right pane (#pRight) — i.e.
-       immediately to the RIGHT of the Team Graph panel it's launched from — so the whole Team Graph stays
-       visible. It's a child of #pRight, absolutely positioned and clipped to that pane (not the window),
-       and slides in from the left (out from behind the graph). */
-    .drawer{ position:absolute; top:0; left:0; height:100%; width:266px; z-index:30; background:var(--secondary-background); border-right:var(--border-width) solid var(--border); box-shadow:6px 0 0 0 rgb(from var(--border) r g b / 0.08); overflow-y:auto; animation:slideInLeft .15s ease; }
+    /* ============================ Team-panel drawers (Sheet) ============================ */
+    /* v1.x #3 (rev): the drawers open against the LEFT edge of the right pane (#pRight) — i.e.
+       immediately to the RIGHT of the Team panel they're launched from — so the whole Team panel stays
+       visible. Each is a child of #pRight, absolutely positioned and clipped to that pane (not the window),
+       and slides in from the left (out from behind the graph). NU-2: two drawers now share this one slot —
+       Link Config (#link-drawer, the base --drawer-w) and Past (#past-drawer, .drawer--past at the wider
+       --drawer-w-past); toggleDrawer keeps them mutually exclusive. */
+    .drawer{ position:absolute; top:0; left:0; height:100%; width:var(--drawer-w); z-index:30; background:var(--secondary-background); border-right:var(--border-width) solid var(--border); box-shadow:6px 0 0 0 rgb(from var(--border) r g b / 0.08); overflow-y:auto; animation:slideInLeft .15s ease; }
+    .drawer--past{ width:var(--drawer-w-past); }
+    /* NU-2 fit tuning (headed): inside the Past drawer the died/retired stamp wraps to two short lines —
+       verb + date over the time ("retired 07-12" / "17:40") — which frees the row's identity label to render
+       role · model + name un-ellipsized at the drawer width. 74px seats the wrap at the space AFTER the date
+       (64 let it break inside "07-12" at the hyphen). The full stamp already rides the row tooltip. */
+    .drawer--past .past-stamp{ white-space:normal; max-width:74px; }
     @keyframes slideInLeft{ from{ transform:translateX(-40px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
     /* Next-up item 18: the cycler carries a Lucide arrow glyph (arrow-right / arrow-left / arrow-left-right) — flex-centred,
        inked navy --foreground (was an off-centre unicode text glyph in --warning; no true black exists in the palette). */
@@ -925,7 +933,7 @@
     .think-tog.gated{ opacity:.4; cursor:not-allowed; }
     .think-tog.gated:hover{ transform:none; box-shadow:var(--shadow-sm); background:var(--secondary-background); }
 
-    /* ============================ v8p6 — Team Graph status badge (replaces .node-dot) ============================ */
+    /* ============================ v8p6 — Team status badge (replaces .node-dot) ============================ */
     .node-badge{ position:absolute; top:calc(-1 * var(--space-8)); right:calc(-1 * var(--space-8)); z-index:3; display:inline-flex; align-items:center;
       height:var(--badge-m-h); padding:0 var(--space-6); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); font-size:7px; font-weight:900;
       letter-spacing:0.07em; text-transform:uppercase; cursor:pointer; box-shadow:var(--shadow-sm);
@@ -993,7 +1001,7 @@
     .mic-btn:disabled{ color:var(--muted-2); opacity:.55; cursor:default; box-shadow:var(--shadow-sm); }
     .mic-btn:disabled:hover{ transform:none; box-shadow:var(--shadow-sm); }
     /* icon-only action button (cream mic-button style + hover tooltip via title) — used for Copy / Retry in
-       the Team Feed + History action strips, plus the danger Stop. (Plans/Documents Copy·Edit·Comment moved
+       the Feed + History action strips, plus the danger Stop. (Plans/Documents Copy·Edit·Comment moved
        to the Editor header in P3 and use the ghost icon style — see .ghost-ic / .lib-edit-head.) Labeled
        buttons (Summarize, Revise, Reject, Approve) keep their text. */
     .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:var(--size-30); height:var(--size-30); flex:0 0 auto; padding:0;
@@ -1072,7 +1080,7 @@
     .wf-phases{ display:flex; flex-wrap:wrap; gap:var(--space-4); margin-top:var(--space-5); }
     .wf-phase{ display:inline-flex; align-items:center; height:var(--badge-m-h); padding:0 var(--badge-m-px); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); background:var(--surface-3); font-family:var(--font-mono); font-size:var(--badge-m-fs); font-weight:800; color:var(--muted); }
     .wf-script{ margin:var(--space-7) 0 0; max-height:170px; overflow:auto; background:var(--surface-3); border:var(--border-width-thin) solid var(--rule); border-radius:var(--radius-sm); padding:var(--space-6) var(--space-8); font-family:var(--font-mono); font-size:9.5px; line-height:1.5; color:var(--foreground); white-space:pre; }
-    /* Team Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
+    /* Feed → Messages: typed content blocks (thinking / tool calls / diffs / meta), filtered by the Include toggles */
     .msg-blocks{ display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-7); }
     .msg-blk{ font-family:var(--font-mono); font-size:10px; line-height:1.5; padding:var(--space-4) var(--space-7); border:var(--border-width) solid var(--border); border-radius:var(--radius-base); background:var(--surface-3); color:var(--foreground); white-space:pre-wrap; }
     .msg-blk.blk-think{ background:var(--secondary-background); color:var(--muted); font-style:italic; }
@@ -1098,6 +1106,16 @@
        reviewer dropdown to the card's bottom edge. While any of them is open the card releases its clip and lifts
        above sibling cards (mirrors the .fcard.att-open escape). Cleared by closeAllPopups(). */
     .plan-card.pop-open{ overflow:visible; position:relative; z-index:5; }
+    /* NU-3: the Library accordion FILL model. Closed cards never flex-shrink inside the scroll list (the old
+       default shrink + .plan-card's overflow:hidden clipped the open card's decision footer clean out of view
+       at the default layout — the LIST scrolls instead). The OPEN card is a real flex-fill chain: card →
+       .plan-body → .plan-rev → .doc-ed → .md, so the editor genuinely fills the panel height (no more dead
+       space under the old 520px .plan-rev cap), floored at --card-open-min-h so a short pane scrolls the list
+       rather than crushing the editor. Scoped to the two Library lists (#plan-list / #doc-list). */
+    #plan-list > .plan-card, #doc-list > .plan-card{ flex:0 0 auto; }
+    #plan-list > .plan-card.open, #doc-list > .plan-card.open{ flex:1 1 auto; min-height:var(--card-open-min-h); display:flex; flex-direction:column; }
+    #plan-list .plan-card.open > .plan-head, #doc-list .plan-card.open > .plan-head{ flex:0 0 auto; }
+    #plan-list .plan-card.open .plan-body, #doc-list .plan-card.open .plan-body{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
     .plan-head{ display:flex; align-items:center; gap:var(--space-8); width:100%; text-align:left; padding:var(--space-8) var(--space-9); background:transparent; border:none; cursor:pointer; }
     .plan-head:hover{ background:var(--surface-3); }
     .plan-chev{ width:var(--size-14); height:var(--size-14); flex:0 0 auto; color:var(--muted); transition:transform .15s; }
@@ -1260,7 +1278,7 @@
     .acc-cv{ width:var(--size-13); height:var(--size-13); color:var(--muted); flex:0 0 auto; margin-left:auto; transition:transform .12s; }
     .src-dd.open > .dd-trig .acc-cv{ transform:rotate(90deg); }   /* descendant combinator on .acc-cv — still matches when the chevron is nested inside the multi picker's .acc-chevcell */
     /* item 4 — MULTI-picker accordion chevron cell. The Prompt From (#hist-from) and To (#prompt-targets)
-       selectors — plus the Team Feed From/To filter (#feed-filter), all .src-dd.dd.multi — seat their trigger
+       selectors — plus the Feed From/To filter (#feed-filter), all .src-dd.dd.multi — seat their trigger
        chevron in a flush SQUARE, divider-flanked cell at the trailing edge, mirroring the feed/history card
        accordions' .fcard-chevbtn (a border-left divider + centred chevron). Scoped to .src-dd.dd.multi so the
        single-select source picker keeps its plain floating chevron. The .dd-trig is size-40 tall (border-box)
@@ -1312,7 +1330,7 @@
     .vrow.no-cmt .v-cmt{ opacity:.25; }
 
     /* plan expanded = outline/feedback/authors nav rail + line-numbered body */
-    .plan-rev{ display:flex; gap:var(--space-9); margin-top:var(--space-9); max-height:520px; }   /* R-batch item 4: the height cap lives on the editor ROW (was on .md). The nav + editor stretch equal-height to this cap; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the Outline/Feedback/Authors nav is taller than the plan text. Both columns scroll internally past the cap (nav lists + .md). NEXT-UP item 13: raised 346→520 so the docked comment popout (which never shrinks — see .plan-cmt-pop) fits below a still-useful stretch of editor. */
+    .plan-rev{ display:flex; gap:var(--space-9); margin-top:var(--space-9); flex:1 1 auto; min-height:0; }   /* NU-3: the fixed 520px cap is gone — the editor row flex-fills the open card (which itself flex-fills the list, floored at --card-open-min-h), so the accordion genuinely fills the panel with no dead space. The nav + editor stretch equal-height to the row; the editor's .md flex-fills it (and .md-fill runs the rail track to the bottom) so the gutter never stops short of the visible editor — even when the TOC/Feedback/Authors nav is taller than the plan text. Both columns still scroll internally when content outgrows the row (nav lists + .md), and the docked comment popout still never shrinks (see .plan-cmt-pop). */
     .plan-nav{ display:flex; flex-direction:column; min-width:0; }
     /* ND 1a: the lens-tab strip is a full-bleed --surface-3 CHROME band over the white nav body, closed by a
        full-bleed navy divider (negative margins cancel the nav's own padding). */
@@ -1773,7 +1791,7 @@
        wrap (Approve drops to its own line, still right-aligned) so nothing clips at the narrow extreme. */
     .plan-foot-right{ flex-wrap:wrap; justify-content:flex-end; row-gap:var(--space-7); }
 
-    /* ============================ v8p7/v8p8 — selectable cards (History single-select · Messages multi-select), mirror Team Graph .node ============================ */
+    /* ============================ v8p7/v8p8 — selectable cards (History single-select · Messages multi-select), mirror Team .node ============================ */
     #prompt-history .rcard, #feed-transcript .rcard{ box-shadow:var(--shadow-sm); cursor:pointer; transition:transform .08s ease, box-shadow .08s ease; }
     #prompt-history .rcard:hover, #feed-transcript .rcard:hover{ transform:translate(2px,2px); box-shadow:none; }
     #prompt-history .rcard.sel, #feed-transcript .rcard.sel{ background:var(--select); box-shadow:var(--shadow); transform:none; }   /* v9p1: --select selection fill (light teal), matches .node.selected */

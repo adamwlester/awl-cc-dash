@@ -521,8 +521,7 @@
           <div data-comp="tab-bar" class="tabset">
             <button data-tab-group="mid" data-tab="details" onclick="switchTab('mid','details')" class="tab-btn active">Details</button>
             <button data-tab-group="mid" data-tab="create" onclick="switchTab('mid','create')" class="tab-btn">Create</button>
-            <button data-tab-group="mid" data-tab="past" onclick="switchTab('mid','past')" class="tab-btn">Past</button>
-            <button data-tab-group="mid" data-tab="console" onclick="switchTab('mid','console')" class="tab-btn">Console</button>
+            <button data-tab-group="mid" data-tab="console" onclick="switchTab('mid','console')" class="tab-btn">Console</button><!-- NU-2: the Past tab moved out of this bar — its content now lives in the Team panel's Past drawer (switchTab remaps a stale stored mid:'past' to 'details') -->
           </div>
         </div>
         <div class="pcard-body flex flex-col overflow-y-auto" style="background:var(--background)">
@@ -634,8 +633,8 @@
             <!-- MODEL (ND 8d: the group divider above is removed — spacing alone separates the bands) -->
             <div>
               <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="model-current">opus 4.8</span></div>
+              <!-- NU-7: the Claude-Code-default "Inherit" option is retired everywhere — a running agent always has a concrete model; the app's own default is Opus. -->
               <div data-comp="model-selector" class="model-tabs" id="model-tabs">
-                <button class="model-tab" data-model="inherit">Inherit</button>
                 <button class="model-tab active" data-model="opus">Opus</button>
                 <button class="model-tab" data-model="sonnet">Sonnet</button>
                 <button class="model-tab" data-model="haiku">Haiku</button>
@@ -828,8 +827,9 @@
             </div>
             <!-- (ND 8d: the group divider above Model is removed) -->
             <div>
-              <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold model-cur">inherit ← parent</span></div>
-              <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="inherit">Inherit</button><button class="model-tab" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
+              <!-- NU-7: Inherit is retired here too — Create opens on OPUS, the app's own default (no more "whatever Claude Code's config defaults to"); a Handoff prefill overrides this with the SOURCE agent's concrete model (prefillFromFocus). -->
+              <div class="ro-head"><span class="ro-label">Model</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold model-cur">opus 4.8</span></div>
+              <div data-comp="model-selector" class="model-tabs"><button class="model-tab active" data-model="opus">Opus</button><button class="model-tab" data-model="sonnet">Sonnet</button><button class="model-tab" data-model="haiku">Haiku</button><button class="model-tab" data-model="fable">Fable</button></div>
               <div data-comp="version-popout" class="ver-panel"></div>
             </div>
             <div><label class="ro-label block mb-1.5">Mode</label><div data-comp="segmented-control" class="seg mode-seg" id="create-mode-seg"><button onclick="segPick(this)">Plan</button><button onclick="segPick(this)">Ask</button><button onclick="segPick(this)">Edit</button><button class="seg-unarmed" data-mode="auto" onclick="segPick(this)">Auto</button><button class="seg-danger active" data-mode="bypass" onclick="segPick(this)" title="Bypass permissions — dangerous">Bypass</button></div><div class="grid grid-cols-2 gap-2 mt-2"><button data-comp="toggle-button" class="think-tog tog-cell fast-tog" onclick="toggleFast(this)" title="Opus fast mode (/fast) — faster responses, slightly lower quality"><i data-lucide="zap"></i><span class="tt-lbl">Opus Fast-Mode Off</span></button><button data-comp="toggle-button" class="think-tog tog-cell" onclick="toggleThink(this)" title="Extended thinking for this agent"><i data-lucide="brain"></i><span class="tt-lbl">Thinking Mode Off</span></button></div></div>
@@ -855,25 +855,7 @@
             </div>
           </div>
 
-          <!-- ===== PAST — the past-agents resume picker + the per-agent archive (dead roster + deep-freeze).
-               The RESUMABLE list mirrors the merged past-agents feed (dead roster records + archived records,
-               each row source-tagged roster|archive with a resumable flag); the ARCHIVE section below it is the
-               full deep-freeze record — identity snapshot, timestamps, lineage, git author, the transcript
-               referenced in place — with Resume + true-delete. Rendered from PAST/ARCHIVE by renderPast(). -->
-          <div id="mid-past" data-group="mid" class="hidden p-3 space-y-3">
-            <div class="agent-head">
-              <span class="agtile agtile--user" style="width:var(--size-40);height:var(--size-40)"><i data-lucide="history" class="agtile-luc"></i></span>
-              <div class="min-w-0 flex-1"><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">Past agents</div><div class="text-[10px] text-muted font-semibold">resume a dead or archived agent — same conversation, same identity</div></div>
-            </div>
-            <div>
-              <div class="ro-head"><span class="ro-label" data-hc-title="Resumable" data-hc="Every persisted agent that isn't live right now — dead roster records plus the archive, merged and source-tagged. Resume relaunches the agent on its own conversation (never a fork); a row with no conversation id can't resume and reads greyed.">Resumable</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="past-count"></span></div>
-              <div data-comp="past-agent-picker" class="aglist past-list" id="past-list"></div>
-            </div>
-            <div>
-              <div class="ro-head"><span class="ro-label" data-hc-title="Archive" data-hc="Retire = deep-freeze: a light archive record — identity snapshot, created/retired stamps, lineage, per-agent git author — with the transcript referenced in place, never copied. Resume un-retires the agent; Delete forever true-deletes the record (the referenced transcript is untouched).">Archive</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="archive-count"></span></div>
-              <div data-comp="archive-roster" class="arch-list" id="archive-list"></div>
-            </div>
-          </div>
+          <!-- (NU-2: the PAST pane moved out of this tab group — it now lives in the Team panel's Past drawer, #past-drawer in #pRight, all content ids intact.) -->
 
           <!-- ===== CONSOLE (v1.2: raw terminal feed + slash-command catalog, scoped to the focused agent) ===== -->
           <div id="mid-console" data-group="mid" class="hidden flex flex-col console-pane">
@@ -895,8 +877,7 @@
         <div class="pcard-foot px-2 py-2.5">
           <div data-group="mid-foot" id="mid-foot-details" class="flex" style="gap:var(--space-8)"><button data-comp="button" class="btn flex-1" onclick="saveAgentMd(this)" title="Save this agent's current config as an agent.md — name it and pick Save to project / Save to system"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save</button><button data-comp="button" class="btn-danger flex-1" onclick="retireAgent(this)" title="Retire this agent — ends the session"><i data-lucide="power" class="w-3.5 h-3.5"></i>Retire</button><button data-comp="button" class="btn-danger-solid flex-1" onclick="deleteAgent(this)" title="Permanently delete this agent — configuration + transcripts (irreversible)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button></div>   <!-- ND 13: Save leads (writes the config out as an agent.md — filename + Save to project / Save to system); R-batch item 11: Retire (soft red-on-cream, ends the session) + Delete (solid red, permanent wipe — gated by a confirm), labels shortened (no "agent") -->
 
-          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button data-comp="button" class="btn-main" onclick="createAgent()">Create agent</button><button data-comp="button" class="btn px-3" onclick="resetCreate()">Reset</button><button data-comp="button" class="btn px-3" onclick="cancelCreate()">Cancel</button></div>
-          <div data-group="mid-foot" id="mid-foot-past" class="hidden flex items-center"><span class="text-[9.5px] text-muted font-mono font-semibold" id="past-foot-note"></span></div>
+          <div data-group="mid-foot" id="mid-foot-create" class="hidden grid grid-cols-[1fr_auto_auto] gap-2"><button data-comp="button" class="btn-main" onclick="createAgent()">Create agent</button><button data-comp="button" class="btn px-3" onclick="resetCreate()">Reset</button><button data-comp="button" class="btn px-3" onclick="cancelCreate()">Cancel</button></div><!-- NU-2: #mid-foot-past is gone — #past-foot-note rides at the bottom of the Past drawer body now -->
           <div data-comp="console-runbar" data-group="mid-foot" id="mid-foot-console" class="hidden flex con-run">
             <button class="con-cmds-btn" onclick="toggleCmdPanel(this)" title="Browse all commands"><i data-lucide="terminal" class="w-3.5 h-3.5"></i><span>/</span></button>
             <input class="con-input" id="con-input-col" placeholder="Type a command, or / to browse…" onkeydown="if(event.key==='Enter')runConsoleCmd(this)"><!-- Console surface (feed · catalog · run bar) is design-final/built; the live raw-terminal feed + slash-route are BACKEND wiring (separate stream), so runConsoleCmd stays a static-mockup demo -->
@@ -911,11 +892,15 @@
       <div class="rz-panel" id="pMid" style="flex:1 1 40%">
         <div class="rz-group vertical" id="rzMid">
 
-          <!-- TEAM GRAPH -->
+          <!-- TEAM -->
           <section class="rz-panel" id="pGraph" style="flex:1 1 52%; min-height:var(--pane-graph-min-h); max-height:var(--pane-graph-max-h)">
             <div class="pcard-head">
-              <h3>Team Graph</h3>
-              <button onclick="toggleDrawer()" class="btn btn-sm"><i data-lucide="link-2" class="w-3.5 h-3.5"></i>Link Config</button>
+              <h3>Team</h3>
+              <div class="flex items-center" style="gap:var(--space-6)">
+                <!-- NU-2: the Past drawer trigger — the Past tab left the Agent pane's mid tab bar and lives here as the Team panel's second drawer (mutually exclusive with Link Config; both occupy the same absolute slot). -->
+                <button data-comp="button" onclick="toggleDrawer('past')" class="btn btn-sm"><i data-lucide="history" class="w-3.5 h-3.5"></i>Past</button>
+                <button data-comp="button" onclick="toggleDrawer('link')" class="btn btn-sm"><i data-lucide="link-2" class="w-3.5 h-3.5"></i>Link Config</button>
+              </div>
             </div>
             <div class="pcard-body overflow-auto" style="background:var(--background)">
               <div class="graph-wrap p-3.5" id="graph-wrap" data-status="planned"><!-- planned: edge-layer host for drawEdges()/LINKS — no #edge-layer element exists yet, so drawEdges() returns early and draws nothing -->
@@ -1349,13 +1334,13 @@
       <div class="rz-panel" id="pRight" style="flex:1 1 36%; min-width:var(--col-right-min); max-width:var(--col-right-max)">
 
         <!-- Link Config drawer (Sheet) — v1.x #3 (rev): lives in #pRight so it opens against this pane's
-             LEFT edge, i.e. immediately to the RIGHT of the Team Graph, keeping all graph cards visible. -->
+             LEFT edge, i.e. immediately to the RIGHT of the Team panel, keeping all graph cards visible. -->
         <div data-comp="link-drawer" id="link-drawer" class="hidden drawer">
           <div class="pcard-head"><h3>Link Config</h3><button onclick="toggleDrawer()" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
           <div class="p-3 space-y-3">
             <!-- Next-up item 11: the agent pair is two single-select agent dropdowns (the Compose-From source-dropdown
                  pattern — .src-dd.single + .dd-trig + .src-pop/.aglist, driven by the shared toggleSrcPop/pickSource);
-                 the Team Graph selection still prepopulates them (sandy/kai here = the demo prepopulation), and either
+                 the Team-panel selection still prepopulates them (sandy/kai here = the demo prepopulation), and either
                  endpoint can be re-picked from the drawer. Next-up items 3+18 on the cycler between them: defaults to
                  A↔B (both), and the glyphs are Lucide arrows (arrow-right / arrow-left / arrow-left-right), navy ink. -->
             <div class="link-pair flex items-center gap-2">
@@ -1437,12 +1422,39 @@
           </div>
         </div>
 
+        <!-- PAST drawer (Sheet) — NU-2: the old Agent → Past tab's content, relocated as the Team panel's second
+             drawer. Same Sheet behavior as Link Config (absolute in #pRight, slides out from behind the graph);
+             the two drawers share the slot, so toggleDrawer opens one and closes the other. Wider than the Link
+             sheet (--drawer-w-past) so the past rows (tile · role+model · source badge · stamp · Resume) read
+             cleanly. The RESUMABLE list mirrors the merged past-agents feed (dead roster records + archived
+             records, each row source-tagged roster|archive with a resumable flag); the ARCHIVE section below it
+             is the full deep-freeze record — identity snapshot, timestamps, lineage, git author, the transcript
+             referenced in place — with Resume + true-delete. Rendered from PAST/ARCHIVE by renderPast(). -->
+        <div data-comp="past-drawer" id="past-drawer" class="hidden drawer drawer--past">
+          <div class="pcard-head"><h3>Past</h3><button onclick="toggleDrawer('past')" class="ghost-ic" title="Close"><i data-lucide="x"></i></button></div>
+          <div class="p-3 space-y-3">
+            <div class="agent-head">
+              <span class="agtile agtile--user" style="width:var(--size-40);height:var(--size-40)"><i data-lucide="history" class="agtile-luc"></i></span>
+              <div class="min-w-0 flex-1"><div class="text-[15px] font-heading text-foreground leading-tight" style="font-weight:900">Past agents</div><div class="text-[10px] text-muted font-semibold">resume a dead or archived agent — same conversation, same identity</div></div>
+            </div>
+            <div>
+              <div class="ro-head"><span class="ro-label" data-hc-title="Resumable" data-hc="Every persisted agent that isn't live right now — dead roster records plus the archive, merged and source-tagged. Resume relaunches the agent on its own conversation (never a fork); a row with no conversation id can't resume and reads greyed.">Resumable</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="past-count"></span></div>
+              <div data-comp="past-agent-picker" class="aglist past-list" id="past-list"></div>
+            </div>
+            <div>
+              <div class="ro-head"><span class="ro-label" data-hc-title="Archive" data-hc="Retire = deep-freeze: a light archive record — identity snapshot, created/retired stamps, lineage, per-agent git author — with the transcript referenced in place, never copied. Resume un-retires the agent; Delete forever true-deletes the record (the referenced transcript is untouched).">Archive</span><span class="ml-auto text-[9.5px] text-muted font-mono font-semibold" id="archive-count"></span></div>
+              <div data-comp="archive-roster" class="arch-list" id="archive-list"></div>
+            </div>
+            <div class="pt-1"><span class="text-[9.5px] text-muted font-mono font-semibold" id="past-foot-note"></span></div>
+          </div>
+        </div>
+
         <div class="rz-group vertical" id="rzRight">
 
           <!-- FEED -->
           <section class="rz-panel" id="pFeed" style="flex:1 1 52%; min-height:var(--pane-feed-min-h); max-height:var(--pane-feed-max-h)">
         <div class="pcard-head">
-          <h3>Team Feed</h3>
+          <h3>Feed</h3>
           <div data-comp="tab-bar" class="tabset">
             <button data-tab-group="feed" data-tab="transcript" onclick="switchTab('feed','transcript')" class="tab-btn active">Transcript</button><!-- ND 6a: renamed from "Messages" — the tab is the container; "Message" survives as the entry TYPE (the Messages content filter below) -->
             <button data-tab-group="feed" data-tab="scratch" onclick="switchTab('feed','scratch')" class="tab-btn">Scratch</button>
@@ -1455,7 +1467,7 @@
           <!-- v9p9: agent filter moved into a header sub-bar (multi w/ identity badges) -->
           <div class="subbar">
             <!-- ND 6b: the "From/To" caption is gone — the badge-filled trigger reads for itself. -->
-            <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team Graph cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
+            <!-- Next-up items 6+7+8 (+15): the From/To filter is an IN-FLOW ACCORDION selector (.dd--acc + .src-acc — sticky toggle, chevron-right → down), and its 2-level tree renders from the SHARED roster in behavior.js (fillRosterLists — AG[k].subs mirrors the Team cards, the ground truth), so this list can't drift from the cards. Parent rows carry a live SELECTED/TOTAL sub-count (e.g. "6/6"). The reserved SYSTEM row renders second, after User (item 15) — filter-only, never addressable: it exists only in this tree mount, never in Compose To / Compose From / History From. data-off = the demo's deselected agents. -->
             <div data-comp="source-dropdown" id="feed-filter" class="src-dd dd multi dd--acc" data-agscope data-badge-cap="3">
               <button class="dd-trig" type="button" onclick="toggleSrcPop(this)"><span data-comp="badge-strip" data-variants="empty" class="dd-badges" data-badges></span><span class="acc-chevcell"><i data-lucide="chevron-right" class="acc-cv"></i></span></button>
               <div class="src-pop src-acc">

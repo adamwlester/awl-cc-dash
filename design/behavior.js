@@ -23,6 +23,7 @@
        doc CARD ids (doc-readme, doc-claude, …) and would leave the remap dead for those stale keys. */
     if(g==='doc'&&['plan','documents','assets'].indexOf(t)<0){t={readme:'documents',claude:'documents',todo:'documents'}[t]||'plan';}
     /* remap stale internal tab keys to the user-facing names (requests→inbox, library→templates) */
+    if(g==='mid'&&t==='past')t='details';   /* NU-2: the Past tab left the mid bar for the Team panel's Past drawer — a stale stored mid:'past' (persisted below, replayed at boot) would otherwise blank the whole Agent panel */
     if(g==='feed'&&t==='requests')t='inbox';
     if(g==='feed'&&t==='messages')t='transcript';   /* ND 6a: the Messages tab is renamed Transcript — remap stale stored keys + old callers */
     if(g==='prompt'&&(t==='templates'||t==='library'))t='compose';   /* v10p1 #22: Templates folded into Compose */
@@ -53,14 +54,19 @@
     if(typeof syncEditorMics==='function')setTimeout(syncEditorMics,0);   /* L: switching Compose↔History / Plans↔Documents re-evaluates each mic's field visibility (let the revealed pane settle first) */
   }
   /* ===== generic interactions (ported from v7p3) ===== */
-  function toggleDrawer(){document.getElementById('link-drawer').classList.toggle('hidden');}
+  /* NU-2: toggleDrawer(which) drives BOTH Team-panel drawers — 'link' (#link-drawer, the default so the old
+     no-arg call sites keep working: the drawer's close x, linkSave/linkDelete) and 'past' (#past-drawer).
+     The two occupy the same absolute slot in #pRight (z-30), so opening one closes the other. */
+  function toggleDrawer(which){const id=which==='past'?'past-drawer':'link-drawer';const el=document.getElementById(id);if(!el)return;
+    if(el.classList.contains('hidden')){const other=document.getElementById(id==='past-drawer'?'link-drawer':'past-drawer');if(other)other.classList.add('hidden');}
+    el.classList.toggle('hidden');}
   function agSync(scope){const link=scope.querySelector('[data-allnone]');if(!link)return;const rows=[...scope.querySelectorAll('.agrow')];const allOn=rows.length>0&&rows.every(r=>r.classList.contains('on'));link.dataset.act=allOn?'none':'all';link.textContent=allOn?'None':'All';}  /* show only the useful action */
   function toggleAgRow(el){el.classList.toggle('on');
     if(el.classList.contains('agrow--parent')){const subs=el.nextElementSibling;const on=el.classList.contains('on');   /* parent select = the whole subtree (parent + its subagents) */
       if(subs&&subs.classList.contains('agrow-subs'))subs.querySelectorAll('.agrow--sub').forEach(r=>r.classList.toggle('on',on));}
     const sc=el.closest('[data-agscope]');if(sc){agSync(sc);updateAgBadges(sc);updateSubCounts(sc);if(sc.id==='hist-from'&&typeof applyHistFilters==='function')applyHistFilters();}}   /* multi-select (Target / Filter); item 7 recount + item 9 History-From filter */
   function toggleAgSubs(e,btn){e.stopPropagation();const row=btn.closest('.agrow');if(!row)return;const subs=row.nextElementSibling;if(!subs||!subs.classList.contains('agrow-subs'))return;const open=subs.classList.toggle('open');row.classList.toggle('subs-open',open);}   /* expand/collapse a parent's subagent sub-rows (does NOT change selection) */
-  function setFeedSubFilter(node,id){const fil=document.getElementById('feed-filter');if(!fil)return false;   /* scope the Team Feed filter to one subagent (called by subBadgeClick) */
+  function setFeedSubFilter(node,id){const fil=document.getElementById('feed-filter');if(!fil)return false;   /* scope the Feed filter to one subagent (called by subBadgeClick) */
     const key=node?agKeyFromNode(node):'';   /* Next-up item 6: sub ids repeat across parents (every run starts at A1), so scope the lookup to the clicked card's agent (rows carry data-par from the shared roster) */
     const sub=[...fil.querySelectorAll('.agrow--sub')].find(r=>r.dataset.sub===id&&(!key||!r.dataset.par||r.dataset.par===key));if(!sub)return false;
     fil.querySelectorAll('.agrow.on').forEach(r=>r.classList.remove('on'));sub.classList.add('on');
@@ -320,7 +326,7 @@
     setTimeout(()=>{(row||acc).scrollIntoView({block:'center',behavior:'smooth'});},40);}
   /* Graph-card subagent badge click — replaces the old stopPropagation no-op (OQ-1). Three actions:
      (1) focus the PARENT agent, (2) open Details → Subagents scrolled+highlighted to that row,
-     (3) scope the Team Feed to that subagent on the Messages tab. Still stops propagation so the
+     (3) scope the Feed to that subagent on the Messages tab. Still stops propagation so the
      click doesn't also select the card or toggle the badge drawer. */
   function subBadgeClick(e,badge){
     e.stopPropagation();
@@ -362,7 +368,7 @@
   function ninbTrig(e,el){e.stopPropagation();if(el.classList.contains('node-inbox--empty'))return;
     const node=el.closest('.node');if(!node)return;
     const open=node.classList.toggle('ninb-open');el.setAttribute('aria-expanded',open?'true':'false');LU();}
-  /* deep-link a footer row into the Team Feed → Inbox — scroll + expand + select + flash that agent's typed card.
+  /* deep-link a footer row into the Feed → Inbox — scroll + expand + select + flash that agent's typed card.
      The parallel path to the status badge's statusJump; the item stays open until it's actually completed there. */
   function ninbGoto(e,key,type){e.stopPropagation();
     if(typeof switchTab==='function')switchTab('feed','inbox');
@@ -511,7 +517,7 @@
     const cards=[...root.querySelectorAll('.fcard.sel')];if(!cards.length)return;
     cards.forEach(c=>{const txt=cardText(c);if(!txt)return;let src;
       if(host==='hist')src='Prompts → History';
-      else{const o=c.classList.contains('txcard')?MSGS[+c.dataset.msgi]:null;const a=o?AG[o.ag]:null;src=a?('Team Feed · '+a.role+' '+a.name):'Team Feed';}
+      else{const o=c.classList.contains('txcard')?MSGS[+c.dataset.msgi]:null;const a=o?AG[o.ag]:null;src=a?('Feed · '+a.role+' '+a.name):'Feed';}
       insertEmbed(src,txt,host==='hist'?"switchTab('prompt','history')":"switchTab('feed','transcript')");});}
   function eaEmbedFeed(){const rows=[...document.querySelectorAll('#tx-list .mrow.bsel')].filter(r=>!r.classList.contains('mrow--title'));if(!rows.length)return;
     const card=rows[0].closest('.txcard');const o=MSGS[+card.dataset.msgi];const a=AG[o.ag];
@@ -519,7 +525,7 @@
     const text=rows.map(r=>((r.querySelector('.mrow-c')||{}).textContent||'').trim()).filter(Boolean).join('\n\n');
     const kinds=rows.map(r=>r.dataset.mblk==='text'?'message':(r.dataset.blk||'block'));
     const label=kinds.length>1?(kinds.length+' blocks'):kinds[0];
-    insertEmbed('Team Feed · '+a.role+' '+a.name+' · '+label,text,"switchTab('feed','transcript')");}
+    insertEmbed('Feed · '+a.role+' '+a.name+' · '+label,text,"switchTab('feed','transcript')");}
   function insertEmbed(src,text,srcAction){const f=document.getElementById('compose-field');if(!f)return;
     switchTab('prompt','compose');
     f.insertAdjacentHTML('beforeend',blockHTML('embed',{source:src,body:esc(text),srcAction:srcAction,clamp:text.length>220,kindLabel:'embed'}));
@@ -708,7 +714,9 @@
   function filterIcons(input){filterIconsGrid(input.closest('.picker-pop'),input.value);}
 
   /* ===== MODEL button groups ===== */
-  const MODELS={inherit:[],opus:['4.8','4.6','4.5','4.1'],sonnet:['4.6','4.5','3.7'],haiku:['4.5','3.5'],fable:['5']};
+  /* NU-7: the Claude-Code-default "Inherit" entry is retired — the app defines its own default (Opus, the
+     markup's active tab in both bands); a Handoff prefills the SOURCE agent's concrete model instead. */
+  const MODELS={opus:['4.8','4.6','4.5','4.1'],sonnet:['4.6','4.5','3.7'],haiku:['4.5','3.5'],fable:['5']};
   const DEFV={opus:'4.8',sonnet:'4.6',haiku:'4.5',fable:'5'};
   /* v1.x #2: Fast (/fast) is Opus-only — gate a panel's Fast toggle whenever its selected model isn't Opus */
   function gateFast(tabs){const panel=tabs.closest('[data-group="mid"]');if(!panel)return;const ft=panel.querySelector('.fast-tog');if(!ft)return;
@@ -719,12 +727,17 @@
     const wrap=tabs.parentElement,ver=tabs.nextElementSibling,curEl=wrap.querySelector('#model-current,.model-cur');
     const act=tabs.querySelector('.model-tab.active');
     const st={model:act?act.dataset.model:'opus',ver:Object.assign({},DEFV)};
-    const label=()=>st.model==='inherit'?'inherit ← parent':st.model+' '+st.ver[st.model];
+    const label=()=>st.model+' '+st.ver[st.model];   /* NU-7: the 'inherit ← parent' branch is retired with the Inherit tab */
     function renderVer(){const vs=MODELS[st.model]||[];if(!vs.length){ver.classList.remove('open');ver.innerHTML='';return;}
       ver.innerHTML=vs.map(v=>'<div class="ver-row'+(v===st.ver[st.model]?' sel':'')+'" data-v="'+v+'"><span class="ver-name">'+st.model+'-'+v+'</span><span class="ver-check">✓</span></div>').join('');
       ver.querySelectorAll('.ver-row').forEach(r=>r.onclick=()=>{st.ver[st.model]=r.dataset.v;if(curEl)curEl.textContent=label();ver.classList.remove('open');renderVer();});
       ver.classList.add('open');}
     tabs.querySelectorAll('.model-tab').forEach(t=>t.onclick=()=>{const m=t.dataset.model;if(st.model===m&&ver.classList.contains('open')){ver.classList.remove('open');return;}st.model=m;tabs.querySelectorAll('.model-tab').forEach(x=>x.classList.toggle('active',x===t));if(curEl)curEl.textContent=label();renderVer();gateFast(tabs);});
+    /* NU-7: programmatic setter for the band (used by the Handoff prefill — prefillFromFocus sets the Create
+       band to the SOURCE agent's model). Mirrors a tab click minus opening the version popout. */
+    tabs._set=(m,v)=>{if(!MODELS[m])return;st.model=m;if(v&&MODELS[m].indexOf(v)>=0)st.ver[m]=v;
+      tabs.querySelectorAll('.model-tab').forEach(x=>x.classList.toggle('active',x.dataset.model===m));
+      if(curEl)curEl.textContent=label();ver.classList.remove('open');gateFast(tabs);};
     if(curEl)curEl.textContent=label();
     gateFast(tabs);   /* v1.x #2: set the Fast gate from the panel's initial model */
   });
@@ -852,7 +865,7 @@
      the Turns readout's model-round count — and terminal-driven turns never land in the record (the standing
      footnote + the rewind confirm carry that honest limit). Rewind addressing is k-FROM-LAST over these
      records: picking row n of N rolls back N−n prompts; Handoff from row n forks a new agent seeded through
-     that turn (row N = fork at head). The summary vocabulary is shared with the Team Feed / History
+     that turn (row N = fork at head). The summary vocabulary is shared with the Feed / History
      collapsed previews. */
   function ctxColor(p){return p<50?'var(--success)':(p<=75?'var(--warning)':'var(--danger)');}   /* the shared health scale — the card + Agent-panel context/turns bars key off it */
   const TL_ROWS_DEFAULT=[
@@ -976,7 +989,12 @@
   function randomizeCreateName(btn){const root=document.getElementById('mid-create');randomizeName(root&&root.querySelector('input[placeholder="auto-generated if blank"]'));}
   function prefillFromFocus(){const a=AG[FOCUS];if(!a)return;const root=document.getElementById('mid-create');if(!root)return;
     const roleIn=root.querySelector('.combo-in');if(roleIn)roleIn.value=a.role;
-    const nameIn=root.querySelector('input[placeholder="auto-generated if blank"]');if(nameIn){nameIn.value='';randomizeName(nameIn);}}
+    const nameIn=root.querySelector('input[placeholder="auto-generated if blank"]');if(nameIn){nameIn.value='';randomizeName(nameIn);}
+    /* NU-7: the Handoff prefill carries the SOURCE agent's model as a CONCRETE value (the abstract "inherit
+       ← parent" label is retired). The focused agent's model reads from the Details #model-current label,
+       which repaintAgentPanel keeps true to the focused card (e.g. "opus 4.8" → model + version). */
+    const mc=document.getElementById('model-current');const mm=((mc&&mc.textContent)||'').trim().split(/\s+/);
+    const tabs=root.querySelector('.model-tabs');if(tabs&&tabs._set&&mm[0])tabs._set(mm[0],mm[1]);}
   function createAgent(){const root=document.getElementById('mid-create');if(!root)return;
     const role=(root.querySelector('.combo-in')||{}).value||'agent';
     const name=(root.querySelector('input[placeholder="auto-generated if blank"]')||{}).value||'new';
@@ -1369,7 +1387,7 @@
     +'<div class="link-sec-body">'+(items.length?linkGroupsHTML(items):'<div class="link-empty">None.</div>')+'</div></div>';}
   function renderLinkList(){const el=document.getElementById('link-list');if(!el)return;
     const all=LINKS_CFG.map((lk,i)=>({lk,i}));
-    if(!all.length){el.innerHTML='<div class="link-empty">No links yet — connect two agents from the Team Graph to create one.</div>';return;}
+    if(!all.length){el.innerHTML='<div class="link-empty">No links yet — connect two agents from the Team panel to create one.</div>';return;}
     el.innerHTML=linkSecHTML('Active Links',all.filter(o=>!o.lk.expired),true)
       +linkSecHTML('Expired Links',all.filter(o=>o.lk.expired),false);
     LU();}
@@ -1677,7 +1695,7 @@
   /* ============================ v9p10 ============================ */
   /* shared agent model + identity badges (one source of truth for badges everywhere).
      Next-up item 6: each agent's `subs` array is the ONE shared SUBAGENT roster — it mirrors that agent's
-     Team Graph card badge strip (the GROUND TRUTH: same ids, same run-state classes), and every other
+     Team card badge strip (the GROUND TRUTH: same ids, same run-state classes), and every other
      agent-listing surface (the feed From/To filter tree, Prompt To, the Compose/History From lists, the
      Link-pair dropdowns, the Details Subagents audit, the footer subagent total) renders from or reconciles
      to it — so rosters and counts can't drift. `type` is the audit's demo vocabulary. */
@@ -1731,7 +1749,7 @@
   function fillAgLists(){document.querySelectorAll('[data-aglist]').forEach(el=>{el.innerHTML=AG_ORDER.map(k=>agrowHTML(k)).join('');});}
   /* ===== Next-up items 6+7: roster-rendered agent-selector lists ===== */
   /* ONE renderer fills every [data-agroster] .aglist mount from the shared AG roster (AG[k].subs mirrors the
-     Team Graph cards — the ground truth), so the feed From/To filter tree, Prompt To, the Compose-From source
+     Team cards — the ground truth), so the feed From/To filter tree, Prompt To, the Compose-From source
      list, the History-From filter, and the Link-pair dropdowns can't drift from the cards or each other.
      Mount kinds: tree (User + the reserved System row + 2-level subagent tree — item 15: System is filter-only,
      so ONLY this mount includes it) · targets (Scratch + agents) · agents (agents only — the History From list) ·
@@ -2061,7 +2079,7 @@ The window is a title bar over three columns over a status footer.
 - **Agent** — inspect & configure the selected agent.
 
 ### Middle column
-- **Team Graph** — every agent as a live card.
+- **Team** — every agent as a live card.
 - **Library** — plans + project docs (README, CLAUDE) and reference assets.
 
 #### Library tabs
@@ -2694,7 +2712,7 @@ Short-lived notes for the current run — kept brief on purpose.
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxResolve(this,\'Dismissed\')" title="Dismiss this warning (clears it from the Inbox)">Dismiss</button>'+inboxReplyHTML();}
     else if(o.type==='response'){detail='<div class="rc-body">'+esc(o.body)+'</div>';
       /* Next-up item 14: Response — the lone non-blocking card (a run ended with output the user hasn't
-         reviewed). View (pink — this card's completion action, like the Warning's Dismiss) jumps to Team Feed →
+         reviewed). View (pink — this card's completion action, like the Warning's Dismiss) jumps to Feed →
          Messages scoped to the agent + flashes the run's final reply, and COMPLETES the item; the shared Reply
          ALSO completes here (inboxReply special-cases response). No Dismiss; no read-tracking. */
       acts='<button data-comp="button" class="btn-main btn-sm" onclick="inboxView(this)" title="View — jump to the run\'s final reply in Messages (completes this item)"><i data-lucide="eye" class="w-3 h-3"></i>View</button>'+inboxReplyHTML();}
@@ -2744,7 +2762,7 @@ Short-lived notes for the current run — kept brief on purpose.
     const sec=card.closest('.inbox-sec');const nm=((card.querySelector('.b-name')||{}).textContent||'agent').trim();const lab=(opt.querySelector('.opt-nm')||{}).textContent||'option';
     toast('Approved '+lab+' — '+nm+' unblocked');card.style.transition='opacity .2s';card.style.opacity='0';
     setTimeout(()=>{card.remove();inboxAfterRemove(sec);refreshInbox();},200);}
-  /* Next-up item 14: Response → View — hand off to Team Feed → Messages with the From/To filter scoped to
+  /* Next-up item 14: Response → View — hand off to Feed → Messages with the From/To filter scoped to
      that agent, then scroll + flash the run's FINAL REPLY (the agent's last parent-level message) — the
      plan-flash jump pattern (scroll + select-free flash, via the shared .reply-flash). Viewing COMPLETES the
      item (the deliberate seen/unseen model without read-tracking: reading Messages organically leaves it open). */
@@ -2902,7 +2920,7 @@ Short-lived notes for the current run — kept brief on purpose.
   }
   function closeConsole(){const v=document.getElementById('console-view');if(!v)return;v.classList.remove('open');v.setAttribute('aria-hidden','true');v.style.right='';}
   /* v10p1 #13: the Console step-into covers only the LEFT + MIDDLE columns — its right edge stops at the
-     left edge of the right column (#pRight), so Team Feed + Prompt stay visible. Recomputed on window
+     left edge of the right column (#pRight), so the Feed + Prompt stay visible. Recomputed on window
      resize and splitter drags (a ResizeObserver on #pRight fires for both). Settings keeps its full-window
      step-into — a deliberate difference (see DESIGN.md). */
   function positionConsoleView(){const v=document.getElementById('console-view');if(!v||!v.classList.contains('open'))return;
@@ -2924,10 +2942,11 @@ Short-lived notes for the current run — kept brief on purpose.
   /* pure-documentation content (no clickable links inside — routing stays on the real controls) */
   const HC={
     'Agent':"The selected agent — its identity, config, and live run state. Details (config + Context/Turns + Rewind/Handoff timeline) · Create (new-agent wizard) · Console (raw CLI feed + slash-command runner).",
-    'Team Graph':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending/error), a subagent strip, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
+    'Team':"The live roster, one card per agent. Click a card to focus that agent across the whole app. Each card shows identity, a health-colored Ctx + Turns bar, a status badge (active/idle/pending/error), a subagent strip, and model·mode·effort. Select agents and use Link Agents to connect them; directed link edges are planned.",
     'Library':"Organize and review the project's docs and assets. Plans (native plan files, reviewable with per-section feedback + Approve/Revise/Reject; the badge counts plans not yet reviewed) · Documents (README + project/user CLAUDE.md, line-numbered) · Assets (reference images — the single source of truth for media).",
-    'Team Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Transcript (team traffic; Sent/Received filter by direction, the content filters by block kind — Messages · Thinking · Files · Shell · Search · Workflow — and the Subagent toggle hides the entries nested inside each parent's card; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Error · Warning · Permission · Review (plans, docs & workflow approvals) · Decision sections, plus the non-blocking Response section for run output you haven't reviewed; its badge is the fleet total).",
+    'Feed':"Real-time cross-agent view, narrowed by the shared agent From/To filter (persists across all four tabs). Transcript (team traffic; Sent/Received filter by direction, the content filters by block kind — Messages · Thinking · Files · Shell · Search · Workflow — and the Subagent toggle hides the entries nested inside each parent's card; select-to-act cards) · Scratch (live shared-scratchpad posts) · Log (system events) · Inbox (the requests you owe — Error · Warning · Permission · Review (plans, docs & workflow approvals) · Decision sections, plus the non-blocking Response section for run output you haven't reviewed; its badge is the fleet total).",
     'Prompt':"Compose and dispatch prompts — the compose-first heart of the app. On Compose, From (single) sets who it's sent as; on History, From becomes a multi-select filter (the To list minus Scratch — your own prompts always show). To (multi, led by the Scratch row) sets who receives it and persists across both tabs.",
+    'Past':"Agents that are no longer live, in one drawer. Resumable merges every persisted agent that isn't on the roster — dead roster records + the archive, source-tagged — with a per-row Resume (relaunch on its own conversation, never a fork). Archive is the management lens over the same records: the full deep-freeze read (stamps, lineage, git author, transcript pointer) with Resume + Delete forever.",
     'Link Config':"Forwards context from one agent to another. The agent pair is two single-select dropdowns (the graph selection prepopulates them). Direction A→B / B→A / A↔B (default: both). Relationship (what flows — ONE per link; wanting both = two links): Direct messaging is a reply-to conversation · Shared context is passive awareness of selected content (Messages/Thinking/Files/Shell/Search/Workflow — the Transcript content taxonomy), optionally backfilled once. Trigger (when it delivers — a dropdown): Now interrupts · Inject feeds a running agent without stopping it · Next waits for the turn · Queue joins the prompt queue (the Direct-messaging default) · Hold stages for your approval · Piggyback never initiates — it rides the next message the target receives from any source (the Shared-context default; an actively-delivered share costs the target a turn to ingest). End After bounds this exchange in Exchanges/Tokens (on a one-way link each fire counts as an exchange) — distinct from an agent's own Lifecycle limits."
   };
   function seedHoverCards(){document.querySelectorAll('.pcard-head h3').forEach(h=>{const k=h.textContent.trim();const d=HC[k];if(!d)return;
