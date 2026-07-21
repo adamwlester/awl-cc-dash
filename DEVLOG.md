@@ -404,6 +404,38 @@ Files: dev/notes/TODO.md, DEVLOG.md
 
 ---
 
+### 2026-07-20 22:40:00 — [NU] run: all 7 queue items built in 3 file-disjoint lanes (renames, Past drawer, Library fill, icon fix, 167-picker, attach reuse, Opus default)
+
+The full [NU] NEXT UP queue implemented off a 6-mapper anchor pass, as three parallel lanes. **Design** (`15885e0`, five-file propagation): "Team Graph"→**Team** / "Team Feed"→**Feed** (incl. the h3-keyed hover-card dict and all current-state comments; history preserved); the Past pane moved out of the Agent tab bar into a second Team-panel sheet **`past-drawer`** beside Link Config (generalized `toggleDrawer(which)` with mutual exclusion, `mid:'past'→'details'` stale-localStorage remap, widths tokenized `--drawer-w`/`--drawer-w-past` 416px); the Library open card became a real **flex-fill chain** (520px `.plan-rev` cap dead, closed cards `flex:0 0 auto`, tokenized `--card-open-min-h` floor — headed-verified 60/60 incl. pane extremes); **Inherit removed from both model bands** with Opus default-active and the Handoff prefill pushing the source agent's concrete model; DESIGN.md synced throughout. **Renderer** (`de97d1d`): the same seven in the app — [PastDrawer.tsx](frontend/src/renderer/components/PastDrawer.tsx) extracted on the store's new `drawer:'link'|'past'|null` union; Library `pop-open` + design `.cmt-pop-head/.cmt-pop-body` composer structure; the **icon fix** (suffix-strip sprite alias + agent-coloured recolor fallback — the invisible-tile bug for 11 curated stems, incl. fnord's `dragon-head__lorc`, dead); the **167-icon picker** off the new listing endpoint (sprite fast-path, degrade-to-50); the **console attach cache** (in-flight-promise dedupe, invalidation on death/retire/delete; single-writer resize untouched); `MODEL_FAMILIES` minus inherit, Create defaults opus, legacy null models display "—". **Backend** (`c81c104`): `GET /assets/agent-icons` (the full-set listing), `DEFAULT_MODEL="opus"` coercion in create_session (resume/fork read-backs and `req.model or source.model` parent-inherit untouched), the five role presets reseeded `model: inherit`→**`model: fable`**, +30 hermetic pins (new [tests/test_agent_icons_unit.py](tests/test_agent_icons_unit.py), TestModelDefault, an argv pin). Gates: 1504 pytest, tsc, variant-lint, node --check — green.
+
+Files: design/mockup.html, design/behavior.js, design/styles.css, design/tokens.css, design/DESIGN.md, frontend/src/renderer/* (13 files incl. PastDrawer.tsx new), sidecar/main.py, .awl-cc-dash/agents/*.md, tests/test_agent_icons_unit.py (new), tests/test_sidecar_unit.py, tests/test_bridge_unit.py
+
+---
+
+### 2026-07-20 22:50:00 — [NU] adversarial review: 13 findings → 9 real, all fixed (renderer fill ids, header parity, resume cache-clear, glyph-layer watermark)
+
+Six dimension reviewers over the run diff + 3-skeptic refutation panels (the panel stage was cut short by a model usage limit; the orphaned findings were adjudicated by direct code reading). **Real and fixed** (`576757b`): the headline — the NU-3 fill CSS was scoped to `#plan-list`/`#doc-list`, ids only the mockup renders, so the app got none of the fix while losing its old 520px cap (fixed with a load-bearing conditional id on the renderer's list container); the Team header's drawer triggers now ride in one gap group, Past first, matching the mockup; **resume now clears the console attach cache** (a stale ws_url could have bound a resumed agent to a recycled port — another agent's terminal); the graph watermark polarity for non-sprite icons was inverted (tinted square + white glyph) — fixed properly with a **`layer=glyph` mode on the recolor endpoint** (bg knocked out, glyph tinted, +3 test pins) consumed by `AgGlyphUse`; `.past-stamp` 74px tokenized (`--past-stamp-w`); four stale behavior.js comments renamed. Gates re-run green: **1507 pytest**, tsc, variant-lint, node --check.
+
+Files: frontend/src/renderer/components/Library.tsx, frontend/src/renderer/components/TeamGraph.tsx, frontend/src/renderer/components/PastDrawer.tsx, frontend/src/renderer/api.ts, sidecar/main.py, design/styles.css, design/tokens.css, design/behavior.js, frontend/src/renderer/design/{styles,tokens}.css (re-copy), tests/test_agent_icons_unit.py
+
+---
+
+### 2026-07-20 23:05:00 — [NU] live drive: 7/7 proven in the real app; sidecar restarted on the new code, demo team rebound
+
+Read-only drive against the real stack (fresh sidecar on the run's code, vite :5199, ui-verify parked headed Chromium): renames clean in the live DOM; the Past drawer at exactly 416px with the real 5-past/6-archive store, mutual exclusion both directions, no Past tab; Library open-card fill **0px dead space**, 280px floor + list-scroll at pane minimum, editor 782px at pane max, comment popout uncrushed everywhere; the picker offered **167 tiles** and a `devil-mask` probe agent rendered visibly with the **tinted-glyph watermark** (no pale square); the probe's model persisted **"opus"** off the untouched default and the builder preset prefilled Fable; console first attach 2014ms/1 POST vs **expand 133ms/0 POSTs** (re-expand 144ms/0; resize single-writer re-asserted on collapse); the retire→resume→fresh-attach→re-retire→true-delete round trip green with the store baseline restored exactly. Non-blocking observations: a ~30s stale-poll window in the Past drawer right after retire+archive-delete (self-heals; a stale Resume would 404 into the honest toast); a first attach on a still-`connecting` session can outlast the UI's patience (bounded-recovery design, not a regression); the pre-run stray tmux `awl-5df70f3d` (Jul 16) untouched. Teardown: vite killed, **sidecar left running** with the 4 demo agents idle, probe fully cleaned up.
+
+Files: (read-only drive — evidence in .scratch/nu-live/; no repo changes)
+
+---
+
+### 2026-07-20 23:14:16 — docs: [NU] currency pass (ARCHITECTURE §4.2/§5.2/§7.5/§7.13/§8.4/§9.2/§11, tests/README)
+
+[ARCHITECTURE](docs/ARCHITECTURE.md) trued to the run, every claim code-verified: §4.2 records the **Team/Feed renames** at the primary definition + the `PastDrawer` sheet pair; §5.2 gains `GET /assets/agent-icons` and the recolor route's `layer=` param; §7.5 carries the full-set picker + icon-fix prose, the cleared #56 ⚠ marker, and a new explicitly-flagged **decision-change paragraph: Opus is the product's launch default** (no Inherit anywhere; `DEFAULT_MODEL="opus"` coercion; server-side fork parent-inherit unchanged; seeds pin fable; legacy nulls display "—"); §7.13 records the session-keyed attach cache (live-measured ~133ms expand); §9.2 the create-flow coercion; §11.1 index re-synced (four markers remain); §11.6 #56 → BUILT + a consolidated **#59 built row** for the run. Two flagged pre-existing fixes: §4.2's stale "identity edits" claim trued to the 2026-07-17 Create-lock, and the missing §11.7 heading restored (both §11.1 and §7.19 already pointed at it). [tests/README.md](tests/README.md): a row for `test_agent_icons_unit.py` (22) + trued counts for `test_sidecar_unit.py` (~140) and `test_bridge_unit.py` (~156).
+
+Files: docs/ARCHITECTURE.md, tests/README.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
