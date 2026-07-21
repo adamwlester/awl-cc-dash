@@ -165,7 +165,8 @@ export function Library() {
                   <span>{plans.length} plan{plans.length === 1 ? '' : 's'} · {awaiting} awaiting review</span>
                 </div>
               )}
-              <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0">
+              {/* NU-3: the id is load-bearing — the accordion fill/no-shrink rules in design styles.css are scoped to #plan-list/#doc-list (mirroring the mockup's list ids). */}
+              <div id={d.libTab === 'plan' ? 'plan-list' : 'doc-list'} className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0">
                 {entries.map(e => (
                   <PlanCard key={e.id} e={e} open={openId === e.id} onToggle={() => setOpenId(openId === e.id ? null : e.id)}
                     onChanged={() => setRefresh(x => x + 1)} />

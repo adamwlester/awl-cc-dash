@@ -196,7 +196,9 @@ function watermarkHex(color: string): string {
 function AgGlyphUse({ icon, color }: { icon: string; color: string }) {
   const sym = spriteSymOf(icon)
   if (sym) return <use href={`#${sym}`} />
-  return <image href={api.iconUrl(icon, watermarkHex(color))} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+  // layer=glyph mirrors .node-bg's polarity: the colour square is knocked out and the GLYPH takes the tint
+  // (a plain bg recolor here would paint a near-white square with a white glyph — inverted and invisible).
+  return <image href={api.iconUrl(icon, watermarkHex(color), 'glyph')} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
 }
 
 export function inboxTitle(it: InboxItem): string {
@@ -210,8 +212,11 @@ export function TeamGraph() {
     <section className="rz-panel" id="pGraph" style={{ flex: '1 1 52%', minHeight: 'var(--pane-graph-min-h)', maxHeight: 'var(--pane-graph-max-h)' }}>
       <div className="pcard-head">
         <h3>Team</h3>
-        <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'link' ? null : 'link')}><Ic name="link-2" className="w-3.5 h-3.5" />Link Config</button>
-        <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'past' ? null : 'past')}><Ic name="history" className="w-3.5 h-3.5" />Past</button>
+        {/* Mockup parity: the two drawer triggers ride in one gap group (Past first), not as bare space-between children. */}
+        <div className="flex items-center" style={{ gap: 'var(--space-6)' }}>
+          <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'past' ? null : 'past')}><Ic name="history" className="w-3.5 h-3.5" />Past</button>
+          <button className="btn btn-sm" onClick={() => d.setDrawer(p => p === 'link' ? null : 'link')}><Ic name="link-2" className="w-3.5 h-3.5" />Link Config</button>
+        </div>
       </div>
       <div className="pcard-body overflow-auto" style={{ background: 'var(--background)' }}>
         <div className="graph-wrap p-3.5" data-status="planned">

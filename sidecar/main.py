@@ -4603,7 +4603,7 @@ _ICON_BG_PATH = '<path d="M0 0h512v512H0z"/>'
 
 
 @app.get("/assets/agent-icons/{name}")
-async def agent_icon(name: str, color: str | None = None):
+async def agent_icon(name: str, color: str | None = None, layer: str | None = None):
     safe = name if name.endswith(".svg") else f"{name}.svg"
     if "/" in safe or "\\" in safe or ".." in safe:
         raise HTTPException(status_code=404, detail="Not found")
@@ -4613,9 +4613,19 @@ async def agent_icon(name: str, color: str | None = None):
     svg = path.read_text(encoding="utf-8")
     # Recolor only when a valid hex is given (guards against SVG injection).
     if color and _HEX_RE.match(color):
-        svg = svg.replace(
-            _ICON_BG_PATH, f'<path d="M0 0h512v512H0z" fill="{color}"/>', 1
-        )
+        if layer == "glyph":
+            # Watermark polarity (mirrors the mockup's .node-bg): knock the colour
+            # square out and paint the GLYPH with the tint — a plain bg recolor
+            # here would render a tinted square under a white glyph, the inverse
+            # of the design's behind-content watermark.
+            svg = svg.replace(
+                _ICON_BG_PATH, '<path d="M0 0h512v512H0z" fill="none"/>', 1
+            )
+            svg = svg.replace('fill="#fff"', f'fill="{color}"')
+        else:
+            svg = svg.replace(
+                _ICON_BG_PATH, f'<path d="M0 0h512v512H0z" fill="{color}"/>', 1
+            )
     return Response(content=svg, media_type="image/svg+xml",
                     headers={"Cache-Control": "public, max-age=86400"})
 

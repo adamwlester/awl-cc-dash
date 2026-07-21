@@ -16,6 +16,7 @@ import React, { useEffect, useState } from 'react'
 import { api, type PastAgent, type ArchiveRecord, type Identity } from '../api'
 import { useDash } from '../store'
 import { Ic, AgGlyph } from '../lib/icons'
+import { clearAttachCache } from './Console'
 import { modelLabel } from '../lib/identity'
 import { toast } from '../lib/toast'
 
@@ -87,6 +88,7 @@ function PastDrawerBody() {
     const r = await api.resumeSession(sel.archive_id ? { archive_id: sel.archive_id } : { session_id: sel.session_id })
     setBusyKey(null)
     if (r.ok && r.data) {
+      clearAttachCache(r.data.session_id)   // NU-6: the pre-death attach is stale after resume — the recycled port could even be another agent's terminal; force a fresh attach
       toast(`Resumed ${label} — same conversation, same identity${r.data.resumed_from === 'archive' ? ' (un-retired from the archive)' : ''}`)
       d.select(r.data.session_id)
       d.setAgentTab('details')

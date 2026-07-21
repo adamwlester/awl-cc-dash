@@ -822,8 +822,8 @@ export const api = {
   assetUrl: (rec: AssetRecord): string | null => (rec.http_url ? `${API}${rec.http_url}` : null),
 
   // ---- assets --------------------------------------------------------------
-  iconUrl: (icon: string, color: string) =>
-    `${API}/assets/agent-icons/${encodeURIComponent(icon)}.svg?color=${encodeURIComponent(color)}`,
+  iconUrl: (icon: string, color: string, layer?: 'glyph') =>
+    `${API}/assets/agent-icons/${encodeURIComponent(icon)}.svg?color=${encodeURIComponent(color)}${layer ? `&layer=${layer}` : ''}`,
   // The full agent-icon inventory (§11 #56): every stem on disk under
   // assets/icons/agents/, sorted — the picker serves all of them, not just the
   // sprite-embedded 50. Null → endpoint absent; callers degrade to the sprite set.

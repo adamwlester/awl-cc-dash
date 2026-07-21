@@ -59,8 +59,8 @@ def _clean(tmp_path, monkeypatch):
     yield
 
 
-def _get_icon(name: str, color: str | None = None):
-    return asyncio.run(main.agent_icon(name, color=color))
+def _get_icon(name: str, color: str | None = None, layer: str | None = None):
+    return asyncio.run(main.agent_icon(name, color=color, layer=layer))
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +90,28 @@ class TestAgentIconRoute:
             resp = _get_icon("wizard-face", color=bad)
             assert resp.status_code == 200
             assert resp.body.decode("utf-8") == on_disk
+
+    def test_glyph_layer_knocks_out_bg_and_tints_glyph(self):
+        # layer=glyph is the watermark treatment (mirrors the mockup's
+        # .node-bg polarity): the colour square is knocked out and the GLYPH
+        # takes the tint — a plain bg recolor would be the inverse.
+        resp = _get_icon("devil-mask", color="#aa3a61", layer="glyph")
+        body = resp.body.decode("utf-8")
+        assert '<path d="M0 0h512v512H0z" fill="none"/>' in body
+        assert 'fill="#aa3a61"' in body
+        assert 'fill="#fff"' not in body
+
+    def test_glyph_layer_without_valid_color_serves_raw(self):
+        on_disk = (_ICONS_DIR / "wizard-face.svg").read_text(encoding="utf-8")
+        for bad in (None, "red", "#zzzzzz"):
+            resp = _get_icon("wizard-face", color=bad, layer="glyph")
+            assert resp.body.decode("utf-8") == on_disk
+
+    def test_unknown_layer_value_falls_back_to_bg_recolor(self):
+        resp = _get_icon("wizard-face", color="#aa3a61", layer="bogus")
+        body = resp.body.decode("utf-8")
+        assert '<path d="M0 0h512v512H0z" fill="#aa3a61"/>' in body
+        assert 'fill="#fff"' in body   # glyph untouched in bg mode
 
     def test_traversal_names_404(self):
         for name in ("..", "../identity", "a/b", "a\\b", "..\\secrets"):

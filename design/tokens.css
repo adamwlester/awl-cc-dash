@@ -230,6 +230,7 @@
      ratified in the NU-2 headed pass — at 352/400 the longest role·model label still ellipsized). */
   --drawer-w:266px;        /* the base drawer — Link Config */
   --drawer-w-past:416px;   /* the Past drawer (.drawer--past) */
+  --past-stamp-w:74px;     /* the Past drawer's stamp column — caps the two-line date wrap */
 
   /* Library accordion fill (NU-3): the open plan/doc card flex-fills its list, floored here so that when many
      cards + a short pane compete, the LIST scrolls instead of crushing the open editor below usability. */

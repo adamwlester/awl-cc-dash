@@ -1567,7 +1567,7 @@
   }
   function projInit(){ if(document.getElementById('proj-list'))projRender(); }
 
-  /* ===== Past agents (Agent → Past) — the resume picker + the per-agent archive =====
+  /* ===== Past agents (Team → Past drawer) — the resume picker + the per-agent archive =====
      PAST mirrors the merged past-agents feed: every persisted agent that isn't live — dead roster records
      (src:'roster') plus archived records (src:'archive') — each with a resumable flag (has a conversation id
      to resume AND isn't live). ARCHIVE holds the full deep-freeze records behind the archive rows: a distinct
@@ -2471,7 +2471,7 @@ Short-lived notes for the current run — kept brief on purpose.
        {k:'think',t:'The refresh path reissues the session cookie but carries the CSRF secret over unchanged — a privilege-boundary smell worth probing before I write this up.'},
        {k:'read',t:'● Read  src/auth/session.ts (212 lines)'},
        {k:'search',t:'● Grep  "refreshToken" in src/auth\n  ⎿ 6 matches across session.ts, tokens.ts'}]},
-    /* Multi-subagent stream, demo 1 of 2 — researcher-01-sandy's full run-A fan-out (A1–A6, matching sandy's Team-Graph roster: 3 Explore active · 1 general-purpose done · 1 code-reviewer active · 1 general-purpose error). The full multi-subagent stream is split across TWO different agents (sandy here, fen below), not two runs on one agent, so each fits the timespan of its example card. ND 6c: these entries render NESTED inside their parent's card — the old "subagent of …" meta blocks are gone (nesting conveys parentage). */
+    /* Multi-subagent stream, demo 1 of 2 — researcher-01-sandy's full run-A fan-out (A1–A6, matching sandy's Team-panel roster: 3 Explore active · 1 general-purpose done · 1 code-reviewer active · 1 general-purpose error). The full multi-subagent stream is split across TWO different agents (sandy here, fen below), not two runs on one agent, so each fits the timespan of its example card. ND 6c: these entries render NESTED inside their parent's card — the old "subagent of …" meta blocks are gone (nesting conveys parentage). */
     {ag:'sandy',sub:'A1',subtype:'Explore',substate:'sb-active',dir:'in',status:'active',turn:8,time:'14:41',body:`JWT middleware mapped — 7 validateToken() call-sites; session.ts:142 is the one refresh path that skips the exp check.`,
      blocks:[
        {k:'read',t:'● Read  src/auth/middleware/jwt.ts (164 lines)'}]},
@@ -2502,7 +2502,7 @@ Short-lived notes for the current run — kept brief on purpose.
     {ag:'sandy',dir:'in',status:'complete',turn:15,time:'14:46',body:`Patch is ready on the rotation branch — can you re-check the expiry path holds under token reuse?`,
      blocks:[
        {k:'meta',t:'relayed via link from coder-01-max · trigger: Next'}]},
-    /* Multi-subagent stream, demo 2 of 2 — scribe-01-fen's run-B helpers (B1–B3, matching fen's Team-Graph roster: code-reviewer done · Explore active · general-purpose error). fen's card also carries an A and a C run; only run B is streamed here so the example fits one card's timespan (the companion 6-subagent fan-out is demo 1 on sandy, above). */
+    /* Multi-subagent stream, demo 2 of 2 — scribe-01-fen's run-B helpers (B1–B3, matching fen's Team-panel roster: code-reviewer done · Explore active · general-purpose error). fen's card also carries an A and a C run; only run B is streamed here so the example fits one card's timespan (the companion 6-subagent fan-out is demo 1 on sandy, above). */
     {ag:'fen',dir:'in',status:'active',turn:6,time:'14:46',body:`Compiling the auth-fix changelog — dispatched a review + exploration pass over the rotation patch so the writeup cites the exact call-sites and carries the reviewer's verdict.`,
      blocks:[
        {k:'workflow',t:'▸ Workflow changelog-sweep — phase Verify · 2/3 agents complete · review + call-site pass over the rotation patch'},
@@ -2963,7 +2963,7 @@ Short-lived notes for the current run — kept brief on purpose.
     document.querySelectorAll('[data-expmount]').forEach(m=>{m.outerHTML=expMenuHTML(m.dataset.expmount);});   /* R-batch items 6/9: mount the merged Export control into the Feed + History footers (static markup carries a placeholder span) */
     fillRosterLists();   /* Next-up item 6: mount every agent-selector list from the shared roster (before renderFeed, whose applyHistFilters reads the History-From selection) */
     renderAssets();renderDocs();renderPlans();renderFeed();renderConsole();fillAgLists();buildTemplateOptions();renderAttachStrip();renderLinkList();eaUpdateAll();
-    renderPast();   /* Agent → Past: the resume picker + the archive roster */
+    renderPast();   /* Team → Past drawer: the resume picker + the archive roster */
     renderImportList();renderImportAgents();   /* Library Import drawer — pre-rendered so it opens instantly (and the states page clones a faithful specimen) */
     document.addEventListener('selectionchange',saveComposeRange);   /* v10p1 #22: remember the compose cursor so a template inserts where you left off */
     const sn=document.querySelector('.node.selected');if(sn)selectNode(sn);   /* sync the Agent panel + Console to the focused card on load (single-sources Turns/Ctx/identity) */
