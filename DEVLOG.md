@@ -436,6 +436,14 @@ Files: docs/ARCHITECTURE.md, tests/README.md, DEVLOG.md
 
 ---
 
+### 2026-07-27 17:05:32 — cleanup: [NU] queue cleared (operator-directed) + stale-drawer quirk filed to inbox
+
+Operator reviewed the 2026-07-20 [NU] run and directed the queue cleared: removed all 7 finished items from **[NU] NEXT UP** in `dev/notes/TODO.md` (section now empty per the "empty by design when idle" rule — all 7 were built, reviewed, and live-proven in that run, DEVLOG 2026-07-20). Filed the one non-blocking observation from that run's live drive — the ~30s stale-data window in the Team → Past drawer right after a retire + archive-delete — into **[IN] INBOX** for later triage (build lane, renderer/sidecar). Also killed the pre-run stray tmux session `awl-5df70f3d` (an old Jul-16 ad-hoc test screen — confirmed not one of the 4 demo agents via the `agents.json` tmux-name map: ecto→awl-10195a97, fnord→awl-843a777d, goop→awl-881a7234, taro→awl-46b28a77); the 4 demo agents and the running sidecar (`:7690`, 4 idle agents) left untouched.
+
+Files: dev/notes/TODO.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
