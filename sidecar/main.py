@@ -1343,6 +1343,43 @@ async def _cap_poll_loop():
             logger.error("cap poll loop error: %s", e)
 
 
+def _load_fleet_oauth_token() -> None:
+    """Load the fleet OAuth token into the sidecar's OWN process env (§6.4).
+
+    Serves only the opt-in in-process ``sdk`` driver, whose SDK subprocess
+    inherits this process's env. The ``bridge`` driver does NOT rely on this —
+    it injects the token explicitly per spawn from the same file. Reads the
+    file ``bridge.paths.oauth_token_file()`` resolves (default
+    ``%LOCALAPPDATA%\\awl-cc-dash\\oauth-token``, ``AWL_OAUTH_TOKEN_FILE``
+    override) and sets ``CLAUDE_CODE_OAUTH_TOKEN`` if unset. Process-scoped by
+    design: VS Code is a sibling of the sidecar, not a child, so nothing here
+    reaches the operator's interactive environment. Cleanly separable — delete
+    this function (and its one call in ``_on_startup``) for a bridge-only setup.
+    """
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        return  # explicit env wins (e.g. a test or an operator override)
+    try:
+        import sys
+        _repo_root = str(Path(__file__).resolve().parents[1])
+        if _repo_root not in sys.path:
+            sys.path.insert(0, _repo_root)
+        from bridge.paths import oauth_token_file
+        path = oauth_token_file()
+        if not path:
+            return
+        # utf-8-sig: tolerate a UTF-8 BOM (Notepad / Out-File default) — a BOM
+        # read as plain utf-8 would silently corrupt the token.
+        token = Path(path).read_text(encoding="utf-8-sig").strip()
+        if token:
+            os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = token
+            logger.info("fleet OAuth token loaded into sidecar process env "
+                        "(sdk driver auth); bridge agents use per-spawn injection")
+    except FileNotFoundError:
+        pass  # transitional fallback — ambient env (if any) stands
+    except Exception as e:  # pragma: no cover - must never block startup
+        logger.warning("fleet OAuth token load failed: %s", e)
+
+
 @app.on_event("startup")
 async def _on_startup():
     """Sidecar startup — picker-first, restoring NOTHING by default (§9.1).
@@ -1355,6 +1392,7 @@ async def _on_startup():
     (or ``1``) keeps the old restore-everything-at-boot behavior for tests and
     one-sidecar-per-project setups.
     """
+    _load_fleet_oauth_token()     # sdk-driver auth (§6.4) — process-scoped
     state_store.install_hooks()   # write-through persistence (§8.3)
     if os.environ.get("AWL_STARTUP_RESTORE", "").lower() in ("all", "1", "true"):
         await reconnect_sessions()

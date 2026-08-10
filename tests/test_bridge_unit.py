@@ -2117,3 +2117,124 @@ class TestCloseKeepsLaunchConfigDir:
         b.purge_launch_config("awl-x")
         assert len(b.run_cmds) == 1
         assert "rm -rf" in b.run_cmds[0] and "awl-x" in b.run_cmds[0]
+
+
+# -----------------------------------------------------------------------------
+# Fleet OAuth token — file resolution, per-spawn read, and log redaction (§6.4).
+# The per-spawn injection replaced the retired ambient path (Windows user env
+# var + WSLENV through the frozen tmux server env, which hijacked the
+# operator's interactive login). Hermetic: temp files only, NEVER a real
+# credential — conftest's _hermetic_oauth_token_file guard points resolution at
+# an absent path unless a test sets its own AWL_OAUTH_TOKEN_FILE.
+# The launch-command integration (prefix present/absent/composed with GIT_*)
+# lives in tests/test_git_identity_unit.py::TestCreateOauthTokenPrefix.
+# -----------------------------------------------------------------------------
+
+from bridge.bridge import _read_oauth_token, _redact
+from bridge.paths import oauth_token_file
+
+
+class TestOauthTokenFileResolution:
+    def test_env_override_wins(self, monkeypatch):
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", r"D:\elsewhere\tok")
+        assert oauth_token_file() == r"D:\elsewhere\tok"
+
+    def test_default_is_localappdata_awl_cc_dash(self, monkeypatch):
+        monkeypatch.delenv("AWL_OAUTH_TOKEN_FILE", raising=False)
+        monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\u\AppData\Local")
+        import os as _os
+        assert oauth_token_file() == _os.path.join(
+            r"C:\Users\u\AppData\Local", "awl-cc-dash", "oauth-token")
+
+    def test_no_override_no_localappdata_resolves_none(self, monkeypatch):
+        # Non-Windows host without the override: no default location — the
+        # caller injects nothing (ambient env, if any, stands).
+        monkeypatch.delenv("AWL_OAUTH_TOKEN_FILE", raising=False)
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        assert oauth_token_file() is None
+
+
+class TestReadOauthToken:
+    def test_reads_and_strips_token(self, monkeypatch, tmp_path):
+        f = tmp_path / "tok"
+        f.write_text("sk-ant-oat01-FAKE-unit-token\n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        assert _read_oauth_token() == "sk-ant-oat01-FAKE-unit-token"
+
+    def test_absent_file_is_none(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(tmp_path / "missing"))
+        assert _read_oauth_token() is None
+
+    def test_empty_file_is_none_and_warns(self, monkeypatch, tmp_path, caplog):
+        # Present-but-empty is a BROKEN setup, not a fallback — one clear
+        # warning line so the auth gap is diagnosable here, not as a 401.
+        f = tmp_path / "tok"
+        f.write_text("   \n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        with caplog.at_level("WARNING", logger="bridge"):
+            assert _read_oauth_token() is None
+        assert any("EMPTY" in r.message for r in caplog.records)
+
+    def test_no_resolvable_path_is_none(self, monkeypatch):
+        monkeypatch.delenv("AWL_OAUTH_TOKEN_FILE", raising=False)
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        assert _read_oauth_token() is None
+
+    def test_undecodable_file_is_none_and_warns(self, monkeypatch, tmp_path, caplog):
+        # A UTF-16 LE token file WITH BOM (stock Windows PowerShell 5.1
+        # Out-File default) must degrade to the same one-line warning as
+        # unreadable — the 0xFF BOM byte raises UnicodeDecodeError, which is a
+        # ValueError, NOT an OSError, so it needs its own catch; without it
+        # every spawn would crash with a raw traceback.
+        f = tmp_path / "tok"
+        f.write_bytes(b"\xff\xfe" + "sk-ant-oat01-FAKE".encode("utf-16-le"))
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        with caplog.at_level("WARNING", logger="bridge"):
+            assert _read_oauth_token() is None
+        assert any("unreadable" in r.message for r in caplog.records)
+
+
+class TestRedact:
+    def test_masks_bare_token_value(self):
+        s = ("tmux new-session -d -s a 'CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-"
+             "SECRET123 /home/lester/.local/bin/claude --session-id x'")
+        out = _redact(s)
+        assert "SECRET123" not in out
+        assert "CLAUDE_CODE_OAUTH_TOKEN=***" in out
+        # Everything around the assignment survives.
+        assert out.startswith("tmux new-session -d -s a '")
+        assert "--session-id x" in out
+
+    def test_masks_quoted_token_value(self):
+        out = _redact("CLAUDE_CODE_OAUTH_TOKEN='sk with spaces' claude")
+        assert "sk with spaces" not in out
+        assert out == "CLAUDE_CODE_OAUTH_TOKEN=*** claude"
+
+    def test_leaves_tokenless_strings_alone(self):
+        s = "tmux new-session -d -s a 'GIT_AUTHOR_NAME=zippy claude'"
+        assert _redact(s) == s
+        assert _redact("") == ""
+        assert _redact(None) is None
+
+
+class TestRunTimeoutRedaction:
+    def test_timeout_error_never_carries_the_token(self, monkeypatch):
+        # The TimeoutExpired handler embeds bash_cmd[:80] in the raised
+        # TmuxBridgeError — which propagates to CLI stderr, sidecar API error
+        # payloads, and pytest output. With the token leftmost on a launch
+        # command, the slice MUST be redacted before truncation.
+        import subprocess as _sp
+        from bridge.bridge import TmuxBridge, TmuxBridgeError
+
+        def fake_run(*a, **kw):
+            raise _sp.TimeoutExpired(cmd="x", timeout=15)
+
+        monkeypatch.setattr("bridge.bridge.subprocess.run", fake_run)
+        b = TmuxBridge()
+        cmd = ("tmux new-session -d -s tok "
+               "'CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FAKE-SECRET-VALUE claude'")
+        with pytest.raises(TmuxBridgeError) as exc:
+            b._run(cmd, timeout=15)
+        msg = str(exc.value)
+        assert "FAKE-SECRET-VALUE" not in msg
+        assert "CLAUDE_CODE_OAUTH_TOKEN=***" in msg

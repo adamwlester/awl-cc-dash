@@ -235,3 +235,105 @@ class TestCreateSessionForwardsGitIdentity:
         d._create_session()
         assert seen["git_author_name"] == "Agent"
         assert seen["git_author_email"] == "agent@agents.awl-cc-dash.invalid"
+
+
+# -----------------------------------------------------------------------------
+# TmuxBridge.create() — the fleet OAuth token prefix on the launched tmux
+# command (§6.4 per-spawn injection; same mechanism as the GIT_* prefix above).
+# Hermetic: temp token files with FAKE values only — never a real credential
+# (conftest's _hermetic_oauth_token_file guard isolates the default path; each
+# test here points AWL_OAUTH_TOKEN_FILE at its own temp file).
+# -----------------------------------------------------------------------------
+
+class TestCreateOauthTokenPrefix:
+    FAKE = "sk-ant-oat01-FAKE-launch-test"
+
+    def _patched_bridge(self, monkeypatch, name):
+        """A TmuxBridge whose launch side effects are captured, not run."""
+        b = TmuxBridge()
+        captured = {"commands": []}
+
+        def fake_run(cmd, timeout=30, stdin_data=None):
+            captured["commands"].append(cmd)
+            return ""
+
+        state = {"listed": 0}
+
+        def fake_list_raw():
+            state["listed"] += 1
+            return {} if state["listed"] == 1 else {name: {"pid": "42"}}
+
+        monkeypatch.setattr(b, "_run", fake_run)
+        monkeypatch.setattr(b, "_list_raw", fake_list_raw)
+        monkeypatch.setattr(b, "_clear_startup_gates", lambda n, **kw: None)
+        monkeypatch.setattr("bridge.bridge.time.sleep", lambda s: None)
+        return b, captured
+
+    def _launch_cmds(self, captured):
+        return [c for c in captured["commands"]
+                if c.startswith("tmux new-session")]
+
+    def test_token_prefix_present_when_file_exists(self, monkeypatch, tmp_path):
+        from bridge.paths import CLAUDE_BIN
+        f = tmp_path / "oauth-token"
+        f.write_text(self.FAKE + "\n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        b, captured = self._patched_bridge(monkeypatch, "tok")
+        b.create("tok", cwd="/tmp/x")
+        (cmd,) = self._launch_cmds(captured)
+        # The assignment rides the launch command, BEFORE the claude binary
+        # (a leading env assignment the tmux `sh -c` honors).
+        assert f"CLAUDE_CODE_OAUTH_TOKEN={self.FAKE}" in cmd
+        assert cmd.index("CLAUDE_CODE_OAUTH_TOKEN=") < cmd.index(CLAUDE_BIN)
+
+    def test_no_token_prefix_when_file_absent(self, monkeypatch, tmp_path):
+        # Transitional fallback: no file → no injection (ambient env, if any,
+        # stands) — the pre-token launch-command shape, unchanged.
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(tmp_path / "missing"))
+        b, captured = self._patched_bridge(monkeypatch, "plaintok")
+        b.create("plaintok", cwd="/tmp/x")
+        (cmd,) = self._launch_cmds(captured)
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in cmd
+
+    def test_empty_token_file_injects_nothing(self, monkeypatch, tmp_path):
+        f = tmp_path / "oauth-token"
+        f.write_text("\n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        b, captured = self._patched_bridge(monkeypatch, "emptytok")
+        b.create("emptytok", cwd="/tmp/x")
+        (cmd,) = self._launch_cmds(captured)
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in cmd
+
+    def test_token_composes_with_git_prefix(self, monkeypatch, tmp_path):
+        # Both prefixes ride the same command; the token sits leftmost and all
+        # four GIT_* vars survive intact.
+        f = tmp_path / "oauth-token"
+        f.write_text(self.FAKE, encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        b, captured = self._patched_bridge(monkeypatch, "both")
+        b.create("both", cwd="/tmp/x",
+                 git_author_name="zippy",
+                 git_author_email="zippy-3@agents.awl-cc-dash.invalid")
+        (cmd,) = self._launch_cmds(captured)
+        assert f"CLAUDE_CODE_OAUTH_TOKEN={self.FAKE}" in cmd
+        for var in ("GIT_AUTHOR_NAME=zippy", "GIT_AUTHOR_EMAIL=",
+                    "GIT_COMMITTER_NAME=zippy", "GIT_COMMITTER_EMAIL="):
+            assert var in cmd
+        assert cmd.index("CLAUDE_CODE_OAUTH_TOKEN=") < cmd.index("GIT_AUTHOR_NAME=")
+
+    def test_rotation_next_spawn_reads_fresh_value(self, monkeypatch, tmp_path):
+        # Per-spawn read: rewriting the file between spawns changes the NEXT
+        # launch command — no tmux kill-server needed (the retired ambient
+        # path froze the token in the tmux server env until kill/reboot).
+        f = tmp_path / "oauth-token"
+        f.write_text("sk-ant-oat01-FAKE-old", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        b1, cap1 = self._patched_bridge(monkeypatch, "rot1")
+        b1.create("rot1", cwd="/tmp/x")
+        f.write_text("sk-ant-oat01-FAKE-new", encoding="utf-8")
+        b2, cap2 = self._patched_bridge(monkeypatch, "rot2")
+        b2.create("rot2", cwd="/tmp/x")
+        (cmd1,) = self._launch_cmds(cap1)
+        (cmd2,) = self._launch_cmds(cap2)
+        assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FAKE-old" in cmd1
+        assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FAKE-new" in cmd2

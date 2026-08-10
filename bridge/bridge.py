@@ -17,7 +17,7 @@ import re
 import uuid
 from .paths import (
     is_windows, win_to_wsl, WSL_AWL_DIR, CLAUDE_BIN,
-    parse_default_gateway, sidecar_base_url,
+    parse_default_gateway, sidecar_base_url, oauth_token_file,
 )
 
 # Console streaming attach (§7.13, §11 #29): the port range ttyd instances are
@@ -36,6 +36,60 @@ CONSOLE_RESIZE_ROWS = (15, 200)
 # Silent by default (no handler). Consumers — e.g. the pytest suite — can attach
 # a handler to capture the exact WSL/tmux commands and their output at DEBUG.
 log = logging.getLogger("bridge")
+
+# Matches the per-spawn fleet-credential assignment in a launch command (the
+# value may or may not be shlex-quoted). Used to REDACT the token from every
+# log line — the credential must never land in debug logs (tests/log/) or
+# console output, only in the tmux launch command itself.
+_OAUTH_ASSIGN_RE = re.compile(r"(CLAUDE_CODE_OAUTH_TOKEN=)(?:'[^']*'|\S+)")
+
+
+def _redact(text):
+    """Mask the fleet OAuth token value in a string destined for a log line."""
+    if not text or "CLAUDE_CODE_OAUTH_TOKEN=" not in text:
+        return text
+    return _OAUTH_ASSIGN_RE.sub(r"\1***", text)
+
+
+def _read_oauth_token():
+    """Read the fleet OAuth token from the token file — called once PER SPAWN.
+
+    Per-spawn (not cached) is deliberate: spawns are infrequent, and re-reading
+    means a rotated token is picked up by the very next agent with no
+    ``tmux kill-server`` / reboot (that wart existed only because the old
+    delivery path flowed through the frozen tmux server env).
+
+    Returns the token string, or ``None`` when the file is ABSENT — the
+    transitional fallback: inject nothing and let ambient inheritance (if any)
+    stand, so the code can land before the machine-state migration. A file that
+    exists but is empty or unreadable is a broken setup, not a fallback: log
+    one clear line so the auth gap is diagnosable here, not as a downstream 401.
+    """
+    path = oauth_token_file()
+    if not path:
+        return None
+    try:
+        # utf-8-sig: tolerate a UTF-8 BOM (Notepad / Out-File default) — a BOM
+        # read as utf-8 would silently corrupt the token (.strip() keeps ﻿).
+        with open(path, "r", encoding="utf-8-sig") as f:
+            token = f.read().strip()
+    except FileNotFoundError:
+        log.debug("oauth token file absent (%s) — no per-spawn auth injection; "
+                  "ambient env (if any) stands", path)
+        return None
+    except (OSError, ValueError) as e:
+        # ValueError covers UnicodeDecodeError (NOT an OSError) — e.g. a token
+        # file saved as UTF-16 LE, stock Windows PowerShell 5.1 Out-File
+        # default. Without this, every spawn would crash with a raw decode
+        # traceback instead of the documented one-line warning.
+        log.warning("oauth token file unreadable (%s): %s — agent will launch "
+                    "WITHOUT explicit auth and may hit 401", path, e)
+        return None
+    if not token:
+        log.warning("oauth token file is EMPTY (%s) — agent will launch "
+                    "WITHOUT explicit auth and may hit 401", path)
+        return None
+    return token
 
 
 class TmuxBridgeError(Exception):
@@ -533,7 +587,8 @@ class TmuxBridge:
         else:
             cmd = ["bash", "-c", bash_cmd]
 
-        log.debug("run (stdin=%dB): %s", len(stdin_data or ""), bash_cmd[:200])
+        log.debug("run (stdin=%dB): %s", len(stdin_data or ""),
+                  _redact(bash_cmd[:280]))
         try:
             result = subprocess.run(
                 cmd,
@@ -545,7 +600,12 @@ class TmuxBridge:
                 input=stdin_data,
             )
         except subprocess.TimeoutExpired:
-            raise TmuxBridgeError(f"Command timed out after {timeout}s: {bash_cmd[:80]}")
+            # Redact BEFORE truncating: a launch command carries the fleet
+            # OAuth token leftmost, so an unredacted [:80] slice would leak
+            # real token characters into exception text (which propagates to
+            # CLI stderr, sidecar API error payloads, and pytest output).
+            raise TmuxBridgeError(
+                f"Command timed out after {timeout}s: {_redact(bash_cmd)[:80]}")
 
         log.debug("  -> rc=%s out=%r err=%r", result.returncode,
                   result.stdout[:200], result.stderr[:200])
@@ -884,6 +944,22 @@ class TmuxBridge:
                 f"GIT_AUTHOR_EMAIL={shlex.quote(git_author_email)} "
                 f"GIT_COMMITTER_NAME={shlex.quote(git_author_name)} "
                 f"GIT_COMMITTER_EMAIL={shlex.quote(git_author_email)} "
+                + claude_cmd
+            )
+        # Agent authentication (ARCHITECTURE §6.4): prepend the fleet OAuth
+        # token the same way — an explicit per-spawn env assignment read fresh
+        # from the token file each launch, replacing the retired ambient path
+        # (Windows user env var + WSLENV through the frozen tmux server env,
+        # which hijacked the operator's interactive login and made token
+        # rotation need a kill-server). Every launch path — create/fork/
+        # batch_create/resume, the CLI, and the sidecar driver — funnels
+        # through this one site. No token file → no prefix (transitional
+        # fallback; _read_oauth_token logs the diagnosable cases). The token
+        # value is redacted from all bridge logging (_redact in _run).
+        oauth_token = _read_oauth_token()
+        if oauth_token:
+            claude_cmd = (
+                f"CLAUDE_CODE_OAUTH_TOKEN={shlex.quote(oauth_token)} "
                 + claude_cmd
             )
         if claude_args:

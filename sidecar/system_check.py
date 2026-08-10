@@ -122,7 +122,8 @@ def check_auth(candidates: list[tuple[str, str]],
     with email/plan/auth-expiry in the detail. Files found but none readable
     as an account → fail (something is there and it doesn't parse — worth
     surfacing). No candidate files at all → skipped (nothing to probe; the
-    agents may still auth via the env-var token path, §6.4).
+    agents may still auth via the fleet oauth-token file — per-spawn
+    injection, §6.4).
     """
     read_band = read_band or settings_io.account_band_split
     tried: list[str] = []
@@ -151,7 +152,8 @@ def check_auth(candidates: list[tuple[str, str]],
             f"(tried: {', '.join(tried)})")
     return skipped_result(
         "no local Claude credentials file found to read (agents may still "
-        "authenticate via the CLAUDE_CODE_OAUTH_TOKEN env path)")
+        "authenticate via the fleet oauth-token file — per-spawn injection, "
+        "ARCHITECTURE §6.4)")
 
 
 def check_drivers(default_name: str,

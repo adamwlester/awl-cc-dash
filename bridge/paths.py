@@ -2,6 +2,7 @@
 Path translation between Windows and WSL2.
 """
 
+import os
 import platform
 import re
 
@@ -125,4 +126,28 @@ WIN_CLAUDE_JSON = "/mnt/c/Users/lester/.claude.json"
 
 # Claude Code native binary path inside WSL
 CLAUDE_BIN = f"{WSL_HOME}/.local/bin/claude"
+
+
+def oauth_token_file():
+    """Resolve the fleet-credential file path (ARCHITECTURE §6.4 agent auth).
+
+    The long-lived subscription OAuth token bridge agents authenticate with
+    lives in a file OUTSIDE the repo — default
+    ``%LOCALAPPDATA%\\awl-cc-dash\\oauth-token`` — and is injected explicitly
+    per spawn by ``create()``, never delivered by ambient env inheritance (the
+    old Windows-user-env-var + ``WSLENV`` path silently overrode the operator's
+    interactive Max login in every process they launched, VS Code included).
+
+    ``AWL_OAUTH_TOKEN_FILE`` overrides the location (tests point it at temp
+    files; a non-Windows host without ``%LOCALAPPDATA%`` must use it). Returns
+    the Windows-side path the bridge Python reads directly, or ``None`` when no
+    location resolves (then no injection happens — ambient env, if any, stands).
+    """
+    override = os.environ.get("AWL_OAUTH_TOKEN_FILE")
+    if override:
+        return override
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if not local_appdata:
+        return None
+    return os.path.join(local_appdata, "awl-cc-dash", "oauth-token")
 

@@ -2112,3 +2112,54 @@ class TestStartupRestorePolicy:
         finally:
             main._open_project = None
             _ss.reset()
+
+
+# ---------------------------------------------------------------------------
+# _load_fleet_oauth_token — the sdk-driver auth loader (§6.4). Process-scoped:
+# reads the fleet token file into the sidecar's OWN env at startup, never
+# overwrites an explicit value, and must never block startup. Hermetic: temp
+# files with FAKE values only, env restored via monkeypatch.
+# ---------------------------------------------------------------------------
+
+import os  # noqa: E402
+
+class TestLoadFleetOauthToken:
+    def test_loads_token_from_file_into_process_env(self, monkeypatch, tmp_path):
+        f = tmp_path / "oauth-token"
+        f.write_text("sk-ant-oat01-FAKE-sidecar\n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        main._load_fleet_oauth_token()
+        assert os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") == "sk-ant-oat01-FAKE-sidecar"
+
+    def test_explicit_env_wins_never_overwritten(self, monkeypatch, tmp_path):
+        f = tmp_path / "oauth-token"
+        f.write_text("sk-ant-oat01-FAKE-file", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "preset-explicit")
+        main._load_fleet_oauth_token()
+        assert os.environ["CLAUDE_CODE_OAUTH_TOKEN"] == "preset-explicit"
+
+    def test_absent_file_is_a_silent_noop(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(tmp_path / "missing"))
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        main._load_fleet_oauth_token()  # must not raise
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ
+
+    def test_bom_is_stripped(self, monkeypatch, tmp_path):
+        # Notepad / Out-File may write a UTF-8 BOM; a BOM-prefixed token would
+        # be silently invalid, so the loader reads utf-8-sig.
+        f = tmp_path / "oauth-token"
+        f.write_bytes(b"\xef\xbb\xbfsk-ant-oat01-FAKE-bom\n")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        main._load_fleet_oauth_token()
+        assert os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") == "sk-ant-oat01-FAKE-bom"
+
+    def test_empty_file_sets_nothing(self, monkeypatch, tmp_path):
+        f = tmp_path / "oauth-token"
+        f.write_text("  \n", encoding="utf-8")
+        monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE", str(f))
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        main._load_fleet_oauth_token()
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ

@@ -227,3 +227,23 @@ def live_session(bridge):
     bridge.create(name, cwd="C:/Users/lester")
     time.sleep(10)  # let the Claude Code TUI finish loading
     return name
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_oauth_token_file(request, monkeypatch, tmp_path):
+    """Hermetic tiers never read the REAL fleet-credential file (§6.4).
+
+    ``TmuxBridge.create()`` reads the oauth token file per spawn and embeds the
+    value in the launch command, so without this guard every hermetic
+    launch-string test would pull the operator's real token into captured
+    commands, assertion messages, and the DEBUG log. Point resolution at a
+    guaranteed-absent path instead (→ no injection — the pre-token command
+    shape). Tests that WANT a token point ``AWL_OAUTH_TOKEN_FILE`` at their own
+    temp file (a later ``monkeypatch.setenv`` in the test overrides this one).
+    The live tier (``*_live.py`` + ``LIVE_TEST_FILES``) is exempt: real spawns
+    MUST read the real file — that IS the post-migration auth path under test.
+    """
+    if _is_live_nodeid(request.node.nodeid):
+        return
+    monkeypatch.setenv("AWL_OAUTH_TOKEN_FILE",
+                       str(tmp_path / "absent-oauth-token"))
