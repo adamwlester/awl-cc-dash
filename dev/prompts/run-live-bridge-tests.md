@@ -15,7 +15,7 @@ current status is unknown. This task confirms it.
 
 ## Preconditions
 
-- Run from the repo root: `c:\Users\lester\MeDocuments\AppData\Anthropic\awl-cc-dash`.
+- Run from the repo root: `c:\Users\lester\MeDocuments\AI\awl-cc-dash`.
 - This laptop must have **WSL2 (Ubuntu) + tmux + a working Claude Code CLI** inside WSL.
   These tests spawn **real detached tmux sessions** — that is expected. Per the repo's
   bridge-sessions rule, they create sessions **tab-less** (no terminal windows pop);

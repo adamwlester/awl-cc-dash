@@ -262,7 +262,7 @@ Of the five original questions, **two are answered** by the [`tests/workflow_pro
 
 ## 12. Source map
 
-- Run A transcript (approval handshake + tool call/result): `C:\Users\lester\.claude\projects\C--Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash\ed34df81-48c4-4eba-849a-904364ae66be.jsonl` (lines 19–20).
+- Run A transcript (approval handshake + tool call/result): `C:\Users\lester\.claude\projects\C--Users-lester-MeDocuments-AI-awl-cc-dash\ed34df81-48c4-4eba-849a-904364ae66be.jsonl` (lines 19–20).
 - Run B run manifest (full state model): `…\5b035767-…\workflows\wf_ae75e5d5-a0c.json`.
 - Run B journal + subagent transcripts + meta: `…\5b035767-…\subagents\workflows\wf_ae75e5d5-a0c\`.
 - Repeatable observer probe (the empirical follow-up, 2026-07-04): [`tests/workflow_probe/`](../../../tests/workflow_probe/) — [test_workflow_orchestration_live.py](../../../tests/workflow_probe/test_workflow_orchestration_live.py), [subject_workflow.js](../../../tests/workflow_probe/subject_workflow.js), [RUNBOOK.md](../../../tests/workflow_probe/RUNBOOK.md); live findings in `tests/log/workflow_probe_findings_latest.txt`. Runs observed: `wf_e03d4702-80f`, `wf_bc9c13b5-66d`.

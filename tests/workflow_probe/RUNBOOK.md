@@ -23,7 +23,7 @@ Do these in order. Steps 1 and 2 should be back-to-back so the probe catches the
 **Step 1 — launch the subject workflow.** Call the `Workflow` tool with the fixture script by path (absolute path is safest):
 
 ```
-Workflow({ scriptPath: "c:/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash/tests/workflow_probe/subject_workflow.js" })
+Workflow({ scriptPath: "c:/Users/lester/MeDocuments/AI/awl-cc-dash/tests/workflow_probe/subject_workflow.js" })
 ```
 
 It returns **immediately** (the run is async) with a block that includes `Transcript dir: <...>\subagents\workflows\wf_XXXX`. **Copy that transcript dir.**

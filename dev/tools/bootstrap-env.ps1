@@ -9,13 +9,13 @@
     venv already exists.
 
 .USAGE
-    cd C:\Users\lester\MeDocuments\AppData\Anthropic\my-project
+    cd C:\Users\lester\MeDocuments\AI\my-project
     .\tools\bootstrap-env.ps1
 
     Or from anywhere:
     .\tools\bootstrap-env.ps1 -ProjectPath "C:\path\to\project"
     E.g.:
-    .\tools\bootstrap-env.ps1 -ProjectPath "C:\Users\lester\MeDocuments\AppData\Anthropic\claude-code-sandbox"
+    .\tools\bootstrap-env.ps1 -ProjectPath "C:\Users\lester\MeDocuments\AI\claude-code-sandbox"
 
 .PARAMETER ProjectPath
     Optional. Defaults to the parent of the directory containing this script.

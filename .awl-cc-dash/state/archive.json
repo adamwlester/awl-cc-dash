@@ -25,7 +25,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "cwd": "C:\\Users\\lester\\MeDocuments\\AI\\awl-cc-dash",
       "model": "opus",
       "driver": "bridge",
       "permission_mode": "acceptEdits",
@@ -56,7 +56,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "C:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "cwd": "C:\\Users\\lester\\MeDocuments\\AI\\awl-cc-dash",
       "model": "opus",
       "driver": "bridge",
       "permission_mode": "acceptEdits",
@@ -87,7 +87,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "/mnt/c/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "cwd": "/mnt/c/Users/lester/MeDocuments/AI/awl-cc-dash",
       "model": "opus",
       "driver": "bridge",
       "permission_mode": "acceptEdits",
@@ -118,7 +118,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "c:\\Users\\lester\\MeDocuments\\AppData\\Anthropic\\awl-cc-dash",
+      "cwd": "c:\\Users\\lester\\MeDocuments\\AI\\awl-cc-dash",
       "model": "haiku",
       "driver": "bridge",
       "permission_mode": "bypassPermissions",
@@ -151,7 +151,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "c:/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "cwd": "c:/Users/lester/MeDocuments/AI/awl-cc-dash",
       "model": "haiku",
       "driver": "bridge",
       "permission_mode": "bypassPermissions",
@@ -184,7 +184,7 @@
         "fork": null,
         "handoff": null
       },
-      "cwd": "c:/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash",
+      "cwd": "c:/Users/lester/MeDocuments/AI/awl-cc-dash",
       "model": "haiku",
       "driver": "bridge",
       "permission_mode": "bypassPermissions",

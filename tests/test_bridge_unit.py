@@ -971,9 +971,9 @@ class TestResolveProjectDir:
 
     def test_falls_back_to_real_listing_match(self):
         # Encoded dir not found by `test -d`; resolve via the real listing.
-        real = "-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash--scratch-dottest"
+        real = "-mnt-c-Users-lester-MeDocuments-AI-awl-cc-dash--scratch-dottest"
         b = _FakeBridge(test_dir_ok=False, listing=f"-other-proj\n{real}\n")
-        cwd = "/mnt/c/Users/lester/MeDocuments/AppData/Anthropic/awl-cc-dash/.scratch/dottest"
+        cwd = "/mnt/c/Users/lester/MeDocuments/AI/awl-cc-dash/.scratch/dottest"
         got = _resolve_project_dir(b, cwd)
         assert got is not None and got.endswith("/" + real)
 

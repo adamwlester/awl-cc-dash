@@ -456,6 +456,16 @@ Files: bridge/bridge.py, bridge/paths.py, sidecar/main.py, sidecar/system_check.
 
 ---
 
+### 2026-11-05 13:04:08 — port repository to MeDocuments AI
+
+Moved the complete repository to `C:\Users\lester\MeDocuments\AI\awl-cc-dash`, preserving all 32,899 files / 1,968,561,325 bytes before repairs, Git history, and the two existing unpushed commits. Updated current project cwd/bookmark/config paths, mockup project paths, Windows history references, runbooks, and path-resolution fixtures; existing WSL transcript pointers retain their historical locations. Recreated `.venv` from `requirements.txt` because moved console launchers failed, preserving the original at `.scratch/venv-before-path-port-20261105` and its package freeze beside it.
+
+Verified clean status and unchanged HEAD/remote immediately after the move, `git fsck` exit 0 (dangling objects only), runtime imports, pip/uvicorn/playwright launchers, `pip check`, four offline path-resolution tests, JavaScript syntax, and the updated visible project path in parked headed Chromium at 1600px and 1000px. Repairs are committed locally only; nothing was pushed.
+
+Files: .awl-cc-dash/state/agents.json, .awl-cc-dash/state/archive.json, .awl-cc-dash/state/bookmarks.json, .claude/plans/ok-now-i-suspect-silly-liskov.md, .claude/settings.json, design/behavior.js, design/mockup.html, dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md, dev/prompts/run-live-bridge-tests.md, dev/tools/bootstrap-env.ps1, tests/test_bridge_unit.py, tests/workflow_probe/RUNBOOK.md, DEVLOG.md
+
+---
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

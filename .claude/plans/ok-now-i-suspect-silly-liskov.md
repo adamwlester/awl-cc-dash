@@ -2,7 +2,7 @@
 
 ## Context
 
-The project `CLAUDE.md` (`c:\Users\lester\MeDocuments\AppData\Anthropic\awl-cc-dash\CLAUDE.md`) ends with a `## Behavioral rules` section that is one flat list mixing five unrelated concerns — safety/scope, communication style, scratch artifacts, DEVLOG bookkeeping, editing discipline, and a UI-test procedure. The list is also uneven: two of the items (DEVLOG logging, DEVLOG rotation) and two more (preserve-untouched, UI verification) are paragraph-length, while the rest are one-liners. That makes the section hard to scan and hard to find a specific rule in.
+The project `CLAUDE.md` (`c:\Users\lester\MeDocuments\AI\awl-cc-dash\CLAUDE.md`) ends with a `## Behavioral rules` section that is one flat list mixing five unrelated concerns — safety/scope, communication style, scratch artifacts, DEVLOG bookkeeping, editing discipline, and a UI-test procedure. The list is also uneven: two of the items (DEVLOG logging, DEVLOG rotation) and two more (preserve-untouched, UI verification) are paragraph-length, while the rest are one-liners. That makes the section hard to scan and hard to find a specific rule in.
 
 Two concrete problems found during exploration:
 - **DEVLOG rules are duplicated.** The two fat DEVLOG bullets restate the format + rotation procedure that already lives — near-verbatim — in the `DEVLOG.md` header (lines 3–15). Both bullets even point there ("Full rules live in the DEVLOG header"). Two copies will drift.
