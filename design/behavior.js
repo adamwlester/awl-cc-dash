@@ -1503,7 +1503,7 @@
      this block wires the pane's own behavior. Guarded on #proj-list so it no-ops on any page without the Projects pane. */
   const PROJ = [
     { name:'awl-cc-dash',         path:'~/MeDocuments/AI/awl-cc-dash',         agents:13, running:true,  last:'2026-07-01 18:42' },
-    { name:'claude-code-sandbox', path:'~/MeDocuments/AI/claude-code-sandbox', agents:6,  running:false, last:'2026-06-21 11:05' },
+    { name:'awl-cc-sandbox',      path:'~/MeDocuments/AI/awl-cc-sandbox',     agents:6,  running:false, last:'2026-06-21 11:05' },
     { name:'vault-notes',         path:'~/MeDocuments/Obsidian/vault-notes',                  agents:2,  running:false, last:'2026-06-28 09:30' },
   ];
   const PROJ_POOL = [   /* demo folders for "Open other folder…" (the real control opens the OS folder picker) */

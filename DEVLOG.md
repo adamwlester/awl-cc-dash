@@ -464,6 +464,12 @@ Verified clean status and unchanged HEAD/remote immediately after the move, `git
 
 Files: .awl-cc-dash/state/agents.json, .awl-cc-dash/state/archive.json, .awl-cc-dash/state/bookmarks.json, .claude/plans/ok-now-i-suspect-silly-liskov.md, .claude/settings.json, design/behavior.js, design/mockup.html, dev/notes/research/claude-code-workflow-orchestration-report-2026-07-04.md, dev/prompts/run-live-bridge-tests.md, dev/tools/bootstrap-env.ps1, tests/test_bridge_unit.py, tests/workflow_probe/RUNBOOK.md, DEVLOG.md
 
+
+### 2026-11-06 07:47:02 - Finish sandbox rename references
+
+Updated the sandbox example in the Projects settings registry to awl-cc-sandbox and its canonical path. JavaScript syntax passes; parked headed Chromium verified the row at 1600 and 1000 pixel viewports and the close-current/open-sandbox interaction. Existing fixed-width mockup overflow at the narrow viewport is unchanged; the complete project row was also captured and inspected.
+Files: design/behavior.js, DEVLOG.md
+
 ---
 
 ## Archived history
