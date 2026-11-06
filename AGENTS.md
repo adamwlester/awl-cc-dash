@@ -1,3 +1,5 @@
+Read `C:\Users\lester\MeDocuments\AI\CLAUDE.md` first (shared instructions for every repo in that folder), then `CLAUDE.md` here; both apply to Codex.
+
 # AGENTS.md
 
 ## Codex Entry Point

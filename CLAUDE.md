@@ -125,4 +125,4 @@ The bridge drives Claude Code agents as **detached** tmux sessions in WSL2 and r
 
 ## Secrets
 
-Never open, search or hard-code a path to any secret file. Every secret (API keys, logins, cards, Adam's personal details) goes through agent-vault, and its policy is in agent-commons: read "Secrets" in C:\Users\lester\MeDocuments\AI\agent-commons\CLAUDE.md and the agent-vault skill before your first use. Scripts in this repo read keys from environment variables and are run as `agent-vault run --keys <entry> --reason "<why>" -- <command>`.
+Never open, search or hard-code a path to any secret file. Every secret (API keys, logins, cards, Adam's personal details) goes through agent-vault, and its policy is in agent-commons: read "Secrets" in the shared file C:\Users\lester\MeDocuments\AI\CLAUDE.md and the agent-vault skill before your first use. Scripts in this repo read keys from environment variables and are run as `agent-vault run --keys <entry> --reason "<why>" -- <command>`.

@@ -472,6 +472,10 @@ Files: design/behavior.js, DEVLOG.md
 
 ---
 
+### 2026-11-06 14:04:00 - Point agents at the shared instructions file
+The agent-commons instructions run prepended a line to `AGENTS.md` so Codex reads the shared file `C:\Users\lester\MeDocuments\AI\CLAUDE.md` first, and repointed the Secrets section from agent-commons' `CLAUDE.md` (whose general sections moved) to that shared file.
+Files: AGENTS.md; CLAUDE.md; DEVLOG.md.
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
