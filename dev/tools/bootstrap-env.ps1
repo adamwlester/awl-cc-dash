@@ -15,7 +15,7 @@
     Or from anywhere:
     .\tools\bootstrap-env.ps1 -ProjectPath "C:\path\to\project"
     E.g.:
-    .\tools\bootstrap-env.ps1 -ProjectPath "C:\Users\lester\MeDocuments\AI\claude-code-sandbox"
+    .\tools\bootstrap-env.ps1 -ProjectPath "C:\Users\lester\MeDocuments\AI\awl-cc-sandbox"
 
 .PARAMETER ProjectPath
     Optional. Defaults to the parent of the directory containing this script.
