@@ -783,27 +783,43 @@ class BridgeDriver(AgentDriver):
         sid = self._claude_session_id
         if not sid:
             return False
-        path = self._transcript_path
-        if not path:
+
+        def _probe(p: str) -> bool | None:
+            """True/False = provable answer; None = unreadable (fail open)."""
             try:
-                from bridge.transcript import _resolve_project_dir  # type: ignore[import-not-found]
-                resolved_cwd = self._bridge._resolve_cwd(self.config.cwd)
-                project_dir = _resolve_project_dir(self._bridge, resolved_cwd) \
-                    if resolved_cwd else None
+                out = self._bridge._run(
+                    f"test -f {shlex.quote(p)} && echo yes || echo no")
             except Exception:  # pragma: no cover - environment dependent
-                return True  # can't tell — keep the legacy resume behavior
-            if not project_dir:
-                # The cwd has no projects dir at all — no conversation was
-                # ever written there, nothing to resume (and nothing a fresh
-                # pinned-id launch could clobber).
-                return False
-            path = f"{project_dir}/{sid}.jsonl"
+                return None
+            return out.strip() == "yes"
+
+        path = self._transcript_path
+        if path:
+            hit = _probe(path)
+            if hit or hit is None:
+                return True
+            # The persisted path is provably absent — but a dead pointer is
+            # NOT proof the conversation is gone: the path goes stale when the
+            # repo moves and the cwd's ~/.claude/projects dir is renamed with
+            # it (the 2026-11-07 MeDocuments-move outage: trusting the stale
+            # path here sent every cold restore down the fresh-pinned-id
+            # branch, which dies on "Session ID … already in use" because the
+            # transcript DOES exist under the renamed dir). Re-resolve from
+            # the cwd before concluding anything.
         try:
-            out = self._bridge._run(
-                f"test -f {shlex.quote(path)} && echo yes || echo no")
+            from bridge.transcript import _resolve_project_dir  # type: ignore[import-not-found]
+            resolved_cwd = self._bridge._resolve_cwd(self.config.cwd)
+            project_dir = _resolve_project_dir(self._bridge, resolved_cwd) \
+                if resolved_cwd else None
         except Exception:  # pragma: no cover - environment dependent
-            return True
-        return out.strip() == "yes"
+            return True  # can't tell — keep the legacy resume behavior
+        if not project_dir:
+            # The cwd has no projects dir at all — no conversation was
+            # ever written there, nothing to resume (and nothing a fresh
+            # pinned-id launch could clobber).
+            return False
+        hit = _probe(f"{project_dir}/{sid}.jsonl")
+        return True if hit is None else hit
 
     def _create_session(self) -> None:
         """Sync: build the per-agent launch config and spawn the tmux session.

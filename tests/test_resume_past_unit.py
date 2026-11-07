@@ -473,6 +473,35 @@ class TestColdRestoreZeroTurnFallsBackToFreshPinnedLaunch:
         _, kw = b.created[-1]
         assert kw.get("resume_session_id") == "c-x"
 
+    def test_stale_persisted_path_rerresolves_before_declaring_zero_turn(self,
+                                                                         monkeypatch):
+        # The 2026-11-07 MeDocuments-move outage: the persisted transcript_path
+        # points at the OLD (renamed-away) ~/.claude/projects dir, but the
+        # conversation exists under the dir the cwd NOW resolves to. A dead
+        # pointer must re-resolve — not send a real conversation down the
+        # fresh-pinned-id branch (which dies on "Session ID already in use").
+        import bridge.transcript as bt
+        monkeypatch.setattr(bt, "_resolve_project_dir", lambda b, cwd: "/newdir")
+
+        class _StalePathBridge(_ColdCreateBridge):
+            def _run(self, cmd, **kw):
+                return "yes" if "/newdir/" in cmd else "no"
+
+        b = _StalePathBridge(probe="unused")
+        from drivers.base import DriverConfig
+        from drivers.bridge import BridgeDriver
+        d = BridgeDriver(
+            DriverConfig(cwd="/p"), lambda e: None,
+            resume_name="awl-z", session_id="s-z",
+            claude_session_id="c-z", cold_restore=True,
+            transcript_path="/olddir/c-z.jsonl",
+            persisted_record={"session_id": "s-z"})
+        d._bridge = b
+        d._create_session()
+        _, kw = b.created[-1]
+        assert kw.get("resume_session_id") == "c-z"   # the conversation survives
+        assert "session_id" not in kw
+
     def test_no_transcript_path_and_no_project_dir_means_fresh_launch(self,
                                                                       monkeypatch):
         # Descriptor without a verified path (the archived zero-turn agent
