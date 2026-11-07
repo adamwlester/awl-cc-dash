@@ -94,7 +94,7 @@ function ProjectsTab() {
   }
   const doOpen = async (path: string) => {
     const r = await api.openProject(path)
-    toast(r ? `Opened ${r.name || path}` : 'Open failed — close the current project first?')
+    toast(r.ok ? `Opened ${r.data?.name || path}` : `Open failed — ${r.detail}`)
     d.refreshProjects()
   }
   const doRegister = async () => {

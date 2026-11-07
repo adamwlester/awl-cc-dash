@@ -732,7 +732,9 @@ export const api = {
   // ---- projects (§3, one project at a time) ---------------------------------
   projects: () => getJSON<ProjectsResponse>('/projects'),
   registerProject: (path: string) => postJSON<ProjectEntry>('/projects/register', { path }),
-  openProject: (path: string) => postJSON<ProjectEntry & { status: string }>('/projects/open', { path }),
+  // reqJSON (not postJSON) so a failed open carries the sidecar's reason
+  // (e.g. "not a directory" for a moved repo, or the one-at-a-time 409).
+  openProject: (path: string) => reqJSON<ProjectEntry & { status: string }>('POST', '/projects/open', { path }),
   closeProject: (stopAgents = false) =>
     postJSON<{ status: string; path: string; stopped_agents: boolean }>('/projects/close', { stop_agents: stopAgents }),
 

@@ -476,6 +476,11 @@ Files: design/behavior.js, DEVLOG.md
 The agent-commons instructions run prepended a line to `AGENTS.md` so Codex reads the shared file `C:\Users\lester\MeDocuments\AI\CLAUDE.md` first, and repointed the Secrets section from agent-commons' `CLAUDE.md` (whose general sections moved) to that shared file.
 Files: AGENTS.md; CLAUDE.md; DEVLOG.md.
 
+### 2026-11-07 01:25:00 — fix Projects picker after the repo move (stale project index) + real open-failure reason
+Root cause: the known-projects index `sidecar/runtime/projects.json` is gitignored, so the 2026-11-05 path port missed it; its only registered project was the dead `MeDocuments\AppData\Anthropic\awl-cc-dash` path, so the startup Projects picker offered a project whose Open 400'd ("not a directory") behind the misleading toast "close the current project first?". Re-keyed the row to `C:\Users\lester\MeDocuments\AI\awl-cc-dash` (runtime data, backup at `.scratch/projects.json.bak-2026-11-07`); the picker now lists it with its 4 agents. `api.openProject` now uses `reqJSON`, so a failed Open toasts the sidecar's actual reason. Verified the built renderer in parked headed Chromium against the live sidecar with throwaway projects (missing folder → "Open failed — not a directory: …"; real folder → opens, active-project card + title chip, main view at 1600 and 900 px).
+Still open: cold-restoring the 4 roster agents runs `claude --resume` from the new cwd, but their WSL transcripts sit under `~/.claude/projects/-mnt-c-Users-lester-MeDocuments-AppData-Anthropic-awl-cc-dash`, so the resumes will not find them until that folder is renamed to `…-MeDocuments-AI-awl-cc-dash` (not done; operator decision). Transcript `a85f6fd3…` was already missing before the move.
+Files: frontend/src/renderer/api.ts; frontend/src/renderer/components/SettingsView.tsx; DEVLOG.md.
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
