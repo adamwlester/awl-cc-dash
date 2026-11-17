@@ -2,13 +2,13 @@
   "window.title": "${rootName}${separator}${activeEditorShort}",
   "terminal.integrated.tabs.title": "${cwdFolder}",
   "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#804e76",
-    "titleBar.activeForeground": "#ffffff",
-    "titleBar.inactiveBackground": "#5f3958",
-    "titleBar.inactiveForeground": "#e8d9e5",
-    "activityBar.background": "#804e76",
-    "activityBar.foreground": "#ffffff",
-    "activityBar.inactiveForeground": "#e8d9e5"
+    "titleBar.activeBackground": "#dcccd9",
+    "titleBar.activeForeground": "#222222",
+    "titleBar.inactiveBackground": "#e6dde4",
+    "titleBar.inactiveForeground": "#5a5a5a",
+    "activityBar.background": "#dcccd9",
+    "activityBar.foreground": "#222222",
+    "activityBar.inactiveForeground": "#555555"
   },
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,
