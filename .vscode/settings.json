@@ -2,11 +2,11 @@
   "window.title": "${rootName}${separator}${activeEditorShort}",
   "terminal.integrated.tabs.title": "${cwdFolder}",
   "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#dcccd9",
+    "titleBar.activeBackground": "#d6c2d2",
     "titleBar.activeForeground": "#222222",
-    "titleBar.inactiveBackground": "#e6dde4",
+    "titleBar.inactiveBackground": "#e3d7e0",
     "titleBar.inactiveForeground": "#5a5a5a",
-    "activityBar.background": "#dcccd9",
+    "activityBar.background": "#d6c2d2",
     "activityBar.foreground": "#222222",
     "activityBar.inactiveForeground": "#555555"
   },
