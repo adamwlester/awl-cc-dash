@@ -8,6 +8,17 @@
 		}
 	],
 	"settings": {
+		"window.title": "${rootName}${separator}${activeEditorShort}",
+		"terminal.integrated.tabs.title": "${cwdFolder}",
+		"workbench.colorCustomizations": {
+			"titleBar.activeBackground": "#804e76",
+			"titleBar.activeForeground": "#ffffff",
+			"titleBar.inactiveBackground": "#5f3958",
+			"titleBar.inactiveForeground": "#e8d9e5",
+			"activityBar.background": "#804e76",
+			"activityBar.foreground": "#ffffff",
+			"activityBar.inactiveForeground": "#e8d9e5"
+		},
 		"claude-history.export.directory": "transcripts/cli"
 	}
 }

@@ -1,4 +1,15 @@
 {
+  "window.title": "${rootName}${separator}${activeEditorShort}",
+  "terminal.integrated.tabs.title": "${cwdFolder}",
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#804e76",
+    "titleBar.activeForeground": "#ffffff",
+    "titleBar.inactiveBackground": "#5f3958",
+    "titleBar.inactiveForeground": "#e8d9e5",
+    "activityBar.background": "#804e76",
+    "activityBar.foreground": "#ffffff",
+    "activityBar.inactiveForeground": "#e8d9e5"
+  },
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true
