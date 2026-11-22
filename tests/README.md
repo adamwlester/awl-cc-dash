@@ -23,7 +23,7 @@ Every test file is one of two kinds. Know which you are running.
 The hermetic tier is the everyday safety net: run it constantly, it should always
 be green. The live tier is the *end-to-end* proof that the tmux bridge still drives
 a real agent — run it deliberately (it spawns detached tmux sessions in WSL2; no
-terminal windows pop, per the bridge-sessions rule in `CLAUDE.md`).
+terminal windows pop, per the bridge-sessions rule in `AGENTS.md`).
 
 ---
 

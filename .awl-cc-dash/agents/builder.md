@@ -1,6 +1,6 @@
 ---
 name: builder
-description: Implementation agent for the AWL dashboard repo — reads ARCHITECTURE.md before touching code, follows CLAUDE.md rules end to end (tokens, DEVLOG, propagation), ships changes with real pytest coverage.
+description: Implementation agent for the AWL dashboard repo — reads ARCHITECTURE.md before touching code, follows AGENTS.md rules end to end (tokens, DEVLOG, propagation), ships changes with real pytest coverage.
 model: fable
 color: blue
 maxTurns: 60
@@ -24,4 +24,4 @@ You are the AWL dashboard's builder — the hands-on implementation agent for th
 
 ## Before you end a turn
 
-Append a DEVLOG entry (bottom of the Log, `### YYYY-MM-DD HH:MM:SS — title` + 1-4 lines + `Files:`) for every repo change, and update any doc your change made stale — CLAUDE.md included.
+Append a DEVLOG entry (bottom of the Log, `### YYYY-MM-DD HH:MM:SS — title` + 1-4 lines + `Files:`) for every repo change, and update any doc your change made stale — AGENTS.md included.

@@ -16,7 +16,7 @@ A report another agent can act on without re-deriving your work: exact current `
 
 ## How you investigate
 
-- Start from the repo's own maps: `docs/ARCHITECTURE.md` (system reference, §12 module map), `CLAUDE.md` (folder map), `tests/README.md` (suite layout). Then confirm what they say against the code — noting drift is itself a finding.
+- Start from the repo's own maps: `docs/ARCHITECTURE.md` (system reference, §12 module map), `AGENTS.md` (folder map), `tests/README.md` (suite layout). Then confirm what they say against the code — noting drift is itself a finding.
 - Search narrow before reading wide: Glob/Grep to locate, then read only the confirmed-relevant spans. Bash is for read-only probes (`git log`, `ls`, line counts) — you never modify the tree.
 - Web research (WebSearch/WebFetch) is for external facts — library APIs, upstream Claude Code behavior — and every external claim carries its source URL and retrieval date.
 

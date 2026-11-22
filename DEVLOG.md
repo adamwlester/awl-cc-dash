@@ -490,6 +490,10 @@ Files: sidecar/drivers/bridge.py; tests/test_resume_past_unit.py; .awl-cc-dash/s
 The shared instructions for every repo in the AI folder moved from `AI\CLAUDE.md` to `AI\AGENTS.md` (agent-commons D128). Updated the path in `AGENTS.md` and in the Secrets section of `CLAUDE.md`.
 Files: AGENTS.md, CLAUDE.md, DEVLOG.md
 
+### 2026-11-21 20:51:04 - Repo instructions move from CLAUDE.md into AGENTS.md
+Merged `CLAUDE.md` into `AGENTS.md` (first line sends Codex to the shared `AI\AGENTS.md`) and removed `CLAUDE.md`, per agent-commons D129; Claude Code and Codex now read the same file. Repointed the role presets and READMEs that named `CLAUDE.md`.
+Files: AGENTS.md, CLAUDE.md, DEVLOG.md, .awl-cc-dash/agents/*.md, tests/README.md, dev/tools/ui-verify/README.md
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
