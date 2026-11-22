@@ -71,7 +71,7 @@ Retired but referenced material: the design lineage (old mockups and UI plans un
 ## Build workflow and config
 
 - `dev/`: Claude Code and VS Code build-workflow assets, not the app. `notes/` holds working notes and `research/`; `prompts/` holds dev-loop prompts; `tools/` holds `bootstrap-env.ps1`, `ui-verify/` (see [ui-verification.md](ui-verification.md)), `variant-lint/` (see [design-changes.md](design-changes.md)) and `claude-context-extractor/`.
-- `dev/tools/claude-context-extractor/`: exporters for claude.ai, Claude desktop and Codex sessions. Retired as an agent tool on 2026-11-06 (agents look up sessions with agent-commons' `agent-transcripts`), but kept because the product's Import external context feature (`sidecar/import_context.py`, [ARCHITECTURE](ARCHITECTURE.md) §11 #28) shells out to it.
+- `dev/tools/claude-context-extractor/`: exporters for claude.ai, Claude desktop and Codex sessions. Retired as an agent tool on 2026-11-06 (agents look up sessions with agent-commons' `tool-transcripts`), but kept because the product's Import external context feature (`sidecar/import_context.py`, [ARCHITECTURE](ARCHITECTURE.md) §11 #28) shells out to it.
 - `transcripts/`: gitignored personal session exports left from the retired export workflow; not part of the product or the agents' workflow (as of 2026-11-22).
 - `.claude/`: Claude Code config: `settings.json` (permissions; `plansDirectory: ./.claude/plans`), `agents/`, `plans/`.
 - `.vscode/`: the VS Code workspace (`awl-cc-dash.code-workspace`), `settings.json`, `tasks.json`, `claude-prompts.code-snippets`.

@@ -27,7 +27,7 @@ The workspace for the AWL Multi-Agent Dashboard: a single-window Electron deskto
 - **Use pytest for all tests**, not ad-hoc scripts. The `test_*_unit.py` docstrings state each module's decided contract: read the matching one before building or changing a module.
 - **`.awl-cc-dash/state/` is runtime data:** commit it deliberately, never as a side effect of unrelated commits, and never hand-edit it. Tests never touch the store.
 - **Carry untouched parts of an edited file forward exactly**, and finish a refactor everywhere it reaches (`docs/working-rules.md`).
-- **Scripts here read keys from environment variables;** run them through agent-vault (its README is in `C:/Users/lester/MeDocuments/AI/agent-commons/tools/agent-vault/`).
+- **Scripts here read keys from environment variables;** run them through tool-vault (its README is in `C:/Users/lester/MeDocuments/AI/agent-commons/tools/tool-vault/`).
 - **Lead with a plain overview on backend topics**, cite code as clickable line-anchored links, and end a run with a one-line git check-in: what merged back to `main` and any branch worth keeping (`docs/working-rules.md`).
 - **Codex** does not change `.claude/` unless asked.
 
