@@ -486,6 +486,10 @@ Operator approved the WSL rename (`~/.claude/projects/…-MeDocuments-AppData-An
 Fix: the probe now re-resolves the project dir from the cwd when the persisted path is provably absent before concluding zero-turn ([bridge.py](sidecar/drivers/bridge.py) `_cold_restore_transcript_exists`), + regression test (36/36 pass); state repair re-pointed 4 roster + 3 archive `transcript_path`s (backups in `.scratch/proj-fix/`). E2E after: project opens, ecto/goop/taro cold-restore with their real July conversations (goop's PONG/`/rename` history on screen), fnord warm-rebinds, all 4 idle; parked-Chromium shots of the restored board at 1600/900 in `.scratch/proj-fix/`. Note: a WSL `pgrep -af claude` echoed the fleet OAuth token into the dev session's local logs — rotating the token is recommended.
 Files: sidecar/drivers/bridge.py; tests/test_resume_past_unit.py; .awl-cc-dash/state/agents.json; .awl-cc-dash/state/archive.json; DEVLOG.md.
 
+### 2026-11-21 20:41:22 - Repoint to the renamed shared instructions file
+The shared instructions for every repo in the AI folder moved from `AI\CLAUDE.md` to `AI\AGENTS.md` (agent-commons D128). Updated the path in `AGENTS.md` and in the Secrets section of `CLAUDE.md`.
+Files: AGENTS.md, CLAUDE.md, DEVLOG.md
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.
