@@ -494,6 +494,10 @@ Files: AGENTS.md, CLAUDE.md, DEVLOG.md
 Merged `CLAUDE.md` into `AGENTS.md` (first line sends Codex to the shared `AI\AGENTS.md`) and removed `CLAUDE.md`, per agent-commons D129; Claude Code and Codex now read the same file. Repointed the role presets and READMEs that named `CLAUDE.md`.
 Files: AGENTS.md, CLAUDE.md, DEVLOG.md, .awl-cc-dash/agents/*.md, tests/README.md, dev/tools/ui-verify/README.md
 
+### 2026-11-21 23:25:01 - AGENTS.md follows the agent-commons repo template
+Cut `AGENTS.md` from 133 lines (about 30,000 characters) to a 55-line index in the shape of agent-commons' `docs/templates/md-agents.md` (agent-commons D132). Detail moved into new docs: the folder map and store rules to `docs/repo-layout.md`, reply and editing rules to `docs/working-rules.md`, the five-file design rules to `docs/design-changes.md`, and the `ui-verify` procedure to `docs/ui-verification.md`. Rules the shared `AI\AGENTS.md` already states were dropped; where the two conflicted (branches and worktrees, changes outside the repo, unsure fixes) the shared file wins. The `claude-context-extractor` tooling section was dropped for agents (use agent-commons' `agent-transcripts`); its folder stays because `sidecar/import_context.py` still runs it. `dev/tools/ui-verify/README.md` now points to `docs/ui-verification.md`.
+Files: AGENTS.md, docs/repo-layout.md, docs/working-rules.md, docs/design-changes.md, docs/ui-verification.md, dev/tools/ui-verify/README.md, DEVLOG.md
+
 ## Archived history
 
 Older entries are rotated into `archive/devlog/` (see the **Rotation** rule in the header) to keep this file small. Archived entries stay full-fidelity and **verbatim** — open the relevant archive only when you need the detail; the digest below is enough for most context.

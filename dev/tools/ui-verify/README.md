@@ -71,4 +71,4 @@ Modes: `headed-parked` (default — headed, parked behind), `headed-front` (head
 - The Team Graph draws its dashed edges via `requestAnimationFrame`, and those edges have a ~sub-pixel **hysteresis** across a narrow↔wide round trip — a mockup quirk, not a window-mode effect. The self-test captures via **capture-until-stable** (shoot until two consecutive frames are byte-identical) and matches the front baseline to the parked capture's viewport-transition **path**, so parking is isolated as the only variable. The report prints the page's own front-to-front noise next to the parked delta to make that explicit.
 - Screenshots and any transient output go to `<repo>/.scratch/ui-verify/` (gitignored), never the repo tree.
 
-_Intended to be the tool referenced by the "Verifying UI changes" rule in the repo root `AGENTS.md`._
+_The tool referenced by the UI verification rule in the repo root `AGENTS.md`; the procedure is in [`docs/ui-verification.md`](../../../docs/ui-verification.md)._
